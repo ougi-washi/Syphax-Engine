@@ -3,7 +3,7 @@
 #ifndef SE_MATH_H
 #define SE_MATH_H
 
-#include "se_types.h"
+#include "syphax/s_types.h"
 
 typedef struct { f32 x, y; } se_vec2;
 typedef struct { f32 x, y, z; } se_vec3;

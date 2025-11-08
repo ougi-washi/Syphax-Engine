@@ -7,3 +7,6 @@
 [submodule "lib/portaudio"]
 	path = lib/portaudio
 	url = git@github.com:PortAudio/portaudio.git
+[submodule "lib/syphax"]
+	path = lib/syphax
+	url = git@github.com:ougi-washi/Syphax.git

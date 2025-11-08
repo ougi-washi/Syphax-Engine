@@ -3,8 +3,7 @@
 #ifndef SE_WINDOW_H
 #define SE_WINDOW_H
 
-#include "se_types.h"
-#include "se_array.h"
+#include "syphax/s_array.h"
 #include <GLFW/glfw3.h>
 
 #define SE_MAX_WINDOWS 8
@@ -35,8 +34,8 @@ typedef struct {
     u64 frame_count;
 } se_window;
 
-SE_DEFINE_ARRAY(se_window, se_windows, SE_MAX_WINDOWS);
-SE_DEFINE_ARRAY(i32, key_combo, SE_MAX_KEY_COMBOS);
+S_DEFINE_ARRAY(se_window, se_windows, SE_MAX_WINDOWS);
+S_DEFINE_ARRAY(i32, key_combo, SE_MAX_KEY_COMBOS);
 
 extern se_window* se_window_create(const char* title, const u32 width, const u32 height);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame

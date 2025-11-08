@@ -19,25 +19,25 @@ typedef struct {
     se_vec2 scale;
     se_shader_ptr shader;
 } se_object_2d;
-SE_DEFINE_ARRAY(se_object_2d, se_objects_2d, SE_MAX_2D_OBJECTS);
+S_DEFINE_ARRAY(se_object_2d, se_objects_2d, SE_MAX_2D_OBJECTS);
 typedef se_object_2d* se_object_2d_ptr;
-SE_DEFINE_ARRAY(se_object_2d_ptr, se_objects_2d_ptr, SE_MAX_2D_OBJECTS);
+S_DEFINE_ARRAY(se_object_2d_ptr, se_objects_2d_ptr, SE_MAX_2D_OBJECTS);
 
 typedef struct {
     se_model* model;
     se_mat4 transform;
 } se_object_3d;
-SE_DEFINE_ARRAY(se_object_3d, se_objects_3d, SE_MAX_3D_OBJECTS);
+S_DEFINE_ARRAY(se_object_3d, se_objects_3d, SE_MAX_3D_OBJECTS);
 typedef se_object_3d* se_object_3d_ptr;
-SE_DEFINE_ARRAY(se_object_3d_ptr, se_objects_3d_ptr, SE_MAX_3D_OBJECTS);
+S_DEFINE_ARRAY(se_object_3d_ptr, se_objects_3d_ptr, SE_MAX_3D_OBJECTS);
 
 typedef struct {
     se_objects_2d_ptr objects;
     se_framebuffer_ptr output;
 } se_scene_2d;
-SE_DEFINE_ARRAY(se_scene_2d, se_scenes_2d, SE_MAX_SCENES);
+S_DEFINE_ARRAY(se_scene_2d, se_scenes_2d, SE_MAX_SCENES);
 typedef se_scene_2d* se_scene_2d_ptr;
-SE_DEFINE_ARRAY(se_scene_2d_ptr, se_scenes_2d_ptr, SE_MAX_SCENES);
+S_DEFINE_ARRAY(se_scene_2d_ptr, se_scenes_2d_ptr, SE_MAX_SCENES);
 
 typedef struct {
     se_models_ptr models;
@@ -47,9 +47,9 @@ typedef struct {
     se_shader_ptr output_shader;
     se_render_buffer_ptr output;
 } se_scene_3d;
-SE_DEFINE_ARRAY(se_scene_3d, se_scenes_3d, SE_MAX_SCENES);
+S_DEFINE_ARRAY(se_scene_3d, se_scenes_3d, SE_MAX_SCENES);
 typedef se_scene_3d* se_scene_3d_ptr;
-SE_DEFINE_ARRAY(se_scene_3d_ptr, se_scenes_3d_ptr, SE_MAX_SCENES);
+S_DEFINE_ARRAY(se_scene_3d_ptr, se_scenes_3d_ptr, SE_MAX_SCENES);
 
 typedef struct {
     se_render_handle* render_handle;
