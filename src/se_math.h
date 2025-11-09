@@ -5,14 +5,17 @@
 
 #include "syphax/s_types.h"
 
+#define PI 3.14159265359
+
 typedef struct { f32 x, y; } se_vec2;
 typedef struct { f32 x, y, z; } se_vec3;
 typedef struct { f32 x, y, z, w; } se_vec4;
 typedef struct { f32 m[16]; } se_mat4;
 
 #define se_vec(_vec_size, ...) ( se_vec##_vec_size ) { __VA_ARGS__ }
-
-#define PI 3.14159265359
+#define se_vec2(_x, _y) (se_vec(2, _x, _y))
+#define se_vec3(_x, _y, _z) (se_vec(3, _x, _y, _z))
+#define se_vec4(_x, _y, _z, _w) (se_vec(4, _x, _y, _z, _w))
 
 static se_mat4 mat4_identity(void) {
     se_mat4 I = { {

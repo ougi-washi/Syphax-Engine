@@ -110,7 +110,7 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
 #endif
    
     new_window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
-    se_assertf(new_window->handle, "Failed to create GLFW window");
+    s_assertf(new_window->handle, "Failed to create GLFW window");
     
     // TODO: figure out why this is causing errors (GLFW Error 65538: Cannot set swap interval without a current OpenGL or OpenGL ES context)
     // glfwSwapInterval(1); 
@@ -179,7 +179,7 @@ void se_window_check_exit_keys(se_window* window, key_combo* keys) {
     if (keys->size == 0) {
         return;
     }
-    se_foreach(key_combo, *keys, i) {
+    s_foreach(key_combo, keys, i) {
         i32* current_key = key_combo_get(keys, i);
         if (!se_window_is_key_down(window, *current_key)) {
             return;
@@ -202,8 +202,8 @@ void se_window_set_target_fps(se_window* window, const u16 fps) {
 
 
 void se_window_destroy(se_window* window) {
-    se_assertf(window, "se_window_destroy :: window is null");
-    se_assertf(window->handle, "se_window_destroy :: window->handle is null");
+    s_assertf(window, "se_window_destroy :: window is null");
+    s_assertf(window->handle, "se_window_destroy :: window->handle is null");
 
     glDeleteVertexArrays(1, &window->quad_vao);
     glDeleteBuffers(1, &window->quad_vbo);
@@ -218,7 +218,7 @@ void se_window_destroy(se_window* window) {
 
 void se_window_destroy_all(){
     // TODO: implement single clear instead of destroying one by one 
-    se_foreach_reverse(se_windows, windows_container, i) {
+    s_foreach_reverse(se_windows, &windows_container, i) {
         se_window* window = se_windows_get(&windows_container, i);
         se_window_destroy(window);
     }

@@ -1,15 +1,15 @@
 // Syphax-Engine - Ougi Washi
 
-#include "se_array.h"
+#include "syphax/s_array.h"
 #include <stdio.h>
 
 #define ARRAY_SIZE 8
 
-SE_DEFINE_ARRAY(i32, ints, ARRAY_SIZE);
+S_DEFINE_ARRAY(i32, ints, ARRAY_SIZE);
 
 void display_array(ints* array) {
     printf("Current size: %zu | Elements: ", ints_get_size(array));
-    se_foreach(ints, *array, i) {
+    s_foreach(ints, array, i) {
         printf("%d, ", *ints_get(array, i));
     }
     printf("\n");
