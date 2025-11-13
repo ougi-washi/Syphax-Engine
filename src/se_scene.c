@@ -32,7 +32,7 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     new_object->position = *position;
     new_object->scale = *scale;
     if (scene_handle->render_handle) {
-        s_foreach(se_shaders, &scene_handle->render_handle->shaders, i) {
+        s_foreach(&scene_handle->render_handle->shaders, i) {
             se_shader* curr_shader = se_shaders_get(&scene_handle->render_handle->shaders, i);
             if (curr_shader && strcmp(curr_shader->fragment_path, fragment_shader_path) == 0) {
                 new_object->shader = curr_shader;
@@ -100,7 +100,7 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle, se_
     se_render_clear();
     se_enable_blending();
     
-    s_foreach(se_objects_2d_ptr, &scene->objects, i) {
+    s_foreach(&scene->objects, i) {
         se_object_2d_ptr* object_ptr = se_objects_2d_ptr_get(&scene->objects, i);
         if (object_ptr == NULL) {
             printf("Warning: se_scene_2d_render :: object_ptr is null\n");
@@ -190,7 +190,7 @@ void se_scene_3d_render(se_scene_3d* scene, se_render_handle* render_handle) {
         return;
     }
 
-    s_foreach(se_models_ptr, &scene->models, i) {
+    s_foreach(&scene->models, i) {
         se_model_ptr* model_ptr = se_models_ptr_get(&scene->models, i);
         if (model_ptr == NULL) {
             continue;
@@ -199,7 +199,7 @@ void se_scene_3d_render(se_scene_3d* scene, se_render_handle* render_handle) {
         se_model_render(render_handle, *model_ptr, scene->camera);
     }
     
-    s_foreach(se_render_buffers_ptr, &scene->post_process, i) {
+    s_foreach(&scene->post_process, i) {
         se_render_buffer_ptr* buffer_ptr = se_render_buffers_ptr_get(&scene->post_process, i);
         if (buffer_ptr == NULL) {
             continue;

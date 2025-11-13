@@ -179,7 +179,7 @@ void se_window_check_exit_keys(se_window* window, key_combo* keys) {
     if (keys->size == 0) {
         return;
     }
-    s_foreach(key_combo, keys, i) {
+    s_foreach(keys, i) {
         i32* current_key = key_combo_get(keys, i);
         if (!se_window_is_key_down(window, *current_key)) {
             return;
@@ -218,7 +218,7 @@ void se_window_destroy(se_window* window) {
 
 void se_window_destroy_all(){
     // TODO: implement single clear instead of destroying one by one 
-    s_foreach_reverse(se_windows, &windows_container, i) {
+    s_foreach_reverse(&windows_container, i) {
         se_window* window = se_windows_get(&windows_container, i);
         se_window_destroy(window);
     }

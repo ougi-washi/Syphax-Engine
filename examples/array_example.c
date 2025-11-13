@@ -9,7 +9,7 @@ S_DEFINE_ARRAY(i32, ints, ARRAY_SIZE);
 
 void display_array(ints* array) {
     printf("Current size: %zu | Elements: ", ints_get_size(array));
-    s_foreach(ints, array, i) {
+    s_foreach(array, i) {
         printf("%d, ", *ints_get(array, i));
     }
     printf("\n");

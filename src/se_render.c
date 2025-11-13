@@ -56,32 +56,32 @@ se_render_handle* se_render_handle_create() {
 void se_render_handle_cleanup(se_render_handle* render_handle) {
     s_assertf(render_handle, "se_render_handle_cleanup :: render_handle is null");
 
-    s_foreach(se_models, &render_handle->models, i) {
+    s_foreach(&render_handle->models, i) {
         se_model* curr_model = se_models_get(&render_handle->models, i);
         se_model_cleanup(curr_model);
     }
 
-    s_foreach(se_textures, &render_handle->textures, i) {
+    s_foreach(&render_handle->textures, i) {
         se_texture* curr_texture = se_textures_get(&render_handle->textures, i);
         se_texture_cleanup(curr_texture);
     }
 
-    s_foreach(se_shaders, &render_handle->shaders, i) {
+    s_foreach(&render_handle->shaders, i) {
         se_shader* curr_shader = se_shaders_get(&render_handle->shaders, i);
         se_shader_cleanup(curr_shader);
     }
    
-    s_foreach(se_models, &render_handle->models, i) {
+    s_foreach(&render_handle->models, i) {
         se_model* curr_model = se_models_get(&render_handle->models, i);
         se_model_cleanup(curr_model);
     }
 
-    s_foreach(se_framebuffers, &render_handle->framebuffers, i) {
+    s_foreach(&render_handle->framebuffers, i) {
         se_framebuffer* curr_framebuffer = se_framebuffers_get(&render_handle->framebuffers, i);
         se_framebuffer_cleanup(curr_framebuffer);
     }
 
-    s_foreach(se_render_buffers, &render_handle->render_buffers, i) {
+    s_foreach(&render_handle->render_buffers, i) {
         se_render_buffer* curr_buffer = se_render_buffers_get(&render_handle->render_buffers, i);
         se_render_buffer_cleanup(curr_buffer);
     }
@@ -90,7 +90,7 @@ void se_render_handle_cleanup(se_render_handle* render_handle) {
 }
 
 void se_render_handle_reload_changed_shaders(se_render_handle* render_handle) {
-    s_foreach(se_shaders, &render_handle->shaders, i) {
+    s_foreach(&render_handle->shaders, i) {
         se_shader_reload_if_changed(se_shaders_get(&render_handle->shaders, i));
     }
 }
@@ -493,7 +493,7 @@ void se_model_render(se_render_handle* render_handle, se_model* model, se_camera
     // set up global view/proj once per frame
     const se_mat4 proj = se_camera_get_projection_matrix(camera);
     const se_mat4 view = se_camera_get_view_matrix(camera);
-    s_foreach(se_meshes, &model->meshes, i) {
+    s_foreach(&model->meshes, i) {
         se_mesh* mesh = se_meshes_get(&model->meshes, i);
         se_shader* sh = mesh->shader;
 
@@ -529,7 +529,7 @@ void se_model_render(se_render_handle* render_handle, se_model* model, se_camera
 }
 
 void se_model_cleanup(se_model* model) {
-    s_foreach(se_meshes, &model->meshes, i) {
+    s_foreach(&model->meshes, i) {
         se_mesh* mesh = se_meshes_get(&model->meshes, i);
         glDeleteVertexArrays(1, &mesh->vao);
         glDeleteBuffers(1, &mesh->vbo);
@@ -541,21 +541,21 @@ void se_model_cleanup(se_model* model) {
 }
 
 void se_model_translate(se_model* model, const se_vec3* v){
-    s_foreach(se_meshes, &model->meshes, i) {
+    s_foreach(&model->meshes, i) {
         se_mesh* mesh = se_meshes_get(&model->meshes, i);
         se_mesh_translate(mesh, v);
     }
 }
 
 void se_model_rotate(se_model* model, const se_vec3* v){
-    s_foreach(se_meshes, &model->meshes, i) {
+    s_foreach(&model->meshes, i) {
         se_mesh* mesh = se_meshes_get(&model->meshes, i);
         se_mesh_rotate(mesh, v);
     }  
 }
 
 void se_model_scale(se_model* model, const se_vec3* v){
-    s_foreach(se_meshes, &model->meshes, i) {
+    s_foreach(&model->meshes, i) {
         se_mesh* mesh = se_meshes_get(&model->meshes, i);
         se_mesh_scale(mesh, v);
     }
@@ -776,7 +776,7 @@ void se_render_buffer_cleanup(se_render_buffer* buffer) {
 
 // Uniform functions
 void se_uniform_set_float(se_uniforms* uniforms, const char* name, f32 value) {
-    s_foreach(se_uniforms, uniforms, i) {
+    s_foreach(uniforms, i) {
         se_uniform* found_uniform = se_uniforms_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
             found_uniform->type = SE_UNIFORM_FLOAT;
@@ -791,7 +791,7 @@ void se_uniform_set_float(se_uniforms* uniforms, const char* name, f32 value) {
 }
 
 void se_uniform_set_vec2(se_uniforms* uniforms, const char* name, const se_vec2* value) {
-    s_foreach(se_uniforms, uniforms, i) {
+    s_foreach(uniforms, i) {
         se_uniform* found_uniform = se_uniforms_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
             found_uniform->type = SE_UNIFORM_VEC2;
@@ -806,7 +806,7 @@ void se_uniform_set_vec2(se_uniforms* uniforms, const char* name, const se_vec2*
 }
 
 void se_uniform_set_vec3(se_uniforms* uniforms, const char* name, const se_vec3* value) {
-    s_foreach(se_uniforms, uniforms, i) {
+    s_foreach(uniforms, i) {
         se_uniform* found_uniform = se_uniforms_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
             found_uniform->type = SE_UNIFORM_VEC3;
@@ -821,7 +821,7 @@ void se_uniform_set_vec3(se_uniforms* uniforms, const char* name, const se_vec3*
 }
 
 void se_uniform_set_vec4(se_uniforms* uniforms, const char* name, const se_vec4* value) {
-    s_foreach(se_uniforms, uniforms, i) {
+    s_foreach(uniforms, i) {
         se_uniform* found_uniform = se_uniforms_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
             found_uniform->type = SE_UNIFORM_VEC4;
@@ -836,7 +836,7 @@ void se_uniform_set_vec4(se_uniforms* uniforms, const char* name, const se_vec4*
 }           
 
 void se_uniform_set_int(se_uniforms* uniforms, const char* name, i32 value) {
-    s_foreach(se_uniforms, uniforms, i) {
+    s_foreach(uniforms, i) {
         se_uniform* found_uniform = se_uniforms_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
             found_uniform->type = SE_UNIFORM_INT;
@@ -852,7 +852,7 @@ void se_uniform_set_int(se_uniforms* uniforms, const char* name, i32 value) {
 
 void se_uniform_set_texture(se_uniforms* uniforms, const char* name, GLuint texture) {
     // TODO: IMPORTANT: SEG FAULT HERE in 2025-08-24, audio_example.c:45
-    s_foreach(se_uniforms, uniforms, i) {
+    s_foreach(uniforms, i) {
         se_uniform* found_uniform = se_uniforms_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
             found_uniform->type = SE_UNIFORM_TEXTURE;
@@ -874,7 +874,7 @@ void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* name, se_r
 void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const b8 update_global_uniforms) {
     glUseProgram(shader->program);
     u32 texture_unit = 0;
-    s_foreach(se_uniforms, &shader->uniforms, i) {
+    s_foreach(&shader->uniforms, i) {
         se_uniform* uniform = se_uniforms_get(&shader->uniforms, i);
         GLint location = glGetUniformLocation(shader->program, uniform->name); 
         if (location == -1) {
@@ -911,7 +911,7 @@ void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const 
 
     // apply global uniforms
     se_uniforms* global_uniforms = se_render_handle_get_global_uniforms(render_handle);
-    s_foreach(se_uniforms, global_uniforms, i) {
+    s_foreach(global_uniforms, i) {
         se_uniform* uniform = se_uniforms_get(global_uniforms, i);
         GLint location = glGetUniformLocation(shader->program, uniform->name); 
         if (location == -1) {
