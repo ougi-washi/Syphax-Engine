@@ -45,11 +45,29 @@ void se_render_set_background_color(const se_vec4 color) {
     glClearColor(color.x, color.y, color.z, color.w);
 }
 
-se_render_handle* se_render_handle_create() {
+se_render_handle* se_render_handle_create(const se_render_handle_params* params) {
+    s_assertf(params, "se_render_handle_create :: params is null");
     printf("Creating render handle\n");
     se_render_handle* render_handle = malloc(sizeof(se_render_handle));
     memset(render_handle, 0, sizeof(se_render_handle));
+    
+    s_array_init(&render_handle->framebuffers, se_framebuffer, params->framebuffers_count);
+    s_array_init(&render_handle->render_buffers, se_render_buffer, params->render_buffers_count);
+    s_array_init(&render_handle->textures, se_texture, params->textures_count);
+    s_array_init(&render_handle->shaders, se_shader, params->shaders_count);
+    s_array_init(&render_handle->models, se_model, params->models_count);
+    s_array_init(&render_handle->cameras, se_camera, params->cameras_count);
+    
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+    /*
+    se_framebuffers framebuffers;
+    se_render_buffers render_buffers;
+    se_textures textures;
+    se_shaders shaders;
+    se_uniforms global_uniforms;
+    se_cameras cameras;
+    se_models models;
+    */
     return render_handle;
 }
 

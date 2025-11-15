@@ -52,6 +52,13 @@ typedef se_scene_3d* se_scene_3d_ptr;
 typedef s_array(se_scene_3d_ptr, se_scenes_3d_ptr);
 
 typedef struct {
+    u16 objects_2d_count;
+    u16 objects_3d_count;
+    u16 scenes_2d_count;
+    u16 scenes_3d_count;
+} se_scene_handle_params;
+
+typedef struct {
     se_render_handle* render_handle;
     se_objects_2d objects_2d;
     se_objects_3d objects_3d;
@@ -60,7 +67,7 @@ typedef struct {
 } se_scene_handle;
 
 // scene handle functions
-extern se_scene_handle* se_scene_handle_create(se_render_handle* render_handle);
+extern se_scene_handle* se_scene_handle_create(se_render_handle* render_handle, const se_scene_handle_params* params);
 extern void se_scene_handle_cleanup(se_scene_handle* scene_handle);
 
 // 2D objects functions

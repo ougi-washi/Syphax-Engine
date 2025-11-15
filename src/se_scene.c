@@ -8,9 +8,14 @@
 
 #define SE_OBJECT_2D_VERTEX_SHADER_PATH "shaders/object_2d_vertex.glsl"
 
-se_scene_handle* se_scene_handle_create(se_render_handle* render_handle) {
+se_scene_handle* se_scene_handle_create(se_render_handle* render_handle, const se_scene_handle_params* params) {
     se_scene_handle* scene_handle = (se_scene_handle*)malloc(sizeof(se_scene_handle));
     memset(scene_handle, 0, sizeof(se_scene_handle));
+    
+    s_array_init(&scene_handle->objects_2d, se_object_2d, params->objects_2d_count);
+    s_array_init(&scene_handle->objects_3d, se_object_3d, params->objects_3d_count);
+    s_array_init(&scene_handle->scenes_2d, se_scene_2d, params->scenes_2d_count);
+    s_array_init(&scene_handle->scenes_3d, se_scene_3d, params->scenes_3d_count);
     
     // if render handle is null, this is a scene handle that is not used for rendering (eg. server side implementation)
     if (render_handle) { 

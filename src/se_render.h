@@ -140,6 +140,15 @@ typedef se_render_buffer* se_render_buffer_ptr;
 typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
 
 typedef struct {
+    u16 framebuffers_count;
+    u16 render_buffers_count;
+    u16 textures_count;
+    u16 shaders_count;
+    u16 models_count;
+    u16 cameras_count;
+} se_render_handle_params;
+
+typedef struct {
     se_framebuffers framebuffers;
     se_render_buffers render_buffers;
     se_textures textures;
@@ -147,7 +156,6 @@ typedef struct {
     se_uniforms global_uniforms;
     se_cameras cameras;
     se_models models;
-
     se_shader* render_quad_shader;
 } se_render_handle;
 
@@ -159,7 +167,7 @@ extern void se_render_clear();
 extern void se_render_set_background_color(const se_vec4 color);
 
 // render_handle functions
-extern se_render_handle* se_render_handle_create();
+extern se_render_handle* se_render_handle_create(const se_render_handle_params* params);
 extern void se_render_handle_cleanup(se_render_handle* render_handle);
 extern void se_render_handle_reload_changed_shaders(se_render_handle* render_handle);
 extern se_uniforms* se_render_handle_get_global_uniforms(se_render_handle* render_handle);
