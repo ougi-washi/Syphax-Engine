@@ -20,7 +20,7 @@ i32 main() {
     // mesh setup
     se_shaders_ptr se_mesh_shaders = {0};
     se_shader* se_shader_0 = se_shader_load(&render_handle, "vert_mesh.glsl", "frag_mesh.glsl");
-    se_shaders_ptr_add(&se_mesh_shaders, se_shader_0);
+    s_array_add(&se_mesh_shaders, se_shader_0);
 
     se_model* model = se_model_load_obj(&render_handle, "cube.obj", &se_mesh_shaders);
     se_render_buffer* model_buf = se_render_buffer_create(&render_handle, WIDTH, HEIGHT, "examples/audio_example/model_buffer_frag.glsl"); // TODO: fix

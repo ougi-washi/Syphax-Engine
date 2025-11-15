@@ -588,13 +588,7 @@ void se_camera_set_aspect(se_camera* camera, const f32 width, const f32 height) 
 }
 
 void se_camera_destroy(se_render_handle* render_handle, se_camera* camera) {
-    s_foreach(&render_handle->cameras, i) {
-        se_camera* curr_camera = s_array_get(&render_handle->cameras, i);
-        if (curr_camera == camera) {
-            s_array_remove(&render_handle->cameras, i);
-            break;
-        }
-    }
+    s_array_remove(&render_handle->cameras, se_camera, camera);
 }
  
 // Framebuffer functions
