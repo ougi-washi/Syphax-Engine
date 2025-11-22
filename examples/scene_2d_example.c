@@ -24,7 +24,7 @@ i32 main() {
     scene_params.scenes_3d_count = 0;
     se_scene_handle* scene_handle = se_scene_handle_create(render_handle, &scene_params);
     
-    se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec(2, WIDTH, HEIGHT));
+    se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec(2, WIDTH, HEIGHT), 10);
     
     se_object_2d* borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &se_vec2(0, 0), &se_vec2(0.95, 0.95));
     se_object_2d* panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &se_vec2(0, 0), &se_vec2(0.5, 0.5));

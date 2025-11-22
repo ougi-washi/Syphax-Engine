@@ -79,11 +79,13 @@ void se_object_2d_update_uniforms(se_object_2d* object) {
     }
 }
 
-se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size) {
+se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
     printf("Creating scene 2D\n");
     se_scene_2d* new_scene = s_array_increment(&scene_handle->scenes_2d);
+    memset(new_scene, 0, sizeof(se_scene_2d));
     if (scene_handle->render_handle) {
         new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
+        s_array_init(&new_scene->objects, se_object_2d, object_count);
     }
     else {
         new_scene->output = NULL;
@@ -175,7 +177,7 @@ void se_scene_2d_remove_object(se_scene_2d* scene, se_object_2d* object) {
     s_array_remove(&scene->objects, se_object_2d_ptr, &object);
 }
 
-se_scene_3d* se_scene_3d_create(se_scene_handle* scene_handle, const se_vec2* size) {
+se_scene_3d* se_scene_3d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
     se_scene_3d* new_scene = s_array_increment(&scene_handle->scenes_3d);
     if (scene_handle->render_handle) {
         new_scene->camera = se_camera_create(scene_handle->render_handle);

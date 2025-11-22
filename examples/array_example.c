@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "syphax/s_array.h"
+#include "se_scene.h"
 #include <stdio.h>
 
 #define ARRAY_SIZE 8
@@ -16,7 +17,6 @@ void display_array(ints* array) {
 }
 
 i32 main() {
-    
     ints my_ints = {0};
 
     printf("Adding elements to array\n");

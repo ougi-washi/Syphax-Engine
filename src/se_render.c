@@ -14,6 +14,7 @@
 #include "stb_image.h"
 
 static f64 se_target_fps = 60.0;
+#define SE_UNIFORMS_MAX 128 
 
 static GLuint compile_shader(const char* source, GLenum type);
 static GLuint create_shader_program(const char* vertex_source, const char* fragment_source);
@@ -57,7 +58,8 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     s_array_init(&render_handle->shaders, se_shader, params->shaders_count);
     s_array_init(&render_handle->models, se_model, params->models_count);
     s_array_init(&render_handle->cameras, se_camera, params->cameras_count);
-    
+    s_array_init(&render_handle->global_uniforms, se_uniform, SE_UNIFORMS_MAX);
+
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
     /*
     se_framebuffers framebuffers;
@@ -209,6 +211,7 @@ b8 se_shader_load_internal(se_shader* shader) {
 
 se_shader* se_shader_load(se_render_handle* render_handle, const char* vertex_file_path, const char* fragment_file_path) {
     se_shader* new_shader = s_array_increment(&render_handle->shaders);
+    new_shader = memset(new_shader, 0, sizeof(se_shader));
     // make path absolute
     char* new_vertex_path = NULL;
     char* new_fragment_path = NULL;
@@ -229,6 +232,8 @@ se_shader* se_shader_load(se_render_handle* render_handle, const char* vertex_fi
     strcpy(new_shader->fragment_path, new_fragment_path);
     free(new_vertex_path);
     free(new_fragment_path);
+    s_array_init(&new_shader->uniforms, se_uniform, SE_UNIFORMS_MAX);
+
     if (se_shader_load_internal(new_shader)) {
         return new_shader;
     }
@@ -825,6 +830,9 @@ void se_uniform_set_vec2(se_uniforms* uniforms, const char* name, const se_vec2*
 }
 
 void se_uniform_set_vec3(se_uniforms* uniforms, const char* name, const se_vec3* value) {
+    s_assertf(uniforms, "se_uniform_set_vec3 :: uniforms is null");
+    s_assertf(name, "se_uniform_set_vec3 :: name is null");
+    s_assertf(value, "se_uniform_set_vec3 :: value is null");
     s_foreach(uniforms, i) {
         se_uniform* found_uniform = s_array_get(uniforms, i);
         if (found_uniform && strcmp(found_uniform->name, name) == 0) {
