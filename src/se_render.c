@@ -52,13 +52,13 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     se_render_handle* render_handle = malloc(sizeof(se_render_handle));
     memset(render_handle, 0, sizeof(se_render_handle));
     
-    s_array_init(&render_handle->framebuffers, se_framebuffer, params->framebuffers_count);
-    s_array_init(&render_handle->render_buffers, se_render_buffer, params->render_buffers_count);
-    s_array_init(&render_handle->textures, se_texture, params->textures_count);
-    s_array_init(&render_handle->shaders, se_shader, params->shaders_count);
-    s_array_init(&render_handle->models, se_model, params->models_count);
-    s_array_init(&render_handle->cameras, se_camera, params->cameras_count);
-    s_array_init(&render_handle->global_uniforms, se_uniform, SE_UNIFORMS_MAX);
+    s_array_init(&render_handle->framebuffers, params->framebuffers_count);
+    s_array_init(&render_handle->render_buffers, params->render_buffers_count);
+    s_array_init(&render_handle->textures, params->textures_count);
+    s_array_init(&render_handle->shaders, params->shaders_count);
+    s_array_init(&render_handle->models, params->models_count);
+    s_array_init(&render_handle->cameras, params->cameras_count);
+    s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
 
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
     /*
@@ -232,7 +232,7 @@ se_shader* se_shader_load(se_render_handle* render_handle, const char* vertex_fi
     strcpy(new_shader->fragment_path, new_fragment_path);
     free(new_vertex_path);
     free(new_fragment_path);
-    s_array_init(&new_shader->uniforms, se_uniform, SE_UNIFORMS_MAX);
+    s_array_init(&new_shader->uniforms, SE_UNIFORMS_MAX);
 
     if (se_shader_load_internal(new_shader)) {
         return new_shader;
@@ -611,7 +611,7 @@ void se_camera_set_aspect(se_camera* camera, const f32 width, const f32 height) 
 }
 
 void se_camera_destroy(se_render_handle* render_handle, se_camera* camera) {
-    s_array_remove(&render_handle->cameras, se_camera, camera);
+    s_array_remove(&render_handle->cameras, camera);
 }
  
 // Framebuffer functions

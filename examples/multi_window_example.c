@@ -12,7 +12,7 @@ i32 main() {
     se_window* window_2 = se_window_create("Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
 
     key_combo exit_keys = {0};
-    key_combo_add(&exit_keys, GLFW_KEY_ESCAPE);
+    s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
 
     while (!se_window_should_close(window_main)) {
         se_window_poll_events();

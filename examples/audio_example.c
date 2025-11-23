@@ -26,7 +26,7 @@ i32 main() {
     se_render_buffer* model_buf = se_render_buffer_create(&render_handle, WIDTH, HEIGHT, "examples/audio_example/model_buffer_frag.glsl"); // TODO: fix
     
     key_combo exit_keys = {0};
-    key_combo_add(&exit_keys, GLFW_KEY_ESCAPE);
+    s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
     
     while (!se_window_should_close(window)) {
         // input

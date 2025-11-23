@@ -6,9 +6,6 @@
 #include "syphax/s_array.h"
 #include <GLFW/glfw3.h>
 
-#define SE_MAX_WINDOWS 8
-#define SE_MAX_KEY_COMBOS 8
-
 typedef struct {
     f64 current;
     f64 delta;
@@ -34,8 +31,8 @@ typedef struct {
     u64 frame_count;
 } se_window;
 
-S_DEFINE_ARRAY(se_window, se_windows, SE_MAX_WINDOWS);
-S_DEFINE_ARRAY(i32, key_combo, SE_MAX_KEY_COMBOS);
+typedef s_array(se_window, se_windows);
+typedef s_array(i32, key_combo);
 
 extern se_window* se_window_create(const char* title, const u32 width, const u32 height);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame

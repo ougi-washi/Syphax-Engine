@@ -41,7 +41,8 @@ i32 main() {
     se_scene_2d_render(scene_2d, render_handle, window);
    
     key_combo exit_keys = {0};
-    key_combo_add(&exit_keys, GLFW_KEY_ESCAPE);
+    s_array_init(&exit_keys, 1);
+    s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
 
     while (!se_window_should_close(window)) {
         se_window_poll_events();

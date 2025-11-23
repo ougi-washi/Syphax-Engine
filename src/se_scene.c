@@ -12,10 +12,14 @@ se_scene_handle* se_scene_handle_create(se_render_handle* render_handle, const s
     se_scene_handle* scene_handle = (se_scene_handle*)malloc(sizeof(se_scene_handle));
     memset(scene_handle, 0, sizeof(se_scene_handle));
     
-    s_array_init(&scene_handle->objects_2d, se_object_2d, params->objects_2d_count);
-    s_array_init(&scene_handle->objects_3d, se_object_3d, params->objects_3d_count);
-    s_array_init(&scene_handle->scenes_2d, se_scene_2d, params->scenes_2d_count);
-    s_array_init(&scene_handle->scenes_3d, se_scene_3d, params->scenes_3d_count);
+    int* data;
+    int count;
+    data = malloc(sizeof(*data) * count);
+
+    s_array_init(&scene_handle->objects_2d, params->objects_2d_count);
+    s_array_init(&scene_handle->objects_3d, params->objects_3d_count);
+    s_array_init(&scene_handle->scenes_2d, params->scenes_2d_count);
+    s_array_init(&scene_handle->scenes_3d, params->scenes_3d_count);
     
     // if render handle is null, this is a scene handle that is not used for rendering (eg. server side implementation)
     if (render_handle) { 
@@ -57,7 +61,7 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
 }
 
 void se_object_2d_destroy(se_scene_handle* scene_handle, se_object_2d* object) {
-    s_array_remove(&scene_handle->objects_2d, se_object_2d, object);
+    s_array_remove(&scene_handle->objects_2d, object);
 }
 
 void se_object_2d_set_position(se_object_2d* object, const se_vec2* position) {
@@ -85,7 +89,7 @@ se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* si
     memset(new_scene, 0, sizeof(se_scene_2d));
     if (scene_handle->render_handle) {
         new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
-        s_array_init(&new_scene->objects, se_object_2d, object_count);
+        s_array_init(&new_scene->objects, object_count);
     }
     else {
         new_scene->output = NULL;
@@ -95,7 +99,7 @@ se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* si
 
 void se_scene_2d_destroy(se_scene_handle* scene_handle, se_scene_2d* scene) {
     // TODO: unsure if we should request cleanup of all render buffers and shaders
-    s_array_remove(&scene_handle->scenes_2d, se_scene_2d, scene);
+    s_array_remove(&scene_handle->scenes_2d, scene);
 }
 
 void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle, se_window* window) {
@@ -174,7 +178,7 @@ void se_scene_2d_add_object(se_scene_2d* scene, se_object_2d* object) {
 void se_scene_2d_remove_object(se_scene_2d* scene, se_object_2d* object) {
     s_assertf(scene, "se_scene_2d_remove_object :: scene is null");
     s_assertf(object, "se_scene_2d_remove_object :: object is null");
-    s_array_remove(&scene->objects, se_object_2d_ptr, &object);
+    s_array_remove(&scene->objects, &object);
 }
 
 se_scene_3d* se_scene_3d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
@@ -189,7 +193,7 @@ se_scene_3d* se_scene_3d_create(se_scene_handle* scene_handle, const se_vec2* si
 }
 
 void se_scene_3d_destroy(se_scene_handle* scene_handle, se_scene_3d* scene) {
-    s_array_remove(&scene_handle->scenes_3d, se_scene_3d, scene);
+    s_array_remove(&scene_handle->scenes_3d, scene);
 }
 
 void se_scene_3d_render(se_scene_3d* scene, se_render_handle* render_handle) {
@@ -223,7 +227,7 @@ void se_scene_3d_add_model(se_scene_3d* scene, se_model* model) {
 }
 
 void se_scene_3d_remove_model(se_scene_3d* scene, se_model* model) {
-    s_array_remove(&scene->models, se_model_ptr, &model);
+    s_array_remove(&scene->models, &model);
 }
 
 void se_scene_3d_set_camera(se_scene_3d* scene, se_camera* camera) {
@@ -235,6 +239,6 @@ void se_scene_3d_add_post_process_buffer(se_scene_3d* scene, se_render_buffer* b
 }
 
 void se_scene_3d_remove_post_process_buffer(se_scene_3d* scene, se_render_buffer* buffer) {
-    s_array_remove(&scene->post_process, se_render_buffer_ptr, &buffer);
+    s_array_remove(&scene->post_process, &buffer);
 }
 

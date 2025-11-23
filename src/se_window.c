@@ -3,8 +3,12 @@
 #include "se_window.h"
 #include "se_gl.h"
 #include <unistd.h>
+#include <stdlib.h>
 
 //static se_windows* windows_container = NULL;
+
+#define SE_MAX_WINDOWS 8
+#define SE_MAX_KEY_COMBOS 8
 
 static se_windows windows_container = { 0 };
 
@@ -96,7 +100,10 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
     }
 
     //se_windows* windows_container = se_windows_handle_get();
-    se_window* new_window = se_windows_increment(&windows_container);
+    if (s_array_get_capacity(&windows_container) == 0) {
+        s_array_init(&windows_container, SE_MAX_WINDOWS);
+    }
+    se_window* new_window = s_array_increment(&windows_container);
     if (new_window == NULL) {
         printf("Failed to create window\n");
         return NULL;
@@ -180,7 +187,7 @@ void se_window_check_exit_keys(se_window* window, key_combo* keys) {
         return;
     }
     s_foreach(keys, i) {
-        i32* current_key = key_combo_get(keys, i);
+        i32* current_key = s_array_get(keys, i);
         if (!se_window_is_key_down(window, *current_key)) {
             return;
         }
@@ -211,15 +218,16 @@ void se_window_destroy(se_window* window) {
     glfwDestroyWindow(window->handle);
     window->handle = NULL;
 
-    se_windows_remove(&windows_container, window);
-    if (se_windows_get_size(&windows_container) == 0) {
+    s_array_remove(&windows_container, window);
+    if (s_array_get_size(&windows_container) == 0) {
+        // Maybe clear up the window manager if needed
     }
 }
 
 void se_window_destroy_all(){
     // TODO: implement single clear instead of destroying one by one 
     s_foreach_reverse(&windows_container, i) {
-        se_window* window = se_windows_get(&windows_container, i);
+        se_window* window = s_array_get(&windows_container, i);
         se_window_destroy(window);
     }
 }
