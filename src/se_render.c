@@ -80,31 +80,37 @@ void se_render_handle_cleanup(se_render_handle* render_handle) {
         se_model* curr_model = s_array_get(&render_handle->models, i);
         se_model_cleanup(curr_model);
     }
+    s_array_clear(&render_handle->models);
 
     s_foreach(&render_handle->textures, i) {
         se_texture* curr_texture = s_array_get(&render_handle->textures, i);
         se_texture_cleanup(curr_texture);
     }
+    s_array_clear(&render_handle->textures);
 
     s_foreach(&render_handle->shaders, i) {
         se_shader* curr_shader = s_array_get(&render_handle->shaders, i);
         se_shader_cleanup(curr_shader);
     }
+    s_array_clear(&render_handle->shaders);
    
     s_foreach(&render_handle->models, i) {
         se_model* curr_model = s_array_get(&render_handle->models, i);
         se_model_cleanup(curr_model);
     }
+    s_array_clear(&render_handle->models);
 
     s_foreach(&render_handle->framebuffers, i) {
         se_framebuffer* curr_framebuffer = s_array_get(&render_handle->framebuffers, i);
         se_framebuffer_cleanup(curr_framebuffer);
     }
+    s_array_clear(&render_handle->framebuffers);
 
     s_foreach(&render_handle->render_buffers, i) {
         se_render_buffer* curr_buffer = s_array_get(&render_handle->render_buffers, i);
         se_render_buffer_cleanup(curr_buffer);
     }
+    s_array_clear(&render_handle->render_buffers);
 
     free(render_handle);
 }
@@ -205,6 +211,7 @@ b8 se_shader_load_internal(se_shader* shader) {
     
     shader->vertex_mtime = get_file_mtime(shader->vertex_path);
     shader->fragment_mtime = get_file_mtime(shader->fragment_path);
+    s_array_init(&shader->uniforms, SE_UNIFORMS_MAX);
     printf("Shader - created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
     return true;
 }
@@ -232,7 +239,6 @@ se_shader* se_shader_load(se_render_handle* render_handle, const char* vertex_fi
     strcpy(new_shader->fragment_path, new_fragment_path);
     free(new_vertex_path);
     free(new_fragment_path);
-    s_array_init(&new_shader->uniforms, SE_UNIFORMS_MAX);
 
     if (se_shader_load_internal(new_shader)) {
         return new_shader;
@@ -264,6 +270,7 @@ void se_shader_use(se_render_handle* render_handle, se_shader* shader, const b8 
 }
 
 void se_shader_cleanup(se_shader* shader) {
+    s_array_clear(&shader->uniforms);
     if (shader->program) {
         glDeleteProgram(shader->program);
         shader->program = 0;

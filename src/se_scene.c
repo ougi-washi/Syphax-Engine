@@ -33,6 +33,10 @@ se_scene_handle* se_scene_handle_create(se_render_handle* render_handle, const s
 }
 
 void se_scene_handle_cleanup(se_scene_handle* scene_handle) {
+    s_foreach(&scene_handle->objects_2d, i) {
+        se_object_2d* current_object = s_array_get(&scene_handle->objects_2d, i);
+        se_object_2d_destroy(scene_handle, current_object);
+    }
     free(scene_handle);
 }
 

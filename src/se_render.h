@@ -148,6 +148,8 @@ typedef struct {
     u16 cameras_count;
 } se_render_handle_params;
 
+// TODO: maybe this should not be accessible by the user, and instead it should be in the .c file,
+// as there seem no need for direct access. All the following data is accessed through other handles.
 typedef struct {
     se_framebuffers framebuffers;
     se_render_buffers render_buffers;
