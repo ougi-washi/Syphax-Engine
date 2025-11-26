@@ -221,6 +221,8 @@ void se_window_destroy(se_window* window) {
     s_array_remove(&windows_container, window);
     if (s_array_get_size(&windows_container) == 0) {
         // Maybe clear up the window manager if needed
+        s_array_clear(&windows_container);
+        glfwTerminate();
     }
 }
 

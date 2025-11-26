@@ -20,7 +20,8 @@ i32 main() {
         se_render_set_background_color(se_vec(4, 0.5, 0.5, 0.5, 1));
         se_window_render_screen(window);
     }
-    
+
+    s_array_clear(&exit_keys);
     se_window_destroy(window);
     return 0;
 }
