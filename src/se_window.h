@@ -4,6 +4,7 @@
 #define SE_WINDOW_H
 
 #include "syphax/s_array.h"
+#include "se_math.h"
 #include <GLFW/glfw3.h>
 
 typedef struct {
@@ -11,6 +12,20 @@ typedef struct {
     f64 delta;
     f64 last_frame;
 } se_time;
+
+typedef enum {
+    SE_INPUT_EVENT_KEY,
+    SE_INPUT_EVENT_MOUSE
+} se_input_event_type;
+
+typedef void (*se_input_event_callback)(void* window);
+typedef struct {
+    i32 id;
+    b8 active : 1;
+    se_box_2d box;
+    i32 depth;
+    se_input_event_callback callback;
+} se_input_event;
 
 typedef struct {
     GLFWwindow* handle;
@@ -29,6 +44,8 @@ typedef struct {
     u16 target_fps;
     se_time time;
     u64 frame_count;
+
+    s_array(se_input_event, input_events);
 } se_window;
 
 typedef s_array(se_window, se_windows);
@@ -45,6 +62,7 @@ extern void se_window_check_exit_keys(se_window* window, key_combo* keys);
 extern f64 se_window_get_delta_time(se_window* window);
 extern f64 se_window_get_time(se_window* window);
 extern void se_window_set_target_fps(se_window* window, const u16 fps);
+extern i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback);
 extern void se_window_destroy(se_window* window);
 extern void se_window_destroy_all();
 

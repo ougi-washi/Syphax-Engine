@@ -4,11 +4,13 @@
 #include "se_gl.h"
 #include <unistd.h>
 #include <stdlib.h>
+#include <float.h>
 
 //static se_windows* windows_container = NULL;
 
 #define SE_MAX_WINDOWS 8
 #define SE_MAX_KEY_COMBOS 8
+#define SE_MAX_INPUT_EVENTS 1024
 
 static se_windows windows_container = { 0 };
 
@@ -104,10 +106,14 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
         s_array_init(&windows_container, SE_MAX_WINDOWS);
     }
     se_window* new_window = s_array_increment(&windows_container);
+
     if (new_window == NULL) {
         printf("Failed to create window\n");
         return NULL;
     }
+    memset(new_window, 0, sizeof(se_window));
+    s_array_init(&new_window->input_events, SE_MAX_INPUT_EVENTS);
+    
     // Set OpenGL version
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -172,6 +178,23 @@ void se_window_render_screen(se_window* window) {
 
 void se_window_poll_events(){
     glfwPollEvents();
+    s_foreach(&windows_container, i) {
+        se_window* window = s_array_get(&windows_container, i);
+        se_input_event* out_event = NULL;
+        i32 out_depth = FLT_MIN;
+        s_foreach(&window->input_events, j) {
+            se_input_event* current_event = s_array_get(&window->input_events, j);
+            if (    current_event->active &&
+                    window->mouse_x >= current_event->box.min.x && window->mouse_x <= current_event->box.max.x &&
+                    window->mouse_y >= current_event->box.min.y && window->mouse_y <= current_event->box.max.y) {
+                if (current_event->depth > out_depth) {
+                    out_event = current_event;
+                    out_depth = current_event->depth;
+                }
+            }
+            current_event->callback(window);
+        }
+    }
 }
 
 b8 se_window_is_key_down(se_window* window, i32 key) {
@@ -207,6 +230,18 @@ void se_window_set_target_fps(se_window* window, const u16 fps) {
     window->target_fps = fps;
 }
 
+i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback) {
+    s_assertf(window, "se_window_register_input_event :: window is null");
+    s_assertf(box, "se_window_register_input_event :: box is null");
+    s_assertf(callback, "se_window_register_input_event :: callback is null");
+
+    se_input_event* new_event = s_array_increment(&window->input_events);
+    new_event->id = rand();
+    new_event->box = *box;
+    new_event->depth = depth;
+    new_event->callback = callback;
+    return new_event->id;
+}
 
 void se_window_destroy(se_window* window) {
     s_assertf(window, "se_window_destroy :: window is null");

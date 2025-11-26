@@ -5,6 +5,14 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
+void on_button_yes_pressed(void* window) {
+    printf("Button YES pressed\n");
+}
+
+void on_button_no_pressed(void* window) {
+    printf("Button NO pressed\n");
+}
+
 i32 main() {
     se_window* window = se_window_create("Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
     
@@ -16,7 +24,7 @@ i32 main() {
     params.models_count = 1;
     params.cameras_count = 1;
     se_render_handle* render_handle = se_render_handle_create(&params);
-
+    
     se_scene_handle_params scene_params = {0};
     scene_params.objects_2d_count = 8;
     scene_params.objects_3d_count = 0;
@@ -33,6 +41,12 @@ i32 main() {
     se_shader_set_vec3(button_yes->shader, "u_color", &se_vec3(0, 1, 0));
     se_shader_set_vec3(button_no->shader, "u_color", &se_vec3(1, 0, 0));
 
+    se_box_2d button_box_yes = {.min = {0.15, 0.}, .max = {0.15 + 0.1, 0.1}};
+    se_box_2d button_box_no = {.min = {-0.15, 0.}, .max = {-0.15 + 0.1, 0.1}};
+    
+    se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed);
+    se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed);
+    
     se_scene_2d_add_object(scene_2d, borders);
     se_scene_2d_add_object(scene_2d, panel);
     se_scene_2d_add_object(scene_2d, button_yes);
