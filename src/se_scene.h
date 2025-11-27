@@ -72,6 +72,7 @@ extern void se_scene_handle_cleanup(se_scene_handle* scene_handle);
 
 // 2D objects functions
 extern se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragment_shader_path, const se_vec2* position, const se_vec2* scale);
+extern void se_object_2d_get_box_2d(se_object_2d* object, se_box_2d* out_box);
 extern void se_object_2d_destroy(se_scene_handle* scene_handle, se_object_2d* object);
 extern void se_object_2d_set_position(se_object_2d* object, const se_vec2* position);
 extern void se_object_2d_set_scale(se_object_2d* object, const se_vec2* scale);

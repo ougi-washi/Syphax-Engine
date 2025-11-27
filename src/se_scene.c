@@ -64,6 +64,13 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     return new_object;
 }
 
+void se_object_2d_get_box_2d(se_object_2d* object, se_box_2d* out_box) {
+    s_assertf(object, "se_object_2d_get_box_2d :: object is null");
+    s_assertf(out_box, "se_object_2d_get_box_2d :: out_box is null");
+    out_box->min = se_vec2(object->position.x - object->scale.x / 2., object->position.y - object->scale.y / 2.);
+    out_box->max = se_vec2(object->position.x + object->scale.x / 2., object->position.y + object->scale.y / 2.);
+}
+
 void se_object_2d_destroy(se_scene_handle* scene_handle, se_object_2d* object) {
     s_array_remove(&scene_handle->objects_2d, object);
 }

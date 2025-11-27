@@ -6,11 +6,15 @@
 #define HEIGHT 1080
 
 void on_button_yes_pressed(void* window) {
-    printf("Button YES pressed\n");
+    if (se_window_is_mouse_down(window, 0)) {
+        printf("Button YES pressed\n");
+    }
 }
 
 void on_button_no_pressed(void* window) {
-    printf("Button NO pressed\n");
+    if (se_window_is_mouse_down(window, 0)) {
+        printf("Button NO pressed\n");
+    }
 }
 
 i32 main() {
@@ -41,16 +45,18 @@ i32 main() {
     se_shader_set_vec3(button_yes->shader, "u_color", &se_vec3(0, 1, 0));
     se_shader_set_vec3(button_no->shader, "u_color", &se_vec3(1, 0, 0));
 
-    se_box_2d button_box_yes = {.min = {0.15, 0.}, .max = {0.15 + 0.1, 0.1}};
-    se_box_2d button_box_no = {.min = {-0.15, 0.}, .max = {-0.15 + 0.1, 0.1}};
+    se_box_2d button_box_yes = {0};
+    se_box_2d button_box_no = {0};
+    se_object_2d_get_box_2d(button_yes, &button_box_yes);
+    se_object_2d_get_box_2d(button_no, &button_box_no);
     
     se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed);
-    se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed);
+    //se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed);
     
     se_scene_2d_add_object(scene_2d, borders);
     se_scene_2d_add_object(scene_2d, panel);
     se_scene_2d_add_object(scene_2d, button_yes);
-    se_scene_2d_add_object(scene_2d, button_no);
+    //se_scene_2d_add_object(scene_2d, button_no);
 
     se_scene_2d_render(scene_2d, render_handle, window);
    
