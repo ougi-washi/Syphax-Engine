@@ -5,15 +5,23 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
-void on_button_yes_pressed(void* window) {
+void on_button_yes_pressed(void* window, void* data) {
     if (se_window_is_mouse_down(window, 0)) {
         printf("Button YES pressed\n");
+        if (data) {
+            (*(int*)data)++;
+            printf("Pressed yes, data: %d\n", *(int*)data);
+        }
     }
 }
 
-void on_button_no_pressed(void* window) {
+void on_button_no_pressed(void* window, void* data) {
     if (se_window_is_mouse_down(window, 0)) {
         printf("Button NO pressed\n");
+        if (data) {
+            (*(int*)data)++;
+            printf("Pressed no, data: %d\n", *(int*)data);
+        }
     }
 }
 
@@ -49,9 +57,12 @@ i32 main() {
     se_box_2d button_box_no = {0};
     se_object_2d_get_box_2d(button_yes, &button_box_yes);
     se_object_2d_get_box_2d(button_no, &button_box_no);
-     
-    se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed);
-    se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed);
+
+    int button_yes_data = 0;
+    int button_no_data = 0;
+
+    se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
+    se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed, &button_no_data);
     
     se_scene_2d_add_object(scene_2d, borders);
     se_scene_2d_add_object(scene_2d, panel);

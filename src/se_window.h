@@ -18,13 +18,14 @@ typedef enum {
     SE_INPUT_EVENT_MOUSE
 } se_input_event_type;
 
-typedef void (*se_input_event_callback)(void* window);
+typedef void (*se_input_event_callback)(void* window, void* data); // Data is a ptr for the user to store/pass data. Handle it carefully.
 typedef struct {
     i32 id;
     b8 active : 1;
     se_box_2d box;
     i32 depth;
     se_input_event_callback callback;
+    void* callback_data;
 } se_input_event;
 
 typedef struct {
@@ -64,7 +65,7 @@ extern void se_window_check_exit_keys(se_window* window, key_combo* keys);
 extern f64 se_window_get_delta_time(se_window* window);
 extern f64 se_window_get_time(se_window* window);
 extern void se_window_set_target_fps(se_window* window, const u16 fps);
-extern i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback);
+extern i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data);
 extern void se_window_destroy(se_window* window);
 extern void se_window_destroy_all();
 

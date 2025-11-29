@@ -197,7 +197,7 @@ void se_window_poll_events(){
             }
         }
         if (pressed) {
-            out_event->callback(window);
+            out_event->callback(window, out_event->callback_data);
         }
     }
 }
@@ -252,7 +252,7 @@ void se_window_set_target_fps(se_window* window, const u16 fps) {
     window->target_fps = fps;
 }
 
-i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback) {
+i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data) {
     s_assertf(window, "se_window_register_input_event :: window is null");
     s_assertf(box, "se_window_register_input_event :: box is null");
     s_assertf(callback, "se_window_register_input_event :: callback is null");
@@ -263,6 +263,7 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
     new_event->depth = depth;
     new_event->active = true;
     new_event->callback = callback;
+    new_event->callback_data = callback_data;
     return new_event->id;
 }
 
