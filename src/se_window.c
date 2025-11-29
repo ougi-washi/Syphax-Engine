@@ -11,6 +11,7 @@
 #define SE_MAX_WINDOWS 8
 #define SE_MAX_KEY_COMBOS 8
 #define SE_MAX_INPUT_EVENTS 1024
+#define SE_MAX_RESIZE_EVENTS 1024
 
 static se_windows windows_container = { 0 };
 
@@ -49,6 +50,13 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
     window->width = width;
     window->height = height;
     glViewport(0, 0, width, height);
+    s_foreach(&window->se_resize_events, i) {
+        se_resize_event* current_event_ptr = s_array_get(&window->se_resize_events, i);
+        if (current_event_ptr) {
+            se_resize_event current_event = *current_event_ptr;
+            current_event(&se_vec2(width, height));
+        }
+    }
 }
 
 // TODO: move to opengl.c or such later on
@@ -112,7 +120,8 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
         return NULL;
     }
     s_array_init(&new_window->input_events, SE_MAX_INPUT_EVENTS);
-    
+    s_array_init(&new_window->se_resize_events, SE_MAX_RESIZE_EVENTS);
+
     // Set OpenGL version
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -258,6 +267,7 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
     s_assertf(callback, "se_window_register_input_event :: callback is null");
 
     se_input_event* new_event = s_array_increment(&window->input_events);
+    s_assertf(new_event, "se_window_register_input_event :: Array is full");
     new_event->id = rand();
     new_event->box = *box;
     new_event->depth = depth;
@@ -265,6 +275,12 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
     new_event->callback = callback;
     new_event->callback_data = callback_data;
     return new_event->id;
+}
+
+void se_window_register_resize_event(se_window* window, se_resize_event callback) {
+    se_resize_event* new_event_ptr = s_array_increment(&window->se_resize_events);
+    s_assertf(new_event_ptr, "se_window_register_resize_event :: Array is full");
+    *new_event_ptr = callback;
 }
 
 void se_window_destroy(se_window* window) {
