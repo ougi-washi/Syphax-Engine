@@ -99,7 +99,6 @@ void se_object_2d_update_uniforms(se_object_2d* object) {
 se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
     printf("Creating scene 2D\n");
     se_scene_2d* new_scene = s_array_increment(&scene_handle->scenes_2d);
-    memset(new_scene, 0, sizeof(se_scene_2d));
     if (scene_handle->render_handle) {
         new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
         s_array_init(&new_scene->objects, object_count);

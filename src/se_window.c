@@ -111,7 +111,6 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
         printf("Failed to create window\n");
         return NULL;
     }
-    memset(new_window, 0, sizeof(se_window));
     s_array_init(&new_window->input_events, SE_MAX_INPUT_EVENTS);
     
     // Set OpenGL version

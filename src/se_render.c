@@ -218,7 +218,6 @@ b8 se_shader_load_internal(se_shader* shader) {
 
 se_shader* se_shader_load(se_render_handle* render_handle, const char* vertex_file_path, const char* fragment_file_path) {
     se_shader* new_shader = s_array_increment(&render_handle->shaders);
-    new_shader = memset(new_shader, 0, sizeof(se_shader));
     // make path absolute
     char* new_vertex_path = NULL;
     char* new_fragment_path = NULL;
