@@ -4,7 +4,7 @@
 #include "se_gl.h"
 #include <unistd.h>
 #include <stdlib.h>
-#include <float.h>
+#include <limits.h>
 
 //static se_windows* windows_container = NULL;
 
@@ -182,13 +182,11 @@ void se_window_poll_events(){
         se_window* window = s_array_get(&windows_container, i);
         se_vec2 mouse_position = {0};
         se_window_get_mouse_position_normalized(window, &mouse_position);
-        printf("Mouse position: %f, %f\n", mouse_position.x, mouse_position.y);
         se_input_event* out_event = NULL;
-        i32 out_depth = FLT_MIN;
+        i32 out_depth = INT_MIN;
         b8 pressed = false;
         s_foreach(&window->input_events, j) {
             se_input_event* current_event = s_array_get(&window->input_events, j);
-            printf("box: minx %f, miny %f, maxx %f, maxy %f\n", current_event->box.min.x, current_event->box.min.y, current_event->box.max.x, current_event->box.max.y);
             if (    current_event->active &&
                     mouse_position.x >= current_event->box.min.x && mouse_position.x <= current_event->box.max.x &&
                     mouse_position.y >= current_event->box.min.y && mouse_position.y <= current_event->box.max.y) {
@@ -219,6 +217,8 @@ void se_window_get_mouse_position_normalized(se_window* window, se_vec2* out_mou
     s_assertf(window, "se_window_get_mouse_position_normalized :: window is null");
     s_assertf(out_mouse_position, "se_window_get_mouse_position_normalized :: out_mouse_position is null");
     *out_mouse_position = se_vec2((window->mouse_x / window->width) - .5, window->mouse_y / window->height - .5);
+    out_mouse_position->x *= 2.;
+    out_mouse_position->y *= 2.;
 }
 
 b8 se_window_should_close(se_window* window) {
@@ -262,6 +262,7 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
     new_event->id = rand();
     new_event->box = *box;
     new_event->depth = depth;
+    new_event->active = true;
     new_event->callback = callback;
     return new_event->id;
 }

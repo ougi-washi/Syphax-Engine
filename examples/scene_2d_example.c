@@ -36,7 +36,7 @@ i32 main() {
     scene_params.scenes_3d_count = 0;
     se_scene_handle* scene_handle = se_scene_handle_create(render_handle, &scene_params);
     
-    se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec(2, WIDTH, HEIGHT), 10);
+    se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec2(WIDTH, HEIGHT), 10);
     
     se_object_2d* borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &se_vec2(0, 0), &se_vec2(0.95, 0.95));
     se_object_2d* panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &se_vec2(0, 0), &se_vec2(0.5, 0.5));
@@ -49,14 +49,14 @@ i32 main() {
     se_box_2d button_box_no = {0};
     se_object_2d_get_box_2d(button_yes, &button_box_yes);
     se_object_2d_get_box_2d(button_no, &button_box_no);
-    
+     
     se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed);
-    //se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed);
+    se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed);
     
     se_scene_2d_add_object(scene_2d, borders);
     se_scene_2d_add_object(scene_2d, panel);
     se_scene_2d_add_object(scene_2d, button_yes);
-    //se_scene_2d_add_object(scene_2d, button_no);
+    se_scene_2d_add_object(scene_2d, button_no);
 
     se_scene_2d_render(scene_2d, render_handle, window);
    

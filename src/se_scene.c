@@ -64,11 +64,13 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     return new_object;
 }
 
+// The reason why we are passing the scene is because the size will depend on the buffer size
 void se_object_2d_get_box_2d(se_object_2d* object, se_box_2d* out_box) {
     s_assertf(object, "se_object_2d_get_box_2d :: object is null");
     s_assertf(out_box, "se_object_2d_get_box_2d :: out_box is null");
-    out_box->min = se_vec2(object->position.x - object->scale.x / 2., object->position.y - object->scale.y / 2.);
-    out_box->max = se_vec2(object->position.x + object->scale.x / 2., object->position.y + object->scale.y / 2.);
+    
+    out_box->min = se_vec2(object->position.x - object->scale.x, object->position.y - object->scale.y);
+    out_box->max = se_vec2(object->position.x + object->scale.x, object->position.y + object->scale.y);
 }
 
 void se_object_2d_destroy(se_scene_handle* scene_handle, se_object_2d* object) {
