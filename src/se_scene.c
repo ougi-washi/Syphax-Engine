@@ -33,6 +33,25 @@ void se_scene_handle_cleanup(se_scene_handle* scene_handle) {
         se_object_2d* current_object = s_array_get(&scene_handle->objects_2d, i);
         se_object_2d_destroy(scene_handle, current_object);
     }
+    s_array_clear(&scene_handle->objects_2d);
+   
+    // TODO: destroy 3D objects
+    //s_foreach(&scene_handle->objects_3d, i) {
+    //    se_object_3d* current_object = s_array_get(&scene_handle->objects_3d, i);
+    //    se_object_3d_destroy(scene_handle, current_object);
+    //}
+    s_array_clear(&scene_handle->objects_3d);
+    
+    s_foreach(&scene_handle->scenes_2d, i) {
+        se_scene_2d* current_scene = s_array_get(&scene_handle->scenes_2d, i);
+        se_scene_2d_destroy(scene_handle, current_scene);
+    }
+    s_array_clear(&scene_handle->scenes_2d);
+    
+    s_foreach(&scene_handle->scenes_3d, i) {
+        se_scene_3d* current_scene = s_array_get(&scene_handle->scenes_3d, i);
+        se_scene_3d_destroy(scene_handle, current_scene);
+    }
     free(scene_handle);
 }
 
