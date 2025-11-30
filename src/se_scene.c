@@ -79,10 +79,28 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     return new_object;
 }
 
+void se_scene_2d_resize_callback(void* window, void* framebuffer) {
+    s_assertf(window, "se_scene_2d_resize_callback :: window is null");
+    s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
+
+    se_window* window_ptr = (se_window*)window;
+    se_framebuffer* framebuffer_ptr = (se_framebuffer*)framebuffer;
+    s_assertf(window_ptr, "se_scene_2d_resize_callback :: window_ptr is null");
+    s_assertf(framebuffer_ptr, "se_scene_2d_resize_callback :: framebuffer_ptr is null");
+    se_framebuffer_set_size(framebuffer, &se_vec2(framebuffer_ptr->ratio.x * window_ptr->width, framebuffer_ptr->ratio.y * window_ptr->height));
+}
+
 void se_scene_2d_set_auto_resize(se_scene_2d* scene, se_window* window, const se_vec2* ratio) {
     s_assertf(scene, "se_scene_2d_set_auto_resize :: scene is null");
     s_assertf(window, "se_scene_2d_set_auto_resize :: window is null");
     s_assertf(ratio, "se_scene_2d_set_auto_resize :: ratio is null");
+   
+    se_framebuffer* framebuffer = scene->output;
+    s_assertf(framebuffer, "se_scene_2d_set_auto_resize :: framebuffer is null");
+    
+    scene->output->auto_resize = true;
+    scene->output->ratio = *ratio;
+    se_window_register_resize_event(window, se_scene_2d_resize_callback, framebuffer);
 }
 
 // The reason why we are passing the scene is because the size will depend on the buffer size
@@ -117,10 +135,10 @@ void se_object_2d_update_uniforms(se_object_2d* object) {
     }
 }
 
-se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* ratio, const u16 object_count) {
+se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
     printf("Creating scene 2D\n");
     s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
-    s_assertf(ratio, "se_scene_2d_create :: ratio is null");
+    s_assertf(size, "se_scene_2d_create :: size is null");
     s_assertf(object_count > 0, "se_scene_2d_create :: object_count is 0");
     se_scene_2d* new_scene = s_array_increment(&scene_handle->scenes_2d);
     if (scene_handle->render_handle) {
@@ -147,6 +165,7 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle, se_
     se_render_clear();
     se_enable_blending();
     
+    printf("Rendering scene %p, size frambuffer: %fx%f\n", scene, scene->output->size.x, scene->output->size.y);
     s_foreach(&scene->objects, i) {
         se_object_2d_ptr* object_ptr = s_array_get(&scene->objects, i);
         if (object_ptr == NULL) {

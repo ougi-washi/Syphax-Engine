@@ -119,6 +119,8 @@ typedef struct {
     GLuint texture;
     GLuint depth_buffer;
     se_vec2 size;
+    se_vec2 ratio;
+    b8 auto_resize : 1;
 } se_framebuffer;
 typedef s_array(se_framebuffer, se_framebuffers);
 typedef se_framebuffer* se_framebuffer_ptr;
@@ -216,6 +218,7 @@ extern void se_camera_destroy(se_render_handle* render_handle, se_camera* camera
 
 // Framebuffer functions
 extern se_framebuffer* se_framebuffer_create(se_render_handle* render_handle, const se_vec2* size);
+extern void se_framebuffer_set_size(se_framebuffer* framebuffer, const se_vec2* size);
 extern void se_framebuffer_bind(se_framebuffer* framebuffer);
 extern void se_framebuffer_unbind(se_framebuffer* framebuffer);
 extern void se_framebuffer_use_quad_shader(se_framebuffer* framebuffer, se_render_handle* render_handle);

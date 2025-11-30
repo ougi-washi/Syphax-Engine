@@ -69,8 +69,7 @@ i32 main() {
     se_scene_2d_add_object(scene_2d, button_yes);
     se_scene_2d_add_object(scene_2d, button_no);
 
-    se_scene_2d_render(scene_2d, render_handle, window);
-    se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
+    se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1, 1));
 
     key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
