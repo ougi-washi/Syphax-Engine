@@ -165,7 +165,6 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle, se_
     se_render_clear();
     se_enable_blending();
     
-    printf("Rendering scene %p, size frambuffer: %fx%f\n", scene, scene->output->size.x, scene->output->size.y);
     s_foreach(&scene->objects, i) {
         se_object_2d_ptr* object_ptr = s_array_get(&scene->objects, i);
         if (object_ptr == NULL) {
