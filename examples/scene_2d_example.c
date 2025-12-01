@@ -61,15 +61,15 @@ i32 main() {
     int button_yes_data = 0;
     int button_no_data = 0;
 
-    se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
-    se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed, &button_no_data);
-    
+    i32 button_yes_update_id = se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
+    i32 button_no_update_id = se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed, &button_no_data);
+
     se_scene_2d_add_object(scene_2d, borders);
     se_scene_2d_add_object(scene_2d, panel);
     se_scene_2d_add_object(scene_2d, button_yes);
     se_scene_2d_add_object(scene_2d, button_no);
 
-    se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1, 1));
+    se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
 
     key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
@@ -80,7 +80,11 @@ i32 main() {
         se_window_check_exit_keys(window, &exit_keys);
         se_window_update(window);
         se_render_handle_reload_changed_shaders(render_handle);
-        button_yes->position.x += 0.01;
+        
+        button_yes->position.x += 0.005;
+        se_object_2d_get_box_2d(button_yes, &button_box_yes);
+        se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
+        
         se_render_clear();
         se_scene_2d_render(scene_2d, render_handle, window);
         se_scene_2d_render_to_screen(scene_2d, render_handle, window);

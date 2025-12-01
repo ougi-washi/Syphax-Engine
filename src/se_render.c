@@ -676,6 +676,12 @@ void se_framebuffer_set_size(se_framebuffer* framebuffer, const se_vec2* size) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void se_framebuffer_get_size(se_framebuffer* framebuffer, se_vec2* out_size) {
+    s_assertf(framebuffer, "se_framebuffer_get_size :: framebuffer is null");
+    s_assertf(out_size, "se_framebuffer_get_size :: out_size is null");
+    *out_size = framebuffer->size;
+}
+
 void se_framebuffer_bind(se_framebuffer* framebuffer) {
     glViewport(0, 0, framebuffer->size.x, framebuffer->size.y);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->framebuffer);

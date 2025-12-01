@@ -219,6 +219,7 @@ extern void se_camera_destroy(se_render_handle* render_handle, se_camera* camera
 // Framebuffer functions
 extern se_framebuffer* se_framebuffer_create(se_render_handle* render_handle, const se_vec2* size);
 extern void se_framebuffer_set_size(se_framebuffer* framebuffer, const se_vec2* size);
+extern void se_framebuffer_get_size(se_framebuffer* framebuffer, se_vec2* out_size);
 extern void se_framebuffer_bind(se_framebuffer* framebuffer);
 extern void se_framebuffer_unbind(se_framebuffer* framebuffer);
 extern void se_framebuffer_use_quad_shader(se_framebuffer* framebuffer, se_render_handle* render_handle);

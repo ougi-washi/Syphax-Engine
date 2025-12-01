@@ -261,6 +261,18 @@ void se_window_set_target_fps(se_window* window, const u16 fps) {
     window->target_fps = fps;
 }
 
+// TODO: move somewhere else and optimize it if it used a lot
+i32 se_hash(const c8* str1, const i32 len1, const c8* str2, const i32 len2) {
+    u32 hash = 5381;
+    for (i32 i = 0; i < len1; i++) {
+        hash = ((hash << 5) + hash) + str1[i];
+    }
+    for (i32 i = 0; i < len2; i++) {
+        hash = ((hash << 5) + hash) + str2[i];
+    }
+    return hash;
+}
+
 i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data) {
     s_assertf(window, "se_window_register_input_event :: window is null");
     s_assertf(box, "se_window_register_input_event :: box is null");
@@ -268,13 +280,41 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
 
     se_input_event* new_event = s_array_increment(&window->input_events);
     s_assertf(new_event, "se_window_register_input_event :: Array is full");
-    new_event->id = rand();
+    c8 event_ptr[16];
+    c8 box_ptr[16];
+    sprintf(event_ptr, "%p", new_event);
+    sprintf(box_ptr, "%p", box);
+    new_event->id = se_hash(event_ptr, strlen(event_ptr), box_ptr, strlen(box_ptr));
     new_event->box = *box;
     new_event->depth = depth;
     new_event->active = true;
     new_event->callback = callback;
     new_event->callback_data = callback_data;
     return new_event->id;
+}
+
+void se_window_update_input_event(const i32 input_event_id, se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data) {
+    s_assertf(window, "se_window_update_input_event :: window is null");
+    s_assertf(box, "se_window_update_input_event :: box is null");
+    s_assertf(callback, "se_window_update_input_event :: callback is null");
+    
+    se_input_event* found_event = NULL;
+    s_foreach(&window->input_events, i) {
+        se_input_event* current_event = s_array_get(&window->input_events, i);
+        if (current_event->id == input_event_id) {
+            found_event = current_event;
+            break;
+        }
+    }
+    if (found_event) {
+        found_event->box = *box;
+        found_event->depth = depth;
+        found_event->callback = callback;
+        found_event->callback_data = callback_data;
+    }
+    else {
+        printf("se_window_update_input_event :: failed to find event with id: %d\n", input_event_id);
+    }
 }
 
 void se_window_register_resize_event(se_window* window, se_resize_event_callback callback, void* data) {

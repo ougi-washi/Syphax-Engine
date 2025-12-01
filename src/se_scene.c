@@ -79,28 +79,47 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     return new_object;
 }
 
-void se_scene_2d_resize_callback(void* window, void* framebuffer) {
+void se_scene_2d_resize_callback(void* window, void* scene) {
     s_assertf(window, "se_scene_2d_resize_callback :: window is null");
-    s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
+    s_assertf(scene, "se_scene_2d_resize_callback :: scene is null");
 
     se_window* window_ptr = (se_window*)window;
-    se_framebuffer* framebuffer_ptr = (se_framebuffer*)framebuffer;
+    se_scene_2d* scene_ptr = (se_scene_2d*)scene;
     s_assertf(window_ptr, "se_scene_2d_resize_callback :: window_ptr is null");
-    s_assertf(framebuffer_ptr, "se_scene_2d_resize_callback :: framebuffer_ptr is null");
-    se_framebuffer_set_size(framebuffer, &se_vec2(framebuffer_ptr->ratio.x * window_ptr->width, framebuffer_ptr->ratio.y * window_ptr->height));
+    s_assertf(scene_ptr, "se_scene_2d_resize_callback :: scene_ptr is null");
+    
+    se_framebuffer_ptr framebuffer = scene_ptr->output;
+    s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
+    se_vec2 old_size = {0};
+    se_framebuffer_get_size(framebuffer, &old_size);
+    se_vec2 new_size = {framebuffer->ratio.x * window_ptr->width, framebuffer->ratio.y * window_ptr->height};
+   
+    // TODO: update object positions and scales
+    //s_foreach(&scene_ptr->objects, i) {
+    //    se_object_2d_ptr* current_object_ptr = s_array_get(&scene_ptr->objects, i);
+    //    if (current_object_ptr == NULL || *current_object_ptr == NULL) {
+    //        continue;
+    //    }
+    //    se_object_2d* current_object = *current_object_ptr;
+    //    se_vec2* current_position = &current_object->position;
+    //    se_vec2* current_scale = &current_object->scale;
+    //    se_object_2d_set_position(current_object, &se_vec2(current_position->x * new_size.x / old_size.x, current_position->y * new_size.y / old_size.y));
+    //    se_object_2d_set_scale(current_object, &se_vec2(current_scale->x * new_size.x / old_size.x, current_scale->y * new_size.y / old_size.y));
+    //}
+
+    se_framebuffer_set_size(framebuffer, &new_size);
 }
 
 void se_scene_2d_set_auto_resize(se_scene_2d* scene, se_window* window, const se_vec2* ratio) {
     s_assertf(scene, "se_scene_2d_set_auto_resize :: scene is null");
     s_assertf(window, "se_scene_2d_set_auto_resize :: window is null");
     s_assertf(ratio, "se_scene_2d_set_auto_resize :: ratio is null");
-   
-    se_framebuffer* framebuffer = scene->output;
-    s_assertf(framebuffer, "se_scene_2d_set_auto_resize :: framebuffer is null");
-    
+  
+    // ratio can only be 1 for now as we are not updating the object positions and scales to match the new ratio
+    s_assertf(ratio->x == 1.0 && ratio->y == 1.0, "se_scene_2d_set_auto_resize :: ratio can only be 1 for now, please wait for the next update");
     scene->output->auto_resize = true;
     scene->output->ratio = *ratio;
-    se_window_register_resize_event(window, se_scene_2d_resize_callback, framebuffer);
+    se_window_register_resize_event(window, se_scene_2d_resize_callback, scene);
 }
 
 // The reason why we are passing the scene is because the size will depend on the buffer size
