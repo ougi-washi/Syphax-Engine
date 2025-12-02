@@ -7,7 +7,6 @@
 
 void on_button_yes_pressed(void* window, void* data) {
     if (se_window_is_mouse_down(window, 0)) {
-        printf("Button YES pressed\n");
         if (data) {
             (*(int*)data)++;
             printf("Pressed yes, data: %d\n", *(int*)data);
@@ -17,7 +16,6 @@ void on_button_yes_pressed(void* window, void* data) {
 
 void on_button_no_pressed(void* window, void* data) {
     if (se_window_is_mouse_down(window, 0)) {
-        printf("Button NO pressed\n");
         if (data) {
             (*(int*)data)++;
             printf("Pressed no, data: %d\n", *(int*)data);
