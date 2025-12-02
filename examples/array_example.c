@@ -16,6 +16,7 @@ void display_array(ints* array) {
 
 i32 main() {
     ints my_ints = {0};
+    s_array_init(&my_ints, ARRAY_SIZE);
 
     printf("Adding elements to array\n");
     for (sz i = 0; i < ARRAY_SIZE; i++) {
