@@ -142,6 +142,11 @@ typedef se_render_buffer* se_render_buffer_ptr;
 typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
 
 typedef struct {
+    GLuint atlas_texture;
+} se_font;
+typedef s_array(se_font, se_fonts);
+
+typedef struct {
     u16 framebuffers_count;
     u16 render_buffers_count;
     u16 textures_count;
@@ -161,6 +166,7 @@ typedef struct {
     se_cameras cameras;
     se_models models;
     se_shader* render_quad_shader;
+    se_fonts fonts;
 } se_render_handle;
 
 // helper functions
@@ -245,8 +251,11 @@ extern void se_uniform_set_texture  (se_uniforms* uniforms, const char* name, GL
 extern void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* name, se_render_buffer* buffer);
 extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const b8 update_global_uniforms);
 
+extern se_font* se_font_load(se_render_handle* render_handle, const char* path);
+
 // Utility functions
 extern time_t get_file_mtime(const char* path);
-extern char* load_file(const char* path);
+extern c8* load_file(const char* path);
+extern uc8* load_file_uc8(const char* path, sz* out_size);
 
 #endif // SE_RENDER_H

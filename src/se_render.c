@@ -16,8 +16,10 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-static f64 se_target_fps = 60.0;
 #define SE_UNIFORMS_MAX 128 
+#define SE_FONTS_MAX 64 
+
+static f64 se_target_fps = 60.0;
 
 static GLuint compile_shader(const char* source, GLenum type);
 static GLuint create_shader_program(const char* vertex_source, const char* fragment_source);
@@ -62,6 +64,7 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     s_array_init(&render_handle->models, params->models_count);
     s_array_init(&render_handle->cameras, params->cameras_count);
     s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
+    s_array_init(&render_handle->fonts, SE_FONTS_MAX);
 
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
     /*
@@ -1005,6 +1008,47 @@ void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const 
     }
 }
 
+se_font* se_font_load(se_render_handle* render_handle, const char* path) {
+    s_assertf(render_handle, "se_font_load :: render_handle is null");
+    s_assertf(path, "se_font_load :: path is null");
+    se_font* new_font = s_array_increment(&render_handle->fonts);
+   
+    sz font_file_size = 0;
+    uc8* font_file_data = load_file_uc8(path, &font_file_size);
+    s_assertf(font_file_data, "se_font_load :: file_data is null");
+  
+    const i32 font_count = stbtt_GetNumberOfFonts(font_file_data);
+    if (font_count == 0) {
+        printf("se_font_load :: No fonts found in file: %s\n", path);
+        return NULL;
+    }
+    
+    const u32 atlas_width = 1024;
+    const u32 atlas_height = 1024;
+    u8* atlas_bitmap = malloc(atlas_width * atlas_height);
+
+    // There are 95 ASCII characters from ASCII 32(Space) to ASCII 126(~)
+    // ASCII 32(Space) to ASCII 126(~) are the commonly used characters in text 
+    const u32 first_character = 32;
+    const u32 characters_count = 95;
+    const f32 font_size = 64.0f;
+
+    stbtt_packedchar packed_characters[characters_count];
+    stbtt_aligned_quad aligned_quads[characters_count];
+
+    stbtt_pack_context ctx;
+    stbtt_PackBegin(&ctx, atlas_bitmap, atlas_width, atlas_height, 0, 1, NULL);
+    stbtt_PackFontRange(&ctx, font_file_data, 0, font_size, first_character, characters_count, packed_characters);
+    
+    for (i32 i = 0; i < characters_count; i++) {
+        f32 unused_x, unused_y;
+    }
+        
+    s_assertf(0, "se_font_load :: Do not use, work in progress");
+    return new_font;
+}
+
+
 time_t get_file_mtime(const char* path) {
     struct stat st;
     if (stat(path, &st) == 0) {
@@ -1034,6 +1078,31 @@ char* load_file(const char* path) {
     buffer[size] = '\0';
     
     fclose(file);
+    return buffer;
+}
+
+uc8* load_file_uc8(const char* path, sz* out_size) {
+    FILE* file = fopen(path, "rb");
+    if (!file) {
+        fprintf(stderr, "Failed to open file: %s\n", path);
+        return NULL;
+    }
+    
+    fseek(file, 0, SEEK_END);
+    u64 size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    uc8* buffer = malloc(size + 1);
+    if (!buffer) {
+        fclose(file);
+        return NULL;
+    }
+    
+    fread(buffer, 1, size, file);
+    buffer[size] = '\0';
+    
+    fclose(file);
+    *out_size = size;
     return buffer;
 }
 
