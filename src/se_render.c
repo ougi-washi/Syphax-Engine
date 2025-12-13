@@ -1042,12 +1042,31 @@ se_font* se_font_load(se_render_handle* render_handle, const char* path) {
     
     for (i32 i = 0; i < characters_count; i++) {
         f32 unused_x, unused_y;
+        stbtt_GetPackedQuad(packed_characters, 
+                atlas_width, atlas_height, 
+                i,
+                &unused_x, &unused_y,
+                &aligned_quads[i],
+                0);
     }
-        
+
+    glGenTextures(1, &new_font->atlas_texture);
+    glBindTexture(GL_TEXTURE_2D, new_font->atlas_texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlas_width, atlas_height, 0, GL_RED, GL_UNSIGNED_BYTE, atlas_bitmap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+   
+    free(font_file_data);
+    free(atlas_bitmap);
+
     s_assertf(0, "se_font_load :: Do not use, work in progress");
     return new_font;
 }
-
 
 time_t get_file_mtime(const char* path) {
     struct stat st;
