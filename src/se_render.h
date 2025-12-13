@@ -167,6 +167,8 @@ typedef struct {
     se_models models;
     se_shader* render_quad_shader;
     se_fonts fonts;
+    se_shader* text_shader;
+    GLuint text_vao, text_vbo, text_ebo;
 } se_render_handle;
 
 // helper functions
@@ -251,7 +253,11 @@ extern void se_uniform_set_texture  (se_uniforms* uniforms, const char* name, GL
 extern void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* name, se_render_buffer* buffer);
 extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const b8 update_global_uniforms);
 
+// Font && text functions
 extern se_font* se_font_load(se_render_handle* render_handle, const char* path);
+extern void se_init_text_render(se_render_handle* render_handle);
+extern void se_text_render(se_render_handle* render_handle, se_font* fonts, const c8* text);
+extern void se_font_cleanup(se_font* font);
 
 // Utility functions
 extern time_t get_file_mtime(const char* path);

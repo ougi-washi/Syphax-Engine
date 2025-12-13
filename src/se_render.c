@@ -67,15 +67,6 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     s_array_init(&render_handle->fonts, SE_FONTS_MAX);
 
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
-    /*
-    se_framebuffers framebuffers;
-    se_render_buffers render_buffers;
-    se_textures textures;
-    se_shaders shaders;
-    se_uniforms global_uniforms;
-    se_cameras cameras;
-    se_models models;
-    */
     return render_handle;
 }
 
@@ -1066,6 +1057,18 @@ se_font* se_font_load(se_render_handle* render_handle, const char* path) {
 
     s_assertf(0, "se_font_load :: Do not use, work in progress");
     return new_font;
+}
+
+void se_init_text_render(se_render_handle* render_handle) {
+    render_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
+}
+
+void se_text_render(se_render_handle* render_handle, se_font* fonts, const c8* text) {
+
+}
+
+void se_font_cleanup(se_font* font) {
+    glDeleteTextures(1, &font->atlas_texture);
 }
 
 time_t get_file_mtime(const char* path) {
