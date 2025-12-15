@@ -143,6 +143,8 @@ typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
 
 typedef struct {
     GLuint atlas_texture;
+    u32 first_character;
+    u32 characters_count;
 } se_font;
 typedef s_array(se_font, se_fonts);
 
@@ -167,8 +169,11 @@ typedef struct {
     se_models models;
     se_shader* render_quad_shader;
     se_fonts fonts;
+
+    // TODO: move to separate struct
     se_shader* text_shader;
     GLuint text_vao, text_vbo, text_ebo;
+    s_array(se_vertex, text_vertices);
 } se_render_handle;
 
 // helper functions

@@ -19,6 +19,8 @@
 #define SE_UNIFORMS_MAX 128 
 #define SE_FONTS_MAX 64 
 
+const sz SE_TEXT_VBO_SIZE = 600000 * sizeof(se_vertex); // Size enough for 600000 vertices (100000 quads)
+
 static f64 se_target_fps = 60.0;
 
 static GLuint compile_shader(const char* source, GLenum type);
@@ -51,6 +53,8 @@ void se_render_set_background_color(const se_vec4 color) {
     glClearColor(color.x, color.y, color.z, color.w);
 }
 
+
+
 se_render_handle* se_render_handle_create(const se_render_handle_params* params) {
     s_assertf(params, "se_render_handle_create :: params is null");
     printf("Creating render handle\n");
@@ -66,7 +70,27 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
     s_array_init(&render_handle->fonts, SE_FONTS_MAX);
 
+    // TODO: move to separate function
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+   
+    glGenBuffers(1, &render_handle->text_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, render_handle->text_vbo);
+    glBufferData(GL_ARRAY_BUFFER, SE_TEXT_VBO_SIZE, NULL, GL_DYNAMIC_DRAW);
+
+    glGenVertexArrays(1, &render_handle->text_vao);
+    glBindVertexArray(render_handle->text_vao);
+    
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)0);
+    glEnableVertexAttribArray(0);
+    
+    // Normal attribute (unsure 3 or 4)
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)(offsetof(se_vertex, normal)));
+    glEnableVertexAttribArray(1);
+    
+    // UV attribute
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)(offsetof(se_vertex, uv)));
+    glEnableVertexAttribArray(2);
     return render_handle;
 }
 
@@ -1055,7 +1079,8 @@ se_font* se_font_load(se_render_handle* render_handle, const char* path) {
     free(font_file_data);
     free(atlas_bitmap);
 
-    s_assertf(0, "se_font_load :: Do not use, work in progress");
+    new_font->first_character = 32;
+    new_font->characters_count = 95;
     return new_font;
 }
 
@@ -1063,8 +1088,24 @@ void se_init_text_render(se_render_handle* render_handle) {
     render_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
 }
 
-void se_text_render(se_render_handle* render_handle, se_font* fonts, const c8* text) {
+void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text) {
+    s_assertf(render_handle, "se_text_render :: render_handle is null");
+    s_assertf(font, "se_text_render :: font is null");
+    s_assertf(text, "se_text_render :: text is null");
 
+    i8 order[6] = { 0, 1, 2, 0, 2, 3 };
+    f32 pixel_scale = 1.f / 1024.f; // TODO: dynamic for screen size-
+   
+    s_array_init(&render_handle->text_vertices, strlen(text) * 6);
+    
+    se_vec3 position = se_vec3(0, 0, 0); // TODO: argument
+    for (i32 i = 0; i < strlen(text); i++) {
+        c8 c = text[i];
+        if (c >= font->first_character && c <= font->first_character + font->characters_count) {
+            //stbtt_packedchar* packed_char = 
+            // TODO: move packed_char to font, fix include
+        }
+    }
 }
 
 void se_font_cleanup(se_font* font) {
