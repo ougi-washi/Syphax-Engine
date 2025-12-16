@@ -11,6 +11,8 @@
 #include <assert.h>
 #include <pthread.h>
 
+#include "stb_truetype.h"
+
 #define SE_MAX_NAME_LENGTH 64
 
 //#define SE_MAX_RENDER_BUFFERS 16
@@ -23,7 +25,6 @@
 #define SE_MAX_VERTICES 65536
 #define SE_MAX_INDICES 65536
 //#define SE_MAX_CAMERAS 32 
-
 
 typedef struct {
     se_vec3 position;
@@ -143,8 +144,11 @@ typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
 
 typedef struct {
     GLuint atlas_texture;
-    u32 first_character;
-    u32 characters_count;
+    f32 size;
+    u16 atlas_width, atlas_height;
+    u16 first_character, characters_count;
+    s_array(stbtt_packedchar, packed_characters);
+    s_array(stbtt_aligned_quad, aligned_quads);
 } se_font;
 typedef s_array(se_font, se_fonts);
 
@@ -261,7 +265,7 @@ extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader,
 // Font && text functions
 extern se_font* se_font_load(se_render_handle* render_handle, const char* path);
 extern void se_init_text_render(se_render_handle* render_handle);
-extern void se_text_render(se_render_handle* render_handle, se_font* fonts, const c8* text);
+extern void se_text_render(se_render_handle* render_handle, se_font* fonts, const c8* text, const f32 size);
 extern void se_font_cleanup(se_font* font);
 
 // Utility functions

@@ -1038,37 +1038,37 @@ se_font* se_font_load(se_render_handle* render_handle, const char* path) {
         return NULL;
     }
     
-    const u32 atlas_width = 1024;
-    const u32 atlas_height = 1024;
-    u8* atlas_bitmap = malloc(atlas_width * atlas_height);
+    new_font->atlas_width = 1024;
+    new_font->atlas_height = 1024;
+    u8* atlas_bitmap = malloc(new_font->atlas_width * new_font->atlas_height);
 
     // There are 95 ASCII characters from ASCII 32(Space) to ASCII 126(~)
     // ASCII 32(Space) to ASCII 126(~) are the commonly used characters in text 
-    const u32 first_character = 32;
-    const u32 characters_count = 95;
-    const f32 font_size = 64.0f;
+    new_font->first_character = 32;
+    new_font->characters_count = 95;
+    new_font->size = 64.0f;
 
-    stbtt_packedchar packed_characters[characters_count];
-    stbtt_aligned_quad aligned_quads[characters_count];
+    s_array_init(&new_font->packed_characters, new_font->characters_count);
+    s_array_init(&new_font->aligned_quads, new_font->characters_count);
 
     stbtt_pack_context ctx;
-    stbtt_PackBegin(&ctx, atlas_bitmap, atlas_width, atlas_height, 0, 1, NULL);
-    stbtt_PackFontRange(&ctx, font_file_data, 0, font_size, first_character, characters_count, packed_characters);
+    stbtt_PackBegin(&ctx, atlas_bitmap, new_font->atlas_width, new_font->atlas_height, 0, 1, NULL);
+    stbtt_PackFontRange(&ctx, font_file_data, 0, new_font->size, new_font->first_character, new_font->characters_count, new_font->packed_characters.data);
     
-    for (i32 i = 0; i < characters_count; i++) {
+    for (i32 i = 0; i < new_font->characters_count; i++) {
         f32 unused_x, unused_y;
-        stbtt_GetPackedQuad(packed_characters, 
-                atlas_width, atlas_height, 
+        stbtt_GetPackedQuad(new_font->packed_characters.data, 
+                new_font->atlas_width, new_font->atlas_height, 
                 i,
                 &unused_x, &unused_y,
-                &aligned_quads[i],
+                s_array_get(&new_font->aligned_quads, i),
                 0);
     }
 
     glGenTextures(1, &new_font->atlas_texture);
     glBindTexture(GL_TEXTURE_2D, new_font->atlas_texture);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlas_width, atlas_height, 0, GL_RED, GL_UNSIGNED_BYTE, atlas_bitmap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, new_font->atlas_width, new_font->atlas_height, 0, GL_RED, GL_UNSIGNED_BYTE, atlas_bitmap);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1079,8 +1079,6 @@ se_font* se_font_load(se_render_handle* render_handle, const char* path) {
     free(font_file_data);
     free(atlas_bitmap);
 
-    new_font->first_character = 32;
-    new_font->characters_count = 95;
     return new_font;
 }
 
@@ -1088,7 +1086,7 @@ void se_init_text_render(se_render_handle* render_handle) {
     render_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
 }
 
-void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text) {
+void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text, const f32 size) {
     s_assertf(render_handle, "se_text_render :: render_handle is null");
     s_assertf(font, "se_text_render :: font is null");
     s_assertf(text, "se_text_render :: text is null");
@@ -1102,8 +1100,14 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
     for (i32 i = 0; i < strlen(text); i++) {
         c8 c = text[i];
         if (c >= font->first_character && c <= font->first_character + font->characters_count) {
-            //stbtt_packedchar* packed_char = 
-            // TODO: move packed_char to font, fix include
+            stbtt_packedchar* packed_char = s_array_get(&font->packed_characters, c - font->first_character);
+            stbtt_aligned_quad* aligned_quad = s_array_get(&font->aligned_quads, c - font->first_character);
+
+            se_vec2 glyph_size = se_vec2((packed_char->x1 - packed_char->x0) * pixel_scale * size,
+                                        (packed_char->y1 - packed_char->y0) * pixel_scale * size);
+
+
+            //se_vec2 glyph_bounding_box_min = 
         }
     }
 }
