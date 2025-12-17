@@ -1032,6 +1032,9 @@ void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const 
             case SE_UNIFORM_INT:
                 glUniform1i(location, uniform->value.i);
                 break;
+            case SE_UNIFORM_MAT4:
+                glUniformMatrix4fv(location, 1, GL_FALSE, &uniform->value.mat4.m[0]);
+                break;
             case SE_UNIFORM_TEXTURE:
                 glActiveTexture(GL_TEXTURE0 + texture_unit);
                 glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
@@ -1048,7 +1051,11 @@ se_font* se_font_load(se_render_handle* render_handle, const char* path) {
     se_font* new_font = s_array_increment(&render_handle->fonts);
    
     sz font_file_size = 0;
-    uc8* font_file_data = load_file_uc8(path, &font_file_size);
+    c8 new_path[SE_MAX_PATH_LENGTH] = "";
+    strncpy(new_path, RESOURCES_DIR, SE_MAX_PATH_LENGTH - 1);
+    strncat(new_path, path, SE_MAX_PATH_LENGTH - strlen(new_path) - 1);
+    uc8* font_file_data = load_file_uc8(new_path, &font_file_size);
+
     s_assertf(font_file_data, "se_font_load :: file_data is null");
   
     const i32 font_count = stbtt_GetNumberOfFonts(font_file_data);

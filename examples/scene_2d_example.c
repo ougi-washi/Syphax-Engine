@@ -69,6 +69,11 @@ i32 main() {
 
     se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
 
+    se_font* main_font = se_font_load(render_handle, "fonts/ithaca.ttf");
+    s_assert(main_font);
+
+    se_init_text_render(render_handle);
+
     key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
     s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
@@ -86,6 +91,7 @@ i32 main() {
         se_render_clear();
         se_scene_2d_render(scene_2d, render_handle, window);
         se_scene_2d_render_to_screen(scene_2d, render_handle, window);
+        se_text_render(render_handle, main_font, "boubli", &se_vec2(0, 0), 1.);
         se_window_render_screen(window);
     }
 

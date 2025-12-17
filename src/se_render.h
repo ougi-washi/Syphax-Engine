@@ -270,7 +270,7 @@ extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader,
 // Font && text functions
 extern se_font* se_font_load(se_render_handle* render_handle, const char* path);
 extern void se_init_text_render(se_render_handle* render_handle);
-extern void se_text_render(se_render_handle* render_handle, se_font* fonts, const c8* text, const se_vec2* position, const f32 size);
+extern void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text, const se_vec2* position, const f32 size);
 extern void se_font_cleanup(se_font* font);
 
 // Utility functions
