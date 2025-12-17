@@ -321,6 +321,10 @@ void se_shader_set_int(se_shader* shader, const char* name, i32 value){
     se_uniform_set_int(&shader->uniforms, name, value);
 }
 
+void se_shader_set_mat4(se_shader* shader, const char* name, const se_mat4* value) {
+    se_uniform_set_mat4(&shader->uniforms, name, value);
+}
+
 void se_shader_set_texture(se_shader* shader, const char* name, GLuint texture){
     se_uniform_set_texture(&shader->uniforms, name, texture);
 }
@@ -930,6 +934,21 @@ void se_uniform_set_int(se_uniforms* uniforms, const char* name, i32 value) {
     new_uniform->value.i = value;
 }
 
+void se_uniform_set_mat4(se_uniforms* uniforms, const char* name, const se_mat4* value) {
+    s_foreach(uniforms, i) {
+        se_uniform* found_uniform = s_array_get(uniforms, i);
+        if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+            found_uniform->type = SE_UNIFORM_MAT4;
+            memcpy(&found_uniform->value.mat4, value, sizeof(se_mat4));
+            return;
+        }
+    }
+    se_uniform* new_uniform = s_array_increment(uniforms);
+    strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
+    new_uniform->type = SE_UNIFORM_MAT4;
+    memcpy(&new_uniform->value.mat4, value, sizeof(se_mat4));
+}
+
 void se_uniform_set_texture(se_uniforms* uniforms, const char* name, GLuint texture) {
     // TODO: IMPORTANT: SEG FAULT HERE in 2025-08-24, audio_example.c:45
     s_foreach(uniforms, i) {
@@ -1093,6 +1112,12 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
 
     render_handle->text_vertex_index = 0; // TODO: Move to text_render_start
 
+    // start of hack, this part should be called only once before rendering all text
+    glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
+    glActiveTexture(GL_TEXTURE0);
+    se_shader_set_texture(render_handle->text_shader, "u_atlas_texture", font->atlas_texture);
+    // end of hack
+
     se_vec2 local_position = *position;
 
     i8 order[6] = { 0, 1, 2, 0, 2, 3 };
@@ -1144,6 +1169,22 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
             local_position.x = position->x;
         }
     }
+
+    // start of hack, this part should be fully reworked 
+    sz size_of_vertices = s_array_get_size(&render_handle->text_vertices) * sizeof(se_vertex);
+    u32 draw_calls_count = (size_of_vertices / SE_TEXT_VBO_SIZE) + 1;
+
+    se_mat4 view_projection_mat = mat4_ortho(0, 1024, 0, 768, 0, 1);
+
+    for (i32 i = 0; i < draw_calls_count; i++) {
+        const se_vertex* vertices_data = render_handle->text_vertices.data + i * SE_TEXT_VBO_SIZE;
+        u32 vertices_count = 
+            i == draw_calls_count - i ? 
+                (size_of_vertices % SE_TEXT_VBO_SIZE) / sizeof(se_vertex) :
+                SE_TEXT_VBO_SIZE / sizeof(se_vertex) * 6;
+        se_shader_set_mat4(render_handle->text_shader, "u_view_projection_mat", &view_projection_mat);
+    }
+    // end of hack
 }
 
 void se_font_cleanup(se_font* font) {

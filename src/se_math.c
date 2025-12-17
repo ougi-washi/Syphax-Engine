@@ -18,6 +18,19 @@ se_mat4 mat4_perspective(float fov_y, float aspect, float near, float far) {
     return P;
 }
 
+se_mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far) {
+    float rl = right - left;
+    float tb = top - bottom;
+    float fn = far - near;
+    se_mat4 P = { {
+        2/rl, 0, 0, left - right,
+        0, 2/tb, 0, bottom - top,
+        0, 0, -2/fn, near - far,
+        0, 0, 0, 1
+    } };
+    return P;
+}
+
 se_vec3 vec3_sub(se_vec3 a, se_vec3 b){
     return (se_vec3){ a.x-b.x, a.y-b.y, a.z-b.z };
 }

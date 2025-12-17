@@ -41,6 +41,7 @@ static se_mat4 mat4_identity(void) {
 #define max(a, b) ((a) > (b) ? (a) : (b))
 extern f32 vec3_length(se_vec3 v);
 extern se_mat4 mat4_perspective(float fov_y, float aspect, float near, float far);
+extern se_mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far);
 extern se_vec3 vec3_sub(se_vec3 a, se_vec3 b);
 extern se_vec3 vec3_norm(se_vec3 v);
 extern se_vec3 vec3_cross(se_vec3 a, se_vec3 b);

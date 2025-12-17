@@ -38,6 +38,7 @@ typedef enum {
     SE_UNIFORM_VEC3,
     SE_UNIFORM_VEC4,
     SE_UNIFORM_INT,
+    SE_UNIFORM_MAT4,
     SE_UNIFORM_TEXTURE
 } se_uniform_type;
 
@@ -50,6 +51,7 @@ typedef struct {
         se_vec3 vec3;
         se_vec4 vec4;
         i32 i;
+        se_mat4 mat4;
         GLuint texture;
     } value;
 } se_uniform;
@@ -211,6 +213,7 @@ extern void se_shader_set_vec2(se_shader* shader, const char* name, const se_vec
 extern void se_shader_set_vec3(se_shader* shader, const char* name, const se_vec3* value);
 extern void se_shader_set_vec4(se_shader* shader, const char* name, const se_vec4* value);
 extern void se_shader_set_int(se_shader* shader, const char* name, i32 value);
+extern void se_shader_set_mat4(se_shader* shader, const char* name, const se_mat4* value);
 extern void se_shader_set_texture(se_shader* shader, const char* name, GLuint texture);
 extern void se_shader_set_buffer_texture(se_shader* shader, const char* name, se_render_buffer* buffer);
 
@@ -259,6 +262,7 @@ extern void se_uniform_set_vec2     (se_uniforms* uniforms, const char* name, co
 extern void se_uniform_set_vec3     (se_uniforms* uniforms, const char* name, const se_vec3* value);
 extern void se_uniform_set_vec4     (se_uniforms* uniforms, const char* name, const se_vec4* value);
 extern void se_uniform_set_int      (se_uniforms* uniforms, const char* name, i32 value);
+extern void se_uniform_set_mat4     (se_uniforms* uniforms, const char* name, const se_mat4* value);
 extern void se_uniform_set_texture  (se_uniforms* uniforms, const char* name, GLuint texture);
 extern void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* name, se_render_buffer* buffer);
 extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const b8 update_global_uniforms);
