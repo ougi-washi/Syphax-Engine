@@ -1182,7 +1182,13 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
             i == draw_calls_count - i ? 
                 (size_of_vertices % SE_TEXT_VBO_SIZE) / sizeof(se_vertex) :
                 SE_TEXT_VBO_SIZE / sizeof(se_vertex) * 6;
+        // This does not make sense to be here
         se_shader_set_mat4(render_handle->text_shader, "u_view_projection_mat", &view_projection_mat);
+        glBindVertexArray(render_handle->text_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, render_handle->text_vbo);
+        // TODO: add this to se_gl.h
+        //glBufferSubData(GL_ARRAY_BUFFER, 0, size_of_vertices, render_handle->text_vertices.data);
+        glDrawArrays(GL_TRIANGLES, 0, vertices_count);
     }
     // end of hack
 }
