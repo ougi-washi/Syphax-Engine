@@ -1086,17 +1086,20 @@ void se_init_text_render(se_render_handle* render_handle) {
     render_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
 }
 
-void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text, const f32 size) {
+void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text, const se_vec2* position, const f32 size) {
     s_assertf(render_handle, "se_text_render :: render_handle is null");
     s_assertf(font, "se_text_render :: font is null");
     s_assertf(text, "se_text_render :: text is null");
+
+    render_handle->text_vertex_index = 0; // TODO: Move to text_render_start
+
+    se_vec2 local_position = *position;
 
     i8 order[6] = { 0, 1, 2, 0, 2, 3 };
     f32 pixel_scale = 1.f / 1024.f; // TODO: dynamic for screen size-
    
     s_array_init(&render_handle->text_vertices, strlen(text) * 6);
     
-    se_vec3 position = se_vec3(0, 0, 0); // TODO: argument
     for (i32 i = 0; i < strlen(text); i++) {
         c8 c = text[i];
         if (c >= font->first_character && c <= font->first_character + font->characters_count) {
@@ -1107,7 +1110,38 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
                                         (packed_char->y1 - packed_char->y0) * pixel_scale * size);
 
 
-            //se_vec2 glyph_bounding_box_min = 
+            se_vec2 glyph_bounding_box_min = se_vec2(local_position.x + packed_char->xoff * pixel_scale * size,
+                                                    local_position.y - (packed_char->yoff + packed_char->y1 - packed_char->y0) * pixel_scale * size);
+        
+            se_vec2 glyph_vertices[4] = {
+                { glyph_bounding_box_min.x + glyph_size.x, glyph_bounding_box_min.y + glyph_size.y},
+                { glyph_bounding_box_min.x, glyph_bounding_box_min.y + glyph_size.y},
+                { glyph_bounding_box_min.x, glyph_bounding_box_min.y},
+                { glyph_bounding_box_min.x + glyph_size.x, glyph_bounding_box_min.y}
+            };
+            
+            se_vec2 glyph_texture_coords[4] = {
+                { aligned_quad->s1, aligned_quad->t0 },
+                { aligned_quad->s0, aligned_quad->t0 },
+                { aligned_quad->s0, aligned_quad->t1 },
+                { aligned_quad->s1, aligned_quad->t1 },
+            };
+
+            for (i32 i = 0; i < 6; i++) {
+                se_vertex* vertex = s_array_get(&render_handle->text_vertices, render_handle->text_vertex_index + i);
+                vertex->position = se_vec3(glyph_vertices[order[i]].x, glyph_vertices[order[i]].y, 0);
+                //vertex->color = se_vec4(1, 1, 1, 1); // TODO: Add color
+                vertex->uv = glyph_texture_coords[order[i]];
+            }
+            render_handle->text_vertex_index += 6;
+            local_position.x += packed_char->xadvance * pixel_scale * size;
+        }
+
+        else if(c == '\n')
+        {
+            // advance y by fontSize, reset x-coordinate
+            local_position.y -= font->size * pixel_scale * size;
+            local_position.x = position->x;
         }
     }
 }
