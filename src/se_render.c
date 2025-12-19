@@ -1119,11 +1119,13 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
 
     render_handle->text_vertex_index = 0; // TODO: Move to text_render_start
 
-    // start of hack, this part should be called only once before rendering all text
+    // start of hack, this part should be called only once before rendering all text with the same font
     glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
     glActiveTexture(GL_TEXTURE0);
     se_shader_set_texture(render_handle->text_shader, "u_atlas_texture", font->atlas_texture);
     // end of hack
+
+    // TODO: Parse text, set it up, instance and push count + data to the GPU
 
     se_vec2 local_position = *position;
 
@@ -1151,17 +1153,16 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
                 { glyph_bounding_box_min.x, glyph_bounding_box_min.y},
                 { glyph_bounding_box_min.x + glyph_size.x, glyph_bounding_box_min.y}
             };
-            
             se_vec2 glyph_texture_coords[4] = {
                 { aligned_quad->s1, aligned_quad->t0 },
                 { aligned_quad->s0, aligned_quad->t0 },
                 { aligned_quad->s0, aligned_quad->t1 },
                 { aligned_quad->s1, aligned_quad->t1 },
             };
-
             for (i32 i = 0; i < 6; i++) {
                 se_vertex* vertex = s_array_get(&render_handle->text_vertices, render_handle->text_vertex_index + i);
                 vertex->position = se_vec3(glyph_vertices[order[i]].x, glyph_vertices[order[i]].y, 0);
+                printf("position: %f, %f\n", vertex->position.x, vertex->position.y);
                 //vertex->color = se_vec4(1, 1, 1, 1); // TODO: Add color
                 vertex->uv = glyph_texture_coords[order[i]];
             }
