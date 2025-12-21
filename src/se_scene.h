@@ -14,10 +14,18 @@
 #define SE_MAX_2D_OBJECTS 1024
 #define SE_MAX_3D_OBJECTS 1024
 
+typedef i32 se_instance_id;
+typedef struct {
+    s_array(se_instance_id, ids);
+    s_array(se_mat4, transforms);
+    s_array(se_mat4, buffers);
+} se_instances;
+
 typedef struct {
     se_vec2 position;
     se_vec2 scale;
     se_shader_ptr shader;
+    se_instances instances;
 } se_object_2d;
 typedef s_array(se_object_2d, se_objects_2d);
 typedef se_object_2d* se_object_2d_ptr;
@@ -26,6 +34,7 @@ typedef s_array(se_object_2d_ptr, se_objects_2d_ptr);
 typedef struct {
     se_model* model;
     se_mat4 transform;
+    se_instances instances;
 } se_object_3d;
 typedef s_array(se_object_3d, se_objects_3d);
 typedef se_object_3d* se_object_3d_ptr;
@@ -71,13 +80,17 @@ extern se_scene_handle* se_scene_handle_create(se_render_handle* render_handle, 
 extern void se_scene_handle_cleanup(se_scene_handle* scene_handle);
 
 // 2D objects functions
-extern se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragment_shader_path, const se_vec2* position, const se_vec2* scale);
+extern se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragment_shader_path, const se_vec2* position, const se_vec2* scale, const sz max_instances_count);
 extern void se_object_2d_get_box_2d(se_object_2d* object, se_box_2d* out_box);
 extern void se_object_2d_destroy(se_scene_handle* scene_handle, se_object_2d* object);
 extern void se_object_2d_set_position(se_object_2d* object, const se_vec2* position);
 extern void se_object_2d_set_scale(se_object_2d* object, const se_vec2* scale);
 extern void se_object_2d_set_shader(se_object_2d* object, se_shader* shader);
 extern void se_object_2d_update_uniforms(se_object_2d* object);
+extern se_instance_id se_object_2d_set_instance_add(se_object_2d* object, const se_mat4* transform, const se_mat4* buffer);
+extern i32 se_object_2d_get_instance_index(se_object_2d* object, const se_instance_id instance_id);
+extern void se_object_2d_set_instance_transform(se_object_2d* object, const se_instance_id instance_id, const se_mat4* transform);
+extern void se_object_2d_set_instance_buffer(se_object_2d* object, const se_instance_id instance_id, const se_mat4* buffer);
 
 // 2D scene functions
 extern se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count);

@@ -44,10 +44,10 @@ i32 main() {
     
     se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec2(WIDTH, HEIGHT), 4);
     
-    se_object_2d* borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &se_vec2(0, 0), &se_vec2(0.95, 0.95));
-    se_object_2d* panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &se_vec2(0, 0), &se_vec2(0.5, 0.5));
-    se_object_2d* button_yes = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(0.15, 0.), &se_vec2(0.1, 0.1));
-    se_object_2d* button_no = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(-0.15, 0.), &se_vec2(0.1, 0.1));
+    se_object_2d* borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &se_vec2(0, 0), &se_vec2(0.95, 0.95), 0);
+    se_object_2d* panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &se_vec2(0, 0), &se_vec2(0.5, 0.5), 0);
+    se_object_2d* button_yes = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(0.15, 0.), &se_vec2(0.1, 0.1), 0);
+    se_object_2d* button_no = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(-0.15, 0.), &se_vec2(0.1, 0.1), 0);
     se_shader_set_vec3(button_yes->shader, "u_color", &se_vec3(0, 1, 0));
     se_shader_set_vec3(button_no->shader, "u_color", &se_vec3(1, 0, 0));
 
