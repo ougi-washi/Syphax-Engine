@@ -995,6 +995,9 @@ void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const 
             case SE_UNIFORM_INT:
                 glUniform1i(location, uniform->value.i);
                 break;
+            case SE_UNIFORM_MAT4:
+                glUniformMatrix4fv(location, 1, GL_FALSE, &uniform->value.mat4.m[0]);
+                break;
             case SE_UNIFORM_TEXTURE:
                 glActiveTexture(GL_TEXTURE0 + texture_unit);
                 glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
