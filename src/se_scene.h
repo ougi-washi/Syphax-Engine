@@ -15,10 +15,13 @@
 #define SE_MAX_3D_OBJECTS 1024
 
 typedef i32 se_instance_id;
+typedef s_array(se_instance_id, se_instance_ids);
+typedef s_array(se_mat4, se_transforms);
+typedef s_array(se_mat4, se_buffers);
 typedef struct {
-    s_array(se_instance_id, ids);
-    s_array(se_mat4, transforms);
-    s_array(se_mat4, buffers);
+    se_instance_ids ids;
+    se_transforms transforms;
+    se_buffers buffers;
 } se_instances;
 
 typedef struct {
@@ -91,6 +94,8 @@ extern se_instance_id se_object_2d_set_instance_add(se_object_2d* object, const 
 extern i32 se_object_2d_get_instance_index(se_object_2d* object, const se_instance_id instance_id);
 extern void se_object_2d_set_instance_transform(se_object_2d* object, const se_instance_id instance_id, const se_mat4* transform);
 extern void se_object_2d_set_instance_buffer(se_object_2d* object, const se_instance_id instance_id, const se_mat4* buffer);
+extern void se_object_2d_set_instances_transforms(se_object_2d* object, const se_transforms* transforms);
+extern void se_object_2d_set_instances_buffers(se_object_2d* object, const se_buffers* buffers);
 
 // 2D scene functions
 extern se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count);

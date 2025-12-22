@@ -207,6 +207,22 @@ void se_object_2d_set_instance_buffer(se_object_2d* object, const se_instance_id
     }
 }
 
+void se_object_2d_set_instances_transforms(se_object_2d* object, const se_transforms* transforms) {
+    s_assertf(object, "se_object_2d_set_instances_transforms :: object is null");
+    s_assertf(transforms, "se_object_2d_set_instances_transforms :: transforms is null");
+    s_assertf(s_array_get_capacity(&object->instances.transforms) == s_array_get_capacity(transforms), "se_object_2d_set_instances_transforms :: transforms capacity is not equal to object capacity");
+    object->instances.transforms.size = s_array_get_size(transforms);
+    *object->instances.transforms.data = *(transforms->data);
+}
+
+void se_object_2d_set_instances_buffers(se_object_2d* object, const se_buffers* buffers) {
+    s_assertf(object, "se_object_2d_set_instances_buffers :: object is null");
+    s_assertf(buffers, "se_object_2d_set_instances_buffers :: buffers is null");
+    s_assertf(s_array_get_capacity(&object->instances.buffers) == s_array_get_capacity(buffers), "se_object_2d_set_instances_buffers :: buffers capacity is not equal to object capacity");
+    object->instances.buffers.size = s_array_get_size(buffers);
+    *object->instances.buffers.data = *(buffers->data);
+}
+
 se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
     printf("Creating scene 2D\n");
     s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
@@ -250,37 +266,6 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle, se_
     }
     se_disable_blending();
     se_framebuffer_unbind(scene->output);
-
-    //se_shader_set_texture(scene->output->shader, "u_texture", scene->output->texture);
-    //se_shader_use(render_handle, scene->output->shader, true);
-    //se_render_buffer_bind(scene->output);
-    //se_render_clear();
-    //se_window_render_quad(window);
-    //se_render_buffer_unbind(scene->output);
-
-    //s_foreach(se_render_buffers_ptr, scene->render_buffers, i) {
-    //    se_render_buffer_ptr* buffer_ptr = se_render_buffers_ptr_get(&scene->render_buffers, i);
-    //    if (buffer_ptr == NULL) {
-    //        continue;
-    //    }
-
-    //    se_render_buffer* buffer = *buffer_ptr;
-
-    //    // render buffer
-    //    se_render_buffer_bind(buffer);
-    //    se_shader_use(render_handle, buffer->shader, true);
-    //    se_render_clear();
-    //    se_window_render_quad(window);
-    //    se_render_buffer_unbind(buffer);
-
-    //    // render output
-    //    se_shader_set_texture(scene->output->shader, "u_texture", buffer->texture);
-    //    se_shader_use(render_handle, scene->output->shader, true);
-    //    se_render_buffer_bind(scene->output);
-    //    se_render_clear();
-    //    se_window_render_quad(window);
-    //    se_render_buffer_unbind(scene->output);
-    //}
 }
 
 void se_scene_2d_render_to_screen(se_scene_2d* scene, se_render_handle* render_handle, se_window* window) {
