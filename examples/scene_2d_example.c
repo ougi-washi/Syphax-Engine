@@ -89,9 +89,9 @@ i32 main() {
         se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
         
         se_render_clear();
-        se_scene_2d_render(scene_2d, render_handle, window);
+        se_scene_2d_render(scene_2d, render_handle);
         se_scene_2d_render_to_screen(scene_2d, render_handle, window);
-        se_text_render(render_handle, main_font, "boubli", &se_vec2(0, 0), 1.);
+        //se_text_render(render_handle, main_font, "boubli", &se_vec2(0, 0), 1.);
         se_window_render_screen(window);
     }
 

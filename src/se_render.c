@@ -1048,6 +1048,49 @@ void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const 
     }
 }
 
+void se_quad_create(se_quad* out_quad) {
+    s_assertf(out_quad, "se_quad_create :: out_quad is null");
+
+    out_quad->vao = 0;
+    out_quad->vbo = 0;
+    out_quad->ebo = 0;
+    
+    glGenVertexArrays(1, &out_quad->vao);
+    glGenBuffers(1, &out_quad->vbo);
+    glGenBuffers(1, &out_quad->ebo);
+    
+    glBindVertexArray(out_quad->vao);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, out_quad->vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(se_quad_vertices), se_quad_vertices, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, out_quad->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(se_quad_indices), se_quad_indices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)offsetof(se_vertex, position));
+   
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)offsetof(se_vertex, normal));
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)offsetof(se_vertex, uv));
+
+    glBindVertexArray(0);
+}
+
+void se_quad_render(se_quad* quad) {
+    glBindVertexArray(quad->vao);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+void se_quad_destroy(se_quad* quad) {
+    glDeleteVertexArrays(1, &quad->vao);
+    glDeleteBuffers(1, &quad->vbo);
+    glDeleteBuffers(1, &quad->ebo);
+}
+
 se_font* se_font_load(se_render_handle* render_handle, const char* path) {
     s_assertf(render_handle, "se_font_load :: render_handle is null");
     s_assertf(path, "se_font_load :: path is null");

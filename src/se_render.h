@@ -32,6 +32,15 @@ typedef struct {
     se_vec2 uv;
 } se_vertex;
 
+static const se_vertex se_quad_vertices[4] = {
+    { { -1.0f,  1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
+    { { -1.0f, -1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+    { {  1.0f, -1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f } },
+    { {  1.0f,  1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } }
+};
+
+static const u32 se_quad_indices[6] = { 0, 1, 2, 0, 2, 3 };
+
 typedef enum {
     SE_UNIFORM_FLOAT,
     SE_UNIFORM_VEC2,
@@ -143,6 +152,12 @@ typedef struct {
 typedef s_array(se_render_buffer, se_render_buffers);
 typedef se_render_buffer* se_render_buffer_ptr;
 typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
+
+typedef struct {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+} se_quad;
 
 typedef struct {
     GLuint atlas_texture;
@@ -266,6 +281,11 @@ extern void se_uniform_set_mat4     (se_uniforms* uniforms, const char* name, co
 extern void se_uniform_set_texture  (se_uniforms* uniforms, const char* name, GLuint texture);
 extern void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* name, se_render_buffer* buffer);
 extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const b8 update_global_uniforms);
+
+// Quad functions
+extern void se_quad_create(se_quad* out_quad);
+extern void se_quad_render(se_quad* quad);
+extern void se_quad_destroy(se_quad* quad);
 
 // Font && text functions
 extern se_font* se_font_load(se_render_handle* render_handle, const char* path);
