@@ -231,7 +231,7 @@ se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* si
     s_assertf(size, "se_scene_2d_create :: size is null");
     s_assertf(object_count > 0, "se_scene_2d_create :: object_count is 0");
     se_scene_2d* new_scene = s_array_increment(&scene_handle->scenes_2d);
-    se_quad_create(&new_scene->quad);
+    se_quad_2d_create(&new_scene->quad);
     if (scene_handle->render_handle) {
         new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
         s_array_init(&new_scene->objects, object_count);

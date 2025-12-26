@@ -27,12 +27,24 @@
 //#define SE_MAX_CAMERAS 32 
 
 typedef struct {
+    se_vec2 position;
+    se_vec2 uv;
+} se_vertex_2d;
+
+typedef struct {
     se_vec3 position;
     se_vec3 normal;
     se_vec2 uv;
-} se_vertex;
+} se_vertex_3d;
 
-static const se_vertex se_quad_vertices[4] = {
+static const se_vertex_2d se_quad_2d_vertices[4] = {
+    { { -1.0f,  1.0f }, { 0.0f, 0.0f } },
+    { { -1.0f, -1.0f }, { 0.0f, 1.0f } },
+    { {  1.0f, -1.0f }, { 1.0f, 1.0f } },
+    { {  1.0f,  1.0f }, { 1.0f, 0.0f } }
+};
+
+static const se_vertex_3d se_quad_3d_vertices[4] = {
     { { -1.0f,  1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
     { { -1.0f, -1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
     { {  1.0f, -1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f } },
@@ -93,7 +105,7 @@ typedef se_texture* se_texture_ptr;
 typedef s_array(se_texture_ptr, se_textures_ptr);
 
 typedef struct {
-    se_vertex* vertices;
+    se_vertex_3d* vertices;
     u32* indices;
     u32 vertex_count;
     u32 index_count;
@@ -195,7 +207,7 @@ typedef struct {
     se_shader* text_shader;
     i32 text_vertex_index;
     GLuint text_vao, text_vbo, text_ebo;
-    s_array(se_vertex, text_vertices);
+    s_array(se_vertex_3d, text_vertices);
 } se_render_handle;
 
 // helper functions
@@ -283,7 +295,8 @@ extern void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* nam
 extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const b8 update_global_uniforms);
 
 // Quad functions
-extern void se_quad_create(se_quad* out_quad);
+extern void se_quad_3d_create(se_quad* out_quad);
+extern void se_quad_2d_create(se_quad* out_quad);
 extern void se_quad_render(se_quad* quad);
 extern void se_quad_destroy(se_quad* quad);
 

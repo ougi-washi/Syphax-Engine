@@ -19,7 +19,7 @@
 #define SE_UNIFORMS_MAX 128 
 #define SE_FONTS_MAX 64 
 
-const sz SE_TEXT_VBO_SIZE = 600000 * sizeof(se_vertex); // Size enough for 600000 vertices (100000 quads)
+const sz SE_TEXT_VBO_SIZE = 600000 * sizeof(se_vertex_3d); // Size enough for 600000 vertices (100000 quads)
 
 static f64 se_target_fps = 60.0;
 
@@ -81,15 +81,15 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     glBindVertexArray(render_handle->text_vao);
     
     // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void*)0);
     glEnableVertexAttribArray(0);
     
     // Normal attribute (unsure 3 or 4)
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)(offsetof(se_vertex, normal)));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void*)(offsetof(se_vertex_3d, normal)));
     glEnableVertexAttribArray(1);
     
     // UV attribute
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)(offsetof(se_vertex, uv)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void*)(offsetof(se_vertex_3d, uv)));
     glEnableVertexAttribArray(2);
     return render_handle;
 }
@@ -349,12 +349,12 @@ void se_mesh_scale(se_mesh* mesh, const se_vec3* v){
 }
 
 // Helper function to finalize a mesh
-void finalize_mesh(se_mesh* mesh, se_vertex* vertices, u32* indices, u32 vertex_count, u32 index_count, 
+void finalize_mesh(se_mesh* mesh, se_vertex_3d* vertices, u32* indices, u32 vertex_count, u32 index_count, 
                    se_shaders_ptr* shaders, u32 se_mesh_index) {
 // Allocate mesh data
-    mesh->vertices = malloc(vertex_count * sizeof(se_vertex));
+    mesh->vertices = malloc(vertex_count * sizeof(se_vertex_3d));
     mesh->indices = malloc(index_count * sizeof(u32));
-    memcpy(mesh->vertices, vertices, vertex_count * sizeof(se_vertex));
+    memcpy(mesh->vertices, vertices, vertex_count * sizeof(se_vertex_3d));
     memcpy(mesh->indices, indices, index_count * sizeof(u32));
     mesh->vertex_count = vertex_count;
     mesh->index_count = index_count;
@@ -376,21 +376,21 @@ void finalize_mesh(se_mesh* mesh, se_vertex* vertices, u32* indices, u32 vertex_
     glBindVertexArray(mesh->vao);
     
     glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(se_vertex), mesh->vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(se_vertex_3d), mesh->vertices, GL_STATIC_DRAW);
     
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), mesh->indices, GL_STATIC_DRAW);
     
     // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void*)0);
     glEnableVertexAttribArray(0);
     
     // Normal attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (void*)offsetof(se_vertex, normal));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void*)offsetof(se_vertex_3d, normal));
     glEnableVertexAttribArray(1);
     
     // UV attribute
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (void*)offsetof(se_vertex, uv));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void*)offsetof(se_vertex_3d, uv));
     glEnableVertexAttribArray(2);
     
     glBindVertexArray(0);
@@ -421,7 +421,7 @@ se_model* se_model_load_obj(se_render_handle* render_handle, const char* path, s
     // Dynamic array for meshes
     
     // Current mesh data
-    se_vertex* current_vertices = malloc(SE_MAX_VERTICES * sizeof(se_vertex));
+    se_vertex_3d* current_vertices = malloc(SE_MAX_VERTICES * sizeof(se_vertex_3d));
     u32* current_indices = malloc(SE_MAX_INDICES * sizeof(u32));
     u32 current_vertex_count = 0;
     u32 current_index_count = 0;
@@ -1048,7 +1048,7 @@ void se_uniform_apply(se_render_handle* render_handle, se_shader* shader, const 
     }
 }
 
-void se_quad_create(se_quad* out_quad) {
+void se_quad3d_create(se_quad* out_quad) {
     s_assertf(out_quad, "se_quad_create :: out_quad is null");
 
     out_quad->vao = 0;
@@ -1062,19 +1062,47 @@ void se_quad_create(se_quad* out_quad) {
     glBindVertexArray(out_quad->vao);
     
     glBindBuffer(GL_ARRAY_BUFFER, out_quad->vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(se_quad_vertices), se_quad_vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(se_quad_3d_vertices), se_quad_3d_vertices, GL_STATIC_DRAW);
     
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, out_quad->ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(se_quad_indices), se_quad_indices, GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)offsetof(se_vertex, position));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void*)offsetof(se_vertex_3d, position));
    
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)offsetof(se_vertex, normal));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void*)offsetof(se_vertex_3d, normal));
 
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex), (const void*)offsetof(se_vertex, uv));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void*)offsetof(se_vertex_3d, uv));
+
+    glBindVertexArray(0);
+}
+
+void se_quad_2d_create(se_quad* out_quad) {
+    s_assertf(out_quad, "se_quad_create :: out_quad is null");
+
+    out_quad->vao = 0;
+    out_quad->vbo = 0;
+    out_quad->ebo = 0;
+    
+    glGenVertexArrays(1, &out_quad->vao);
+    glGenBuffers(1, &out_quad->vbo);
+    glGenBuffers(1, &out_quad->ebo);
+    
+    glBindVertexArray(out_quad->vao);
+   
+    glBindBuffer(GL_ARRAY_BUFFER, out_quad->vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(se_quad_2d_vertices), se_quad_2d_vertices, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, out_quad->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(se_quad_indices), se_quad_indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, position));
+    glEnableVertexAttribArray(0);
+    
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, uv));
+    glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
 }
@@ -1206,7 +1234,7 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
                 { aligned_quad->s1, aligned_quad->t1 },
             };
             for (i32 i = 0; i < 6; i++) {
-                se_vertex* vertex = s_array_get(&render_handle->text_vertices, render_handle->text_vertex_index + i);
+                se_vertex_3d* vertex = s_array_get(&render_handle->text_vertices, render_handle->text_vertex_index + i);
                 vertex->position = se_vec3(glyph_vertices[order[i]].x, glyph_vertices[order[i]].y, 0);
                 printf("position: %f, %f\n", vertex->position.x, vertex->position.y);
                 //vertex->color = se_vec4(1, 1, 1, 1); // TODO: Add color
@@ -1225,17 +1253,17 @@ void se_text_render(se_render_handle* render_handle, se_font* font, const c8* te
     }
 
     // start of hack, this part should be fully reworked 
-    sz size_of_vertices = s_array_get_size(&render_handle->text_vertices) * sizeof(se_vertex);
+    sz size_of_vertices = s_array_get_size(&render_handle->text_vertices) * sizeof(se_vertex_3d);
     u32 draw_calls_count = (size_of_vertices / SE_TEXT_VBO_SIZE) + 1;
 
     se_mat4 view_projection_mat = mat4_ortho(0, 1024, 0, 768, 0, 1);
 
     for (i32 i = 0; i < draw_calls_count; i++) {
-        const se_vertex* vertices_data = render_handle->text_vertices.data + i * SE_TEXT_VBO_SIZE;
+        const se_vertex_3d* vertices_data = render_handle->text_vertices.data + i * SE_TEXT_VBO_SIZE;
         u32 vertices_count = 
             i == draw_calls_count - i ? 
-                (size_of_vertices % SE_TEXT_VBO_SIZE) / sizeof(se_vertex) :
-                SE_TEXT_VBO_SIZE / sizeof(se_vertex) * 6;
+                (size_of_vertices % SE_TEXT_VBO_SIZE) / sizeof(se_vertex_3d) :
+                SE_TEXT_VBO_SIZE / sizeof(se_vertex_3d) * 6;
         // This does not make sense to be here
         se_shader_set_mat4(render_handle->text_shader, "u_view_projection_mat", &view_projection_mat);
         glBindVertexArray(render_handle->text_vao);
