@@ -57,6 +57,7 @@ void se_scene_handle_cleanup(se_scene_handle* scene_handle) {
 
 se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragment_shader_path, const se_vec2* position, const se_vec2* scale, const sz max_instances_count) {
     se_object_2d* new_object = s_array_increment(&scene_handle->objects_2d);
+    se_quad_2d_create(&new_object->quad);
     new_object->position = *position;
     new_object->scale = *scale;
     if (scene_handle->render_handle) {
@@ -75,9 +76,12 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     else {
         new_object->shader = NULL;
     }
-    
-    s_array_init(&new_object->instances.transforms, max_instances_count);
-    s_array_init(&new_object->instances.buffers, max_instances_count);
+   
+    if (max_instances_count > 0) {
+        s_array_init(&new_object->instances.transforms, max_instances_count);
+        s_array_init(&new_object->instances.buffers, max_instances_count);
+        se_quad_2d_make_instanceable(&new_object->quad, max_instances_count);
+    }
     return new_object;
 }
 
@@ -231,7 +235,6 @@ se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* si
     s_assertf(size, "se_scene_2d_create :: size is null");
     s_assertf(object_count > 0, "se_scene_2d_create :: object_count is 0");
     se_scene_2d* new_scene = s_array_increment(&scene_handle->scenes_2d);
-    se_quad_2d_create(&new_scene->quad);
     if (scene_handle->render_handle) {
         new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
         s_array_init(&new_scene->objects, object_count);
@@ -245,7 +248,6 @@ se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* si
 void se_scene_2d_destroy(se_scene_handle* scene_handle, se_scene_2d* scene) {
     s_assertf(scene_handle, "se_scene_2d_destroy :: scene_handle is null");
     s_assertf(scene, "se_scene_2d_destroy :: scene is null");
-    se_quad_destroy(&scene->quad);
     // TODO: unsure if we should request cleanup of all render buffers and shaders
     s_array_remove(&scene_handle->scenes_2d, scene);
 }
@@ -268,7 +270,7 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle) {
         se_object_2d* current_object = *object_ptr;
         se_object_2d_update_uniforms(current_object);
         se_shader_use(render_handle, current_object->shader, true, true);
-        se_quad_render(&scene->quad);
+        se_quad_render(&current_object->quad);
     }
     se_disable_blending();
     se_framebuffer_unbind(scene->output);

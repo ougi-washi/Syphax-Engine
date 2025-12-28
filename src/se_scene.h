@@ -27,6 +27,7 @@ typedef struct {
 typedef struct {
     se_vec2 position;
     se_vec2 scale;
+    se_quad quad;
     se_shader_ptr shader;
     se_instances instances;
 } se_object_2d;
@@ -46,7 +47,6 @@ typedef s_array(se_object_3d_ptr, se_objects_3d_ptr);
 typedef struct {
     se_objects_2d_ptr objects;
     se_framebuffer_ptr output;
-    se_quad quad;
 } se_scene_2d;
 typedef s_array(se_scene_2d, se_scenes_2d);
 typedef se_scene_2d* se_scene_2d_ptr;
@@ -56,7 +56,6 @@ typedef struct {
     se_models_ptr models;
     se_camera_ptr camera;
     se_render_buffers_ptr post_process;
-    
     se_shader_ptr output_shader;
     se_render_buffer_ptr output;
 } se_scene_3d;
