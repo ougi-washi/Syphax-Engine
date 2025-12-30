@@ -178,6 +178,7 @@ se_instance_id se_object_2d_add_instance(se_object_2d* object, const se_mat4* tr
     se_mat4* new_buffer = s_array_increment(&object->instances.buffers);
     *new_transform = *transform;
     *new_buffer = *buffer;
+    se_object_2d_set_instances_dirty(object, true);
     return *new_instance_id;
 }
 
@@ -200,6 +201,7 @@ void se_object_2d_set_instance_transform(se_object_2d* object, const se_instance
     if (index >= 0) {
         se_mat4* current_transform = s_array_get(&object->instances.transforms, index);
         *current_transform = *transform;
+        se_object_2d_set_instances_dirty(object, true);
     }
     else {
         printf("se_object_2d_set_instance_transform :: instance id %d not found\n", instance_id);
@@ -213,6 +215,7 @@ void se_object_2d_set_instance_buffer(se_object_2d* object, const se_instance_id
     if (index >= 0) {
         se_mat4* current_buffer = s_array_get(&object->instances.buffers, index);
         *current_buffer = *buffer;
+        se_object_2d_set_instances_dirty(object, true);
     }
     else {
         printf("se_object_2d_set_instance_buffer :: instance id %d not found\n", instance_id);
@@ -225,6 +228,7 @@ void se_object_2d_set_instances_transforms(se_object_2d* object, const se_transf
     s_assertf(s_array_get_capacity(&object->instances.transforms) == s_array_get_capacity(transforms), "se_object_2d_set_instances_transforms :: transforms capacity is not equal to object capacity");
     object->instances.transforms.size = s_array_get_size(transforms);
     *object->instances.transforms.data = *(transforms->data);
+    se_object_2d_set_instances_dirty(object, true);
 }
 
 void se_object_2d_set_instances_buffers(se_object_2d* object, const se_buffers* buffers) {
@@ -233,6 +237,17 @@ void se_object_2d_set_instances_buffers(se_object_2d* object, const se_buffers* 
     s_assertf(s_array_get_capacity(&object->instances.buffers) == s_array_get_capacity(buffers), "se_object_2d_set_instances_buffers :: buffers capacity is not equal to object capacity");
     object->instances.buffers.size = s_array_get_size(buffers);
     *object->instances.buffers.data = *(buffers->data);
+    se_object_2d_set_instances_dirty(object, true);
+}
+
+void se_object_2d_set_instances_dirty(se_object_2d* object, const b8 dirty) {
+    s_assertf(object, "se_object_2d_set_instances_dirty :: object is null");
+    object->quad.instance_buffers_dirty = dirty;
+}
+
+b8 se_object_2d_are_instances_dirty(se_object_2d* object) {
+    s_assertf(object, "se_object_2d_are_instances_dirty :: object is null");
+    return object->quad.instance_buffers_dirty;
 }
 
 se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {

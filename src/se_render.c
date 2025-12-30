@@ -1203,11 +1203,13 @@ void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const 
 void se_quad_render(se_quad* quad, const sz instance_count) {
     glBindVertexArray(quad->vao);
     if (instance_count > 0) {
-        s_foreach(&quad->instance_buffers, i) {
-            se_instance_buffer* current_buffer = s_array_get(&quad->instance_buffers, i);
-            glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        if (quad->instance_buffers_dirty) {
+            s_foreach(&quad->instance_buffers, i) {
+                se_instance_buffer* current_buffer = s_array_get(&quad->instance_buffers, i);
+                glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+            }
         }
         glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, instance_count);
     }
