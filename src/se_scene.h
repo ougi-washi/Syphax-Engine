@@ -90,7 +90,7 @@ extern void se_object_2d_set_position(se_object_2d* object, const se_vec2* posit
 extern void se_object_2d_set_scale(se_object_2d* object, const se_vec2* scale);
 extern void se_object_2d_set_shader(se_object_2d* object, se_shader* shader);
 extern void se_object_2d_update_uniforms(se_object_2d* object);
-extern se_instance_id se_object_2d_set_instance_add(se_object_2d* object, const se_mat4* transform, const se_mat4* buffer);
+extern se_instance_id se_object_2d_add_instance(se_object_2d* object, const se_mat4* transform, const se_mat4* buffer);
 extern i32 se_object_2d_get_instance_index(se_object_2d* object, const se_instance_id instance_id);
 extern void se_object_2d_set_instance_transform(se_object_2d* object, const se_instance_id instance_id, const se_mat4* transform);
 extern void se_object_2d_set_instance_buffer(se_object_2d* object, const se_instance_id instance_id, const se_mat4* buffer);

@@ -10,6 +10,7 @@
 typedef void (APIENTRY * PFNGLDELETEBUFFERS)(GLsizei n, const GLuint *buffers);
 typedef void (APIENTRY * PFNGLGENBUFFERS)(GLsizei n, GLuint *buffers);
 typedef void (APIENTRY * PFNGLBINDBUFFER)(GLenum target, GLuint buffer);
+typedef void (APIENTRY * PFNGLBUFFERSUBDATA)(GLenum target, GLintptr offset, GLsizeiptr size, const void *data);
 typedef void (APIENTRY * PFNGLBUFFERDATA)(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
 typedef void (APIENTRY * PFNGLUSEPROGRAM)(GLuint program);
 typedef GLuint(APIENTRY * PFNGLCREATESHADER)(GLenum type);
@@ -70,6 +71,7 @@ typedef void (APIENTRY * PFNGLBLITFRAMEBUFFER)(GLint srcX0, GLint srcY0, GLint s
 extern PFNGLDELETEBUFFERS glDeleteBuffers;
 extern PFNGLGENBUFFERS glGenBuffers;
 extern PFNGLBINDBUFFER glBindBuffer;
+extern PFNGLBUFFERSUBDATA glBufferSubData;
 extern PFNGLBUFFERDATA glBufferData;
 extern PFNGLUSEPROGRAM glUseProgram;
 extern PFNGLCREATESHADER glCreateShader;

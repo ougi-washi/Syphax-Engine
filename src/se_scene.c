@@ -7,6 +7,7 @@
 // It is only used for referencing the scenes and use rendering handle to render the objects in the scenes or such.
 
 #define SE_OBJECT_2D_VERTEX_SHADER_PATH "shaders/object_2d_vertex.glsl"
+#define SE_OBJECT_2D_VERTEX_INSTANCED_SHADER_PATH "shaders/object_2d_vertex_instanced.glsl"
 
 se_scene_handle* se_scene_handle_create(se_render_handle* render_handle, const se_scene_handle_params* params) {
     se_scene_handle* scene_handle = (se_scene_handle*)malloc(sizeof(se_scene_handle));
@@ -69,7 +70,9 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
             }
         }
         if (!new_object->shader) {
-            new_object->shader = se_shader_load(scene_handle->render_handle, SE_OBJECT_2D_VERTEX_SHADER_PATH, fragment_shader_path);
+            new_object->shader = se_shader_load(scene_handle->render_handle, 
+                    max_instances_count > 0 ? SE_OBJECT_2D_VERTEX_INSTANCED_SHADER_PATH : SE_OBJECT_2D_VERTEX_SHADER_PATH,
+                    fragment_shader_path);
         }
         s_assertf(new_object->shader, "se_object_2d_create :: failed to load shader: %s", fragment_shader_path);
     }
@@ -78,9 +81,12 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     }
    
     if (max_instances_count > 0) {
+        s_array_init(&new_object->instances.ids, max_instances_count);
         s_array_init(&new_object->instances.transforms, max_instances_count);
         s_array_init(&new_object->instances.buffers, max_instances_count);
-        se_quad_2d_make_instanceable(&new_object->quad, max_instances_count);
+        s_array_init(&new_object->quad.instance_buffers, max_instances_count);
+        se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.transforms.data, max_instances_count);
+        se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.buffers.data, max_instances_count);
     }
     return new_object;
 }
@@ -162,7 +168,7 @@ void se_object_2d_update_uniforms(se_object_2d* object) {
     }
 }
 
-se_instance_id se_object_2d_set_instance_add(se_object_2d* object, const se_mat4* transform, const se_mat4* buffer) {
+se_instance_id se_object_2d_add_instance(se_object_2d* object, const se_mat4* transform, const se_mat4* buffer) {
     s_assertf(object, "se_object_2d_set_instance_add :: object is null");
     s_assertf(transform, "se_object_2d_set_instance_add :: transform is null");
     s_assertf(buffer, "se_object_2d_set_instance_add :: buffer is null");
@@ -270,7 +276,7 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle) {
         se_object_2d* current_object = *object_ptr;
         se_object_2d_update_uniforms(current_object);
         se_shader_use(render_handle, current_object->shader, true, true);
-        se_quad_render(&current_object->quad);
+        se_quad_render(&current_object->quad, s_array_get_size(&current_object->instances.ids));
     }
     se_disable_blending();
     se_framebuffer_unbind(scene->output);

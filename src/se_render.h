@@ -166,10 +166,18 @@ typedef se_render_buffer* se_render_buffer_ptr;
 typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
 
 typedef struct {
-    GLuint vao;
     GLuint vbo;
+    const void* buffer_ptr;
+    sz buffer_size;
+} se_instance_buffer;
+
+typedef struct {
+    GLuint vao;
     GLuint ebo;
-    GLuint vbo_instanced;
+    GLuint vbo;
+    s_array(se_instance_buffer, instance_buffers);
+    b8 instance_buffers_dirty;
+    u32 last_attribute;
 } se_quad;
 
 typedef struct {
@@ -298,8 +306,8 @@ extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader,
 // Quad functions
 extern void se_quad_3d_create(se_quad* out_quad);
 extern void se_quad_2d_create(se_quad* out_quad);
-extern void se_quad_2d_make_instanceable(se_quad* quad, const sz instance_count);
-extern void se_quad_render(se_quad* quad);
+extern void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const u32 count);
+extern void se_quad_render(se_quad* quad, const sz instance_count);
 extern void se_quad_destroy(se_quad* quad);
 
 // Font && text functions
