@@ -36,11 +36,17 @@ i32 main() {
     
     se_object_2d* button = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(0.15, 0.), &se_vec2(0.1, 0.1), 16);
     const se_mat4 identity = mat4_identity();
-    se_instance_id button_instance_id_0 = se_object_2d_add_instance(button, &identity, &identity);
-    se_instance_id button_instance_id_1 = se_object_2d_add_instance(button, &identity, &identity);
+    //se_instance_id button_instance_id_0 = se_object_2d_add_instance(button, &identity, &identity);
+    //se_instance_id button_instance_id_1 = se_object_2d_add_instance(button, &identity, &identity);
 
-    const se_mat4 translate_1 = mat4_translate(&se_vec3(3., 1., 0));
-    se_object_2d_set_instance_transform(button, button_instance_id_1, &translate_1);
+    //const se_mat4 translate_1 = mat4_translate(&se_vec3(3., 1., 0));
+    //se_object_2d_set_instance_transform(button, button_instance_id_1, &translate_1);
+    
+    for (i32 i = 0; i < 3; i++) {
+        se_instance_id button_instance_id = se_object_2d_add_instance(button, &identity, &identity);
+        const se_mat4 translate = mat4_translate(&se_vec3(i * -1.1, 0., 0));
+        se_object_2d_set_instance_transform(button, button_instance_id, &translate);
+    }
 
     se_shader_set_vec3(button->shader, "u_color", &se_vec3(0, 1, 0));
 

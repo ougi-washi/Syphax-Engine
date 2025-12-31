@@ -84,7 +84,8 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
         s_array_init(&new_object->instances.ids, max_instances_count);
         s_array_init(&new_object->instances.transforms, max_instances_count);
         s_array_init(&new_object->instances.buffers, max_instances_count);
-        s_array_init(&new_object->quad.instance_buffers, max_instances_count);
+        // max_instances_count * 2 because we need to store the transform and buffer matrices
+        s_array_init(&new_object->quad.instance_buffers, max_instances_count * 2);
         se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.transforms.data, max_instances_count);
         se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.buffers.data, max_instances_count);
     }
@@ -179,6 +180,7 @@ se_instance_id se_object_2d_add_instance(se_object_2d* object, const se_mat4* tr
     *new_transform = *transform;
     *new_buffer = *buffer;
     se_object_2d_set_instances_dirty(object, true);
+    
     return *new_instance_id;
 }
 
@@ -201,6 +203,7 @@ void se_object_2d_set_instance_transform(se_object_2d* object, const se_instance
     if (index >= 0) {
         se_mat4* current_transform = s_array_get(&object->instances.transforms, index);
         *current_transform = *transform;
+        se_print_mat4(current_transform);
         se_object_2d_set_instances_dirty(object, true);
     }
     else {

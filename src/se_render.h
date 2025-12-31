@@ -306,7 +306,7 @@ extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader,
 // Quad functions
 extern void se_quad_3d_create(se_quad* out_quad);
 extern void se_quad_2d_create(se_quad* out_quad);
-extern void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const u32 count);
+extern void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const sz instance_count);
 extern void se_quad_render(se_quad* quad, const sz instance_count);
 extern void se_quad_destroy(se_quad* quad);
 
@@ -320,5 +320,8 @@ extern void se_font_cleanup(se_font* font);
 extern time_t get_file_mtime(const char* path);
 extern c8* load_file(const char* path);
 extern uc8* load_file_uc8(const char* path, sz* out_size);
+
+// logging
+extern void se_print_mat4(const se_mat4* mat);
 
 #endif // SE_RENDER_H
