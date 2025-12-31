@@ -12,8 +12,7 @@ uniform vec2 u_position;
 out vec2 tex_coord;
 
 void main() {
-    vec2 new_position = vec2(vec4(in_position, 1, 1) * in_instance_transform).xy;
-
+    vec2 new_position = (in_instance_transform * vec4(in_position, 0, 1)).xy;
     new_position *= u_scale;
     new_position += u_position;
 

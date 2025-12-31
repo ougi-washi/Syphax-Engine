@@ -98,6 +98,7 @@ extern void se_object_2d_set_instances_transforms(se_object_2d* object, const se
 extern void se_object_2d_set_instances_buffers(se_object_2d* object, const se_buffers* buffers);
 extern void se_object_2d_set_instances_dirty(se_object_2d* object, const b8 dirty);
 extern b8 se_object_2d_are_instances_dirty(se_object_2d* object);
+extern sz se_object_2d_get_instance_count(se_object_2d* object);
 
 // 2D scene functions
 extern se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count);

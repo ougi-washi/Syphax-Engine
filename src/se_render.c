@@ -1110,14 +1110,6 @@ void se_quad_2d_create(se_quad* out_quad) {
     glBindBuffer(GL_ARRAY_BUFFER, out_quad->vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(se_quad_2d_vertices), se_quad_2d_vertices, GL_STATIC_DRAW);
 
-    //glVertexAttribPointer(out_quad->last_attribute, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, position));
-    //glEnableVertexAttribArray(out_quad->last_attribute);
-    //out_quad->last_attribute++;
-
-    //glVertexAttribPointer(out_quad->last_attribute, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, uv));
-    //glEnableVertexAttribArray(out_quad->last_attribute);
-    //out_quad->last_attribute++;
-
     se_quad_add_vertex_attribute(out_quad, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, position), false);
     se_quad_add_vertex_attribute(out_quad, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, uv), false);
 
@@ -1141,64 +1133,15 @@ void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const 
     glBufferData(GL_ARRAY_BUFFER, new_buffer->buffer_size, new_buffer->buffer_ptr, GL_DYNAMIC_DRAW);
 
     se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)0, true);
-    se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4)), true);
-    se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 2), true);
-    se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 3), true);
+    se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_vec4) * 1), true);
+    se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_vec4) * 2), true);
+    se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_vec4) * 3), true);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     
     printf("se_quad_2d_add_instance_buffer, gluint %d\n", quad->vao);
 }
-
-//void se_quad_2d_make_instanceable(se_quad* quad, const sz instance_count) {
-//    s_assertf(quad, "se_quad_2d_make_instanceable :: quad is null");
-//    s_assertf(instance_count > 0, "se_quad_2d_make_instanceable :: instance_count is 0");
-//
-//    glBindVertexArray(quad->vao);
-//    
-//    glGenBuffers(1, &quad->vbo_instanced);
-//    glBindBuffer(GL_ARRAY_BUFFER, quad->vbo_instanced);
-//    glBufferData(GL_ARRAY_BUFFER, sizeof(se_mat4) * instance_count, NULL, GL_STATIC_DRAW);
-//
-//    // Transformation matrix
-//    glEnableVertexAttribArray(2);
-//    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)0);
-//    
-//    glEnableVertexAttribArray(3);
-//    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4)));
-//
-//    glEnableVertexAttribArray(4);
-//    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 2));
-//
-//    glEnableVertexAttribArray(5);
-//    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 3));
-//
-//    // Data buffer
-//    glEnableVertexAttribArray(6);
-//    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 4));
-//
-//    glEnableVertexAttribArray(7);
-//    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 5));
-//
-//    glEnableVertexAttribArray(8);
-//    glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 6));
-//
-//    glEnableVertexAttribArray(9);
-//    glVertexAttribPointer(9, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void*)(sizeof(se_mat4) * 7));
-//
-//    glVertexAttribDivisor(2, 1);
-//    glVertexAttribDivisor(3, 1);
-//    glVertexAttribDivisor(4, 1);
-//    glVertexAttribDivisor(5, 1);
-//    glVertexAttribDivisor(6, 1);
-//    glVertexAttribDivisor(7, 1);
-//    glVertexAttribDivisor(8, 1);
-//    glVertexAttribDivisor(9, 1);
-//
-//    glBindVertexArray(0);
-//    glBindBuffer(GL_ARRAY_BUFFER, 0);
-//}
 
 void se_quad_render(se_quad* quad, const sz instance_count) {
     glBindVertexArray(quad->vao);

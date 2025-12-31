@@ -250,6 +250,11 @@ b8 se_object_2d_are_instances_dirty(se_object_2d* object) {
     return object->quad.instance_buffers_dirty;
 }
 
+sz se_object_2d_get_instance_count(se_object_2d* object) {
+    s_assertf(object, "se_object_2d_get_instance_count :: object is null");
+    return s_array_get_size(&object->instances.ids);
+}
+
 se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
     printf("Creating scene 2D\n");
     s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
@@ -291,7 +296,8 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle) {
         se_object_2d* current_object = *object_ptr;
         se_object_2d_update_uniforms(current_object);
         se_shader_use(render_handle, current_object->shader, true, true);
-        se_quad_render(&current_object->quad, s_array_get_size(&current_object->instances.ids));
+        const sz instance_count = se_object_2d_get_instance_count(current_object);
+        se_quad_render(&current_object->quad, instance_count);
     }
     se_disable_blending();
     se_framebuffer_unbind(scene->output);
