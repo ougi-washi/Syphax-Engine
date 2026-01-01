@@ -5,14 +5,7 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
-void on_button_pressed(void* window, void* data) {
-    if (se_window_is_mouse_down(window, 0)) {
-        if (data) {
-            (*(int*)data)++;
-            printf("Pressed, data: %d\n", *(int*)data);
-        }
-    }
-}
+#define INSTANCE_COUNT 16
 
 i32 main() {
     se_window* window = se_window_create("Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
@@ -36,33 +29,16 @@ i32 main() {
     
     se_object_2d* button = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(0.15, 0.), &se_vec2(0.1, 0.1), 16);
     const se_mat4 identity = mat4_identity();
-    //se_instance_id button_instance_id_0 = se_object_2d_add_instance(button, &identity, &identity);
-    //se_instance_id button_instance_id_1 = se_object_2d_add_instance(button, &identity, &identity);
-
-    //const se_mat4 translate_1 = mat4_translate(&se_vec3(3., 1., 0));
-    //se_object_2d_set_instance_transform(button, button_instance_id_1, &translate_1);
-    
-    for (i32 i = 0; i < 3; i++) {
+    for (i32 i = 0; i < 16; i++) {
         se_instance_id button_instance_id = se_object_2d_add_instance(button, &identity, &identity);
-        const se_mat4 translate = mat4_translate(&se_vec3(i * -1.1, 0., 0));
+        const se_mat4 translate = mat4_translate(&se_vec3(-15 + i * 1.5, 0., 0));
         se_object_2d_set_instance_transform(button, button_instance_id, &translate);
     }
 
     se_shader_set_vec3(button->shader, "u_color", &se_vec3(0, 1, 0));
 
-    se_box_2d button_box = {0};
-    se_object_2d_get_box_2d(button, &button_box);
-
-    int button_data = 0;
-
-    i32 button_update_id = se_window_register_input_event(window, &button_box, 0, &on_button_pressed, &button_data);
     se_scene_2d_add_object(scene_2d, button);
     se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
-
-    se_font* main_font = se_font_load(render_handle, "fonts/ithaca.ttf");
-    s_assert(main_font);
-
-    se_init_text_render(render_handle);
 
     key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
@@ -73,15 +49,10 @@ i32 main() {
         se_window_check_exit_keys(window, &exit_keys);
         se_window_update(window);
         se_render_handle_reload_changed_shaders(render_handle);
-        
-        button->position.x += 0.005;
-        se_object_2d_get_box_2d(button, &button_box);
-        se_window_update_input_event(button_update_id, window, &button_box, 0, &on_button_pressed, &button_data);
-        
         se_render_clear();
+        button->position.x += 0.001;
         se_scene_2d_render(scene_2d, render_handle);
         se_scene_2d_render_to_screen(scene_2d, render_handle, window);
-        //se_text_render(render_handle, main_font, "boubli", &se_vec2(0, 0), 1.);
         se_window_render_screen(window);
     }
 

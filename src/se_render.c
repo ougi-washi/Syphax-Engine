@@ -1123,7 +1123,6 @@ void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const 
     glBindVertexArray(quad->vao);
 
     se_instance_buffer* new_buffer = s_array_increment(&quad->instance_buffers);
-    printf("se_quad_2d_add_instance_buffer, adding buffer %zu\n", s_array_get_size(&quad->instance_buffers));
     new_buffer->vbo = 0;
     new_buffer->buffer_ptr = buffer;
     new_buffer->buffer_size = sizeof(se_mat4) * instance_count;
@@ -1138,8 +1137,8 @@ void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const 
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    
-    printf("se_quad_2d_add_instance_buffer, gluint %d\n", quad->vao);
+
+    printf("se_quad_2d_add_instance_buffer, ptr %p\n", buffer);
 }
 
 void se_quad_render(se_quad* quad, const sz instance_count) {
@@ -1149,18 +1148,6 @@ void se_quad_render(se_quad* quad, const sz instance_count) {
             s_foreach(&quad->instance_buffers, i) {
                 se_instance_buffer* current_buffer = s_array_get(&quad->instance_buffers, i);
                 glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
-                typedef s_array(se_mat4, se_temp_buffer);
-                se_temp_buffer temp_buffer = {0};
-                s_array_init(&temp_buffer, instance_count);
-                temp_buffer.size = instance_count;
-                memcpy(temp_buffer.data, current_buffer->buffer_ptr, instance_count * sizeof(se_mat4));
-                printf("se_quad_render :: index %zu, size %zu\n", i, temp_buffer.size);
-                s_foreach(&temp_buffer, i) {
-                    se_mat4* current_matrix = s_array_get(&temp_buffer, i);
-                    printf("se_quad_render :: matrix %zu\n", i);
-                    se_print_mat4(current_matrix);
-                }
-                s_array_clear(&temp_buffer);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }

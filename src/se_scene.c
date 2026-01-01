@@ -86,6 +86,10 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
         s_array_init(&new_object->instances.buffers, max_instances_count);
         // max_instances_count * 2 because we need to store the transform and buffer matrices
         s_array_init(&new_object->quad.instance_buffers, max_instances_count * 2);
+        s_foreach(&new_object->instances.ids, i) {
+            se_instance_id* current_id = s_array_get(&new_object->instances.ids, i);
+            *current_id = i;
+        }
         se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.transforms.data, max_instances_count);
         se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.buffers.data, max_instances_count);
     }
@@ -174,13 +178,22 @@ se_instance_id se_object_2d_add_instance(se_object_2d* object, const se_mat4* tr
     s_assertf(transform, "se_object_2d_set_instance_add :: transform is null");
     s_assertf(buffer, "se_object_2d_set_instance_add :: buffer is null");
     s_assertf(s_array_get_capacity(&object->instances.ids) > 0, "se_object_2d_set_instance_add :: object instances capacity is 0");
+    
+    const sz prev_instances_count = s_array_get_size(&object->instances.ids);
+    se_instance_id new_id = 0;
+    if (prev_instances_count > 0) {
+        new_id = *s_array_get(&object->instances.ids, prev_instances_count - 1) + 1;
+    }
+
     se_instance_id* new_instance_id = s_array_increment(&object->instances.ids);
     se_mat4* new_transform = s_array_increment(&object->instances.transforms);
     se_mat4* new_buffer = s_array_increment(&object->instances.buffers);
+    
+    *new_instance_id = new_id;
     *new_transform = *transform;
     *new_buffer = *buffer;
     se_object_2d_set_instances_dirty(object, true);
-    
+
     return *new_instance_id;
 }
 
@@ -202,8 +215,7 @@ void se_object_2d_set_instance_transform(se_object_2d* object, const se_instance
     const i32 index = se_object_2d_get_instance_index(object, instance_id);
     if (index >= 0) {
         se_mat4* current_transform = s_array_get(&object->instances.transforms, index);
-        *current_transform = *transform;
-        se_print_mat4(current_transform);
+        memcpy(current_transform, transform, sizeof(se_mat4));
         se_object_2d_set_instances_dirty(object, true);
     }
     else {
