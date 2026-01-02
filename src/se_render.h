@@ -11,20 +11,9 @@
 #include <assert.h>
 #include <pthread.h>
 
-#include "stb_truetype.h"
-
 #define SE_MAX_NAME_LENGTH 64
-
-//#define SE_MAX_RENDER_BUFFERS 16
-//#define SE_MAX_FRAMEBUFFERS 16
-//#define SE_MAX_UNIFORMS 32
-//#define SE_MAX_TEXTURES 128
-//#define SE_MAX_SHADERS 64
-//#define SE_MAX_MESHES 64
-//#define SE_MAX_MODELS 1024
 #define SE_MAX_VERTICES 65536
 #define SE_MAX_INDICES 65536
-//#define SE_MAX_CAMERAS 32 
 
 typedef struct {
     se_vec2 position;
@@ -181,16 +170,6 @@ typedef struct {
 } se_quad;
 
 typedef struct {
-    GLuint atlas_texture;
-    f32 size;
-    u16 atlas_width, atlas_height;
-    u16 first_character, characters_count;
-    s_array(stbtt_packedchar, packed_characters);
-    s_array(stbtt_aligned_quad, aligned_quads);
-} se_font;
-typedef s_array(se_font, se_fonts);
-
-typedef struct {
     u16 framebuffers_count;
     u16 render_buffers_count;
     u16 textures_count;
@@ -210,13 +189,6 @@ typedef struct {
     se_cameras cameras;
     se_models models;
     se_shader* render_quad_shader;
-    se_fonts fonts;
-
-    // TODO: move to separate struct
-    se_shader* text_shader;
-    i32 text_vertex_index;
-    GLuint text_vao, text_vbo, text_ebo;
-    s_array(se_vertex_3d, text_vertices);
 } se_render_handle;
 
 // helper functions
@@ -309,12 +281,6 @@ extern void se_quad_2d_create(se_quad* out_quad);
 extern void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const sz instance_count);
 extern void se_quad_render(se_quad* quad, const sz instance_count);
 extern void se_quad_destroy(se_quad* quad);
-
-// Font && text functions
-extern se_font* se_font_load(se_render_handle* render_handle, const char* path);
-extern void se_init_text_render(se_render_handle* render_handle);
-extern void se_text_render(se_render_handle* render_handle, se_font* font, const c8* text, const se_vec2* position, const f32 size);
-extern void se_font_cleanup(se_font* font);
 
 // Utility functions
 extern time_t get_file_mtime(const char* path);
