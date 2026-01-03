@@ -9,15 +9,24 @@
 const sz SE_TEXT_VBO_SIZE = 600000 * sizeof(se_vertex_3d); // Size enough for 600000 vertices (100000 quads)
 
 se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32 fonts_count) {
+    s_assertf(render_handle, "se_init_text_render :: render_handle is null");
     se_text_handle* text_handle = malloc(sizeof(se_text_handle));
     memset(text_handle, 0, sizeof(se_text_handle));
     text_handle->render_handle = render_handle;
     s_array_init(&text_handle->fonts, fonts_count);
     se_quad_2d_create(&text_handle->quad);
+    
+    s_assertf(text_handle, "se_init_text_render :: text_handle is null");
+    text_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
+    
     return text_handle;
 }
 
 void se_text_handle_cleanup(se_text_handle* text_handle) {
+    s_foreach(&text_handle->fonts, i) {
+        se_font* curr_font = s_array_get(&text_handle->fonts, i);
+        glDeleteTextures(1, &curr_font->atlas_texture);
+    }
     s_array_clear(&text_handle->fonts);
     se_quad_destroy(&text_handle->quad);
     free(text_handle);
@@ -87,13 +96,6 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path) {
     free(atlas_bitmap);
 
     return new_font;
-}
-
-void se_init_text_render(se_text_handle* text_handle) {
-    s_assertf(text_handle, "se_init_text_render :: text_handle is null");
-    se_render_handle* render_handle = text_handle->render_handle;
-    s_assertf(render_handle, "se_init_text_render :: render_handle is null");
-    text_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
 }
 
 void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, const se_vec2* position, const f32 size) {
@@ -199,9 +201,4 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
     //}
     // end of hack
 }
-
-void se_font_cleanup(se_font* font) {
-    glDeleteTextures(1, &font->atlas_texture);
-}
-
 

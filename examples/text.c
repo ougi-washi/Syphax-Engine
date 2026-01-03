@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_scene.h"
+#include "se_text.h"
 
 #define WIDTH 1920
 #define HEIGHT 1080
@@ -24,7 +25,10 @@ i32 main() {
     scene_params.scenes_3d_count = 0;
     se_scene_handle* scene_handle = se_scene_handle_create(render_handle, &scene_params);
     se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec2(WIDTH, HEIGHT), 4);
-    
+
+    se_text_handle* text_handle = se_text_handle_create(render_handle, 1);
+    se_font* font = se_font_load(text_handle, "fonts/ithaca.ttf");
+
     se_object_2d* button = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &se_vec2(0.15, 0.), &se_vec2(0.1, 0.1), 16);
     const se_mat4 identity = mat4_identity();
     for (i32 i = 0; i < 16; i++) {
@@ -42,6 +46,8 @@ i32 main() {
     s_array_init(&exit_keys, 1);
     s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
 
+    se_text_render(text_handle, font, "boubli", &se_vec2(0.5, 0.5), 1.f);
+    
     while (!se_window_should_close(window)) {
         se_window_poll_events();
         se_window_check_exit_keys(window, &exit_keys);
@@ -53,6 +59,7 @@ i32 main() {
         se_window_render_screen(window);
     }
 
+    se_text_handle_cleanup(text_handle);
     se_scene_handle_cleanup(scene_handle);
     se_render_handle_cleanup(render_handle);
     se_window_destroy(window);
