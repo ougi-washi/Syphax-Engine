@@ -104,113 +104,59 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
     s_assertf(render_handle, "se_text_render :: render_handle is null");
     s_assertf(font, "se_text_render :: font is null");
     s_assertf(text, "se_text_render :: text is null");
-
-    sz text_size = strlen(text);
-
-    text_handle->text_vertex_index = 0; // TODO: Move to text_render_start
-
-    // start of hack, this part should be called only once before rendering all text with the same font
-    glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
-    glActiveTexture(GL_TEXTURE0);
-    se_shader_set_texture(text_handle->text_shader, "u_atlas_texture", font->atlas_texture);
-    // end of hack
-
-    // TODO: Parse text, set it up, instance and push count + data to the GPU
-
-    se_vec2 local_position = *position;
-
-    i8 order[6] = { 0, 1, 2, 0, 2, 3 };
-    f32 pixel_scale = 1.f / 1024.f; // TODO: dynamic for screen size-
-   
-    //s_array_init(&render_handle->text_vertices, strlen(text) * 6);
     
+    sz text_size = strlen(text);
+    
+    // Bind texture once
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
+    se_shader_set_texture(text_handle->text_shader, "u_atlas_texture", font->atlas_texture);
+    
+    se_vec2 local_position = *position;
+    f32 pixel_scale = 1.f / 1024.f;
+    
+    i32 glyph_count = 0;
     for (i32 i = 0; i < text_size; i++) {
         c8 c = text[i];
+        
+        if (c == '\n') {
+            local_position.y -= font->size * pixel_scale * size;
+            local_position.x = position->x;
+            continue;
+        }
+        
         if (c >= font->first_character && c <= font->first_character + font->characters_count) {
             stbtt_packedchar* packed_char = s_array_get(&font->packed_characters, c - font->first_character);
             stbtt_aligned_quad* aligned_quad = s_array_get(&font->aligned_quads, c - font->first_character);
-
-            se_vec2 glyph_size = se_vec2((packed_char->x1 - packed_char->x0) * pixel_scale * size,
-                                        (packed_char->y1 - packed_char->y0) * pixel_scale * size);
-
-
-            se_vec2 glyph_bounding_box_min = se_vec2(local_position.x + packed_char->xoff * pixel_scale * size,
-                                                    local_position.y - (packed_char->yoff + packed_char->y1 - packed_char->y0) * pixel_scale * size);
-        
-            se_vec2 glyph_vertices[4] = {
-                { glyph_bounding_box_min.x + glyph_size.x, glyph_bounding_box_min.y + glyph_size.y},
-                { glyph_bounding_box_min.x, glyph_bounding_box_min.y + glyph_size.y},
-                { glyph_bounding_box_min.x, glyph_bounding_box_min.y},
-                { glyph_bounding_box_min.x + glyph_size.x, glyph_bounding_box_min.y}
-            };
-            se_vec2 glyph_texture_coords[4] = {
-                { aligned_quad->s1, aligned_quad->t0 },
-                { aligned_quad->s0, aligned_quad->t0 },
-                { aligned_quad->s0, aligned_quad->t1 },
-                { aligned_quad->s1, aligned_quad->t1 },
-            };
             
-            // TEMP
-            s_array(se_vec2, temp_positions);
-            s_array(se_vec2, temp_uvs);
-            s_array_init(&temp_positions, 6);
-            s_array_init(&temp_uvs, 6);
-
-            for (i32 i = 0; i < 6; i++) {
-                //se_vertex_3d* vertex = s_array_get(&render_handle->text_vertices, render_handle->text_vertex_index + i);
-                //vertex->position = se_vec3(glyph_vertices[order[i]].x, glyph_vertices[order[i]].y, 0);
-                se_vec2* vertex_position = s_array_increment(&temp_positions);
-                *vertex_position = glyph_vertices[order[i]];
-                se_vec2* vertex_uv = s_array_increment(&temp_uvs);
-                *vertex_uv = glyph_texture_coords[order[i]];
-                memset(&text_handle->buffer[i], 0, sizeof(se_mat4));
-                text_handle->buffer[i].m[0] = glyph_vertices[order[i]].x;
-                text_handle->buffer[i].m[1] = glyph_vertices[order[i]].y;
-                text_handle->buffer[i].m[2] = glyph_texture_coords[order[i]].x;
-                text_handle->buffer[i].m[3] = glyph_texture_coords[order[i]].y;
-            }
-
-            //printf("Character %c, position: %f, %f, uv: %f, %f\n", c, glyph_vertices[0].x, glyph_vertices[0].y, glyph_texture_coords[0].x, glyph_texture_coords[0].y);
-            s_array_clear(&temp_positions);
-            s_array_clear(&temp_uvs);
+            // Calculate glyph dimensions
+            f32 glyph_width = (packed_char->x1 - packed_char->x0) * pixel_scale * size;
+            f32 glyph_height = (packed_char->y1 - packed_char->y0) * pixel_scale * size;
             
-            //render_handle->text_vertex_index += 6;
+            // Calculate glyph position (without adding local_position twice!)
+            f32 glyph_x = local_position.x + packed_char->xoff * pixel_scale * size;
+            f32 glyph_y = local_position.y - (packed_char->yoff + (packed_char->y1 - packed_char->y0)) * pixel_scale * size;
+            
+            // Store instance data: position (xy) + size (zw) + UVs (4 floats)
+            // Assuming buffer layout: [x, y, width, height, u0, v0, u1, v1]
+            text_handle->buffer[glyph_count].m[0] = glyph_x;
+            text_handle->buffer[glyph_count].m[1] = glyph_y;
+            text_handle->buffer[glyph_count].m[2] = glyph_width;
+            text_handle->buffer[glyph_count].m[3] = glyph_height;
+            text_handle->buffer[glyph_count].m[4] = aligned_quad->s0;
+            text_handle->buffer[glyph_count].m[5] = aligned_quad->t0;
+            text_handle->buffer[glyph_count].m[6] = aligned_quad->s1;
+            text_handle->buffer[glyph_count].m[7] = aligned_quad->t1;
+            
+            // Advance cursor
             local_position.x += packed_char->xadvance * pixel_scale * size;
-        }
-
-        else if(c == '\n')
-        {
-            // advance y by fontSize, reset x-coordinate
-            local_position.y -= font->size * pixel_scale * size;
-            local_position.x = position->x;
+            glyph_count++;
         }
     }
-
+    
     se_enable_blending();
     se_shader_use(text_handle->render_handle, text_handle->text_shader, true, true);
     text_handle->quad.instance_buffers_dirty = true;
-    se_quad_render(&text_handle->quad, text_size);
+    se_quad_render(&text_handle->quad, glyph_count);
     se_disable_blending();
-    // start of hack, this part should be fully reworked 
-    //sz size_of_vertices = s_array_get_size(&render_handle->text_vertices) * sizeof(se_vertex_3d);
-    //u32 draw_calls_count = (size_of_vertices / SE_TEXT_VBO_SIZE) + 1;
-
-    //se_mat4 view_projection_mat = mat4_ortho(0, 1024, 0, 768, 0, 1);
-
-    //for (i32 i = 0; i < draw_calls_count; i++) {
-    //    const se_vertex_3d* vertices_data = render_handle->text_vertices.data + i * SE_TEXT_VBO_SIZE;
-    //    u32 vertices_count = 
-    //        i == draw_calls_count - i ? 
-    //            (size_of_vertices % SE_TEXT_VBO_SIZE) / sizeof(se_vertex_3d) :
-    //            SE_TEXT_VBO_SIZE / sizeof(se_vertex_3d) * 6;
-    //    // This does not make sense to be here
-    //    se_shader_set_mat4(text_handle->text_shader, "u_view_projection_mat", &view_projection_mat);
-    //    //glBindVertexArray(render_handle->text_vao);
-    //    //glBindBuffer(GL_ARRAY_BUFFER, render_handle->text_vbo);
-    //    // TODO: add this to se_gl.h
-    //    //glBufferSubData(GL_ARRAY_BUFFER, 0, size_of_vertices, render_handle->text_vertices.data);
-    //    //glDrawArrays(GL_TRIANGLES, 0, vertices_count);
-    //}
-    // end of hack
 }
-
