@@ -14,8 +14,8 @@ se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32
     memset(text_handle, 0, sizeof(se_text_handle));
     text_handle->render_handle = render_handle;
     s_array_init(&text_handle->fonts, fonts_count);
-    se_quad_2d_create(&text_handle->quad);
-    
+    se_quad_2d_create(&text_handle->quad, SE_TEXT_CHAR_COUNT);
+    se_quad_2d_add_instance_buffer(&text_handle->quad, text_handle->buffer, SE_TEXT_CHAR_COUNT);
     s_assertf(text_handle, "se_init_text_render :: text_handle is null");
     text_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
     
@@ -105,6 +105,8 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
     s_assertf(font, "se_text_render :: font is null");
     s_assertf(text, "se_text_render :: text is null");
 
+    sz text_size = strlen(text);
+
     text_handle->text_vertex_index = 0; // TODO: Move to text_render_start
 
     // start of hack, this part should be called only once before rendering all text with the same font
@@ -122,7 +124,7 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
    
     //s_array_init(&render_handle->text_vertices, strlen(text) * 6);
     
-    for (i32 i = 0; i < strlen(text); i++) {
+    for (i32 i = 0; i < text_size; i++) {
         c8 c = text[i];
         if (c >= font->first_character && c <= font->first_character + font->characters_count) {
             stbtt_packedchar* packed_char = s_array_get(&font->packed_characters, c - font->first_character);
@@ -161,9 +163,14 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
                 *vertex_position = glyph_vertices[order[i]];
                 se_vec2* vertex_uv = s_array_increment(&temp_uvs);
                 *vertex_uv = glyph_texture_coords[order[i]];
+                memset(&text_handle->buffer[i], 0, sizeof(se_mat4));
+                text_handle->buffer[i].m[0] = glyph_vertices[order[i]].x;
+                text_handle->buffer[i].m[1] = glyph_vertices[order[i]].y;
+                text_handle->buffer[i].m[2] = glyph_texture_coords[order[i]].x;
+                text_handle->buffer[i].m[3] = glyph_texture_coords[order[i]].y;
             }
 
-            printf("Character %c, position: %f, %f, uv: %f, %f\n", c, glyph_vertices[0].x, glyph_vertices[0].y, glyph_texture_coords[0].x, glyph_texture_coords[0].y);
+            //printf("Character %c, position: %f, %f, uv: %f, %f\n", c, glyph_vertices[0].x, glyph_vertices[0].y, glyph_texture_coords[0].x, glyph_texture_coords[0].y);
             s_array_clear(&temp_positions);
             s_array_clear(&temp_uvs);
             
@@ -179,6 +186,11 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
         }
     }
 
+    se_enable_blending();
+    se_shader_use(text_handle->render_handle, text_handle->text_shader, true, true);
+    text_handle->quad.instance_buffers_dirty = true;
+    se_quad_render(&text_handle->quad, text_size);
+    se_disable_blending();
     // start of hack, this part should be fully reworked 
     //sz size_of_vertices = s_array_get_size(&render_handle->text_vertices) * sizeof(se_vertex_3d);
     //u32 draw_calls_count = (size_of_vertices / SE_TEXT_VBO_SIZE) + 1;

@@ -6,6 +6,8 @@
 #include "se_render.h"
 #include "stb_truetype.h"
 
+#define SE_TEXT_CHAR_COUNT 1024
+
 typedef struct {
     GLuint atlas_texture;
     f32 size;
@@ -19,6 +21,7 @@ typedef s_array(se_font, se_fonts);
 typedef struct {
     se_fonts fonts;
     se_quad quad;
+    se_mat4 buffer[SE_TEXT_CHAR_COUNT];
     se_shader* text_shader;
     i32 text_vertex_index; // ?
     se_render_handle* render_handle;

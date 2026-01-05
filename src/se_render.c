@@ -1063,7 +1063,7 @@ void se_quad3d_create(se_quad* out_quad) {
     glBindVertexArray(0);
 }
 
-void se_quad_2d_create(se_quad* out_quad) {
+void se_quad_2d_create(se_quad* out_quad, const u32 instance_count) {
     s_assertf(out_quad, "se_quad_create :: out_quad is null");
 
     out_quad->vao = 0;
@@ -1087,6 +1087,11 @@ void se_quad_2d_create(se_quad* out_quad) {
     se_quad_add_vertex_attribute(out_quad, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_2d), (const void*)offsetof(se_vertex_2d, uv), false);
 
     glBindVertexArray(0);
+
+    if (instance_count > 0) {
+        s_array_init(&out_quad->instance_buffers, instance_count);
+        out_quad->instance_buffers_dirty = true;
+    }
 }
 
 void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const sz instance_count) {
@@ -1135,6 +1140,11 @@ void se_quad_render(se_quad* quad, const sz instance_count) {
 }
 
 void se_quad_destroy(se_quad* quad) {
+    s_foreach(&quad->instance_buffers, i) {
+        se_instance_buffer* current_buffer = s_array_get(&quad->instance_buffers, i);
+        glDeleteBuffers(1, &current_buffer->vbo);
+    }
+    s_array_clear(&quad->instance_buffers);
     glDeleteVertexArrays(1, &quad->vao);
     glDeleteBuffers(1, &quad->vbo);
     glDeleteBuffers(1, &quad->ebo);

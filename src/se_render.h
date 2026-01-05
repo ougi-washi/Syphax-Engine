@@ -277,7 +277,7 @@ extern void se_uniform_apply(se_render_handle* render_handle, se_shader* shader,
 
 // Quad functions
 extern void se_quad_3d_create(se_quad* out_quad);
-extern void se_quad_2d_create(se_quad* out_quad);
+extern void se_quad_2d_create(se_quad* out_quad, const u32 instance_count);
 extern void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const sz instance_count);
 extern void se_quad_render(se_quad* quad, const sz instance_count);
 extern void se_quad_destroy(se_quad* quad);

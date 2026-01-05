@@ -58,7 +58,7 @@ void se_scene_handle_cleanup(se_scene_handle* scene_handle) {
 
 se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragment_shader_path, const se_vec2* position, const se_vec2* scale, const sz max_instances_count) {
     se_object_2d* new_object = s_array_increment(&scene_handle->objects_2d);
-    se_quad_2d_create(&new_object->quad);
+    se_quad_2d_create(&new_object->quad, max_instances_count * 2);
     new_object->position = *position;
     new_object->scale = *scale;
     if (scene_handle->render_handle) {
@@ -85,7 +85,6 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
         s_array_init(&new_object->instances.transforms, max_instances_count);
         s_array_init(&new_object->instances.buffers, max_instances_count);
         // max_instances_count * 2 because we need to store the transform and buffer matrices
-        s_array_init(&new_object->quad.instance_buffers, max_instances_count * 2);
         s_foreach(&new_object->instances.ids, i) {
             se_instance_id* current_id = s_array_get(&new_object->instances.ids, i);
             *current_id = i;
