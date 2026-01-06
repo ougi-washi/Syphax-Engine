@@ -41,7 +41,7 @@ i32 main() {
         se_window_update(window);
         //se_render_handle_reload_changed_shaders(render_handle);
         se_render_clear();
-        se_text_render(text_handle, font, "boubli", &se_vec2(0., 0.), 32.f);
+        se_text_render(text_handle, font, "yer7am dinek, ch'hal boubli", &se_vec2(0., 0.), 32.f);
         //se_scene_2d_render(scene_2d, render_handle);
         se_scene_2d_render_to_screen(scene_2d, render_handle, window);
         se_window_render_screen(window);

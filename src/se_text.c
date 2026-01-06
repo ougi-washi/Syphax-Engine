@@ -147,9 +147,10 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
             text_handle->buffer[glyph_count].m[5] = aligned_quad->t0;
             text_handle->buffer[glyph_count].m[6] = aligned_quad->s1;
             text_handle->buffer[glyph_count].m[7] = aligned_quad->t1;
-            
+            text_handle->buffer[glyph_count].m[8] = local_position.x;
+            text_handle->buffer[glyph_count].m[9] = local_position.y;
             // Advance cursor
-            local_position.x += packed_char->xadvance * pixel_scale * size;
+            local_position.x += packed_char->xadvance / 550 ;//* pixel_scale * size;
             glyph_count++;
         }
     }
