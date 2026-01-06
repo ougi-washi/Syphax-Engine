@@ -146,8 +146,6 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
             text_handle->buffer[glyph_count].m[8] = local_position.x;
             text_handle->buffer[glyph_count].m[9] = local_position.y;
 
-            printf("--- glyph %d char %c ---\n", glyph_count, c);
-            se_print_mat4(&text_handle->buffer[glyph_count]);
             // Advance cursor
             local_position.x += packed_char->xadvance / 550 ;//* pixel_scale * size;
             glyph_count++;
