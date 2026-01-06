@@ -120,7 +120,7 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
         c8 c = text[i];
         
         if (c == '\n') {
-            local_position.y -= font->size * pixel_scale * size;
+            local_position.y -= .1;
             local_position.x = position->x;
             continue;
         }
@@ -129,16 +129,12 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
             stbtt_packedchar* packed_char = s_array_get(&font->packed_characters, c - font->first_character);
             stbtt_aligned_quad* aligned_quad = s_array_get(&font->aligned_quads, c - font->first_character);
             
-            // Calculate glyph dimensions
-            f32 glyph_width = (packed_char->x1 - packed_char->x0) * pixel_scale * size;
-            f32 glyph_height = (packed_char->y1 - packed_char->y0) * pixel_scale * size;
+            f32 glyph_width = (packed_char->x1 - packed_char->x0) * pixel_scale; 
+            f32 glyph_height = (packed_char->y1 - packed_char->y0) * pixel_scale;
             
-            // Calculate glyph position (without adding local_position twice!)
-            f32 glyph_x = local_position.x + packed_char->xoff * pixel_scale * size;
-            f32 glyph_y = local_position.y - (packed_char->yoff + (packed_char->y1 - packed_char->y0)) * pixel_scale * size;
-            
-            // Store instance data: position (xy) + size (zw) + UVs (4 floats)
-            // Assuming buffer layout: [x, y, width, height, u0, v0, u1, v1]
+            f32 glyph_x = (packed_char->xoff * pixel_scale) * 2;
+            f32 glyph_y = (packed_char->yoff * pixel_scale) * 2 + .1;
+
             text_handle->buffer[glyph_count].m[0] = glyph_x;
             text_handle->buffer[glyph_count].m[1] = glyph_y;
             text_handle->buffer[glyph_count].m[2] = glyph_width;
@@ -149,6 +145,9 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
             text_handle->buffer[glyph_count].m[7] = aligned_quad->t1;
             text_handle->buffer[glyph_count].m[8] = local_position.x;
             text_handle->buffer[glyph_count].m[9] = local_position.y;
+
+            printf("--- glyph %d char %c ---\n", glyph_count, c);
+            se_print_mat4(&text_handle->buffer[glyph_count]);
             // Advance cursor
             local_position.x += packed_char->xadvance / 550 ;//* pixel_scale * size;
             glyph_count++;

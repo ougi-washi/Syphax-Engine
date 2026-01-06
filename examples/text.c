@@ -24,13 +24,10 @@ i32 main() {
     scene_params.scenes_2d_count = 2;
     scene_params.scenes_3d_count = 0;
     se_scene_handle* scene_handle = se_scene_handle_create(render_handle, &scene_params);
-    se_scene_2d* scene_2d = se_scene_2d_create(scene_handle, &se_vec2(WIDTH, HEIGHT), 4);
 
     se_text_handle* text_handle = se_text_handle_create(render_handle, 1);
     se_font* font = se_font_load(text_handle, "fonts/ithaca.ttf");
-
-    se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
-
+    
     key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
     s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
@@ -39,11 +36,8 @@ i32 main() {
         se_window_poll_events();
         se_window_check_exit_keys(window, &exit_keys);
         se_window_update(window);
-        //se_render_handle_reload_changed_shaders(render_handle);
         se_render_clear();
-        se_text_render(text_handle, font, "yer7am dinek, ch'hal boubli", &se_vec2(0., 0.), 32.f);
-        //se_scene_2d_render(scene_2d, render_handle);
-        se_scene_2d_render_to_screen(scene_2d, render_handle, window);
+        se_text_render(text_handle, font, "yer7am dinek, ch'hal boubli \nMa nedri welou", &se_vec2(0., 0.), 32.f);
         se_window_render_screen(window);
     }
 

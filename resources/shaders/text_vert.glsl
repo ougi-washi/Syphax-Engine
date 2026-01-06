@@ -19,6 +19,6 @@ void main() {
     //ndc.y = -ndc.y;
     //tex_coord = mix(glyph_uv.xy, glyph_uv.zw, in_texcoord);
     
-    gl_Position = vec4(in_position + offset, 0.0, 1.0);
+    gl_Position = vec4(in_position + offset - glyph_rect.xy, 0.0, 1.0);
     tex_coord = in_texcoord;
 }
