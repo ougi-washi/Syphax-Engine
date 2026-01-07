@@ -45,7 +45,19 @@ typedef se_object_3d* se_object_3d_ptr;
 typedef s_array(se_object_3d_ptr, se_objects_3d_ptr);
 
 typedef struct {
-    se_objects_2d_ptr objects;
+    void* data;
+    void (*callback)(se_render_handle* render_handle, void* data);
+} se_custom_object;
+
+typedef union {
+    se_object_2d_ptr object_2d;
+    se_object_3d_ptr object_3d;
+    se_custom_object custom;
+} se_render_object;
+typedef s_array(se_render_object, se_render_objects);
+
+typedef struct {
+    se_render_objects objects;
     se_framebuffer_ptr output;
 } se_scene_2d;
 typedef s_array(se_scene_2d, se_scenes_2d);

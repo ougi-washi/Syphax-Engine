@@ -6,8 +6,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-const sz SE_TEXT_VBO_SIZE = 600000 * sizeof(se_vertex_3d); // Size enough for 600000 vertices (100000 quads)
-
 se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32 fonts_count) {
     s_assertf(render_handle, "se_init_text_render :: render_handle is null");
     se_text_handle* text_handle = malloc(sizeof(se_text_handle));
