@@ -65,7 +65,7 @@ typedef se_scene_2d* se_scene_2d_ptr;
 typedef s_array(se_scene_2d_ptr, se_scenes_2d_ptr);
 
 typedef struct {
-    se_models_ptr models;
+    se_models_ptr models; // TODO: change to se_objects_3d
     se_camera_ptr camera;
     se_render_buffers_ptr post_process;
     se_shader_ptr output_shader;
