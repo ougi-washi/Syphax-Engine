@@ -45,6 +45,7 @@ typedef se_object_3d* se_object_3d_ptr;
 typedef s_array(se_object_3d_ptr, se_objects_3d_ptr);
 
 typedef struct {
+    se_mat4 transform;
     void* data;
     void (*callback)(se_render_handle* render_handle, void* data);
 } se_custom_object;

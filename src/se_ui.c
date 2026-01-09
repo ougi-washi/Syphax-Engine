@@ -2,12 +2,13 @@
 
 #include "se_ui.h"
 
-se_ui* se_ui_create(se_render_handle* render_handle, const u32 objects_count, const u32 fonts_count) {
+se_ui* se_ui_create(se_render_handle* render_handle, const u32 objects_count, const u32 fonts_count, const se_ui_layout layout) {
     s_assertf(render_handle, "se_ui_create :: render_handle is null");
     s_assertf(objects_count > 0, "se_ui_create :: objects_count is 0");
     s_assertf(fonts_count > 0, "se_ui_create :: fonts_count is 0");
     se_ui* new_ui = malloc(sizeof(se_ui));
     memset(new_ui, 0, sizeof(se_ui));
+    new_ui->layout = layout;
     new_ui->render_handle = render_handle;
     se_scene_handle_params scene_params = {0};
     scene_params.objects_2d_count = objects_count;
@@ -29,6 +30,14 @@ void se_ui_render(se_ui* ui, se_render_handle* render_handle) {
     se_scene_2d_render(ui->scene_2d, render_handle);
 }
 
+void se_ui_render_to_screen(se_ui* ui, se_render_handle* render_handle, se_window* window) {
+    s_assertf(ui, "se_ui_render_to_screen :: ui is null");
+    s_assertf(ui->scene_2d, "se_ui_render_to_screen :: scene_2d is null");
+    s_assertf(render_handle, "se_ui_render_to_screen :: render_handle is null");
+    s_assertf(window, "se_ui_render_to_screen :: window is null");
+    se_scene_2d_render_to_screen(ui->scene_2d, render_handle, window);
+}
+
 void se_ui_destroy(se_ui* ui) {
     s_assertf(ui, "se_ui_destroy :: ui is null");
     s_assertf(ui->scene_handle, "se_ui_destroy :: scene_handle is null");
@@ -44,10 +53,13 @@ se_ui_object* se_ui_add_object(se_ui* ui, const se_ui_object_params* params) {
     s_assertf(params, "se_ui_add_object :: params is null");
     s_assertf(ui->scene_2d, "se_ui_add_object :: scene_2d is null");
     s_assertf(ui->render_handle, "se_ui_add_object :: render_handle is null");
-    se_ui_object* new_object = s_array_increment(&ui->objects);
-    // TODO shader
-    se_object_2d* object_2d = se_object_2d_create(ui->scene_handle, "", &se_vec2(0, 0), &params->size, 0);
-    
+    s_foreach(&ui->objects, i) {
+        se_ui_object* current_ui_object = s_array_get(&ui->objects, i);
+    }
+
+    se_ui_object* new_ui_object = s_array_increment(&ui->objects);
+    se_object_2d* object_2d = se_object_2d_create(ui->scene_handle, params->fragment_shader_path, &position, &scale, 0);
+    new_ui_object->render_object.object_2d = object_2d;
     return new_object;
 }
 void se_ui_remove_object(se_ui* ui, se_ui_object* object);
