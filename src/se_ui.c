@@ -42,24 +42,53 @@ void se_ui_destroy(se_ui* ui) {
     s_assertf(ui, "se_ui_destroy :: ui is null");
     s_assertf(ui->scene_handle, "se_ui_destroy :: scene_handle is null");
     s_assertf(ui->scene_2d, "se_ui_destroy :: scene_2d is null");
+    se_scene_2d_destroy(ui->scene_handle, ui->scene_2d);
     se_scene_handle_cleanup(ui->scene_handle);
     se_text_handle_cleanup(ui->text_handle);
     free(ui);
     ui = NULL;
 }
 
-se_ui_object* se_ui_add_object(se_ui* ui, const se_ui_object_params* params) {
+se_ui_object* se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, const se_vec2* padding) {
     s_assertf(ui, "se_ui_add_object :: ui is null");
-    s_assertf(params, "se_ui_add_object :: params is null");
+    s_assertf(fragment_shader_path, "se_ui_add_object :: fragment_shader_path is null");
     s_assertf(ui->scene_2d, "se_ui_add_object :: scene_2d is null");
     s_assertf(ui->render_handle, "se_ui_add_object :: render_handle is null");
+
+    sz object_count = s_array_get_size(&ui->objects);
+
+    se_vec2 scale = {1};
+    if (object_count > 0) {
+        if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+            scale.x = 1. / object_count + 1;
+        }
+        else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+            scale.y = 1. / object_count + 1;
+        }
+    }
+
+    se_vec2 position = {0};
     s_foreach(&ui->objects, i) {
         se_ui_object* current_ui_object = s_array_get(&ui->objects, i);
+        if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+            position.x += current_ui_object->object_2d->scale.x;
+        }
+        else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+            position.y += current_ui_object->object_2d->scale.y;
+        }
+        se_object_2d_set_position(current_ui_object->object_2d, &position);
+        se_object_2d_set_scale(current_ui_object->object_2d, &scale);
     }
 
     se_ui_object* new_ui_object = s_array_increment(&ui->objects);
-    se_object_2d* object_2d = se_object_2d_create(ui->scene_handle, params->fragment_shader_path, &position, &scale, 0);
-    new_ui_object->render_object.object_2d = object_2d;
-    return new_object;
+    se_object_2d* object_2d = se_object_2d_create(ui->scene_handle, fragment_shader_path, &position, &scale, 0);
+    new_ui_object->object_2d = object_2d;
+    return new_ui_object;
 }
-void se_ui_remove_object(se_ui* ui, se_ui_object* object);
+
+void se_ui_remove_object(se_ui* ui, se_ui_object* object) {
+    s_assertf(ui, "se_ui_remove_object :: ui is null");
+    s_assertf(object, "se_ui_remove_object :: object is null");
+    s_array_remove(&ui->objects, object);
+}
+

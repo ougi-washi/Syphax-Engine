@@ -8,14 +8,7 @@
 #include "se_window.h"
 
 typedef struct {
-    se_vec2 padding;
-    c8 fragment_shader_path[SE_MAX_PATH_LENGTH];
-    b8 visible;
-} se_ui_object_params;
-#define SE_UI_OBJECT_PARAMS_DEFAULT { .layout = SE_UI_LAYOUT_HORIZONTAL, .size = se_vec2(1., 1.), .spacing = se_vec2(0., 0.), .padding = se_vec2(0., 0.), .visible = true }
-
-typedef struct {
-    se_render_object render_object;
+    se_object_2d* object_2d;
     b8 visible;
 } se_ui_object;
 typedef s_array(se_ui_object, se_ui_objects);
@@ -40,7 +33,7 @@ extern se_ui* se_ui_create(se_render_handle* render_handle, const u32 objects_co
 extern void se_ui_render(se_ui* ui, se_render_handle* render_handle);
 extern void se_ui_render_to_screen(se_ui* ui, se_render_handle* render_handle, se_window* window);
 extern void se_ui_destroy(se_ui* ui);
-extern se_ui_object* se_ui_add_object(se_ui* ui, const se_ui_object_params* params);
+extern se_ui_object* se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, const se_vec2* padding);
 extern void se_ui_remove_object(se_ui* ui, se_ui_object* object);
 
 #endif // SE_UI_H

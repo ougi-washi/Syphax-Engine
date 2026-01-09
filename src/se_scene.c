@@ -302,21 +302,22 @@ void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle) {
     se_enable_blending();
     
     s_foreach(&scene->objects, i) {
-        se_render_object* found_object = s_array_get(&scene->objects, i);
-        if (found_object == NULL) {
-            printf("Warning: se_scene_2d_render :: object_ptr is null\n");
+        se_object_2d_ptr* current_object_2d_ptr = s_array_get(&scene->objects, i);
+        if (current_object_2d_ptr == NULL) {
+            printf("Warning: se_scene_2d_render :: current_object_2d_ptr is null\n");
             continue;
         }
-        se_render_object current_object = *found_object;
-        if (current_object.object_2d) {
-            se_object_2d* current_object_2d = current_object.object_2d;
-            se_object_2d_update_uniforms(current_object_2d);
-            se_shader_use(render_handle, current_object_2d->shader, true, true);
-            const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
-            se_quad_render(&current_object_2d->quad, instance_count);
-        }
-        else if (current_object.custom.callback) {
-            current_object.custom.callback(render_handle, current_object.custom.data);
+        se_object_2d* current_object_2d = *current_object_2d_ptr;
+        if (current_object_2d) {
+            if (current_object_2d->custom.render) {
+                current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
+            }
+            else {
+                se_object_2d_update_uniforms(current_object_2d);
+                se_shader_use(render_handle, current_object_2d->shader, true, true);
+                const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
+                se_quad_render(&current_object_2d->quad, instance_count);
+            }
         }
     }
     se_disable_blending();
@@ -338,21 +339,13 @@ void se_scene_2d_render_to_screen(se_scene_2d* scene, se_render_handle* render_h
 void se_scene_2d_add_object(se_scene_2d* scene, se_object_2d* object) {
     s_assertf(scene, "se_scene_2d_add_object :: scene is null");
     s_assertf(object, "se_scene_2d_add_object :: object is null");
-    se_render_object* new_object = s_array_increment(&scene->objects);
-    memset(new_object, 0, sizeof(se_render_object));
-    new_object->object_2d = object;
+    s_array_add(&scene->objects, object);
 }
 
 void se_scene_2d_remove_object(se_scene_2d* scene, se_object_2d* object) {
     s_assertf(scene, "se_scene_2d_remove_object :: scene is null");
     s_assertf(object, "se_scene_2d_remove_object :: object is null");
-    s_foreach(&scene->objects, i) {
-        se_render_object* found_object = s_array_get(&scene->objects, i);
-        if (found_object->object_2d == object) {
-            s_array_remove_at(&scene->objects, i);
-            break;
-        }
-    }
+    s_array_remove(&scene->objects, &object);
 }
 
 se_scene_3d* se_scene_3d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count) {
