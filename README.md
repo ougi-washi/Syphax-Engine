@@ -34,9 +34,9 @@ To run an example, simply run:
 These submodules are added under `lib/`
 * [GLFW](https://github.com/glfw/glfw)
 * [STB](https://github.com/nothings/stb)
-* [portaudio](https://github.com/PortAudio/portaudio). You may need to install:
-  * Debian: `libpulse-dev` `libasound-dev` `libsndio-dev` `libjack-jackd2-dev`
-  * Arch: `libpulse` `alsa-lib` `sndio` `jack2`
+
+Deprecated submodules:
+* [portaudio](https://github.com/PortAudio/portaudio). This will change to miniaudio in the future.
 
 ### License
 MIT License
