@@ -164,6 +164,7 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
 }
 
 extern void se_window_update(se_window* window) {
+    se_window_check_exit_keys(window);
     window->time.last_frame = window->time.current;
     window->time.current = glfwGetTime();
     window->time.delta = window->time.current - window->time.last_frame;
@@ -234,9 +235,18 @@ b8 se_window_should_close(se_window* window) {
     return glfwWindowShouldClose(window->handle);
 }
 
-void se_window_check_exit_keys(se_window* window, key_combo* keys) {
+void se_window_set_exit_keys(se_window* window, se_key_combo* keys) {
+    s_assertf(window, "se_window_set_exit_keys :: window is null");
+    s_assertf(keys, "se_window_set_exit_keys :: keys is null");
+    window->exit_keys = keys;
+}
+
+void se_window_check_exit_keys(se_window* window) {
     s_assertf(window, "se_window_check_exit_keys :: window is null");
-    s_assertf(keys, "se_window_check_exit_keys :: keys is null");
+    if (!window->exit_keys) {
+        return;
+    }
+    se_key_combo* keys = window->exit_keys;
     if (keys->size == 0) {
         return;
     }

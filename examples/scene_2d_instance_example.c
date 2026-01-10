@@ -40,13 +40,14 @@ i32 main() {
     se_scene_2d_add_object(scene_2d, button);
     se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
 
-    key_combo exit_keys = {0};
+    // TODO: Edit syphax array and make this in a single line
+    se_key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
-    s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
+    s_array_add(&exit_keys, GLFW_KEY_ESCAPE); 
+    se_window_set_exit_keys(window, &exit_keys);
 
     while (!se_window_should_close(window)) {
         se_window_poll_events();
-        se_window_check_exit_keys(window, &exit_keys);
         se_window_update(window);
         se_render_handle_reload_changed_shaders(render_handle);
         se_render_clear();

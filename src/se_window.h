@@ -34,6 +34,8 @@ typedef struct {
     void* data;
 } se_resize_handle;
 
+typedef s_array(i32, se_key_combo);
+
 typedef struct {
     GLFWwindow* handle;
     u32 width;
@@ -52,12 +54,12 @@ typedef struct {
     se_time time;
     u64 frame_count;
 
+    se_key_combo* exit_keys;
     s_array(se_resize_handle, resize_handles);
     s_array(se_input_event, input_events);
 } se_window;
 
 typedef s_array(se_window, se_windows);
-typedef s_array(i32, key_combo);
 
 extern se_window* se_window_create(const char* title, const u32 width, const u32 height);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
@@ -68,7 +70,8 @@ extern b8 se_window_is_key_down(se_window* window, i32 key);
 extern b8 se_window_is_mouse_down(se_window* window, i32 button);
 extern void se_window_get_mouse_position_normalized(se_window* window, se_vec2* out_mouse_position);
 extern b8 se_window_should_close(se_window* window);
-extern void se_window_check_exit_keys(se_window* window, key_combo* keys);
+extern void se_window_set_exit_keys(se_window* window, se_key_combo* keys);
+extern void se_window_check_exit_keys(se_window* window);
 extern f64 se_window_get_delta_time(se_window* window);
 extern f64 se_window_get_time(se_window* window);
 extern void se_window_set_target_fps(se_window* window, const u16 fps);

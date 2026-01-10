@@ -24,15 +24,16 @@ i32 main() {
 
     se_model* model = se_model_load_obj(&render_handle, "cube.obj", &se_mesh_shaders);
     se_render_buffer* model_buf = se_render_buffer_create(&render_handle, WIDTH, HEIGHT, "examples/audio_example/model_buffer_frag.glsl"); // TODO: fix
-    
-    key_combo exit_keys = {0};
-    s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
-    
+ 
+    // TODO: Edit syphax array and make this in a single line
+    se_key_combo exit_keys = {0};
+    s_array_init(&exit_keys, 1);
+    s_array_add(&exit_keys, GLFW_KEY_ESCAPE); 
+    se_window_set_exit_keys(window, &exit_keys);
+   
     while (!se_window_should_close(window)) {
         // input
         se_window_poll_events();
-        se_window_check_exit_keys(window, &exit_keys);
-
         se_window_update(window);
       
         se_render_handle_reload_changed_shaders(&render_handle);

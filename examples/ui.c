@@ -17,21 +17,23 @@ i32 main() {
     params.cameras_count = 0;
     se_render_handle* render_handle = se_render_handle_create(&params);
     
-    se_ui* ui = se_ui_create(render_handle, 4, 1, SE_UI_LAYOUT_HORIZONTAL);
+    se_ui* ui = se_ui_create(render_handle, window, 4, 1, SE_UI_LAYOUT_HORIZONTAL);
 
-    se_object_2d* button_yes = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0., 0.));
-    se_object_2d* button_no = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0., 0.));
+    se_object_2d* button_yes = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
+    se_object_2d* button_no = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
 
-    key_combo exit_keys = {0};
+    // TODO: Edit syphax array and make this in a single line
+    se_key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);
-    s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
-    
+    s_array_add(&exit_keys, GLFW_KEY_ESCAPE); 
+    se_window_set_exit_keys(window, &exit_keys);
+
     while (!se_window_should_close(window)) {
         se_window_poll_events();
-        se_window_check_exit_keys(window, &exit_keys);
         se_window_update(window);
-        se_ui_render(ui, render_handle);
-        se_ui_render_to_screen(ui, render_handle, window);
+        se_render_clear();
+        se_ui_render(ui);
+        se_ui_render_to_screen(ui);
         se_window_render_screen(window);
     }
     
