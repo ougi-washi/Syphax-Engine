@@ -11,10 +11,7 @@ i32 main() {
     se_render_handle_params params = {0};
     params.framebuffers_count = 8;
     params.render_buffers_count = 8;
-    params.textures_count = 0;
     params.shaders_count = 8;
-    params.models_count = 0;
-    params.cameras_count = 0;
     se_render_handle* render_handle = se_render_handle_create(&params);
     
     se_ui* ui = se_ui_create(render_handle, window, 4, 1, SE_UI_LAYOUT_HORIZONTAL);
