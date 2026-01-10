@@ -112,9 +112,3 @@ void se_ui_remove_object(se_ui* ui, se_object_2d* object) {
     se_scene_2d_remove_object(ui->scene_2d, object);
 }
 
-void se_ui_add_child(se_ui* ui, se_ui* child) {
-    s_assertf(ui, "se_ui_add_child :: ui is null");
-    s_assertf(child, "se_ui_add_child :: child is null");
-    s_array_add(&ui->children, child);
-}
-
