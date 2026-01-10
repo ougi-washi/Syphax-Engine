@@ -61,6 +61,8 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     se_quad_2d_create(&new_object->quad, max_instances_count * 2);
     new_object->position = *position;
     new_object->scale = *scale;
+    new_object->is_custom = false;
+    new_object->is_visible = true;
     if (scene_handle->render_handle) {
         s_foreach(&scene_handle->render_handle->shaders, i) {
             se_shader* curr_shader = s_array_get(&scene_handle->render_handle->shaders, i);
@@ -92,6 +94,17 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
         se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.transforms.data, max_instances_count);
         se_quad_2d_add_instance_buffer(&new_object->quad, new_object->instances.buffers.data, max_instances_count);
     }
+    return new_object;
+}
+se_object_2d* se_object_2d_create_custom(se_scene_handle* scene_handle, se_object_custom* custom, const se_vec2* position, const se_vec2* scale) {
+    s_assertf(scene_handle, "se_object_2d_create_custom :: scene_handle is null");
+    s_assertf(custom, "se_object_2d_create_custom :: custom is null");
+    se_object_2d* new_object = s_array_increment(&scene_handle->objects_2d);
+    new_object->position = *position;
+    new_object->scale = *scale;
+    new_object->is_custom = true;
+    new_object->is_visible = true;
+    new_object->custom = *custom;
     return new_object;
 }
 
@@ -293,23 +306,21 @@ void se_scene_2d_destroy(se_scene_handle* scene_handle, se_scene_2d* scene) {
 }
 
 void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle) {
-    if (render_handle == NULL) {
-        return;
-    }
+    s_assertf(scene, "se_scene_2d_render :: scene is null");
+    s_assertf(render_handle, "se_scene_2d_render :: render_handle is null");
 
     se_framebuffer_bind(scene->output);
     se_render_clear();
     se_enable_blending();
-    
     s_foreach(&scene->objects, i) {
         se_object_2d_ptr* current_object_2d_ptr = s_array_get(&scene->objects, i);
         if (current_object_2d_ptr == NULL) {
-            printf("Warning: se_scene_2d_render :: current_object_2d_ptr is null\n");
+            printf("se_scene_2d_render :: current_object_2d_ptr is null\n");
             continue;
         }
         se_object_2d* current_object_2d = *current_object_2d_ptr;
         if (current_object_2d) {
-            if (current_object_2d->custom.render) {
+            if (current_object_2d->is_custom) {
                 current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
             }
             else {

@@ -19,8 +19,8 @@ i32 main() {
     
     se_ui* ui = se_ui_create(render_handle, 4, 1, SE_UI_LAYOUT_HORIZONTAL);
 
-    se_ui_object* button_yes = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0., 0.));
-    se_ui_object* button_no = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0., 0.));
+    se_object_2d* button_yes = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0., 0.));
+    se_object_2d* button_no = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0., 0.));
 
     key_combo exit_keys = {0};
     s_array_init(&exit_keys, 1);

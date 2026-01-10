@@ -19,7 +19,6 @@ se_ui* se_ui_create(se_render_handle* render_handle, const u32 objects_count, co
     // TODO: maybe the size should be configurable
     new_ui->scene_2d = se_scene_2d_create(new_ui->scene_handle, &se_vec2(1920, 1080), objects_count);
     new_ui->text_handle = se_text_handle_create(render_handle, fonts_count);
-    s_array_init(&new_ui->objects, objects_count);
     return new_ui;
 }
 
@@ -49,13 +48,19 @@ void se_ui_destroy(se_ui* ui) {
     ui = NULL;
 }
 
-se_ui_object* se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, const se_vec2* padding) {
+se_object_2d_ptr se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, const se_vec2* padding) {
     s_assertf(ui, "se_ui_add_object :: ui is null");
     s_assertf(fragment_shader_path, "se_ui_add_object :: fragment_shader_path is null");
-    s_assertf(ui->scene_2d, "se_ui_add_object :: scene_2d is null");
-    s_assertf(ui->render_handle, "se_ui_add_object :: render_handle is null");
 
-    sz object_count = s_array_get_size(&ui->objects);
+    se_scene_2d* scene_2d = ui->scene_2d;
+    s_assertf(scene_2d, "se_ui_add_object :: scene_2d is null");
+
+    se_render_handle* render_handle = ui->render_handle;    
+    s_assertf(render_handle, "se_ui_add_object :: render_handle is null");
+
+    printf("se_ui_add_object :: ui: %p, fragment_shader_path: %s\n", ui, fragment_shader_path);
+
+    sz object_count = s_array_get_size(&scene_2d->objects);
 
     se_vec2 scale = {1};
     if (object_count > 0) {
@@ -68,27 +73,34 @@ se_ui_object* se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, const 
     }
 
     se_vec2 position = {0};
-    s_foreach(&ui->objects, i) {
-        se_ui_object* current_ui_object = s_array_get(&ui->objects, i);
+    s_foreach(&scene_2d->objects, i) {
+        se_object_2d_ptr* current_object_2d_ptr = s_array_get(&scene_2d->objects, i);
+        if (!current_object_2d_ptr) {
+            printf("se_ui_add_object :: one of the previous objects is null\n");
+            continue;
+        }
+        se_object_2d* current_object_2d = *current_object_2d_ptr;
+        if (!current_object_2d) {
+            printf("se_ui_add_object :: one of the previous objects is null\n");
+            continue;
+        }
         if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-            position.x += current_ui_object->object_2d->scale.x;
+            position.x += scale.x * i;
         }
         else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-            position.y += current_ui_object->object_2d->scale.y;
+            position.y += scale.y * i;
         }
-        se_object_2d_set_position(current_ui_object->object_2d, &position);
-        se_object_2d_set_scale(current_ui_object->object_2d, &scale);
+        se_object_2d_set_position(current_object_2d, &position);
+        se_object_2d_set_scale(current_object_2d, &scale);
     }
-
-    se_ui_object* new_ui_object = s_array_increment(&ui->objects);
-    se_object_2d* object_2d = se_object_2d_create(ui->scene_handle, fragment_shader_path, &position, &scale, 0);
-    new_ui_object->object_2d = object_2d;
-    return new_ui_object;
+    se_object_2d_ptr object_2d = se_object_2d_create(ui->scene_handle, fragment_shader_path, &position, &scale, 0);
+    se_scene_2d_add_object(ui->scene_2d, object_2d);
+    return object_2d;
 }
 
-void se_ui_remove_object(se_ui* ui, se_ui_object* object) {
+void se_ui_remove_object(se_ui* ui, se_object_2d* object) {
     s_assertf(ui, "se_ui_remove_object :: ui is null");
     s_assertf(object, "se_ui_remove_object :: object is null");
-    s_array_remove(&ui->objects, object);
+    se_scene_2d_remove_object(ui->scene_2d, object);
 }
 
