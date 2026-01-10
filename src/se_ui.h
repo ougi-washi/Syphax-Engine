@@ -21,8 +21,6 @@ typedef struct {
     se_window* window;
     se_scene_2d* scene_2d;
     se_text_handle* text_handle;
-
-    s_array(struct se_ui, children);
 } se_ui;
 
 extern se_ui* se_ui_create(se_render_handle* render_handle, se_window* window, const u32 objects_count, const u32 fonts_count, const se_ui_layout layout);
