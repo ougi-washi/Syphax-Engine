@@ -16,8 +16,10 @@ i32 main() {
     
     se_ui* ui = se_ui_create(render_handle, window, 4, 1, SE_UI_LAYOUT_HORIZONTAL);
 
-    se_object_2d* button_yes = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
-    se_object_2d* button_no = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
+
+    se_object_2d* button_minimize = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
+    se_object_2d* button_maximize = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
+    se_object_2d* button_exit = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
 
     // TODO: Edit syphax array and make this in a single line
     se_key_combo exit_keys = {0};

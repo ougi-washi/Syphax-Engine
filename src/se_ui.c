@@ -66,20 +66,19 @@ se_object_2d_ptr se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, con
 
     se_vec2 scale = {1, 1};
     se_vec2 position = {0, 0};
+    se_object_2d_ptr object_2d = se_object_2d_create(ui->scene_handle, fragment_shader_path, &position, &scale, 0);
+    se_scene_2d_add_object(ui->scene_2d, object_2d);
+    
     if (object_count > 0) {
         if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
             scale.x = 1. / (object_count + 1);
-            position.x = -scale.x;
         }
         else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
             scale.y = 1. / (object_count + 1);
-            position.y = -scale.y;
         }
     }
-    
-    scale.x -= padding->x;
-    scale.y -= padding->y;
-    
+   
+    position = se_vec2(scale.x - 1, scale.y - 1);
     s_foreach(&scene_2d->objects, i) {
         se_object_2d_ptr* current_object_2d_ptr = s_array_get(&scene_2d->objects, i);
         if (!current_object_2d_ptr) {
@@ -91,18 +90,18 @@ se_object_2d_ptr se_ui_add_object(se_ui* ui, const c8* fragment_shader_path, con
             printf("se_ui_add_object :: one of the previous objects is null\n");
             continue;
         }
+        
         se_object_2d_set_position(current_object_2d, &position);
-        se_object_2d_set_scale(current_object_2d, &scale);
+        se_object_2d_set_scale(current_object_2d, &se_vec2(scale.x - padding->x, scale.y - padding->y));
         if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-            position.x += scale.x * (i + 1) * 2.;
+            position.x += scale.x * 2 ;
         }
         else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-            position.y += scale.y * (i + 1) * 2.;
+            position.y += scale.y * 2;
         }
+        
     }
-   
-    se_object_2d_ptr object_2d = se_object_2d_create(ui->scene_handle, fragment_shader_path, &position, &scale, 0);
-    se_scene_2d_add_object(ui->scene_2d, object_2d);
+  
     return object_2d;
 }
 
