@@ -216,6 +216,13 @@ extern b8 se_shader_reload_if_changed(se_shader* shader);
 extern void se_shader_use(se_render_handle* render_handle, se_shader* shader, const b8 update_uniforms, const b8 update_global_uniforms);
 extern void se_shader_cleanup(se_shader* shader);
 extern GLuint se_shader_get_uniform_location(se_shader* shader, const char* name);
+extern f32* se_shader_get_uniform_float(se_shader* shader, const char* name);
+extern se_vec2* se_shader_get_uniform_vec2(se_shader* shader, const char* name);
+extern se_vec3* se_shader_get_uniform_vec3(se_shader* shader, const char* name);
+extern se_vec4* se_shader_get_uniform_vec4(se_shader* shader, const char* name);
+extern i32* se_shader_get_uniform_int(se_shader* shader, const char* name);
+extern se_mat4* se_shader_get_uniform_mat4(se_shader* shader, const char* name);
+extern GLuint* se_shader_get_uniform_texture(se_shader* shader, const char* name);
 extern void se_shader_set_float(se_shader* shader, const char* name, f32 value);
 extern void se_shader_set_vec2(se_shader* shader, const char* name, const se_vec2* value);
 extern void se_shader_set_vec3(se_shader* shader, const char* name, const se_vec3* value);
@@ -224,6 +231,7 @@ extern void se_shader_set_int(se_shader* shader, const char* name, i32 value);
 extern void se_shader_set_mat4(se_shader* shader, const char* name, const se_mat4* value);
 extern void se_shader_set_texture(se_shader* shader, const char* name, GLuint texture);
 extern void se_shader_set_buffer_texture(se_shader* shader, const char* name, se_render_buffer* buffer);
+
 
 // Mesh functions
 extern void se_mesh_translate(se_mesh* mesh, const se_vec3* v);

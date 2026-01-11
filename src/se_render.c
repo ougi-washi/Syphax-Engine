@@ -47,11 +47,8 @@ void se_render_set_background_color(const se_vec4 color) {
     glClearColor(color.x, color.y, color.z, color.w);
 }
 
-
-
 se_render_handle* se_render_handle_create(const se_render_handle_params* params) {
     s_assertf(params, "se_render_handle_create :: params is null");
-    printf("Creating render handle\n");
     se_render_handle* render_handle = malloc(sizeof(se_render_handle));
     memset(render_handle, 0, sizeof(se_render_handle));
     
@@ -64,12 +61,14 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
 
     render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+    printf("se_render_handle_create :: created render handle %p\n", render_handle);
     return render_handle;
 }
 
 void se_render_handle_cleanup(se_render_handle* render_handle) {
     s_assertf(render_handle, "se_render_handle_cleanup :: render_handle is null");
 
+    printf("se_render_handle_cleanup :: render handle: %p\n", render_handle);
     s_foreach(&render_handle->models, i) {
         se_model* curr_model = s_array_get(&render_handle->models, i);
         se_model_cleanup(curr_model);
@@ -107,6 +106,7 @@ void se_render_handle_cleanup(se_render_handle* render_handle) {
     s_array_clear(&render_handle->render_buffers);
 
     free(render_handle);
+    printf("se_render_handle_cleanup :: finished cleanup\n");
 }
 
 void se_render_handle_reload_changed_shaders(se_render_handle* render_handle) {
@@ -206,12 +206,22 @@ b8 se_shader_load_internal(se_shader* shader) {
     shader->vertex_mtime = get_file_mtime(shader->vertex_path);
     shader->fragment_mtime = get_file_mtime(shader->fragment_path);
     s_array_init(&shader->uniforms, SE_UNIFORMS_MAX);
-    printf("Shader - created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
+    printf("se_shader_load_internal :: created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
     return true;
 }
 
 se_shader* se_shader_load(se_render_handle* render_handle, const char* vertex_file_path, const char* fragment_file_path) {
+    s_assertf(render_handle, "se_shader_load :: render_handle is null");
+    s_assertf(vertex_file_path, "se_shader_load :: vertex_file_path is null");
+    s_assertf(fragment_file_path, "se_shader_load :: fragment_file_path is null");
+
+    if (s_array_get_capacity(&render_handle->shaders) <= s_array_get_size(&render_handle->shaders)) {
+        printf("se_shader_load :: error, render_handle->shaders is full, allocate more space\n");
+        return NULL;
+    }
+
     se_shader* new_shader = s_array_increment(&render_handle->shaders);
+
     // make path absolute
     char* new_vertex_path = NULL;
     char* new_fragment_path = NULL;
@@ -248,7 +258,7 @@ b8 se_shader_reload_if_changed(se_shader* shader) {
     time_t fragment_mtime = get_file_mtime(shader->fragment_path);
     
     if (vertex_mtime != shader->vertex_mtime || fragment_mtime != shader->fragment_mtime) {
-        printf("Reloading shader: %s, %s\n", shader->vertex_path, shader->fragment_path);
+        printf("se_shader_reload_if_changed :: Reloading shader: %s, %s\n", shader->vertex_path, shader->fragment_path);
         return se_shader_load_internal(shader);
     }
     
@@ -264,6 +274,7 @@ void se_shader_use(se_render_handle* render_handle, se_shader* shader, const b8 
 
 void se_shader_cleanup(se_shader* shader) {
     s_array_clear(&shader->uniforms);
+    printf("se_shader_cleanup :: shader: %p\n", shader);
     if (shader->program) {
         glDeleteProgram(shader->program);
         shader->program = 0;
@@ -599,6 +610,7 @@ se_camera* se_camera_create(se_render_handle* render_handle) {
     camera->near = 0.1f;
     camera->far = 100.0f;
     camera->aspect = 1.78; 
+    printf("se_camera_create :: created camera %p\n", camera);
     return camera;
 }
 
@@ -615,6 +627,7 @@ void se_camera_set_aspect(se_camera* camera, const f32 width, const f32 height) 
 }
 
 void se_camera_destroy(se_render_handle* render_handle, se_camera* camera) {
+    printf("se_camera_destroy :: camera: %p\n", camera);
     s_array_remove(&render_handle->cameras, camera);
 }
  
@@ -645,12 +658,14 @@ se_framebuffer* se_framebuffer_create(se_render_handle* render_handle, const se_
    
     // Check framebuffer completeness
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        fprintf(stderr, "Framebuffer not complete!\n");
+        fprintf(stderr, "se_framebuffer_create :: framebuffer not complete!\n");
         se_framebuffer_cleanup(framebuffer);
         return false;
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    printf("se_framebuffer_create :: created framebuffer %p\n", framebuffer);
     return framebuffer;
 }
 
@@ -697,6 +712,7 @@ void se_framebuffer_use_quad_shader(se_framebuffer* framebuffer, se_render_handl
 }
 
 void se_framebuffer_cleanup(se_framebuffer* framebuffer) {
+    printf("se_framebuffer_cleanup :: framebuffer: %p\n", framebuffer);
     if (framebuffer->framebuffer) {
         glDeleteFramebuffers(1, &framebuffer->framebuffer);
         framebuffer->framebuffer = 0;
@@ -757,12 +773,13 @@ se_render_buffer* se_render_buffer_create(se_render_handle* render_handle, const
 
     // Check framebuffer completeness
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        fprintf(stderr, "Framebuffer not complete!\n");
+        fprintf(stderr, "se_render_buffer_create :: Framebuffer not complete!\n");
         se_render_buffer_cleanup(buffer);
         return false;
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    printf("se_render_buffer_create :: created render buffer %p\n", buffer);
     return buffer;
 }
 
@@ -814,6 +831,7 @@ void se_render_buffer_set_position(se_render_buffer* buffer, const se_vec2* posi
 }
 
 void se_render_buffer_cleanup(se_render_buffer* buffer) {
+    printf("se_render_buffer_cleanup :: buffer: %p\n", buffer);
     if (buffer->framebuffer) {
         glDeleteFramebuffers(1, &buffer->framebuffer);
         buffer->framebuffer = 0;
@@ -826,6 +844,76 @@ void se_render_buffer_cleanup(se_render_buffer* buffer) {
         glDeleteRenderbuffers(1, &buffer->depth_buffer);
         buffer->depth_buffer = 0;
     }
+}
+
+f32* se_shader_get_uniform_float(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.f;
+        }
+    }
+    return NULL;
+}
+
+se_vec2* se_shader_get_uniform_vec2(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.vec2;
+        }
+    }
+    return NULL;
+}
+
+se_vec3* se_shader_get_uniform_vec3(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.vec3;
+        }
+    }
+    return NULL;
+}
+
+se_vec4* se_shader_get_uniform_vec4(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.vec4;
+        }
+    }
+    return NULL;
+}
+
+i32* se_shader_get_uniform_int(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.i;
+        }
+    }
+    return NULL;
+}
+
+se_mat4* se_shader_get_uniform_mat4(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.mat4;
+        }
+    }
+    return NULL;
+}
+
+GLuint* se_shader_get_uniform_texture(se_shader* shader, const char* name) {
+    s_foreach(&shader->uniforms, i) {
+        se_uniform* uniform = s_array_get(&shader->uniforms, i);
+        if (uniform && strcmp(uniform->name, name) == 0) {
+            return &uniform->value.texture;
+        }
+    }
+    return NULL;
 }
 
 // Uniform functions
@@ -1116,7 +1204,7 @@ void se_quad_2d_add_instance_buffer(se_quad* quad, const se_mat4* buffer, const 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    printf("se_quad_2d_add_instance_buffer, ptr %p\n", buffer);
+    printf("se_quad_2d_add_instance_buffer :: buffer: %p\n", buffer);
 }
 
 void se_quad_render(se_quad* quad, const sz instance_count) {
@@ -1161,7 +1249,7 @@ time_t get_file_mtime(const char* path) {
 char* load_file(const char* path) {
     FILE* file = fopen(path, "rb");
     if (!file) {
-        fprintf(stderr, "Failed to open file: %s\n", path);
+        fprintf(stderr, "load_file :: Failed to open file: %s\n", path);
         return NULL;
     }
     
@@ -1185,7 +1273,7 @@ char* load_file(const char* path) {
 uc8* load_file_uc8(const char* path, sz* out_size) {
     FILE* file = fopen(path, "rb");
     if (!file) {
-        fprintf(stderr, "Failed to open file: %s\n", path);
+        fprintf(stderr, "load_file_uc8 :: Failed to open file: %s\n", path);
         return NULL;
     }
     
@@ -1217,7 +1305,7 @@ static GLuint compile_shader(const char* source, GLenum type) {
     if (!success) {
         char info_log[512];
         glGetShaderInfoLog(shader, 512, NULL, info_log);
-        fprintf(stderr, "Shader compilation failed: %s\n", info_log);
+        fprintf(stderr, "compile_shader :: Shader compilation failed: %s\n", info_log);
         glDeleteShader(shader);
         return 0;
     }
@@ -1231,7 +1319,7 @@ static GLuint create_shader_program(const char* vertex_source, const char* fragm
     if (!vertex_shader || !fragment_shader) {
         if (vertex_shader) glDeleteShader(vertex_shader);
         if (fragment_shader) glDeleteShader(fragment_shader);
-        printf("Failed to create shader program, vertex or fragment shaders are invalid\n");
+        printf("create_shader_program :: Failed to create shader program, vertex or fragment shaders are invalid\n");
         return 0;
     }
     
@@ -1245,7 +1333,7 @@ static GLuint create_shader_program(const char* vertex_source, const char* fragm
     if (!success) {
         char info_log[512];
         glGetProgramInfoLog(program, 512, NULL, info_log);
-        fprintf(stderr, "Shader program linking failed: %s\n", info_log);
+        fprintf(stderr, "create_shader_program :: Shader program linking failed: %s\n", info_log);
         glDeleteProgram(program);
         program = 0;
     }

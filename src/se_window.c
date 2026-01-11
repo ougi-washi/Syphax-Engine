@@ -159,7 +159,7 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
     new_window->time.delta = 0;
     new_window->frame_count = 0;
     new_window->target_fps = 60;
-    printf("Created window %p\n", new_window);
+    printf("se_window_create :: created window %p\n", new_window);
     return new_window;
 }
 
@@ -233,6 +233,11 @@ void se_window_get_mouse_position_normalized(se_window* window, se_vec2* out_mou
 b8 se_window_should_close(se_window* window) {
     s_assertf(window, "se_window_should_close :: window is null");
     return glfwWindowShouldClose(window->handle);
+}
+
+void se_window_set_should_close(se_window* window, const b8 should_close) {
+    s_assertf(window, "se_window_set_should_close :: window is null");
+    glfwSetWindowShouldClose(window->handle, should_close);
 }
 
 void se_window_set_exit_keys(se_window* window, se_key_combo* keys) {

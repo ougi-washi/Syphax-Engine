@@ -5,21 +5,70 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
+void increment_button_color(se_object_2d* button) {
+    se_vec3* color = se_shader_get_uniform_vec3(button->shader, "u_color");
+    if (color) {
+        se_shader_set_vec3(button->shader, "u_color", &se_vec3(color->x * 1.1, color->y * 1.1, color->z * 1.1));
+    }
+}
+
+void on_button_exit_captured(void* window, void* data) {
+    se_object_2d* button_exit = (se_object_2d*)data;
+    if (se_window_is_mouse_down(window, 0)) {
+        se_window_set_should_close((se_window*)window, true);
+    }
+    increment_button_color(button_exit);
+}
+
+void on_button_hovered(void* window, void* data) {
+    se_object_2d* button = (se_object_2d*)data;
+    increment_button_color(button);
+}
+
 i32 main() {
     se_window* window = se_window_create("Syphax-Engine - UI Example", WIDTH, HEIGHT);
     
     se_render_handle_params params = {0};
     params.framebuffers_count = 8;
     params.render_buffers_count = 8;
-    params.shaders_count = 8;
+    params.shaders_count = 16;
     se_render_handle* render_handle = se_render_handle_create(&params);
-    
-    se_ui* ui = se_ui_create(render_handle, window, 4, 1, SE_UI_LAYOUT_HORIZONTAL);
+   
+    se_ui_create_params ui_create_params = SE_UI_CREATE_PARAMS_DEFAULTS;
+    ui_create_params.window = window;
+    ui_create_params.render_handle = render_handle; 
+    ui_create_params.layout = SE_UI_LAYOUT_VERTICAL;
+    se_ui* root = se_ui_create(&ui_create_params);
 
+    ui_create_params.layout = SE_UI_LAYOUT_HORIZONTAL;
+    se_ui* toolbar = se_ui_add_child(root, &ui_create_params);
+    se_object_2d* button_minimize   = se_ui_add_object(toolbar, "examples/ui/button.glsl");
+    se_object_2d* button_maximize   = se_ui_add_object(toolbar, "examples/ui/button.glsl");
+    se_object_2d* button_exit       = se_ui_add_object(toolbar, "examples/ui/button.glsl");
+    se_shader_set_vec3(button_minimize->shader, "u_color", &se_vec3(0, 0, .3));
+    se_shader_set_vec3(button_maximize->shader, "u_color", &se_vec3(0, .3, 0));
+    se_shader_set_vec3(button_exit->shader, "u_color", &se_vec3(.3, 0, 0));
 
-    se_object_2d* button_minimize = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
-    se_object_2d* button_maximize = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
-    se_object_2d* button_exit = se_ui_add_object(ui, "examples/ui/button.glsl", &se_vec2(0.1, 0.1));
+    ui_create_params.layout = SE_UI_LAYOUT_VERTICAL;
+    se_ui* content = se_ui_add_child(root, &ui_create_params);
+    se_object_2d* item_1 = se_ui_add_object(content, "examples/ui/button.glsl");
+    se_object_2d* item_2 = se_ui_add_object(content, "examples/ui/button.glsl");
+    se_object_2d* item_3 = se_ui_add_object(content, "examples/ui/button.glsl");
+    se_shader_set_vec3(item_1->shader, "u_color", &se_vec3(.5, .5, 0));
+    se_shader_set_vec3(item_2->shader, "u_color", &se_vec3(0, .5, .5));
+    se_shader_set_vec3(item_3->shader, "u_color", &se_vec3(.5, 0, .5));
+
+    se_box_2d exit_box = {0};
+    se_object_2d_get_box_2d(button_exit, &exit_box);
+    i32 exit_update_id = se_window_register_input_event(window, &exit_box, 0, &on_button_exit_captured, button_exit);
+
+    se_box_2d minimize_box = {0};
+    se_object_2d_get_box_2d(button_minimize, &minimize_box);
+    i32 minimize_update_id = se_window_register_input_event(window, &minimize_box, 0, &on_button_hovered, button_minimize);
+
+    se_box_2d maximize_box = {0};
+    se_object_2d_get_box_2d(button_maximize, &maximize_box);
+    i32 maximize_update_id = se_window_register_input_event(window, &maximize_box, 0, &on_button_hovered, button_maximize);
 
     // TODO: Edit syphax array and make this in a single line
     se_key_combo exit_keys = {0};
@@ -31,12 +80,12 @@ i32 main() {
         se_window_poll_events();
         se_window_update(window);
         se_render_clear();
-        se_ui_render(ui);
-        se_ui_render_to_screen(ui);
+        se_ui_render(root);
+        se_ui_render_to_screen(root);
         se_window_render_screen(window);
     }
     
-    se_ui_destroy(ui);
+    se_ui_destroy(root);
     se_render_handle_cleanup(render_handle);
     se_window_destroy(window);
     return 0;
