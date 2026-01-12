@@ -133,14 +133,13 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
     new_window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
     s_assertf(new_window->handle, "Failed to create GLFW window");
     
-    // TODO: figure out why this is causing errors (GLFW Error 65538: Cannot set swap interval without a current OpenGL or OpenGL ES context)
-    // glfwSwapInterval(1); 
     
     new_window->width = width;
     new_window->height = height;
     
     glfwMakeContextCurrent(new_window->handle);
     glfwSetWindowUserPointer(new_window->handle, new_window);
+    glfwSwapInterval(0); 
     
     // Set callbacks
     glfwSetKeyCallback(new_window->handle, key_callback);

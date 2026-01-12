@@ -24,6 +24,7 @@ se_ui_handle* se_ui_handle_create(se_window* window, se_render_handle* render_ha
     
     if (params->fonts_count > 0) {
         ui_handle->text_handle = se_text_handle_create(render_handle, params->fonts_count);
+        s_array_init(&ui_handle->ui_texts, params->texts_count);
     }
     printf("se_ui_handle_create :: created ui handle %p\n", ui_handle);
     return ui_handle;
@@ -41,6 +42,7 @@ void se_ui_handle_cleanup(se_ui_handle* ui_handle) {
     if (ui_handle->text_handle) { // Text handle is optional
         se_text_handle_cleanup(ui_handle->text_handle);
     }
+    s_array_clear(&ui_handle->ui_texts);
     free(ui_handle);
     ui_handle = NULL;
     printf("se_ui_handle_cleanup :: ui_handle cleanup done\n");
@@ -65,10 +67,24 @@ se_ui_element* se_ui_element_create(se_ui_handle* ui_handle, const se_ui_element
     return new_ui;
 }
 
+se_ui_element* se_ui_element_text_create(se_ui_handle* ui_handle, const se_ui_element_params* params, const c8* text, const c8* font_path, const f32 font_size) {
+    s_assertf(ui_handle, "se_ui_element_text_create :: ui_handle is null");
+    s_assertf(params, "se_ui_element_text_create :: params is null");
+    s_assertf(text, "se_ui_element_text_create :: text is null");
+    s_assertf(font_path, "se_ui_element_text_create :: font_path is null");
+
+    se_ui_element* new_ui = se_ui_element_create(ui_handle, params);
+    se_ui_element_set_text(new_ui, text, font_path, font_size);
+    return new_ui;
+}
+
 void se_ui_element_render(se_ui_element* ui) {
     s_assertf(ui, "se_ui_element_render :: ui is null");
     s_assertf(ui->ui_handle, "se_ui_element_render :: ui_handle is null");
     s_assertf(ui->scene_2d, "se_ui_element_render :: scene_2d is null");
+
+    se_ui_handle* ui_handle = ui->ui_handle;
+    s_assertf(ui_handle, "se_ui_element_render :: ui_handle is null");
 
     if (!ui->visible) {
         return;
@@ -89,6 +105,10 @@ void se_ui_element_render(se_ui_element* ui) {
     }
 
     se_scene_2d_render(ui->scene_2d, ui->ui_handle->render_handle);
+    if (ui->text) {
+        se_font* curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
+        se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), .1, .08f); // TODO: add/store parameters, add allignment
+    }
 }
 
 void se_ui_element_render_to_screen(se_ui_element* ui) {
@@ -162,6 +182,31 @@ void se_ui_element_set_layout(se_ui_element* ui, const se_ui_layout layout) {
 void se_ui_element_set_visible(se_ui_element* ui, const b8 visible) {
     s_assertf(ui, "se_ui_element_set_visible :: ui is null");
     ui->visible = visible;
+}
+
+void se_ui_element_set_text(se_ui_element* ui, const c8* text, const c8* font_path, const f32 font_size) {
+    s_assertf(ui, "se_ui_element_set_text :: ui is null");
+    s_assertf(text, "se_ui_element_set_text :: text is null");
+    s_assertf(font_path, "se_ui_element_set_text :: font_path is null");
+    se_ui_handle* ui_handle = ui->ui_handle;
+    s_assertf(ui_handle, "se_ui_element_set_text :: ui_handle is null");
+
+    if (strlen(text) > SE_MAX_UI_TEXT_LENGTH) {
+        printf("se_ui_element_set_text :: text is too long, max length is %d\n", SE_MAX_UI_TEXT_LENGTH);
+        return;
+    }
+
+    if (!ui->text) {
+        if (s_array_get_capacity(&ui_handle->ui_texts) <= s_array_get_size(&ui_handle->ui_texts)) {
+            printf("se_ui_element_set_text :: error, ui_handle->ui_texts is full, allocate more space\n");
+            return;
+        }
+        ui->text = s_array_increment(&ui_handle->ui_texts);
+    }
+
+    strcpy(ui->text->characters, text);
+    strcpy(ui->text->font_path, font_path);
+    ui->text->font_size = font_size;
 }
 
 void se_ui_element_update_objects(se_ui_element* ui) {
