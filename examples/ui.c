@@ -50,7 +50,7 @@ i32 main() {
     se_ui_handle* ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
 
     se_ui_element_params ui_element_params = SE_UI_ELEMENT_PARAMS_DEFAULTS;
-    ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
+    ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
     se_ui_element* root = se_ui_element_create(ui_handle, &ui_element_params);
 
     ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
