@@ -20,18 +20,27 @@ static f64 se_target_fps = 60.0;
 static GLuint compile_shader(const char* source, GLenum type);
 static GLuint create_shader_program(const char* vertex_source, const char* fragment_source);
 
+static b8 se_is_blending = false;
 void se_enable_blending() {
+    if (se_is_blending) {
+        return;
+    }
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     // Also disable depth testing if you have it on
     glDisable(GL_DEPTH_TEST);
+    se_is_blending = true;
 }
 
 void se_disable_blending() {
+    if (!se_is_blending) {
+        return;
+    }
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
+    se_is_blending = false;
 }
 
 void se_unbind_framebuffer() {
