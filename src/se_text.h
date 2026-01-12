@@ -9,6 +9,7 @@
 #define SE_TEXT_CHAR_COUNT 1024
 
 typedef struct {
+    c8 path[SE_MAX_PATH_LENGTH];
     GLuint atlas_texture;
     f32 size;
     u16 atlas_width, atlas_height;

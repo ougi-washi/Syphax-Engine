@@ -8,6 +8,7 @@
 
 se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32 fonts_count) {
     s_assertf(render_handle, "se_init_text_render :: render_handle is null");
+    s_assertf(fonts_count > 0, "se_init_text_render :: fonts_count is 0");
     se_text_handle* text_handle = malloc(sizeof(se_text_handle));
     memset(text_handle, 0, sizeof(se_text_handle));
     text_handle->render_handle = render_handle;
@@ -16,11 +17,13 @@ se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32
     se_quad_2d_add_instance_buffer(&text_handle->quad, text_handle->buffer, SE_TEXT_CHAR_COUNT);
     s_assertf(text_handle, "se_init_text_render :: text_handle is null");
     text_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
-    
+    printf("se_text_handle_create :: created text handle %p\n", text_handle);
     return text_handle;
 }
 
 void se_text_handle_cleanup(se_text_handle* text_handle) {
+    s_assertf(text_handle, "se_text_handle_cleanup :: text_handle is null");
+    printf("se_text_handle_cleanup :: text_handle: %p\n", text_handle);
     s_foreach(&text_handle->fonts, i) {
         se_font* curr_font = s_array_get(&text_handle->fonts, i);
         glDeleteTextures(1, &curr_font->atlas_texture);
@@ -36,9 +39,20 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
     se_render_handle* render_handle = text_handle->render_handle;
     s_assertf(render_handle, "se_font_load :: render_handle is null");
     s_assertf(path, "se_font_load :: path is null");
+    
+    s_foreach(&text_handle->fonts, i) {
+        se_font* curr_font = s_array_get(&text_handle->fonts, i);
+        if (strcmp(curr_font->path, path) == 0 && curr_font->size == size) {
+            return curr_font;
+        }
+    }
+
     se_font* new_font = s_array_increment(&text_handle->fonts);
    
     sz font_file_size = 0;
+    
+    strcpy(new_font->path, path);
+
     c8 new_path[SE_MAX_PATH_LENGTH] = "";
     strncpy(new_path, RESOURCES_DIR, SE_MAX_PATH_LENGTH - 1);
     strncat(new_path, path, SE_MAX_PATH_LENGTH - strlen(new_path) - 1);

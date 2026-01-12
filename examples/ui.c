@@ -45,27 +45,28 @@ i32 main() {
     params.render_buffers_count = 8;
     params.shaders_count = 16;
     se_render_handle* render_handle = se_render_handle_create(&params);
-   
-    se_ui_create_params ui_create_params = SE_UI_CREATE_PARAMS_DEFAULTS;
-    ui_create_params.window = window;
-    ui_create_params.render_handle = render_handle; 
-    ui_create_params.layout = SE_UI_LAYOUT_VERTICAL;
-    se_ui* root = se_ui_create(&ui_create_params);
 
-    ui_create_params.layout = SE_UI_LAYOUT_HORIZONTAL;
-    se_ui* toolbar = se_ui_add_child(root, &ui_create_params);
-    se_object_2d* button_minimize   = se_ui_add_object(toolbar, "examples/ui/button.glsl");
-    se_object_2d* button_maximize   = se_ui_add_object(toolbar, "examples/ui/button.glsl");
-    se_object_2d* button_exit       = se_ui_add_object(toolbar, "examples/ui/button.glsl");
+    se_ui_handle_params ui_handle_params = SE_UI_HANDLE_PARAMS_DEFAULTS;
+    se_ui_handle* ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
+
+    se_ui_element_params ui_element_params = SE_UI_ELEMENT_PARAMS_DEFAULTS;
+    ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
+    se_ui_element* root = se_ui_element_create(ui_handle, &ui_element_params);
+
+    ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
+    se_ui_element* toolbar = se_ui_element_add_child(root, &ui_element_params);
+    se_object_2d* button_minimize   = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
+    se_object_2d* button_maximize   = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
+    se_object_2d* button_exit       = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
     se_shader_set_vec3(button_minimize->shader, "u_color", &se_vec3(0, 0, .3));
     se_shader_set_vec3(button_maximize->shader, "u_color", &se_vec3(0, .3, 0));
     se_shader_set_vec3(button_exit->shader, "u_color", &se_vec3(.3, 0, 0));
 
-    ui_create_params.layout = SE_UI_LAYOUT_VERTICAL;
-    se_ui* content = se_ui_add_child(root, &ui_create_params);
-    se_object_2d* item_1 = se_ui_add_object(content, "examples/ui/button.glsl");
-    se_object_2d* item_2 = se_ui_add_object(content, "examples/ui/button.glsl");
-    se_object_2d* item_3 = se_ui_add_object(content, "examples/ui/button.glsl");
+    ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
+    se_ui_element* content = se_ui_element_add_child(root, &ui_element_params);
+    se_object_2d* item_1 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+    se_object_2d* item_2 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+    se_object_2d* item_3 = se_ui_element_add_object(content, "examples/ui/button.glsl");
     se_shader_set_vec3(item_1->shader, "u_color", &se_vec3(.5, .5, 0));
     se_shader_set_vec3(item_2->shader, "u_color", &se_vec3(0, .5, .5));
     se_shader_set_vec3(item_3->shader, "u_color", &se_vec3(.5, 0, .5));
@@ -92,12 +93,12 @@ i32 main() {
         se_window_poll_events();
         se_window_update(window);
         se_render_clear();
-        se_ui_render(root);
-        se_ui_render_to_screen(root);
+        se_ui_element_render(root);
+        se_ui_element_render_to_screen(root);
         se_window_render_screen(window);
     }
-    
-    se_ui_destroy(root);
+
+    se_ui_handle_cleanup(ui_handle);
     se_render_handle_cleanup(render_handle);
     se_window_destroy(window);
     return 0;
