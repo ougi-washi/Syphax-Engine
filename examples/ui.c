@@ -8,7 +8,9 @@
 void increment_button_color(se_object_2d* button) {
     se_vec3* color = se_shader_get_uniform_vec3(button->shader, "u_color");
     if (color) {
-        se_shader_set_vec3(button->shader, "u_color", &se_vec3(color->x * 1.1, color->y * 1.1, color->z * 1.1));
+        color->x = min(color->x * 1.1, 1);
+        color->y = min(color->y * 1.1, 1);
+        color->z = min(color->z * 1.1, 1);
     }
 }
 
@@ -23,6 +25,16 @@ void on_button_exit_captured(void* window, void* data) {
 void on_button_hovered(void* window, void* data) {
     se_object_2d* button = (se_object_2d*)data;
     increment_button_color(button);
+}
+
+void on_button_stop_hovered(void* window, void* data) {
+    se_object_2d* button = (se_object_2d*)data;
+    se_vec3* color = se_shader_get_uniform_vec3(button->shader, "u_color");
+    if (color) {
+        color->x = max(color->x / 2., 0);
+        color->y = max(color->y / 2., 0);
+        color->z = max(color->z / 2., 0);
+    }
 }
 
 i32 main() {
@@ -60,15 +72,15 @@ i32 main() {
 
     se_box_2d exit_box = {0};
     se_object_2d_get_box_2d(button_exit, &exit_box);
-    i32 exit_update_id = se_window_register_input_event(window, &exit_box, 0, &on_button_exit_captured, button_exit);
+    i32 exit_update_id = se_window_register_input_event(window, &exit_box, 0, &on_button_exit_captured, &on_button_stop_hovered, button_exit);
 
     se_box_2d minimize_box = {0};
     se_object_2d_get_box_2d(button_minimize, &minimize_box);
-    i32 minimize_update_id = se_window_register_input_event(window, &minimize_box, 0, &on_button_hovered, button_minimize);
+    i32 minimize_update_id = se_window_register_input_event(window, &minimize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_minimize);
 
     se_box_2d maximize_box = {0};
     se_object_2d_get_box_2d(button_maximize, &maximize_box);
-    i32 maximize_update_id = se_window_register_input_event(window, &maximize_box, 0, &on_button_hovered, button_maximize);
+    i32 maximize_update_id = se_window_register_input_event(window, &maximize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_maximize);
 
     // TODO: Edit syphax array and make this in a single line
     se_key_combo exit_keys = {0};

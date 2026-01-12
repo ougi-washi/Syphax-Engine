@@ -59,8 +59,8 @@ i32 main() {
     int button_yes_data = 0;
     int button_no_data = 0;
 
-    i32 button_yes_update_id = se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
-    i32 button_no_update_id = se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed, &button_no_data);
+    i32 button_yes_update_id = se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
+    i32 button_no_update_id = se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed, NULL, &button_no_data);
 
     se_scene_2d_add_object(scene_2d, borders);
     se_scene_2d_add_object(scene_2d, panel);
@@ -82,7 +82,7 @@ i32 main() {
         
         button_yes->position.x += 0.005;
         se_object_2d_get_box_2d(button_yes, &button_box_yes);
-        se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, &button_yes_data);
+        se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
         
         se_render_clear();
         se_scene_2d_render(scene_2d, render_handle);

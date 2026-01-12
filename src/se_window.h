@@ -24,8 +24,10 @@ typedef struct {
     b8 active : 1;
     se_box_2d box;
     i32 depth;
-    se_input_event_callback callback;
+    se_input_event_callback on_interact_callback;
+    se_input_event_callback on_stop_interact_callback;
     void* callback_data;
+    b8 interacted : 1;
 } se_input_event;
 
 typedef void(*se_resize_event_callback)(void* window, void* data);
@@ -76,8 +78,8 @@ extern void se_window_check_exit_keys(se_window* window);
 extern f64 se_window_get_delta_time(se_window* window);
 extern f64 se_window_get_time(se_window* window);
 extern void se_window_set_target_fps(se_window* window, const u16 fps);
-extern i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data);
-extern void se_window_update_input_event(const i32 input_event_id, se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data);
+extern i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
+extern void se_window_update_input_event(const i32 input_event_id, se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
 extern void se_window_register_resize_event(se_window* window, se_resize_event_callback callback, void* data);
 extern void se_window_destroy(se_window* window);
 extern void se_window_destroy_all();

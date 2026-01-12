@@ -193,7 +193,7 @@ void se_window_poll_events(){
         se_window_get_mouse_position_normalized(window, &mouse_position);
         se_input_event* out_event = NULL;
         i32 out_depth = INT_MIN;
-        b8 pressed = false;
+        b8 interacted = false;
         s_foreach(&window->input_events, j) {
             se_input_event* current_event = s_array_get(&window->input_events, j);
             if (    current_event->active &&
@@ -202,12 +202,26 @@ void se_window_poll_events(){
                 if (current_event->depth > out_depth) {
                     out_event = current_event;
                     out_depth = current_event->depth;
-                    pressed = true;
+                    interacted = true;
                 }
             }
         }
-        if (pressed) {
-            out_event->callback(window, out_event->callback_data);
+        if (interacted) {
+            if (out_event->on_interact_callback) {
+                out_event->on_interact_callback(window, out_event->callback_data);
+            }
+            out_event->interacted = true;
+        }
+        else {
+            s_foreach(&window->input_events, j) {
+                se_input_event* current_event = s_array_get(&window->input_events, j);
+                if (current_event->interacted) {
+                    if (current_event->on_stop_interact_callback) {
+                        current_event->on_stop_interact_callback(window, current_event->callback_data);
+                    }
+                    current_event->interacted = false;
+                }
+            }
         }
     }
 }
@@ -288,10 +302,9 @@ i32 se_hash(const c8* str1, const i32 len1, const c8* str2, const i32 len2) {
     return hash;
 }
 
-i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data) {
+i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data) {
     s_assertf(window, "se_window_register_input_event :: window is null");
     s_assertf(box, "se_window_register_input_event :: box is null");
-    s_assertf(callback, "se_window_register_input_event :: callback is null");
 
     se_input_event* new_event = s_array_increment(&window->input_events);
     s_assertf(new_event, "se_window_register_input_event :: Array is full");
@@ -303,15 +316,15 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
     new_event->box = *box;
     new_event->depth = depth;
     new_event->active = true;
-    new_event->callback = callback;
+    new_event->on_interact_callback = on_interact_callback;
+    new_event->on_stop_interact_callback = on_stop_interact_callback;
     new_event->callback_data = callback_data;
     return new_event->id;
 }
 
-void se_window_update_input_event(const i32 input_event_id, se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback callback, void* callback_data) {
+void se_window_update_input_event(const i32 input_event_id, se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data) {
     s_assertf(window, "se_window_update_input_event :: window is null");
     s_assertf(box, "se_window_update_input_event :: box is null");
-    s_assertf(callback, "se_window_update_input_event :: callback is null");
     
     se_input_event* found_event = NULL;
     s_foreach(&window->input_events, i) {
@@ -324,7 +337,8 @@ void se_window_update_input_event(const i32 input_event_id, se_window* window, c
     if (found_event) {
         found_event->box = *box;
         found_event->depth = depth;
-        found_event->callback = callback;
+        found_event->on_interact_callback = on_interact_callback;
+        found_event->on_stop_interact_callback = on_stop_interact_callback;
         found_event->callback_data = callback_data;
     }
     else {
