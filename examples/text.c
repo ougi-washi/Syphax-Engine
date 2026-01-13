@@ -11,11 +11,7 @@ i32 main() {
     
     se_render_handle_params params = {0};
     params.framebuffers_count = 1;
-    params.render_buffers_count = 0;
-    params.textures_count = 0;
     params.shaders_count = 2; // 1 for screen, 1 for text
-    params.models_count = 0;
-    params.cameras_count = 0;
     se_render_handle* render_handle = se_render_handle_create(&params);
     
     se_text_handle* text_handle = se_text_handle_create(render_handle, 1);

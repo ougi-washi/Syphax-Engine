@@ -93,8 +93,8 @@ i32 main() {
     while (!se_window_should_close(window)) {
         se_window_poll_events();
         se_window_update(window);
-        c8 fps_text[16] = "-- ms";
-        sprintf(fps_text, "%f ms", se_window_get_delta_time(window) * 1000);
+        c8 fps_text[16] = "-- fps";
+        sprintf(fps_text, "%f fps", 1. / se_window_get_delta_time(window));
         se_ui_element_set_text(toolbar, fps_text, "fonts/ithaca.ttf", 32.f);
         se_render_clear();
         se_ui_element_render(root);
