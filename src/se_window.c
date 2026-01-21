@@ -48,6 +48,7 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
     window->width = width;
     window->height = height;
     glViewport(0, 0, width, height);
+    printf("frambuffer_size_change_fallback\n");
     s_foreach(&window->resize_handles, i) {
         se_resize_handle* current_event_ptr = s_array_get(&window->resize_handles, i);
         if (current_event_ptr) {
@@ -175,9 +176,6 @@ extern void se_window_update(se_window* window) {
 }
 
 void se_window_render_quad(se_window* window) {
-    //glBindVertexArray(window->quad_vao);
-    //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    //glBindVertexArray(0);
     se_shader_use(window->render_handle, window->shader, true, false);
     se_quad_render(&window->quad, 0);
 }

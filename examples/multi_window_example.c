@@ -7,9 +7,18 @@
 #define HEIGHT 1080
 
 i32 main() {
-    se_window* window_main = se_window_create("Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
-    se_window* window_1 = se_window_create("Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
-    se_window* window_2 = se_window_create("Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
+    se_render_handle_params params = {0};
+    params.framebuffers_count = 8;
+    params.render_buffers_count = 8;
+    params.textures_count = 0;
+    params.shaders_count = 8;
+    params.models_count = 0;
+    params.cameras_count = 0;
+    se_render_handle* render_handle = se_render_handle_create(&params);
+    
+    se_window* window_main = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
+    se_window* window_1 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
+    se_window* window_2 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
 
     // TODO: Edit syphax array and make this in a single line
     se_key_combo exit_keys = {0};

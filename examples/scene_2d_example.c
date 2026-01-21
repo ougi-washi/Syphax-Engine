@@ -24,7 +24,6 @@ void on_button_no_pressed(void* window, void* data) {
 }
 
 i32 main() {
-    
     se_render_handle_params params = {0};
     params.framebuffers_count = 8;
     params.render_buffers_count = 8;
@@ -76,17 +75,18 @@ i32 main() {
     s_array_add(&exit_keys, GLFW_KEY_ESCAPE); 
     se_window_set_exit_keys(window, &exit_keys);
 
-    se_scene_2d_render(scene_2d, render_handle);
+    
     while (!se_window_should_close(window)) {
         se_window_poll_events();
         se_window_update(window);
-        //se_render_handle_reload_changed_shaders(render_handle);
+        se_render_handle_reload_changed_shaders(render_handle);
         
-        //button_yes->position.x += 0.005;
-        //se_object_2d_get_box_2d(button_yes, &button_box_yes);
-        //se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
+        button_yes->position.x += 0.005;
+        se_object_2d_get_box_2d(button_yes, &button_box_yes);
+        se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
+        se_scene_2d_render(scene_2d, render_handle);
         
-        //se_render_clear();
+        se_render_clear();
         se_scene_2d_render_to_screen(scene_2d, render_handle, window);
         se_window_render_screen(window);
     }

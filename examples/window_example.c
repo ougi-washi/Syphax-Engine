@@ -7,7 +7,9 @@
 #define HEIGHT 1080
 
 i32 main() {
-    se_window* window = se_window_create("Syphax-Engine - Window Example", WIDTH, HEIGHT);
+    se_render_handle_params params = {0};
+    se_render_handle* render_handle = se_render_handle_create(&params);
+    se_window* window = se_window_create(render_handle, "Syphax-Engine - Window Example", WIDTH, HEIGHT);
 
     // TODO: Edit syphax array and make this in a single line
     se_key_combo exit_keys = {0};

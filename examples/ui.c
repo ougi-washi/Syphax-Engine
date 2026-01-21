@@ -38,14 +38,14 @@ void on_button_stop_hovered(void* window, void* data) {
 }
 
 i32 main() {
-    se_window* window = se_window_create("Syphax-Engine - UI Example", WIDTH, HEIGHT);
-    
     se_render_handle_params params = {0};
     params.framebuffers_count = 8;
     params.render_buffers_count = 8;
     params.shaders_count = 16;
     se_render_handle* render_handle = se_render_handle_create(&params);
 
+    se_window* window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
+    
     se_ui_handle_params ui_handle_params = SE_UI_HANDLE_PARAMS_DEFAULTS;
     se_ui_handle* ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
 

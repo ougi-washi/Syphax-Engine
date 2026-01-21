@@ -127,6 +127,9 @@ void se_scene_2d_resize_callback(void* window, void* scene) {
     s_assertf(window_ptr, "se_scene_2d_resize_callback :: window_ptr is null");
     s_assertf(scene_ptr, "se_scene_2d_resize_callback :: scene_ptr is null");
     
+    se_render_handle* render_handle_ptr = window_ptr->render_handle;
+    s_assertf(render_handle_ptr, "se_scene_2d_resize_callback :: render_handle_ptr is null");
+
     se_framebuffer_ptr framebuffer = scene_ptr->output;
     s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
     se_vec2 old_size = {0};
@@ -147,6 +150,7 @@ void se_scene_2d_resize_callback(void* window, void* scene) {
     //}
 
     se_framebuffer_set_size(framebuffer, &new_size);
+    se_scene_2d_render(scene, render_handle_ptr);
 }
 
 void se_scene_2d_set_auto_resize(se_scene_2d* scene, se_window* window, const se_vec2* ratio) {

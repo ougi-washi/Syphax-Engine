@@ -7,12 +7,13 @@
 #define HEIGHT 1080
 
 i32 main() {
-    se_window* window = se_window_create("Syphax-Engine - Text Example", WIDTH, HEIGHT);
     
     se_render_handle_params params = {0};
     params.framebuffers_count = 1;
     params.shaders_count = 2; // 1 for screen, 1 for text
     se_render_handle* render_handle = se_render_handle_create(&params);
+    
+    se_window* window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
     
     se_text_handle* text_handle = se_text_handle_create(render_handle, 1);
     se_font* font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.f);

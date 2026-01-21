@@ -8,8 +8,6 @@
 #define INSTANCE_COUNT 16
 
 i32 main() {
-    se_window* window = se_window_create("Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
-    
     se_render_handle_params params = {0};
     params.framebuffers_count = 8;
     params.render_buffers_count = 8;
@@ -20,6 +18,8 @@ i32 main() {
     se_render_handle* render_handle = se_render_handle_create(&params);
     
     se_scene_handle_params scene_params = {0};
+    se_window* window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
+    
     scene_params.objects_2d_count = 4;
     scene_params.objects_3d_count = 0;
     scene_params.scenes_2d_count = 2;
