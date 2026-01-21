@@ -349,7 +349,7 @@ void se_scene_2d_render_to_screen(se_scene_2d* scene, se_render_handle* render_h
 
     se_unbind_framebuffer();
     se_enable_blending();
-    se_framebuffer_use_quad_shader(scene->output, render_handle);
+    se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
     se_window_render_quad(window);
     se_disable_blending();
 }

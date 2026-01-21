@@ -188,7 +188,6 @@ typedef struct {
     se_uniforms global_uniforms;
     se_cameras cameras;
     se_models models;
-    se_shader* render_quad_shader;
 } se_render_handle;
 
 // helper functions

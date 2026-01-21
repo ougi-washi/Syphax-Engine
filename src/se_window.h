@@ -3,9 +3,7 @@
 #ifndef SE_WINDOW_H
 #define SE_WINDOW_H
 
-#include "syphax/s_array.h"
-#include "se_math.h"
-#include <GLFW/glfw3.h>
+#include "se_render.h"
 
 typedef struct {
     f64 current;
@@ -40,6 +38,7 @@ typedef s_array(i32, se_key_combo);
 
 typedef struct {
     GLFWwindow* handle;
+    se_render_handle* render_handle;
     u32 width;
     u32 height;
 
@@ -48,9 +47,8 @@ typedef struct {
     f64 mouse_dx, mouse_dy;
     b8 mouse_buttons[8];
 
-    GLuint quad_vao;
-    GLuint quad_vbo;
-    GLuint quad_ebo;
+    se_quad quad;
+    se_shader* shader;
 
     u16 target_fps;
     se_time time;
@@ -63,7 +61,7 @@ typedef struct {
 
 typedef s_array(se_window, se_windows);
 
-extern se_window* se_window_create(const char* title, const u32 width, const u32 height);
+extern se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
 extern void se_window_render_quad(se_window* window);   // mid-frame: draws using window's quad
 extern void se_window_render_screen(se_window* window); // frame end: clear, renders the frame and swaps buffers

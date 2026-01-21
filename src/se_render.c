@@ -69,7 +69,6 @@ se_render_handle* se_render_handle_create(const se_render_handle_params* params)
     s_array_init(&render_handle->cameras, params->cameras_count);
     s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
 
-    render_handle->render_quad_shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
     printf("se_render_handle_create :: created render handle %p\n", render_handle);
     return render_handle;
 }
@@ -716,8 +715,8 @@ void se_framebuffer_unbind(se_framebuffer* framebuffer) {
 void se_framebuffer_use_quad_shader(se_framebuffer* framebuffer, se_render_handle* render_handle) {
     s_assertf(framebuffer, "se_framebuffer_use_quad_shader :: framebuffer is null");
     s_assertf(render_handle, "se_framebuffer_use_quad_shader :: render_handle is null");
-    se_shader_set_texture(render_handle->render_quad_shader, "u_texture", framebuffer->texture);
-    se_shader_use(render_handle, render_handle->render_quad_shader, true, false); // we don't want to update global uniforms here
+    //se_shader_set_texture(render_handle->render_quad_shader, "u_texture", framebuffer->texture);
+    //se_shader_use(render_handle, render_handle->render_quad_shader, true, false); // we don't want to update global uniforms here
 }
 
 void se_framebuffer_cleanup(se_framebuffer* framebuffer) {
@@ -1027,13 +1026,13 @@ void se_uniform_set_texture(se_uniforms* uniforms, const char* name, GLuint text
             found_uniform->type = SE_UNIFORM_TEXTURE;
             found_uniform->value.texture = texture;
             return;
-            
         }
     }
     se_uniform* new_uniform = s_array_increment(uniforms);
     strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
     new_uniform->type = SE_UNIFORM_TEXTURE;
     new_uniform->value.texture = texture;
+    printf("se_uniform_set_texture :: added texture uniform: %s, id: %d, ptr: %p\n", name, texture, new_uniform);
 }
 
 void se_uniform_set_buffer_texture(se_uniforms* uniforms, const char* name, se_render_buffer* buffer) {

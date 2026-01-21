@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <limits.h>
 
-//static se_windows* windows_container = NULL;
-
 #define SE_MAX_WINDOWS 8
 #define SE_MAX_KEY_COMBOS 8
 #define SE_MAX_INPUT_EVENTS 1024
@@ -101,7 +99,10 @@ void gl_error_callback(i32 error, const c8* description) {
     printf("GLFW Error %d: %s\n", error, description);
 }
 
-se_window* se_window_create(const char* title, const u32 width, const u32 height) {
+se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height) {
+    s_assertf(render_handle, "se_window_create :: render_handle is null");
+    s_assertf(title, "se_window_create :: title is null");
+
     glfwSetErrorCallback(gl_error_callback);
     
     if (!glfwInit()) {
@@ -109,11 +110,12 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
         return NULL;
     }
 
-    //se_windows* windows_container = se_windows_handle_get();
     if (s_array_get_capacity(&windows_container) == 0) {
         s_array_init(&windows_container, SE_MAX_WINDOWS);
     }
     se_window* new_window = s_array_increment(&windows_container);
+    s_assertf(new_window, "Failed to create window");
+    new_window->render_handle = render_handle;
 
     if (new_window == NULL) {
         printf("Failed to create window\n");
@@ -151,8 +153,10 @@ se_window* se_window_create(const char* title, const u32 width, const u32 height
     
     glEnable(GL_DEPTH_TEST);
     
-    create_fullscreen_quad(&new_window->quad_vao, &new_window->quad_vbo, &new_window->quad_ebo);
-    
+    //create_fullscreen_quad(&new_window->quad_vao, &new_window->quad_vbo, &new_window->quad_ebo);
+    se_quad_2d_create(&new_window->quad, 0);
+    new_window->shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+
     new_window->time.current = glfwGetTime();
     new_window->time.last_frame = new_window->time.current;
     new_window->time.delta = 0;
@@ -171,9 +175,11 @@ extern void se_window_update(se_window* window) {
 }
 
 void se_window_render_quad(se_window* window) {
-    glBindVertexArray(window->quad_vao);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+    //glBindVertexArray(window->quad_vao);
+    //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    //glBindVertexArray(0);
+    se_shader_use(window->render_handle, window->shader, true, false);
+    se_quad_render(&window->quad, 0);
 }
 
 void se_window_render_screen(se_window* window) {
@@ -359,8 +365,9 @@ void se_window_destroy(se_window* window) {
     s_assertf(window, "se_window_destroy :: window is null");
     s_assertf(window->handle, "se_window_destroy :: window->handle is null");
 
-    glDeleteVertexArrays(1, &window->quad_vao);
-    glDeleteBuffers(1, &window->quad_vbo);
+    //glDeleteVertexArrays(1, &window->quad_vao);
+    //glDeleteBuffers(1, &window->quad_vbo);
+    se_quad_destroy(&window->quad);
 
     glfwDestroyWindow(window->handle);
     window->handle = NULL;
