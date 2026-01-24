@@ -671,6 +671,8 @@ se_framebuffer* se_framebuffer_create(se_render_handle* render_handle, const se_
         return false;
     }
     
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     printf("se_framebuffer_create :: created framebuffer %p\n", framebuffer);
