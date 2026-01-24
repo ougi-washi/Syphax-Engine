@@ -64,10 +64,10 @@ fi
 
 if [ -z "$TARGET" ]; then
     echo "Building all targets..."
-    make
+    make -j $(nproc)
 else
     echo "Building target: $TARGET"
-    make "$TARGET"
+    make -j $(nproc) "$TARGET"
 fi
 
 cd ..

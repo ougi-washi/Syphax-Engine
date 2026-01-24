@@ -118,7 +118,10 @@ extern sz se_object_2d_get_instance_count(se_object_2d* object);
 extern se_scene_2d* se_scene_2d_create(se_scene_handle* scene_handle, const se_vec2* size, const u16 object_count);
 extern void se_scene_2d_set_auto_resize(se_scene_2d* scene, se_window* window, const se_vec2* ratio); // ratio can only be 1 for now
 extern void se_scene_2d_destroy(se_scene_handle *scene_handle, se_scene_2d* scene);
-extern void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle);
+extern void se_scene_2d_bind(se_scene_2d* scene);
+extern void se_scene_2d_unbind(se_scene_2d* scene);
+extern void se_scene_2d_render_raw(se_scene_2d* scene, se_render_handle* render_handle); // Does not bind/unbind
+extern void se_scene_2d_render(se_scene_2d* scene, se_render_handle* render_handle); // Binds/unbinds the scene
 extern void se_scene_2d_render_to_screen(se_scene_2d* scene, se_render_handle* render_handle, se_window* window);
 extern void se_scene_2d_add_object(se_scene_2d* scene, se_object_2d* object);
 extern void se_scene_2d_remove_object(se_scene_2d* scene, se_object_2d* object);

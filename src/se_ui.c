@@ -104,11 +104,13 @@ void se_ui_element_render(se_ui_element* ui) {
         se_ui_element_render(current_ui);
     }
 
-    se_scene_2d_render(ui->scene_2d, ui->ui_handle->render_handle);
+    se_scene_2d_bind(ui->scene_2d);
+    se_scene_2d_render_raw(ui->scene_2d, ui->ui_handle->render_handle);
     if (ui->text) {
         se_font* curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
         se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), .1, .08f); // TODO: add/store parameters, add allignment
     }
+    se_scene_2d_unbind(ui->scene_2d);
 }
 
 void se_ui_element_render_to_screen(se_ui_element* ui) {
