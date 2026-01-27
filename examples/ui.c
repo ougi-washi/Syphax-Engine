@@ -89,12 +89,18 @@ i32 main() {
     s_array_add(&exit_keys, GLFW_KEY_ESCAPE); 
     se_window_set_exit_keys(window, &exit_keys);
     
-    se_window_set_target_fps(window, 60);
+    se_window_set_target_fps(window, 144);
     while (!se_window_should_close(window)) {
         se_window_poll_events();
         se_window_update(window);
-        c8 fps_text[16] = "-- fps";
-        sprintf(fps_text, "%f fps", 1. / se_window_get_delta_time(window));
+        se_vec2 normalized_mouse_position = {0};
+        se_window_get_mouse_position_normalized(window, &normalized_mouse_position);
+        c8 fps_text[1024] = "";
+        sprintf(fps_text, "fps: %.2f\n mouse_pos: %.2f, %.2f (%.2f, %.2f)",
+                1. / se_window_get_delta_time(window),
+                se_window_get_mouse_position_x(window),
+                se_window_get_mouse_position_y(window), 
+                normalized_mouse_position.x, normalized_mouse_position.y);
         se_ui_element_set_text(toolbar, fps_text, "fonts/ithaca.ttf", 32.f);
         se_render_clear();
         se_ui_element_render(root);

@@ -58,44 +58,6 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
     }
 }
 
-// TODO: move to opengl.c or such later on
-void create_fullscreen_quad(GLuint* vao, GLuint* vbo, GLuint* ebo) {
-    f32 quad_vertices[] = { 
-        // positions     // texCoords 
-        -1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f,    0.0f, 1.0f,
-         1.0f, -1.0f,    1.0f, 1.0f,
-         1.0f,  1.0f,    1.0f, 0.0f 
-    };
-    
-    GLuint indices[] = {
-        0, 1, 2,  // First triangle
-        2, 3, 0   // Second triangle
-    };
-    
-    glGenVertexArrays(1, vao);
-    glGenBuffers(1, vbo);
-    glGenBuffers(1, ebo);
-    
-    glBindVertexArray(*vao);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, *vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), quad_vertices, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    
-    // Position attribute (location = 0)
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    // Texture coordinate attribute (location = 1)
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void*)(2 * sizeof(f32)));
-    glEnableVertexAttribArray(1);
-    
-    glBindVertexArray(0);
-}
-
 void gl_error_callback(i32 error, const c8* description) {
     printf("GLFW Error %d: %s\n", error, description);
 }
@@ -142,7 +104,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
     
     glfwMakeContextCurrent(new_window->handle);
     glfwSetWindowUserPointer(new_window->handle, new_window);
-    glfwSwapInterval(0); 
+    glfwSwapInterval(1); // vsync 
     
     // Set callbacks
     glfwSetKeyCallback(new_window->handle, key_callback);
@@ -237,6 +199,16 @@ b8 se_window_is_key_down(se_window* window, i32 key) {
 b8 se_window_is_mouse_down(se_window* window, i32 button) {
     s_assertf(window, "se_window_is_mouse_down :: window is null");
     return window->mouse_buttons[button];
+}
+
+f32 se_window_get_mouse_position_x(se_window* window) {
+    s_assertf(window, "se_window_get_mouse_position_x :: window is null");
+    return window->mouse_x;
+}
+
+f32 se_window_get_mouse_position_y(se_window* window) {
+    s_assertf(window, "se_window_get_mouse_position_y :: window is null");
+    return window->mouse_y;
 }
 
 void se_window_get_mouse_position_normalized(se_window* window, se_vec2* out_mouse_position) {

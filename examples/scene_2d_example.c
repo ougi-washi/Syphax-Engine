@@ -82,6 +82,7 @@ i32 main() {
         se_render_handle_reload_changed_shaders(render_handle);
         
         button_yes->position.x += 0.005;
+        button_yes->position.y += 0.005;
         se_object_2d_get_box_2d(button_yes, &button_box_yes);
         se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
         se_scene_2d_render(scene_2d, render_handle);

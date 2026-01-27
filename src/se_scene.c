@@ -106,6 +106,7 @@ se_object_2d* se_object_2d_create(se_scene_handle* scene_handle, const c8* fragm
     }
     return new_object;
 }
+
 se_object_2d* se_object_2d_create_custom(se_scene_handle* scene_handle, se_object_custom* custom, const se_vec2* position, const se_vec2* scale) {
     s_assertf(scene_handle, "se_object_2d_create_custom :: scene_handle is null");
     s_assertf(custom, "se_object_2d_create_custom :: custom is null");
