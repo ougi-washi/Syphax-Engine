@@ -9,23 +9,23 @@
 #define SE_TEXT_CHAR_COUNT 1024
 
 typedef struct {
-    c8 path[SE_MAX_PATH_LENGTH];
-    GLuint atlas_texture;
-    f32 size;
-    u16 atlas_width, atlas_height;
-    u16 first_character, characters_count;
-    s_array(stbtt_packedchar, packed_characters);
-    s_array(stbtt_aligned_quad, aligned_quads);
+	c8 path[SE_MAX_PATH_LENGTH];
+	GLuint atlas_texture;
+	f32 size;
+	u16 atlas_width, atlas_height;
+	u16 first_character, characters_count;
+	s_array(stbtt_packedchar, packed_characters);
+	s_array(stbtt_aligned_quad, aligned_quads);
 } se_font;
 typedef s_array(se_font, se_fonts);
 
 typedef struct {
-    se_fonts fonts;
-    se_quad quad;
-    se_mat4 buffer[SE_TEXT_CHAR_COUNT];
-    se_shader* text_shader;
-    i32 text_vertex_index; // ?
-    se_render_handle* render_handle;
+	se_fonts fonts;
+	se_quad quad;
+	se_mat4 buffer[SE_TEXT_CHAR_COUNT];
+	se_shader* text_shader;
+	i32 text_vertex_index; // ?
+	se_render_handle* render_handle;
 } se_text_handle;
 
 // Font && text functions

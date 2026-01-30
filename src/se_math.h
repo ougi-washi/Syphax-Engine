@@ -8,41 +8,41 @@
 #define PI 3.14159265359
 
 typedef struct {
-  f32 x, y;
+	f32 x, y;
 } se_vec2;
 typedef struct {
-  f32 x, y, z;
+	f32 x, y, z;
 } se_vec3;
 typedef struct {
-  f32 x, y, z, w;
+	f32 x, y, z, w;
 } se_vec4;
 typedef struct {
-  f32 m[9];
+	f32 m[9];
 } se_mat3;
 typedef struct {
-  f32 m[16];
+	f32 m[16];
 } se_mat4;
 
 // 2D
 typedef struct {
-  se_vec2 min, max;
+	se_vec2 min, max;
 } se_box_2d;
 typedef struct {
-  se_vec2 position;
-  f32 radius;
+	se_vec2 position;
+	f32 radius;
 } se_circle;
 
 // 3D
 typedef struct {
-  se_vec3 min, max;
+	se_vec3 min, max;
 } se_box_3d;
 typedef struct {
-  se_vec3 position;
-  f32 radius;
+	se_vec3 position;
+	f32 radius;
 } se_sphere;
 
-#define se_vec(_vec_size, ...)                                                 \
-  (se_vec##_vec_size) { __VA_ARGS__ }
+#define se_vec(_vec_size, ...)												 \
+	(se_vec##_vec_size) { __VA_ARGS__ }
 #define se_vec2(_x, _y) (se_vec(2, _x, _y))
 #define se_vec3(_x, _y, _z) (se_vec(3, _x, _y, _z))
 #define se_vec4(_x, _y, _z, _w) (se_vec(4, _x, _y, _z, _w))
@@ -55,18 +55,18 @@ typedef struct {
 extern f32 vec3_length(se_vec3 v);
 
 static se_mat4 mat4_identity(void) {
-  se_mat4 I = {{1, 0, 0, 0, 
-                0, 1, 0, 0, 
-                0, 0, 1, 0, 
-                0, 0, 0, 1}};
-  return I;
+	se_mat4 I = {{1, 0, 0, 0, 
+				0, 1, 0, 0, 
+				0, 0, 1, 0, 
+				0, 0, 0, 1}};
+	return I;
 }
 
 static se_mat3 mat3_identity(void) {
-  se_mat3 I = {{1, 0, 0, 
-                0, 1, 0, 
-                0, 0, 1}};
-  return I;
+	se_mat3 I = {{1, 0, 0, 
+				0, 1, 0, 
+				0, 0, 1}};
+	return I;
 }
 
 // se_mat3

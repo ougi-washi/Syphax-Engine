@@ -8,60 +8,60 @@
 #include "se_window.h"
 
 typedef enum {
-    SE_UI_LAYOUT_HORIZONTAL,
-    SE_UI_LAYOUT_VERTICAL
+	SE_UI_LAYOUT_HORIZONTAL,
+	SE_UI_LAYOUT_VERTICAL
 } se_ui_layout;
 
 typedef struct se_ui{
-    struct se_ui_handle* ui_handle;
-    se_ui_layout layout;
-    se_vec2 position;
-    se_vec2 size;
-    se_vec2 padding;
-    se_scene_2d* scene_2d;
-    struct se_ui_text* text;
-    b8 visible : 1;
-    s_array(struct se_ui*, children);
+	struct se_ui_handle* ui_handle;
+	se_ui_layout layout;
+	se_vec2 position;
+	se_vec2 size;
+	se_vec2 padding;
+	se_scene_2d* scene_2d;
+	struct se_ui_text* text;
+	b8 visible : 1;
+	s_array(struct se_ui*, children);
 } se_ui_element;
 typedef s_array(se_ui_element, se_ui_elements);
 typedef se_ui_element* se_ui_element_ptr;
 
 typedef struct {
-    se_ui_layout layout;
-    se_vec2 position;
-    se_vec2 size;
-    se_vec2 padding;
-    b8 visible : 1;
+	se_ui_layout layout;
+	se_vec2 position;
+	se_vec2 size;
+	se_vec2 padding;
+	b8 visible : 1;
 } se_ui_element_params;
 #define SE_UI_ELEMENT_PARAMS_DEFAULTS { .layout = SE_UI_LAYOUT_HORIZONTAL, .position = se_vec2(0, 0), .size = se_vec2(1, 1), .padding = se_vec2(.05, .05), .visible = 1 }
 
 #define SE_MAX_UI_TEXT_LENGTH 1024
 typedef struct se_ui_text {
-    c8 characters[SE_MAX_UI_TEXT_LENGTH];
-    c8 font_path[SE_MAX_PATH_LENGTH];
-    f32 font_size; 
+	c8 characters[SE_MAX_UI_TEXT_LENGTH];
+	c8 font_path[SE_MAX_PATH_LENGTH];
+	f32 font_size; 
 } se_ui_text;
 typedef s_array(se_ui_text, se_ui_texts);
 typedef se_ui_text* se_ui_text_ptr;
 
 typedef struct se_ui_handle {
-    se_window* window;
-    se_render_handle* render_handle;
-    se_scene_handle* scene_handle;
-    se_text_handle* text_handle;
-    se_ui_elements ui_elements;
-    se_ui_texts ui_texts;
+	se_window* window;
+	se_render_handle* render_handle;
+	se_scene_handle* scene_handle;
+	se_text_handle* text_handle;
+	se_ui_elements ui_elements;
+	se_ui_texts ui_texts;
 
-    u16 objects_per_element_count;
-    u16 children_per_element_count;
+	u16 objects_per_element_count;
+	u16 children_per_element_count;
 } se_ui_handle;
 
 typedef struct {
-    u16 elements_count;
-    u16 children_per_element_count;
-    u16 objects_per_element_count;
-    u16 texts_count;
-    u16 fonts_count;
+	u16 elements_count;
+	u16 children_per_element_count;
+	u16 objects_per_element_count;
+	u16 texts_count;
+	u16 fonts_count;
 } se_ui_handle_params;
 #define SE_UI_HANDLE_PARAMS_DEFAULTS { .elements_count = 8, .children_per_element_count = 8, .objects_per_element_count = 16, .texts_count = 128, .fonts_count = 1 }
 

@@ -5,7 +5,7 @@
 
 #define SE_MAX_PATH_LENGTH 256
 #ifndef RESOURCES_DIR
-#  error "RESOURCES_DIR not defined!"
+#	error "RESOURCES_DIR not defined!"
 #endif
 
 #endif // SE_DEFINES_H

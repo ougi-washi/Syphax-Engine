@@ -20,28 +20,28 @@ typedef s_array(se_instance_id, se_instance_ids);
 typedef s_array(se_mat4, se_transforms);
 typedef s_array(se_mat4, se_buffers);
 typedef struct {
-  se_instance_ids ids;
-  se_transforms transforms;
-  se_buffers buffers;
+	se_instance_ids ids;
+	se_transforms transforms;
+	se_buffers buffers;
 } se_instances;
 
 typedef struct {
-  void *data;
-  void (*render)(se_render_handle *render_handle, void *data);
+	void *data;
+	void (*render)(se_render_handle *render_handle, void *data);
 } se_object_custom;
 
 typedef struct {
-  se_mat3 transform;
-  union {
-    struct {
-      se_quad quad;
-      se_shader_ptr shader;
-      se_instances instances;
-    };
-    se_object_custom custom;
-  };
-  b8 is_custom : 1;
-  b8 is_visible : 1;
+	se_mat3 transform;
+	union {
+	struct {
+		se_quad quad;
+		se_shader_ptr shader;
+		se_instances instances;
+	};
+	se_object_custom custom;
+	};
+	b8 is_custom : 1;
+	b8 is_visible : 1;
 } se_object_2d;
 
 typedef s_array(se_object_2d, se_objects_2d);
@@ -49,46 +49,46 @@ typedef se_object_2d *se_object_2d_ptr;
 typedef s_array(se_object_2d_ptr, se_objects_2d_ptr);
 
 typedef struct {
-  se_model *model;
-  se_mat4 transform;
-  se_instances instances;
+	se_model *model;
+	se_mat4 transform;
+	se_instances instances;
 } se_object_3d;
 typedef s_array(se_object_3d, se_objects_3d);
 typedef se_object_3d *se_object_3d_ptr;
 typedef s_array(se_object_3d_ptr, se_objects_3d_ptr);
 
 typedef struct {
-  se_objects_2d_ptr objects;
-  se_framebuffer_ptr output;
+	se_objects_2d_ptr objects;
+	se_framebuffer_ptr output;
 } se_scene_2d;
 typedef s_array(se_scene_2d, se_scenes_2d);
 typedef se_scene_2d *se_scene_2d_ptr;
 typedef s_array(se_scene_2d_ptr, se_scenes_2d_ptr);
 
 typedef struct {
-  se_models_ptr models; // TODO: change to se_objects_3d
-  se_camera_ptr camera;
-  se_render_buffers_ptr post_process;
-  se_shader_ptr output_shader;
-  se_render_buffer_ptr output;
+	se_models_ptr models; // TODO: change to se_objects_3d
+	se_camera_ptr camera;
+	se_render_buffers_ptr post_process;
+	se_shader_ptr output_shader;
+	se_render_buffer_ptr output;
 } se_scene_3d;
 typedef s_array(se_scene_3d, se_scenes_3d);
 typedef se_scene_3d *se_scene_3d_ptr;
 typedef s_array(se_scene_3d_ptr, se_scenes_3d_ptr);
 
 typedef struct {
-  u16 objects_2d_count;
-  u16 objects_3d_count;
-  u16 scenes_2d_count;
-  u16 scenes_3d_count;
+	u16 objects_2d_count;
+	u16 objects_3d_count;
+	u16 scenes_2d_count;
+	u16 scenes_3d_count;
 } se_scene_handle_params;
 
 typedef struct {
-  se_render_handle *render_handle;
-  se_objects_2d objects_2d;
-  se_objects_3d objects_3d;
-  se_scenes_2d scenes_2d;
-  se_scenes_3d scenes_3d;
+	se_render_handle *render_handle;
+	se_objects_2d objects_2d;
+	se_objects_3d objects_3d;
+	se_scenes_2d scenes_2d;
+	se_scenes_3d scenes_3d;
 } se_scene_handle;
 
 // scene handle functions

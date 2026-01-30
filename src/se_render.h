@@ -16,180 +16,180 @@
 #define SE_MAX_INDICES 65536
 
 typedef struct {
-  se_vec2 position;
-  se_vec2 uv;
+	se_vec2 position;
+	se_vec2 uv;
 } se_vertex_2d;
 
 typedef struct {
-  se_vec3 position;
-  se_vec3 normal;
-  se_vec2 uv;
+	se_vec3 position;
+	se_vec3 normal;
+	se_vec2 uv;
 } se_vertex_3d;
 
 static const se_vertex_2d se_quad_2d_vertices[4] = {
-    {{-1.0f, 1.0f}, {0.0f, 0.0f}},
-    {{-1.0f, -1.0f}, {0.0f, 1.0f}},
-    {{1.0f, -1.0f}, {1.0f, 1.0f}},
-    {{1.0f, 1.0f}, {1.0f, 0.0f}}};
+	{{-1.0f, 1.0f}, {0.0f, 0.0f}},
+	{{-1.0f, -1.0f}, {0.0f, 1.0f}},
+	{{1.0f, -1.0f}, {1.0f, 1.0f}},
+	{{1.0f, 1.0f}, {1.0f, 0.0f}}};
 
 static const se_vertex_3d se_quad_3d_vertices[4] = {
-    {{-1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-    {{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-    {{1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}};
+	{{-1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+	{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+	{{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+	{{1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}};
 
 static const u32 se_quad_indices[6] = {0, 1, 2, 0, 2, 3};
 
 typedef enum {
-  SE_UNIFORM_FLOAT,
-  SE_UNIFORM_VEC2,
-  SE_UNIFORM_VEC3,
-  SE_UNIFORM_VEC4,
-  SE_UNIFORM_INT,
-  SE_UNIFORM_MAT3,
-  SE_UNIFORM_MAT4,
-  SE_UNIFORM_TEXTURE
+	SE_UNIFORM_FLOAT,
+	SE_UNIFORM_VEC2,
+	SE_UNIFORM_VEC3,
+	SE_UNIFORM_VEC4,
+	SE_UNIFORM_INT,
+	SE_UNIFORM_MAT3,
+	SE_UNIFORM_MAT4,
+	SE_UNIFORM_TEXTURE
 } se_uniform_type;
 
 typedef struct {
-  char name[SE_MAX_NAME_LENGTH];
-  se_uniform_type type;
-  union {
-    f32 f;
-    se_vec2 vec2;
-    se_vec3 vec3;
-    se_vec4 vec4;
-    i32 i;
-    se_mat3 mat3;
-    se_mat4 mat4;
-    GLuint texture;
-  } value;
+	char name[SE_MAX_NAME_LENGTH];
+	se_uniform_type type;
+	union {
+	f32 f;
+	se_vec2 vec2;
+	se_vec3 vec3;
+	se_vec4 vec4;
+	i32 i;
+	se_mat3 mat3;
+	se_mat4 mat4;
+	GLuint texture;
+	} value;
 } se_uniform;
 typedef s_array(se_uniform, se_uniforms);
 
 typedef struct {
-  GLuint program;
-  GLuint vertex_shader;
-  GLuint fragment_shader;
-  c8 vertex_path[SE_MAX_PATH_LENGTH];
-  c8 fragment_path[SE_MAX_PATH_LENGTH];
-  time_t vertex_mtime;
-  time_t fragment_mtime;
-  se_uniforms uniforms;
-  b8 needs_reload;
+	GLuint program;
+	GLuint vertex_shader;
+	GLuint fragment_shader;
+	c8 vertex_path[SE_MAX_PATH_LENGTH];
+	c8 fragment_path[SE_MAX_PATH_LENGTH];
+	time_t vertex_mtime;
+	time_t fragment_mtime;
+	se_uniforms uniforms;
+	b8 needs_reload;
 } se_shader;
 typedef s_array(se_shader, se_shaders);
 typedef se_shader *se_shader_ptr;
 typedef s_array(se_shader_ptr, se_shaders_ptr);
 
 typedef struct se_texture {
-  char path[SE_MAX_PATH_LENGTH];
-  GLuint id;
-  i32 width;
-  i32 height;
-  i32 channels;
+	char path[SE_MAX_PATH_LENGTH];
+	GLuint id;
+	i32 width;
+	i32 height;
+	i32 channels;
 } se_texture;
 typedef s_array(se_texture, se_textures);
 typedef se_texture *se_texture_ptr;
 typedef s_array(se_texture_ptr, se_textures_ptr);
 
 typedef struct {
-  se_vertex_3d
-      *vertices; // TODO: no need for this, we can just use the buffer directly
-  u32 *indices;
-  u32 vertex_count;
-  u32 index_count;
-  GLuint vao;
-  GLuint vbo;
-  GLuint ebo;
-  se_shader *shader;
-  se_mat4 matrix;
+	se_vertex_3d
+		*vertices; // TODO: no need for this, we can just use the buffer directly
+	u32 *indices;
+	u32 vertex_count;
+	u32 index_count;
+	GLuint vao;
+	GLuint vbo;
+	GLuint ebo;
+	se_shader *shader;
+	se_mat4 matrix;
 } se_mesh;
 typedef s_array(se_mesh, se_meshes);
 
 typedef struct {
-  se_meshes meshes;
+	se_meshes meshes;
 } se_model;
 typedef s_array(se_model, se_models);
 typedef se_model *se_model_ptr;
 typedef s_array(se_model_ptr, se_models_ptr);
 
 typedef struct {
-  se_vec3 position;
-  se_vec3 target;
-  se_vec3 up;
-  se_vec3 right;
-  f32 fov;
-  f32 near;
-  f32 far;
-  f32 aspect;
+	se_vec3 position;
+	se_vec3 target;
+	se_vec3 up;
+	se_vec3 right;
+	f32 fov;
+	f32 near;
+	f32 far;
+	f32 aspect;
 } se_camera;
 typedef s_array(se_camera, se_cameras);
 typedef se_camera *se_camera_ptr;
 typedef s_array(se_camera_ptr, se_cameras_ptr);
 
 typedef struct {
-  GLuint framebuffer;
-  GLuint texture;
-  GLuint depth_buffer;
-  se_vec2 size;
-  se_vec2 ratio;
-  b8 auto_resize : 1;
+	GLuint framebuffer;
+	GLuint texture;
+	GLuint depth_buffer;
+	se_vec2 size;
+	se_vec2 ratio;
+	b8 auto_resize : 1;
 } se_framebuffer;
 typedef s_array(se_framebuffer, se_framebuffers);
 typedef se_framebuffer *se_framebuffer_ptr;
 typedef s_array(se_framebuffer_ptr, se_framebuffers_ptr);
 
 typedef struct {
-  GLuint framebuffer;
-  GLuint texture;
-  GLuint prev_framebuffer;
-  GLuint prev_texture;
-  GLuint depth_buffer;
-  se_vec2 texture_size;
-  se_vec2 scale;
-  se_vec2 position;
-  se_shader_ptr shader;
+	GLuint framebuffer;
+	GLuint texture;
+	GLuint prev_framebuffer;
+	GLuint prev_texture;
+	GLuint depth_buffer;
+	se_vec2 texture_size;
+	se_vec2 scale;
+	se_vec2 position;
+	se_shader_ptr shader;
 } se_render_buffer;
 typedef s_array(se_render_buffer, se_render_buffers);
 typedef se_render_buffer *se_render_buffer_ptr;
 typedef s_array(se_render_buffer_ptr, se_render_buffers_ptr);
 
 typedef struct {
-  GLuint vbo;
-  const void *buffer_ptr;
-  sz buffer_size;
+	GLuint vbo;
+	const void *buffer_ptr;
+	sz buffer_size;
 } se_instance_buffer;
 
 typedef struct {
-  GLuint vao;
-  GLuint ebo;
-  GLuint vbo;
-  s_array(se_instance_buffer, instance_buffers);
-  b8 instance_buffers_dirty;
-  u32 last_attribute;
+	GLuint vao;
+	GLuint ebo;
+	GLuint vbo;
+	s_array(se_instance_buffer, instance_buffers);
+	b8 instance_buffers_dirty;
+	u32 last_attribute;
 } se_quad;
 
 typedef struct {
-  u16 framebuffers_count;
-  u16 render_buffers_count;
-  u16 textures_count;
-  u16 shaders_count;
-  u16 models_count;
-  u16 cameras_count;
+	u16 framebuffers_count;
+	u16 render_buffers_count;
+	u16 textures_count;
+	u16 shaders_count;
+	u16 models_count;
+	u16 cameras_count;
 } se_render_handle_params;
 
 // TODO: maybe this should not be accessible by the user, and instead it should
 // be in the .c file, as there seem no need for direct access. All the following
 // data is accessed through other handles.
 typedef struct {
-  se_framebuffers framebuffers;
-  se_render_buffers render_buffers;
-  se_textures textures;
-  se_shaders shaders;
-  se_uniforms global_uniforms;
-  se_cameras cameras;
-  se_models models;
+	se_framebuffers framebuffers;
+	se_render_buffers render_buffers;
+	se_textures textures;
+	se_shaders shaders;
+	se_uniforms global_uniforms;
+	se_cameras cameras;
+	se_models models;
 } se_render_handle;
 
 // helper functions
