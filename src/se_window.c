@@ -3,7 +3,6 @@
 #include "se_window.h"
 #include "se_gl.h"
 #include <unistd.h>
-#include <stdlib.h>
 #include <limits.h>
 
 #define SE_MAX_WINDOWS 8
@@ -335,8 +334,6 @@ void se_window_destroy(se_window* window) {
     s_assertf(window, "se_window_destroy :: window is null");
     s_assertf(window->handle, "se_window_destroy :: window->handle is null");
 
-    //glDeleteVertexArrays(1, &window->quad_vao);
-    //glDeleteBuffers(1, &window->quad_vbo);
     se_quad_destroy(&window->quad);
 
     glfwDestroyWindow(window->handle);
