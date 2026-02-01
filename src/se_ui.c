@@ -34,13 +34,13 @@ void se_ui_handle_cleanup(se_ui_handle *ui_handle) {
 	s_assertf(ui_handle, "se_ui_handle_cleanup :: ui_handle is null");
 	printf("se_ui_handle_cleanup :: ui_handle: %p\n", ui_handle);
 	s_foreach(&ui_handle->ui_elements, i) {
-	se_ui_element *current_ui = s_array_get(&ui_handle->ui_elements, i);
-	se_ui_element_destroy(current_ui);
+	    se_ui_element *current_ui = s_array_get(&ui_handle->ui_elements, i);
+	    se_ui_element_destroy(current_ui);
 	}
 	s_array_clear(&ui_handle->ui_elements);
 	se_scene_handle_cleanup(ui_handle->scene_handle);
 	if (ui_handle->text_handle) { // Text handle is optional
-	se_text_handle_cleanup(ui_handle->text_handle);
+	    se_text_handle_cleanup(ui_handle->text_handle);
 	}
 	s_array_clear(&ui_handle->ui_texts);
 	free(ui_handle);
@@ -87,29 +87,29 @@ void se_ui_element_render(se_ui_element *ui) {
 	s_assertf(ui_handle, "se_ui_element_render :: ui_handle is null");
 
 	if (!ui->visible) {
-	return;
+	    return;
 	}
 
 	s_foreach(&ui->children, i) {
-	se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
-	if (!current_ui_ptr) {
-		printf("se_ui_element_render :: children index %zu is null\n", i);
-		continue;
-	}
-	se_ui_element *current_ui = *current_ui_ptr;
-	if (!current_ui) {
-		printf("se_ui_element_render :: children index %zu is null\n", i);
-		continue;
-	}
-	se_ui_element_render(current_ui);
+	    se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
+	    if (!current_ui_ptr) {
+	    	printf("se_ui_element_render :: children index %zu is null\n", i);
+	    	continue;
+	    }
+	    se_ui_element *current_ui = *current_ui_ptr;
+	    if (!current_ui) {
+	    	printf("se_ui_element_render :: children index %zu is null\n", i);
+	    	continue;
+	    }
+	    se_ui_element_render(current_ui);
 	}
 
 	se_scene_2d_bind(ui->scene_2d);
 	se_scene_2d_render_raw(ui->scene_2d, ui->ui_handle->render_handle);
 	if (ui->text) {
-	se_font *curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
-	// TODO: add/store parameters, add allignment
-	se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), .1, .08f); 
+	    se_font *curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
+	    // TODO: add/store parameters, add allignment
+	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), .1, .08f); 
 	}
 	se_scene_2d_unbind(ui->scene_2d);
 }
@@ -123,20 +123,19 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
 	s_assertf(ui_handle->window, "se_ui_element_render_to_screen :: window is null");
 
 	s_foreach(&ui->children, i) {
-	se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
-	if (!current_ui_ptr) {
-		printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
-		continue;
-	}
-	se_ui_element *current_ui = *current_ui_ptr;
-	if (!current_ui) {
-		printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
-		continue;
-	}
-	se_ui_element_render_to_screen(current_ui);
-	}
-	se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->render_handle,
-								 ui_handle->window);
+	    se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
+	    if (!current_ui_ptr) {
+	    	printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
+	    	continue;
+	    }
+	    se_ui_element *current_ui = *current_ui_ptr;
+	    if (!current_ui) {
+	    	printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
+	    	continue;
+	    }
+	    se_ui_element_render_to_screen(current_ui);
+	    }
+	se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->render_handle, ui_handle->window);
 }
 
 void se_ui_element_destroy(se_ui_element *ui) {
@@ -146,11 +145,11 @@ void se_ui_element_destroy(se_ui_element *ui) {
 	s_assertf(ui_handle, "se_ui_element_destroy :: ui_handle is null");
 	printf("se_ui_element_destroy :: ui: %p, ui_handle: %p\n", ui, ui_handle);
 	s_foreach(&ui->children, i) {
-	se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
-	if (!current_ui_ptr) {
-		printf("se_ui_element_destroy :: children index %zu is null\n", i);
-		continue;
-	}
+	    se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
+	    if (!current_ui_ptr) {
+	    	printf("se_ui_element_destroy :: children index %zu is null\n", i);
+	    	continue;
+	    }
 	se_ui_element *current_ui = *current_ui_ptr;
 	if (!current_ui) {
 		printf("se_ui_element_destroy :: children index %zu is null\n", i);
@@ -237,23 +236,23 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	position.x += ui->position.x;
 	position.y += ui->position.y;
 	s_foreach(&scene_2d->objects, i) {
-	se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene_2d->objects, i);
-	if (!current_object_2d_ptr) {
-		printf("se_ui_element_add_object :: one of the previous objects is null\n");
-		continue;
-	}
-	se_object_2d *current_object_2d = *current_object_2d_ptr;
-	if (!current_object_2d) {
-		printf("se_ui_element_add_object :: one of the previous objects is null\n");
-		continue;
-	}
-	se_object_2d_set_position(current_object_2d, &position);
-	se_object_2d_set_scale(current_object_2d, &se_vec2(scale.x - ui->padding.x, scale.y - ui->padding.y));
-	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-		position.x += scale.x * 2;
-	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-		position.y += scale.y * 2;
-	}
+	    se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene_2d->objects, i);
+	    if (!current_object_2d_ptr) {
+	    	printf("se_ui_element_add_object :: one of the previous objects is null\n");
+	    	continue;
+	    }
+	    se_object_2d *current_object_2d = *current_object_2d_ptr;
+	    if (!current_object_2d) {
+	    	printf("se_ui_element_add_object :: one of the previous objects is null\n");
+	    	continue;
+	    }
+	    se_object_2d_set_position(current_object_2d, &position);
+	    se_object_2d_set_scale(current_object_2d, &se_vec2(scale.x - ui->padding.x, scale.y - ui->padding.y));
+	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+	    	position.x += scale.x * 2;
+	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+	    	position.y += scale.y * 2;
+	    }
 	}
 };
 
