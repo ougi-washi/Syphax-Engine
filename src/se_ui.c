@@ -109,7 +109,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	if (ui->text) {
 	    se_font *curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
 	    // TODO: add/store parameters, add allignment
-	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), 1., .03f); 
+	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), &se_vec2(1., 1.), .03f); 
 	}
 	se_scene_2d_unbind(ui->scene_2d);
 }
@@ -232,9 +232,23 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	    }
 	}
 
-	position = se_vec2(scale.x - 1, scale.y - 1);
-	position.x += ui->position.x;
-	position.y += ui->position.y;
+	f32 available_width = 2.0f * ui->size.x; 
+	f32 available_height = 2.0f * ui->size.y; 
+
+	if (object_count > 0) {
+	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+	    	scale.x = available_width / object_count;
+	    	scale.y = available_height;
+	    	position.x = -ui->size.x + scale.x * 0.5f;  
+	    	position.y = 0;
+	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+	    	scale.y = available_height / object_count;
+	    	scale.x = available_width;
+	    	position.y = -ui->size.y - scale.y * 0.5f;
+	    	position.x = 0; 
+	    }
+	}
+
 	s_foreach(&scene_2d->objects, i) {
 	    se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene_2d->objects, i);
 	    if (!current_object_2d_ptr) {
@@ -247,11 +261,11 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	    	continue;
 	    }
 	    se_object_2d_set_position(current_object_2d, &position);
-	    se_object_2d_set_scale(current_object_2d, &se_vec2(scale.x - ui->padding.x, scale.y - ui->padding.y));
+	    se_object_2d_set_scale(current_object_2d, &se_vec2((scale.x * 0.5f) - ui->padding.x, (scale.y * 0.5f) - ui->padding.y));
 	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-	    	position.x += scale.x * 2;
+	    	position.x += scale.x;
 	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-	    	position.y += scale.y * 2;
+	    	position.y -= scale.y;  // Go down (decrease y)
 	    }
 	}
 };
@@ -262,12 +276,19 @@ void se_ui_element_update_children(se_ui_element *ui) {
 	se_vec2 scale = {1, 1};
 	se_vec2 position = {0, 0};
 
+	f32 available_width = 2.0f * ui->size.x;   // Total width in normalized coords (-1 to 1 = 2 units)
+	f32 available_height = 2.0f * ui->size.y;  // Total height in normalized coords
+
 	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-	    scale.x = 1. / (child_count);
-	    position.x = -scale.x * (child_count);
+	    scale.x = available_width / child_count;
+	    scale.y = available_height;
+	    position.x = -ui->size.x + scale.x * 0.5f;  // Start from left edge
+	    position.y = 0;  // Center vertically
 	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-	    scale.y = 1. / (child_count);
-	    position.y = -scale.y * (child_count);
+	    scale.y = available_height / child_count;
+	    scale.x = available_width;
+	    position.y = ui->size.y - scale.y * 0.5f;  // Start from top
+	    position.x = 0;  // Center horizontally
 	}
 
 	for (u32 i = 0; i < child_count; i++) {
@@ -281,13 +302,13 @@ void se_ui_element_update_children(se_ui_element *ui) {
 	    	printf("se_ui_element_update_children :: ui %p children index %d is null\n", ui, i);
 	    	continue;
 	    }
-	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-	    	position.x += scale.x * 2;
-	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-	    	position.y += scale.y * 2;
-	    }
 	    se_ui_element_set_position(current_ui, &se_vec2(position.x + ui->position.x, position.y + ui->position.y));
-	    se_ui_element_set_size(current_ui, &se_vec2(scale.x * (ui->size.x), scale.y * (ui->size.y)));
+	    se_ui_element_set_size(current_ui, &se_vec2(scale.x * 0.5f, scale.y * 0.5f));
+	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+	    	position.x += scale.x;
+	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+	    	position.y -= scale.y;  // Go down (decrease y)
+	    }
 	}
 }
 

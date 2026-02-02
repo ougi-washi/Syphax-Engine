@@ -235,8 +235,8 @@ void se_object_2d_get_box_2d(se_object_2d *object, se_box_2d *out_box) {
 	se_vec2 pos = se_vec2(object->transform.m[6], object->transform.m[7]);
 	se_vec2 scale = se_vec2(object->transform.m[0], object->transform.m[4]);
 
-	out_box->min = se_vec2(pos.x - scale.x, pos.y - scale.y);
-	out_box->max = se_vec2(pos.x + scale.x, pos.y + scale.y);
+	out_box->min = se_vec2(pos.x - scale.x, -pos.y - scale.y);
+	out_box->max = se_vec2(pos.x + scale.x, -pos.y + scale.y);
 }
 
 void se_object_2d_set_shader(se_object_2d *object, se_shader *shader) {

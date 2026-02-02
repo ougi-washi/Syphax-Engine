@@ -28,7 +28,7 @@ i32 main() {
 		se_window_poll_events();
 		se_window_update(window);
 		se_render_clear();
-		se_text_render(text_handle, font, "yer7am dinek, ch'hal boubli \nMa nedri welou", &se_vec2(0., 0.), 1, .03f);
+		se_text_render(text_handle, font, "yer7am dinek, ch'hal boubli \nMa nedri welou", &se_vec2(0., 0.), &se_vec2(1, 1), .03f);
 		se_window_render_screen(window);
 	}
 
