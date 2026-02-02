@@ -109,7 +109,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	if (ui->text) {
 	    se_font *curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
 	    // TODO: add/store parameters, add allignment
-	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), .1, .08f); 
+	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), 1., .03f); 
 	}
 	se_scene_2d_unbind(ui->scene_2d);
 }
@@ -223,13 +223,13 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	se_vec2 position = {0, 0};
 
 	if (object_count > 0) {
-	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-		scale.x = 1. / (object_count);
-		scale.y *= ui->size.y;
-	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-		scale.y = 1. / (object_count);
-		scale.x *= ui->size.x;
-	}
+	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+	    	scale.x = 1. / (object_count);
+	    	scale.y *= ui->size.y;
+	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+	    	scale.y = 1. / (object_count);
+	    	scale.x *= ui->size.x;
+	    }
 	}
 
 	position = se_vec2(scale.x - 1, scale.y - 1);
@@ -263,31 +263,31 @@ void se_ui_element_update_children(se_ui_element *ui) {
 	se_vec2 position = {0, 0};
 
 	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-	scale.x = 1. / (child_count);
-	position.x = -scale.x * (child_count);
+	    scale.x = 1. / (child_count);
+	    position.x = -scale.x * (child_count);
 	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-	scale.y = 1. / (child_count);
-	position.y = -scale.y * (child_count);
+	    scale.y = 1. / (child_count);
+	    position.y = -scale.y * (child_count);
 	}
 
 	for (u32 i = 0; i < child_count; i++) {
-	se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
-	if (!current_ui_ptr) {
-		printf("se_ui_element_update_children :: ui %p, children index %d is null\n", ui, i);
-		continue;
-	}
-	se_ui_element *current_ui = *current_ui_ptr;
-	if (!current_ui) {
-		printf("se_ui_element_update_children :: ui %p children index %d is null\n", ui, i);
-		continue;
-	}
-	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-		position.x += scale.x * 2;
-	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-		position.y += scale.y * 2;
-	}
-	se_ui_element_set_position(current_ui, &se_vec2(position.x + ui->position.x, position.y + ui->position.y));
-	se_ui_element_set_size(current_ui, &se_vec2(scale.x * (ui->size.x), scale.y * (ui->size.y)));
+	    se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
+	    if (!current_ui_ptr) {
+	    	printf("se_ui_element_update_children :: ui %p, children index %d is null\n", ui, i);
+	    	continue;
+	    }
+	    se_ui_element *current_ui = *current_ui_ptr;
+	    if (!current_ui) {
+	    	printf("se_ui_element_update_children :: ui %p children index %d is null\n", ui, i);
+	    	continue;
+	    }
+	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+	    	position.x += scale.x * 2;
+	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+	    	position.y += scale.y * 2;
+	    }
+	    se_ui_element_set_position(current_ui, &se_vec2(position.x + ui->position.x, position.y + ui->position.y));
+	    se_ui_element_set_size(current_ui, &se_vec2(scale.x * (ui->size.x), scale.y * (ui->size.y)));
 	}
 }
 
@@ -307,12 +307,10 @@ se_object_2d_ptr se_ui_element_add_object(se_ui_element *ui, const c8 *fragment_
 	se_scene_handle *scene_handle = ui_handle->scene_handle;
 	s_assertf(scene_handle, "se_ui_element_add_object :: scene_handle is null");
 
-	printf("se_ui_element_add_object :: ui: %p, fragment_shader_path: %s\n", ui,
-		 fragment_shader_path);
+	printf("se_ui_element_add_object :: ui: %p, fragment_shader_path: %s\n", ui, fragment_shader_path);
 
 	se_mat3 transform = mat3_identity();
-	se_object_2d_ptr object_2d =
-		se_object_2d_create(scene_handle, fragment_shader_path, &transform, 0);
+	se_object_2d_ptr object_2d = se_object_2d_create(scene_handle, fragment_shader_path, &transform, 0);
 	se_scene_2d_add_object(ui->scene_2d, object_2d);
 	se_ui_element_update_objects(ui);
 	return object_2d;

@@ -148,13 +148,13 @@ void se_window_render_screen(se_window* window) {
 	f64 elapsed = now - window->time.frame_start;
 	f64 time_left = target_frame_time - elapsed;
 	
-	if (time_left > 0.002) {
-		usleep((time_left - 0.002) * 1000000);
+	if (time_left > 0) {
+		usleep((time_left) * 1000000);
 	}
 	
 	f64 wait_end = window->time.frame_start + target_frame_time;
 	while (glfwGetTime() < wait_end) {
-		sched_yield(); 
+        usleep(1000);
 	}
 	
 	glfwSwapBuffers(window->handle);

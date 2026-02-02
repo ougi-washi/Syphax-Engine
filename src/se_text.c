@@ -132,7 +132,7 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 		c8 c = text[i];
 		
 		if (c == '\n') {
-			local_position.y -= new_line_offset;
+			local_position.y -= new_line_offset * size;
 			local_position.x = position->x;
 			continue;
 		}
@@ -141,11 +141,13 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 			stbtt_packedchar* packed_char = s_array_get(&font->packed_characters, c - font->first_character);
 			stbtt_aligned_quad* aligned_quad = s_array_get(&font->aligned_quads, c - font->first_character);
 			
-			f32 glyph_width = (packed_char->x1 - packed_char->x0)	* text_scale; 
+			f32 glyph_width = (packed_char->x1 - packed_char->x0) * text_scale; 
 			f32 glyph_height = (packed_char->y1 - packed_char->y0) * text_scale;
 			
-			f32 glyph_x = (packed_char->xoff * pixel_scale) * 2;
-			f32 glyph_y = (packed_char->yoff * pixel_scale) * 2 + new_line_offset;
+			// xoff/yoff are offsets to top-left corner, but shader centers quad
+			// So we add half size to get offset to the center
+			f32 glyph_x = packed_char->xoff * text_scale + glyph_width * 0.5f;
+			f32 glyph_y = -packed_char->yoff * text_scale - glyph_height * 0.5f;
 
 			text_handle->buffer[glyph_count].m[0] = glyph_x;
 			text_handle->buffer[glyph_count].m[1] = glyph_y;
@@ -158,8 +160,8 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 			text_handle->buffer[glyph_count].m[8] = local_position.x;
 			text_handle->buffer[glyph_count].m[9] = local_position.y;
 
-			// Advance cursor
-			local_position.x += packed_char->xadvance / 550 ;//* pixel_scale * size;
+			// Advance cursor by xadvance (scaled)
+			local_position.x += packed_char->xadvance * text_scale;
 			glyph_count++;
 		}
 	}
