@@ -60,7 +60,7 @@ i32 main() {
 	se_object_2d *button_exit = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
 	se_shader_set_vec3(button_minimize->shader, "u_color", &se_vec3(0, 0, .3));
 	se_shader_set_vec3(button_maximize->shader, "u_color", &se_vec3(0, .3, 0));
-	se_shader_set_vec3(button_exit->shader, "u_color", &se_vec3(.3, 0, 0));
+	se_shader_set_vec3(button_exit->shader,     "u_color", &se_vec3(.3, 0, 0));
 
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
 	se_ui_element *content = se_ui_element_add_child(root, &ui_element_params);
@@ -91,21 +91,21 @@ i32 main() {
 
 	se_window_set_target_fps(window, 30);
 	while (!se_window_should_close(window)) {
-	se_window_poll_events();
-	se_window_update(window);
-	se_vec2 normalized_mouse_position = {0};
-	se_window_get_mouse_position_normalized(window, &normalized_mouse_position);
-	c8 fps_text[1024] = "";
-	sprintf(fps_text, "fps: %.2f\n mouse_pos: %.2f, %.2f (%.2f, %.2f)",
-			1. / se_window_get_delta_time(window),
-			se_window_get_mouse_position_x(window),
-			se_window_get_mouse_position_y(window), normalized_mouse_position.x,
-			normalized_mouse_position.y);
-	se_ui_element_set_text(toolbar, fps_text, "fonts/ithaca.ttf", 32.f);
-	se_render_clear();
-	se_ui_element_render(root);
-	se_ui_element_render_to_screen(root);
-	se_window_render_screen(window);
+	    se_window_poll_events();
+	    se_window_update(window);
+        se_vec2 normalized_mouse_position = {0};
+	    se_window_get_mouse_position_normalized(window, &normalized_mouse_position);
+	    c8 fps_text[1024] = "";
+	    sprintf(fps_text, "fps: %.2f\n mouse_pos: %.2f, %.2f (%.2f, %.2f)",
+	    		1. / se_window_get_delta_time(window),
+	    		se_window_get_mouse_position_x(window),
+	    		se_window_get_mouse_position_y(window), normalized_mouse_position.x,
+	    		normalized_mouse_position.y);
+	    se_ui_element_set_text(toolbar, fps_text, "fonts/ithaca.ttf", 32.f);
+	    se_render_clear();
+	    se_ui_element_render(root);
+	    se_ui_element_render_to_screen(root);
+	    se_window_render_screen(window);
 	}
 
 	se_ui_handle_cleanup(ui_handle);

@@ -135,7 +135,7 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
 	    }
 	    se_ui_element_render_to_screen(current_ui);
 	    }
-	se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->render_handle, ui_handle->window);
+    se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->render_handle, ui_handle->window);
 }
 
 void se_ui_element_destroy(se_ui_element *ui) {
@@ -218,36 +218,35 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	s_assertf(scene_2d, "se_ui_element_update_objects :: scene_2d is null");
 
 	sz object_count = s_array_get_size(&scene_2d->objects);
+	if (object_count == 0) return;
 
 	se_vec2 scale = {1, 1};
 	se_vec2 position = {0, 0};
 
-	if (object_count > 0) {
-	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-	    	scale.x = 1. / (object_count);
-	    	scale.y *= ui->size.y;
-	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-	    	scale.y = 1. / (object_count);
-	    	scale.x *= ui->size.x;
-	    }
+	const f32 element_top = ui->position.y + ui->size.y;     // Top edge in screen coords
+	const f32 element_bottom = ui->position.y - ui->size.y;  // Bottom edge in screen coords
+	const f32 element_left = ui->position.x - ui->size.x;    // Left edge
+	const f32 element_right = ui->position.x + ui->size.x;   // Right edge
+
+	const f32 element_width = element_right - element_left;   // Width in NDC
+	const f32 element_height = element_top - element_bottom;  // Height in NDC
+
+	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
+	    scale.x = element_width / object_count;
+	    scale.y = element_height;
+	    position.x = element_left + scale.x * 0.5f;  // Center of first object
+	    position.y = ui->position.y;  // Center vertically in element
+	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
+	    scale.y = element_height / object_count;
+	    scale.x = element_width;
+	    position.y = element_top - scale.y * 0.5f;  // Center of first object (from top)
+	    position.x = ui->position.x;  // Center horizontally in element
 	}
 
-	f32 available_width = 2.0f * ui->size.x; 
-	f32 available_height = 2.0f * ui->size.y; 
-
-	if (object_count > 0) {
-	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
-	    	scale.x = available_width / object_count;
-	    	scale.y = available_height;
-	    	position.x = -ui->size.x + scale.x * 0.5f;  
-	    	position.y = 0;
-	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
-	    	scale.y = available_height / object_count;
-	    	scale.x = available_width;
-	    	position.y = -ui->size.y - scale.y * 0.5f;
-	    	position.x = 0; 
-	    }
-	}
+	se_vec2 object_scale = {
+	    (scale.x * 0.5f) - ui->padding.x,
+	    (scale.y * 0.5f) - ui->padding.y
+	};
 
 	s_foreach(&scene_2d->objects, i) {
 	    se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene_2d->objects, i);
@@ -261,7 +260,7 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	    	continue;
 	    }
 	    se_object_2d_set_position(current_object_2d, &position);
-	    se_object_2d_set_scale(current_object_2d, &se_vec2((scale.x * 0.5f) - ui->padding.x, (scale.y * 0.5f) - ui->padding.y));
+	    se_object_2d_set_scale(current_object_2d, &object_scale);
 	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
 	    	position.x += scale.x;
 	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
@@ -282,13 +281,13 @@ void se_ui_element_update_children(se_ui_element *ui) {
 	if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
 	    scale.x = available_width / child_count;
 	    scale.y = available_height;
-	    position.x = -ui->size.x + scale.x * 0.5f;  // Start from left edge
-	    position.y = 0;  // Center vertically
+	    position.x = -ui->size.x + scale.x * 0.5f;
+	    position.y = 0;
 	} else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
 	    scale.y = available_height / child_count;
 	    scale.x = available_width;
-	    position.y = ui->size.y - scale.y * 0.5f;  // Start from top
-	    position.x = 0;  // Center horizontally
+	    position.y = ui->size.y - scale.y * 0.5f;
+	    position.x = 0;
 	}
 
 	for (u32 i = 0; i < child_count; i++) {
@@ -302,8 +301,8 @@ void se_ui_element_update_children(se_ui_element *ui) {
 	    	printf("se_ui_element_update_children :: ui %p children index %d is null\n", ui, i);
 	    	continue;
 	    }
-	    se_ui_element_set_position(current_ui, &se_vec2(position.x + ui->position.x, position.y + ui->position.y));
-	    se_ui_element_set_size(current_ui, &se_vec2(scale.x * 0.5f, scale.y * 0.5f));
+    se_ui_element_set_position(current_ui, &se_vec2(position.x + ui->position.x, position.y + ui->position.y));
+    se_ui_element_set_size(current_ui, &se_vec2(scale.x * 0.5f, scale.y * 0.5f));
 	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
 	    	position.x += scale.x;
 	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
