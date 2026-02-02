@@ -9,6 +9,7 @@ typedef struct {
 	f64 current;
 	f64 delta;
 	f64 last_frame;
+	f64 frame_start;
 } se_time;
 
 typedef enum {

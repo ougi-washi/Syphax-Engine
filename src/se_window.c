@@ -103,7 +103,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	
 	glfwMakeContextCurrent(new_window->handle);
 	glfwSetWindowUserPointer(new_window->handle, new_window);
-	glfwSwapInterval(1); // vsync 
+	glfwSwapInterval(0); 
 	
 	// Set callbacks
 	glfwSetKeyCallback(new_window->handle, key_callback);
@@ -123,7 +123,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->time.last_frame = new_window->time.current;
 	new_window->time.delta = 0;
 	new_window->frame_count = 0;
-	new_window->target_fps = 60;
+	new_window->target_fps = 30;
 	printf("se_window_create :: created window %p\n", new_window);
 	return new_window;
 }
@@ -133,6 +133,7 @@ extern void se_window_update(se_window* window) {
 	window->time.last_frame = window->time.current;
 	window->time.current = glfwGetTime();
 	window->time.delta = window->time.current - window->time.last_frame;
+	window->time.frame_start = window->time.current;
 	window->frame_count++;
 }
 
@@ -142,10 +143,20 @@ void se_window_render_quad(se_window* window) {
 }
 
 void se_window_render_screen(se_window* window) {
-	f64 time_left = 1. / window->target_fps - window->time.delta;
-	if (time_left > 0) {
-		usleep(time_left * 1000000);
+	f64 target_frame_time = 1.0 / window->target_fps;
+	f64 now = glfwGetTime();
+	f64 elapsed = now - window->time.frame_start;
+	f64 time_left = target_frame_time - elapsed;
+	
+	if (time_left > 0.002) {
+		usleep((time_left - 0.002) * 1000000);
 	}
+	
+	f64 wait_end = window->time.frame_start + target_frame_time;
+	while (glfwGetTime() < wait_end) {
+		sched_yield(); 
+	}
+	
 	glfwSwapBuffers(window->handle);
 }
 
