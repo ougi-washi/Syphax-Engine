@@ -72,25 +72,23 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	new_object->transform = *transform;
 	new_object->is_custom = false;
 	new_object->is_visible = true;
-	if (scene_handle->render_handle) {
+    if (scene_handle->render_handle) {
 		s_foreach(&scene_handle->render_handle->shaders, i) {
-		se_shader *curr_shader =
-			s_array_get(&scene_handle->render_handle->shaders, i);
-		if (curr_shader &&
-			strcmp(curr_shader->fragment_path, fragment_shader_path) == 0) {
-			new_object->shader = curr_shader;
-			break;
-		}
+		    se_shader *curr_shader = s_array_get(&scene_handle->render_handle->shaders, i);
+		    if (curr_shader && strcmp(curr_shader->fragment_path, fragment_shader_path) == 0) {
+		    	new_object->shader = curr_shader;
+		    	break;
+		    }
 		}
 		if (!new_object->shader) {
-		new_object->shader = se_shader_load(
-			scene_handle->render_handle,
-			max_instances_count > 0 ? SE_OBJECT_2D_VERTEX_INSTANCED_SHADER_PATH
-									: SE_OBJECT_2D_VERTEX_SHADER_PATH,
-			fragment_shader_path);
+		    new_object->shader = se_shader_load(
+                            scene_handle->render_handle, 
+                            max_instances_count > 0 ? SE_OBJECT_2D_VERTEX_INSTANCED_SHADER_PATH : SE_OBJECT_2D_VERTEX_SHADER_PATH,
+			                fragment_shader_path);
 		}
 		s_assertf(new_object->shader, "se_object_2d_create :: failed to load shader: %s", fragment_shader_path);
-	} else {
+    } 
+    else {
 		new_object->shader = NULL;
 	}
 
@@ -101,8 +99,8 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 		// max_instances_count * 2 because we need to store the transform and buffer
 		// matrices
 		s_foreach(&new_object->instances.ids, i) {
-		se_instance_id *current_id = s_array_get(&new_object->instances.ids, i);
-		*current_id = i;
+		    se_instance_id *current_id = s_array_get(&new_object->instances.ids, i);
+		    *current_id = i;
 		}
 		se_quad_2d_add_instance_buffer(&new_object->quad,
 									 new_object->instances.transforms.data,
@@ -183,8 +181,7 @@ void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const se
 void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object) {
 	s_assertf(scene_handle, "se_object_2d_destroy :: scene_handle is null");
 	s_assertf(object, "se_object_2d_destroy :: object is null");
-	printf("se_object_2d_destroy :: scene_handle: %p, object: %p\n", scene_handle,
-			 object);
+	printf("se_object_2d_destroy :: scene_handle: %p, object: %p\n", scene_handle, object);
 	s_array_remove(&scene_handle->objects_2d, object);
 }
 
@@ -388,19 +385,19 @@ void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle)
 	s_foreach(&scene->objects, i) {
 		se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene->objects, i);
 		if (current_object_2d_ptr == NULL) {
-		printf("se_scene_2d_render :: current_object_2d_ptr is null\n");
-		continue;
+		    printf("se_scene_2d_render :: current_object_2d_ptr is null\n");
+		    continue;
 		}
 		se_object_2d *current_object_2d = *current_object_2d_ptr;
 		if (current_object_2d) {
-		if (current_object_2d->is_custom) {
-			current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
-		} else {
-			se_object_2d_update_uniforms(current_object_2d);
-			se_shader_use(render_handle, current_object_2d->shader, true, true);
-			const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
-			se_quad_render(&current_object_2d->quad, instance_count);
-		}
+		    if (current_object_2d->is_custom) {
+		    	current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
+		    } else {
+		    	se_object_2d_update_uniforms(current_object_2d);
+		    	se_shader_use(render_handle, current_object_2d->shader, true, true);
+		    	const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
+		    	se_quad_render(&current_object_2d->quad, instance_count);
+		    }
 		}
 	}
 }
@@ -463,7 +460,7 @@ void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle) {
 	s_foreach(&scene->models, i) {
 		se_model_ptr *model_ptr = s_array_get(&scene->models, i);
 		if (model_ptr == NULL) {
-		continue;
+		    continue;
 		}
 
 		se_model_render(render_handle, *model_ptr, scene->camera);
@@ -472,7 +469,7 @@ void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle) {
 	s_foreach(&scene->post_process, i) {
 		se_render_buffer_ptr *buffer_ptr = s_array_get(&scene->post_process, i);
 		if (buffer_ptr == NULL) {
-		continue;
+		    continue;
 		}
 
 		se_render_buffer_bind(*buffer_ptr);
