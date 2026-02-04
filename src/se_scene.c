@@ -199,41 +199,33 @@ se_mat3 se_object_2d_get_transform(se_object_2d *object) {
 void se_object_2d_set_position(se_object_2d *object, const se_vec2 *position) {
 	s_assertf(object, "se_object_2d_set_position :: object is null");
 	s_assertf(position, "se_object_2d_set_position :: position is null");
-	// Position is stored in the third column of the mat3: m[6], m[7]
-	object->transform.m[6] = position->x;
-	object->transform.m[7] = position->y;
+    se_mat3_set_position(&object->transform, position);
 }
 
 se_vec2 se_object_2d_get_position(se_object_2d *object) {
 	s_assertf(object, "se_object_2d_get_position :: object is null");
-	// Position is stored in the third column of the mat3: m[6], m[7]
-	return se_vec2(object->transform.m[6], object->transform.m[7]);
+    se_vec2 out_pos = {0};
+    se_mat3_get_position(&object->transform, &out_pos);
+    return out_pos;
 }
 
 void se_object_2d_set_scale(se_object_2d *object, const se_vec2 *scale) {
 	s_assertf(object, "se_object_2d_set_scale :: object is null");
 	s_assertf(scale, "se_object_2d_set_scale :: scale is null");
-	// Scale is stored in the diagonal: m[0] for x, m[4] for y
-	object->transform.m[0] = scale->x;
-	object->transform.m[4] = scale->y;
+    se_mat3_set_scale(&object->transform, scale);
 }
 
 se_vec2 se_object_2d_get_scale(se_object_2d *object) {
 	s_assertf(object, "se_object_2d_get_scale :: object is null");
-	// Scale is stored in the diagonal: m[0] for x, m[4] for y
-	return se_vec2(object->transform.m[0], object->transform.m[4]);
+    se_vec2 out_scale = {0};
+    se_mat3_get_scale(&object->transform, &out_scale);
+    return out_scale;
 }
 
 void se_object_2d_get_box_2d(se_object_2d *object, se_box_2d *out_box) {
 	s_assertf(object, "se_object_2d_get_box_2d :: object is null");
 	s_assertf(out_box, "se_object_2d_get_box_2d :: out_box is null");
-
-	// Position is in m[6], m[7]; scale is in m[0], m[4]
-	se_vec2 pos = se_vec2(object->transform.m[6], object->transform.m[7]);
-	se_vec2 scale = se_vec2(object->transform.m[0], object->transform.m[4]);
-
-	out_box->min = se_vec2(pos.x - scale.x, -pos.y - scale.y);
-	out_box->max = se_vec2(pos.x + scale.x, -pos.y + scale.y);
+    se_box_2d_make(out_box, &object->transform);
 }
 
 void se_object_2d_set_shader(se_object_2d *object, se_shader *shader) {
