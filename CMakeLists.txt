@@ -6,7 +6,6 @@ cmake_minimum_required(VERSION 3.22.1)
 project(SYPHAX_ENGINE LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
 add_compile_options(-Wall -O0)
 
 if(NOT CMAKE_GENERATOR)

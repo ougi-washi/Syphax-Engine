@@ -97,6 +97,7 @@ i32 main() {
 	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
+		printf("frame time: %f\n", se_window_get_delta_time(window));
 		se_window_poll_events();
 		se_window_update(window);
 		se_render_handle_reload_changed_shaders(render_handle);
