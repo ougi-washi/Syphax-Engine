@@ -35,9 +35,8 @@ typedef struct {
 } se_ui_element_params;
 #define SE_UI_ELEMENT_PARAMS_DEFAULTS { .layout = SE_UI_LAYOUT_HORIZONTAL, .position = s_vec2(0, 0), .size = s_vec2(1, 1), .padding = s_vec2(.05, .05), .visible = 1 }
 
-#define SE_MAX_UI_TEXT_LENGTH 1024
 typedef struct se_ui_text {
-	c8 characters[SE_MAX_UI_TEXT_LENGTH];
+	c8 characters[SE_TEXT_CHAR_COUNT];
 	c8 font_path[SE_MAX_PATH_LENGTH];
 	f32 font_size; 
 } se_ui_text;
@@ -81,6 +80,7 @@ extern void se_ui_element_set_text(se_ui_element* ui, const c8* text, const c8* 
 extern void se_ui_element_update_objects(se_ui_element* ui);
 extern void se_ui_element_update_children(se_ui_element* ui);
 extern se_object_2d_ptr se_ui_element_add_object(se_ui_element* ui, const c8* fragment_shader_path);
+extern se_object_2d_ptr se_ui_element_add_text(se_ui_element* ui, const c8* text, const c8* font_path, const f32 font_size);
 extern void se_ui_element_remove_object(se_ui_element* ui, se_object_2d_ptr object);
 extern se_ui_element* se_ui_element_add_child(se_ui_element* parent_ui, const se_ui_element_params* params);
 

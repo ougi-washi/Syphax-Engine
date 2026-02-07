@@ -6,7 +6,7 @@
 #include "se_render.h"
 #include "stb_truetype.h"
 
-#define SE_TEXT_CHAR_COUNT 1024
+#define SE_TEXT_CHAR_COUNT 1024 * 8
 
 typedef struct {
 	c8 path[SE_MAX_PATH_LENGTH];

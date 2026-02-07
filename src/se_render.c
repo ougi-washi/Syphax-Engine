@@ -1036,14 +1036,15 @@ void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *
 }
 
 void se_uniform_set_texture(se_uniforms *uniforms, const char *name, GLuint texture) {
-	// TODO: IMPORTANT: SEG FAULT HERE in 2025-08-24, audio_example.c:45
+	s_assertf(uniforms, "se_uniform_set_texture :: uniforms is null");
+	s_assertf(name, "se_uniform_set_texture :: name is null");
 	s_foreach(uniforms, i) {
 	se_uniform *found_uniform = s_array_get(uniforms, i);
-	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
-		found_uniform->type = SE_UNIFORM_TEXTURE;
-		found_uniform->value.texture = texture;
-		return;
-	}
+		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+			found_uniform->type = SE_UNIFORM_TEXTURE;
+			found_uniform->value.texture = texture;
+			return;
+		}
 	}
 	se_uniform *new_uniform = s_array_increment(uniforms);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);

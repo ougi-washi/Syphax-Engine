@@ -2,6 +2,7 @@
 
 #include "se_scene.h"
 #include <stdlib.h>
+#include <string.h>
 
 // Scene handle is not responsible for allocating memory
 // It is only used for referencing the scenes and use rendering handle to render
@@ -116,12 +117,21 @@ se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_objec
 	s_assertf(scene_handle, "se_object_2d_create_custom :: scene_handle is null");
 	s_assertf(custom, "se_object_2d_create_custom :: custom is null");
 	s_assertf(transform, "se_object_2d_create_custom :: transform is null");
+	s_assertf(custom->data_size <= SE_OBJECT_CUSTOM_DATA_SIZE, "se_object_2d_create_custom :: data_size exceeds SE_OBJECT_CUSTOM_DATA_SIZE");
 	se_object_2d *new_object = s_array_increment(&scene_handle->objects_2d);
 	new_object->transform = *transform;
 	new_object->is_custom = true;
 	new_object->is_visible = true;
-	new_object->custom = *custom;
+	memcpy(&new_object->custom, custom, sizeof(se_object_custom));
 	return new_object;
+}
+
+void se_object_custom_set_data(se_object_custom *custom, const void *data, const sz size) {
+	s_assertf(custom, "se_object_custom_set_data :: custom is null");
+	s_assertf(data, "se_object_custom_set_data :: data is null");
+	s_assertf(size <= SE_OBJECT_CUSTOM_DATA_SIZE, "se_object_custom_set_data :: size exceeds SE_OBJECT_CUSTOM_DATA_SIZE");
+	memcpy(custom->data, data, size);
+	custom->data_size = size;
 }
 
 void se_scene_2d_resize_callback(void *window, void *scene) {
@@ -487,3 +497,5 @@ void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *b
 void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
 	s_array_remove(&scene->post_process, &buffer);
 }
+#include <stdlib.h>
+#include <string.h>

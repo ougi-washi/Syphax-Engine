@@ -2,6 +2,8 @@
 
 #include "se_ui.h"
 
+#include <string.h>
+
 se_ui_handle *se_ui_handle_create(se_window *window, se_render_handle *render_handle, const se_ui_handle_params *params) {
 	s_assertf(window, "se_ui_handle_create :: window is null");
 	s_assertf(render_handle, "se_ui_handle_create :: render_handle is null");
@@ -23,8 +25,8 @@ se_ui_handle *se_ui_handle_create(se_window *window, se_render_handle *render_ha
 	ui_handle->scene_handle = se_scene_handle_create(render_handle, &scene_params);
 
 	if (params->fonts_count > 0) {
-	ui_handle->text_handle = se_text_handle_create(render_handle, params->fonts_count);
-	s_array_init(&ui_handle->ui_texts, params->texts_count);
+		ui_handle->text_handle = se_text_handle_create(render_handle, params->fonts_count);
+		s_array_init(&ui_handle->ui_texts, params->texts_count);
 	}
 	printf("se_ui_handle_create :: created ui handle %p\n", ui_handle);
 	return ui_handle;
@@ -194,17 +196,17 @@ void se_ui_element_set_text(se_ui_element *ui, const c8 *text, const c8 *font_pa
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_set_text :: ui_handle is null");
 
-	if (strlen(text) > SE_MAX_UI_TEXT_LENGTH) {
-	printf("se_ui_element_set_text :: text is too long, max length is %d\n", SE_MAX_UI_TEXT_LENGTH);
-	return;
+	if (strlen(text) > SE_TEXT_CHAR_COUNT) {
+		printf("se_ui_element_set_text :: text is too long, max length is %d\n", SE_TEXT_CHAR_COUNT);
+		return;
 	}
 
 	if (!ui->text) {
-	if (s_array_get_capacity(&ui_handle->ui_texts) <= s_array_get_size(&ui_handle->ui_texts)) {
-		printf("se_ui_element_set_text :: error, ui_handle->ui_texts is full, allocate more space\n");
-		return;
-	}
-	ui->text = s_array_increment(&ui_handle->ui_texts);
+		if (s_array_get_capacity(&ui_handle->ui_texts) <= s_array_get_size(&ui_handle->ui_texts)) {
+			printf("se_ui_element_set_text :: error, ui_handle->ui_texts is full, allocate more space\n");
+			return;
+		}
+		ui->text = s_array_increment(&ui_handle->ui_texts);
 	}
 
 	strcpy(ui->text->characters, text);
@@ -321,9 +323,6 @@ se_object_2d_ptr se_ui_element_add_object(se_ui_element *ui, const c8 *fragment_
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_add_object :: ui_handle is null");
 
-	se_render_handle *render_handle = ui_handle->render_handle;
-	s_assertf(render_handle, "se_ui_element_add_object :: render_handle is null");
-
 	se_scene_handle *scene_handle = ui_handle->scene_handle;
 	s_assertf(scene_handle, "se_ui_element_add_object :: scene_handle is null");
 
@@ -333,6 +332,68 @@ se_object_2d_ptr se_ui_element_add_object(se_ui_element *ui, const c8 *fragment_
 	se_object_2d_ptr object_2d = se_object_2d_create(scene_handle, fragment_shader_path, &transform, 0);
 	se_scene_2d_add_object(ui->scene_2d, object_2d);
 	se_ui_element_update_objects(ui);
+	return object_2d;
+}
+
+typedef struct {
+	se_text_handle *text_handle;
+	c8 text[SE_TEXT_CHAR_COUNT];
+	se_font *font;
+} se_ui_text_render_data;
+
+static void se_ui_text_render(se_render_handle *render_handle, void *data) {
+	s_assertf(render_handle, "se_ui_text_render :: render_handle is null");
+	s_assertf(data, "se_ui_text_render :: data is null");
+
+	se_ui_text_render_data *text_render_data = (se_ui_text_render_data *)data;
+	s_assertf(text_render_data->text_handle, "se_ui_text_render :: text_render_data->text_handle is null");
+	s_assertf(text_render_data->font, "se_ui_text_render :: text_render_data->font is null");
+	s_assertf(text_render_data->text, "se_ui_text_render :: text_render_data->text is null");
+
+	se_text_render(text_render_data->text_handle, text_render_data->font, text_render_data->text, &s_vec2(0, 0), &s_vec2(1., 1.), .03f);
+}
+
+se_object_2d_ptr se_ui_element_add_text(se_ui_element *ui, const c8 *text, const c8 *font_path, const f32 font_size) {
+	s_assertf(ui, "se_ui_element_add_text :: ui is null");
+	s_assertf(text, "se_ui_element_add_text :: text is null");
+	s_assertf(font_path, "se_ui_element_add_text :: font_path is null");
+
+	se_ui_handle *ui_handle = ui->ui_handle;
+	s_assertf(ui_handle, "se_ui_element_add_text :: ui_handle is null");
+
+	se_scene_handle *scene_handle = ui_handle->scene_handle;
+	s_assertf(scene_handle, "se_ui_element_add_text :: scene_handle is null");
+
+	se_text_handle *text_handle = ui_handle->text_handle;
+	s_assertf(text_handle, "se_ui_element_add_text :: text_handle is null");
+
+
+	se_render_handle *render_handle = ui_handle->render_handle;
+	s_assertf(render_handle, "se_ui_element_add_text :: render_handle is null");
+	printf("se_ui_element_add_text :: render_handle: %p, render_handle_shader_count: %zu\n", render_handle, s_array_get_size(&render_handle->shaders));
+
+	if (strlen(text) >= SE_TEXT_CHAR_COUNT) {
+		printf("se_ui_element_add_text :: text is too long, max length is %d\n", SE_TEXT_CHAR_COUNT - 1);
+		return NULL;
+	}
+
+	se_ui_text_render_data text_render_data = {
+		.text_handle = text_handle,
+		.font = se_font_load(ui_handle->text_handle, font_path, font_size)
+	};
+	strcpy(text_render_data.text, text);
+
+	se_object_custom object_custom = {0};
+	object_custom.render = &se_ui_text_render;
+	se_object_custom_set_data(&object_custom, &text_render_data, sizeof(text_render_data));
+
+	se_object_2d_ptr object_2d = se_object_2d_create_custom(scene_handle, &object_custom, &s_mat3_identity);
+	if (!object_2d) {
+		return NULL;
+	}
+	se_scene_2d_add_object(ui->scene_2d, object_2d);
+	se_ui_element_update_objects(ui);
+	
 	return object_2d;
 }
 

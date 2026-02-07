@@ -40,6 +40,7 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	s_assertf(render_handle, "se_font_load :: render_handle is null");
 	s_assertf(path, "se_font_load :: path is null");
 	
+	// Check if font is already loaded
 	s_foreach(&text_handle->fonts, i) {
 		se_font* curr_font = s_array_get(&text_handle->fonts, i);
 		if (strcmp(curr_font->path, path) == 0 && curr_font->size == size) {

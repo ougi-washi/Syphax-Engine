@@ -25,20 +25,25 @@ typedef struct {
 	se_buffers buffers;
 } se_instances;
 
+typedef void (*se_object_custom_callback)(se_render_handle *render_handle, void *data);
+
+#define SE_OBJECT_CUSTOM_DATA_SIZE (16 * 1024)
+
 typedef struct {
-	void *data;
-	void (*render)(se_render_handle *render_handle, void *data);
+	se_object_custom_callback render;
+	sz data_size;
+	u8 data[SE_OBJECT_CUSTOM_DATA_SIZE];
 } se_object_custom;
 
 typedef struct {
 	s_mat3 transform;
 	union {
-	struct {
-		se_quad quad;
-		se_shader_ptr shader;
-		se_instances instances;
-	};
-	se_object_custom custom;
+		struct {
+			se_quad quad;
+			se_shader_ptr shader;
+			se_instances instances;
+		};
+		se_object_custom custom;
 	};
 	b8 is_custom : 1;
 	b8 is_visible : 1;
@@ -98,6 +103,7 @@ extern void se_scene_handle_cleanup(se_scene_handle *scene_handle);
 // 2D objects functions
 extern se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count);
 extern se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform);
+extern void se_object_custom_set_data(se_object_custom *custom, const void *data, const sz size);
 extern void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object);
 extern void se_object_2d_set_transform(se_object_2d *object, const s_mat3 *transform);
 extern s_mat3 se_object_2d_get_transform(se_object_2d *object);
