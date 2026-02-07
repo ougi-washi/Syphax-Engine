@@ -63,19 +63,10 @@ i32 main() {
 	se_shader_set_vec3(button_yes->shader, "u_color", &s_vec3(0, 1, 0));
 	se_shader_set_vec3(button_no->shader, "u_color", &s_vec3(1, 0, 0));
 
-	// Compute bounding boxes from position and scale
-	s_vec2 btn_yes_pos = se_object_2d_get_position(button_yes);
-	s_vec2 btn_yes_scale = se_object_2d_get_scale(button_yes);
-	se_box_2d button_box_yes = {
-		s_vec2(btn_yes_pos.x - btn_yes_scale.x, btn_yes_pos.y - btn_yes_scale.y),
-		s_vec2(btn_yes_pos.x + btn_yes_scale.x,
-				btn_yes_pos.y + btn_yes_scale.y)};
-
-	s_vec2 btn_no_pos = se_object_2d_get_position(button_no);
-	s_vec2 btn_no_scale = se_object_2d_get_scale(button_no);
-	se_box_2d button_box_no = {
-		s_vec2(btn_no_pos.x - btn_no_scale.x, btn_no_pos.y - btn_no_scale.y),
-		s_vec2(btn_no_pos.x + btn_no_scale.x, btn_no_pos.y + btn_no_scale.y)};
+	se_box_2d button_box_yes = {0};
+	se_box_2d button_box_no = {0};
+	se_object_2d_get_box_2d(button_yes, &button_box_yes);
+	se_object_2d_get_box_2d(button_no, &button_box_no);
 
 	int button_yes_data = 0;
 	int button_no_data = 0;
@@ -97,20 +88,13 @@ i32 main() {
 	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
-		printf("frame time: %f\n", se_window_get_delta_time(window));
 		se_window_poll_events();
 		se_window_update(window);
 		se_render_handle_reload_changed_shaders(render_handle);
 
-		// Update position using setter
 		s_vec2 current_pos = se_object_2d_get_position(button_yes);
 		se_object_2d_set_position(button_yes, &s_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
-
-		// Update bounding box from position/scale
-		s_vec2 btn_pos = se_object_2d_get_position(button_yes);
-		s_vec2 btn_scale = se_object_2d_get_scale(button_yes);
-		button_box_yes.min = s_vec2(btn_pos.x - btn_scale.x, btn_pos.y - btn_scale.y);
-		button_box_yes.max = s_vec2(btn_pos.x + btn_scale.x, btn_pos.y + btn_scale.y);
+		se_object_2d_get_box_2d(button_yes, &button_box_yes);
 		se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
 		se_scene_2d_render(scene_2d, render_handle);
 
