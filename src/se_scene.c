@@ -59,7 +59,7 @@ void se_scene_handle_cleanup(se_scene_handle *scene_handle) {
 	free(scene_handle);
 }
 
-se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const se_mat3 *transform, const sz max_instances_count) {
+se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count) {
 	s_assertf(scene_handle, "se_object_2d_create :: scene_handle is null");
 	s_assertf(fragment_shader_path, "se_object_2d_create :: fragment_shader_path is null");
 	s_assertf(transform, "se_object_2d_create :: transform is null");
@@ -112,7 +112,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	return new_object;
 }
 
-se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const se_mat3 *transform) {
+se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform) {
 	s_assertf(scene_handle, "se_object_2d_create_custom :: scene_handle is null");
 	s_assertf(custom, "se_object_2d_create_custom :: custom is null");
 	s_assertf(transform, "se_object_2d_create_custom :: transform is null");
@@ -138,9 +138,9 @@ void se_scene_2d_resize_callback(void *window, void *scene) {
 
 	se_framebuffer_ptr framebuffer = scene_ptr->output;
 	s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
-	se_vec2 old_size = {0};
+	s_vec2 old_size = {0};
 	se_framebuffer_get_size(framebuffer, &old_size);
-	se_vec2 new_size = {framebuffer->ratio.x * window_ptr->width,
+	s_vec2 new_size = {framebuffer->ratio.x * window_ptr->width,
 						framebuffer->ratio.y * window_ptr->height};
 
 	// TODO: update object positions and scales
@@ -150,12 +150,12 @@ void se_scene_2d_resize_callback(void *window, void *scene) {
 	//		continue;
 	//	}
 	//	se_object_2d* current_object = *current_object_ptr;
-	//	se_vec2* current_position = &current_object->position;
-	//	se_vec2* current_scale = &current_object->scale;
-	//	se_object_2d_set_position(current_object, &se_vec2(current_position->x *
+	//	s_vec2* current_position = &current_object->position;
+	//	s_vec2* current_scale = &current_object->scale;
+	//	se_object_2d_set_position(current_object, &s_vec2(current_position->x *
 	//	new_size.x / old_size.x, current_position->y * new_size.y /
 	//	old_size.y)); se_object_2d_set_scale(current_object,
-	//	&se_vec2(current_scale->x * new_size.x / old_size.x, current_scale->y *
+	//	&s_vec2(current_scale->x * new_size.x / old_size.x, current_scale->y *
 	//	new_size.y / old_size.y));
 	//}
 
@@ -163,7 +163,7 @@ void se_scene_2d_resize_callback(void *window, void *scene) {
 	se_scene_2d_render(scene, render_handle_ptr);
 }
 
-void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const se_vec2 *ratio) {
+void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio) {
 	s_assertf(scene, "se_scene_2d_set_auto_resize :: scene is null");
 	s_assertf(window, "se_scene_2d_set_auto_resize :: window is null");
 	s_assertf(ratio, "se_scene_2d_set_auto_resize :: ratio is null");
@@ -185,40 +185,38 @@ void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object) {
 	s_array_remove(&scene_handle->objects_2d, object);
 }
 
-void se_object_2d_set_transform(se_object_2d *object, const se_mat3 *transform) {
+void se_object_2d_set_transform(se_object_2d *object, const s_mat3 *transform) {
 	s_assertf(object, "se_object_2d_set_transform :: object is null");
 	s_assertf(transform, "se_object_2d_set_transform :: transform is null");
 	object->transform = *transform;
 }
 
-se_mat3 se_object_2d_get_transform(se_object_2d *object) {
+s_mat3 se_object_2d_get_transform(se_object_2d *object) {
 	s_assertf(object, "se_object_2d_get_transform :: object is null");
 	return object->transform;
 }
 
-void se_object_2d_set_position(se_object_2d *object, const se_vec2 *position) {
+void se_object_2d_set_position(se_object_2d *object, const s_vec2 *position) {
 	s_assertf(object, "se_object_2d_set_position :: object is null");
 	s_assertf(position, "se_object_2d_set_position :: position is null");
-    se_mat3_set_position(&object->transform, position);
+    s_mat3_set_translation(&object->transform, position);
 }
 
-se_vec2 se_object_2d_get_position(se_object_2d *object) {
+s_vec2 se_object_2d_get_position(se_object_2d *object) {
 	s_assertf(object, "se_object_2d_get_position :: object is null");
-    se_vec2 out_pos = {0};
-    se_mat3_get_position(&object->transform, &out_pos);
+    s_vec2 out_pos = s_mat3_get_translation(&object->transform);
     return out_pos;
 }
 
-void se_object_2d_set_scale(se_object_2d *object, const se_vec2 *scale) {
+void se_object_2d_set_scale(se_object_2d *object, const s_vec2 *scale) {
 	s_assertf(object, "se_object_2d_set_scale :: object is null");
 	s_assertf(scale, "se_object_2d_set_scale :: scale is null");
-    se_mat3_set_scale(&object->transform, scale);
+    s_mat3_set_scale(&object->transform, scale);
 }
 
-se_vec2 se_object_2d_get_scale(se_object_2d *object) {
+s_vec2 se_object_2d_get_scale(se_object_2d *object) {
 	s_assertf(object, "se_object_2d_get_scale :: object is null");
-    se_vec2 out_scale = {0};
-    se_mat3_get_scale(&object->transform, &out_scale);
+    s_vec2 out_scale = s_mat3_get_scale(&object->transform);
     return out_scale;
 }
 
@@ -238,7 +236,7 @@ void se_object_2d_update_uniforms(se_object_2d *object) {
 	}
 }
 
-se_instance_id se_object_2d_add_instance(se_object_2d *object, const se_mat4 *transform, const se_mat4 *buffer) {
+se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat4 *transform, const s_mat4 *buffer) {
 	s_assertf(object, "se_object_2d_set_instance_add :: object is null");
 	s_assertf(transform, "se_object_2d_set_instance_add :: transform is null");
 	s_assertf(buffer, "se_object_2d_set_instance_add :: buffer is null");
@@ -251,8 +249,8 @@ se_instance_id se_object_2d_add_instance(se_object_2d *object, const se_mat4 *tr
 	}
 
 	se_instance_id *new_instance_id = s_array_increment(&object->instances.ids);
-	se_mat4 *new_transform = s_array_increment(&object->instances.transforms);
-	se_mat4 *new_buffer = s_array_increment(&object->instances.buffers);
+	s_mat4 *new_transform = s_array_increment(&object->instances.transforms);
+	s_mat4 *new_buffer = s_array_increment(&object->instances.buffers);
 
 	*new_instance_id = new_id;
 	*new_transform = *transform;
@@ -274,14 +272,14 @@ i32 se_object_2d_get_instance_index(se_object_2d *object, const se_instance_id i
 	return -1;
 }
 
-void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance_id instance_id, const se_mat4 *transform) {
+void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance_id instance_id, const s_mat4 *transform) {
 	s_assertf(object, "se_object_2d_set_instance_transform :: object is null");
 	s_assertf(transform, "se_object_2d_set_instance_transform :: transform is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index >= 0) {
-		se_mat4 *current_transform =
+		s_mat4 *current_transform =
 			s_array_get(&object->instances.transforms, index);
-		memcpy(current_transform, transform, sizeof(se_mat4));
+		memcpy(current_transform, transform, sizeof(s_mat4));
 		se_object_2d_set_instances_dirty(object, true);
 	} else {
 		printf("se_object_2d_set_instance_transform :: instance id %d not found\n",
@@ -289,12 +287,12 @@ void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance
 	}
 }
 
-void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const se_mat4 *buffer) {
+void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const s_mat4 *buffer) {
 	s_assertf(object, "se_object_2d_set_instance_buffer :: object is null");
 	s_assertf(buffer, "se_object_2d_set_instance_buffer :: buffer is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index >= 0) {
-		se_mat4 *current_buffer = s_array_get(&object->instances.buffers, index);
+		s_mat4 *current_buffer = s_array_get(&object->instances.buffers, index);
 		*current_buffer = *buffer;
 		se_object_2d_set_instances_dirty(object, true);
 	} else {
@@ -337,7 +335,7 @@ sz se_object_2d_get_instance_count(se_object_2d *object) {
 }
 
 se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
-									const se_vec2 *size, const u16 object_count) {
+									const s_vec2 *size, const u16 object_count) {
 	s_assertf(scene_handle->render_handle,
 				"se_scene_2d_create :: scene_handle->render_handle is null");
 	s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
@@ -429,7 +427,7 @@ void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object) {
 	s_array_remove(&scene->objects, &object);
 }
 
-se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const se_vec2 *size, const u16 object_count) {
+se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count) {
 	se_scene_3d *new_scene = s_array_increment(&scene_handle->scenes_3d);
 	if (scene_handle->render_handle) {
 		new_scene->camera = se_camera_create(scene_handle->render_handle);

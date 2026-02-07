@@ -39,13 +39,13 @@ i32 main() {
 		se_render_handle_reload_changed_shaders(&render_handle);
 		 
 		se_uniforms* global_uniforms = se_render_handle_get_global_uniforms(&render_handle);
-		const se_vec3 amps = se_audio_input_get_amplitudes();
+		const s_vec3 amps = se_audio_input_get_amplitudes();
 		se_uniform_set_vec3(global_uniforms, "amps", &amps);
 		
 		// render model
 		se_render_buffer_bind(model_buf);
 		se_render_clear();
-		const se_vec3 rot_angle = {0.006, se_window_get_delta_time(window) * 0.1, .004};
+		const s_vec3 rot_angle = {0.006, se_window_get_delta_time(window) * 0.1, .004};
 		se_model_rotate(model, &rot_angle);
 		se_model_render(&render_handle, model, camera);
 		se_render_buffer_unbind(model_buf);

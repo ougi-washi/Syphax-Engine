@@ -71,7 +71,7 @@ extern b8 se_window_is_key_down(se_window* window, i32 key);
 extern b8 se_window_is_mouse_down(se_window* window, i32 button);
 extern f32 se_window_get_mouse_position_x(se_window* window);
 extern f32 se_window_get_mouse_position_y(se_window* window);
-extern void se_window_get_mouse_position_normalized(se_window* window, se_vec2* out_mouse_position);
+extern void se_window_get_mouse_position_normalized(se_window* window, s_vec2* out_mouse_position);
 extern b8 se_window_should_close(se_window* window);
 extern void se_window_set_should_close(se_window* window, const b8 should_close);
 extern void se_window_set_exit_keys(se_window* window, se_key_combo* keys);

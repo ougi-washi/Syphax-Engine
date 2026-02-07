@@ -32,19 +32,19 @@ i32 main() {
 		glfwMakeContextCurrent(window_main->handle);
 		se_window_update(window_main);
 		se_render_clear();
-		se_render_set_background_color(se_vec(4, .5, 0.1, 0.1, 1));
+		se_render_set_background_color(s_vec(4, .5, 0.1, 0.1, 1));
 		se_window_render_screen(window_main);
 
 		glfwMakeContextCurrent(window_1->handle);
 		se_window_update(window_1);
 		se_render_clear();
-		se_render_set_background_color(se_vec(4, 0.1, 0.5, 0.1, 1));
+		se_render_set_background_color(s_vec(4, 0.1, 0.5, 0.1, 1));
 		se_window_render_screen(window_1);
 		
 		glfwMakeContextCurrent(window_2->handle);
 		se_window_update(window_2);
 		se_render_clear();
-		se_render_set_background_color(se_vec(4, 0.1, 0.1, 0.5, 1));
+		se_render_set_background_color(s_vec(4, 0.1, 0.1, 0.5, 1));
 		se_window_render_screen(window_2);
 	}
 

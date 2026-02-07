@@ -16,14 +16,14 @@
 #define SE_MAX_INDICES 65536
 
 typedef struct {
-	se_vec2 position;
-	se_vec2 uv;
+	s_vec2 position;
+	s_vec2 uv;
 } se_vertex_2d;
 
 typedef struct {
-	se_vec3 position;
-	se_vec3 normal;
-	se_vec2 uv;
+	s_vec3 position;
+	s_vec3 normal;
+	s_vec2 uv;
 } se_vertex_3d;
 
 static const se_vertex_2d se_quad_2d_vertices[4] = {
@@ -56,12 +56,12 @@ typedef struct {
 	se_uniform_type type;
 	union {
 	f32 f;
-	se_vec2 vec2;
-	se_vec3 vec3;
-	se_vec4 vec4;
+	s_vec2 vec2;
+	s_vec3 vec3;
+	s_vec4 vec4;
 	i32 i;
-	se_mat3 mat3;
-	se_mat4 mat4;
+	s_mat3 mat3;
+	s_mat4 mat4;
 	GLuint texture;
 	} value;
 } se_uniform;
@@ -103,7 +103,7 @@ typedef struct {
 	GLuint vbo;
 	GLuint ebo;
 	se_shader *shader;
-	se_mat4 matrix;
+	s_mat4 matrix;
 } se_mesh;
 typedef s_array(se_mesh, se_meshes);
 
@@ -115,10 +115,10 @@ typedef se_model *se_model_ptr;
 typedef s_array(se_model_ptr, se_models_ptr);
 
 typedef struct {
-	se_vec3 position;
-	se_vec3 target;
-	se_vec3 up;
-	se_vec3 right;
+	s_vec3 position;
+	s_vec3 target;
+	s_vec3 up;
+	s_vec3 right;
 	f32 fov;
 	f32 near;
 	f32 far;
@@ -132,8 +132,8 @@ typedef struct {
 	GLuint framebuffer;
 	GLuint texture;
 	GLuint depth_buffer;
-	se_vec2 size;
-	se_vec2 ratio;
+	s_vec2 size;
+	s_vec2 ratio;
 	b8 auto_resize : 1;
 } se_framebuffer;
 typedef s_array(se_framebuffer, se_framebuffers);
@@ -146,9 +146,9 @@ typedef struct {
 	GLuint prev_framebuffer;
 	GLuint prev_texture;
 	GLuint depth_buffer;
-	se_vec2 texture_size;
-	se_vec2 scale;
-	se_vec2 position;
+	s_vec2 texture_size;
+	s_vec2 scale;
+	s_vec2 position;
 	se_shader_ptr shader;
 } se_render_buffer;
 typedef s_array(se_render_buffer, se_render_buffers);
@@ -197,7 +197,7 @@ extern void se_enable_blending();
 extern void se_disable_blending();
 extern void se_unbind_framebuffer(); // window framebuffer
 extern void se_render_clear();
-extern void se_render_set_background_color(const se_vec4 color);
+extern void se_render_set_background_color(const s_vec4 color);
 
 // render_handle functions
 extern se_render_handle *
@@ -219,46 +219,46 @@ extern void se_shader_use(se_render_handle *render_handle, se_shader *shader, co
 extern void se_shader_cleanup(se_shader *shader);
 extern GLuint se_shader_get_uniform_location(se_shader *shader, const char *name);
 extern f32 *se_shader_get_uniform_float(se_shader *shader, const char *name);
-extern se_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name);
-extern se_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name);
-extern se_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name);
+extern s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name);
+extern s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name);
+extern s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name);
 extern i32 *se_shader_get_uniform_int(se_shader *shader, const char *name);
-extern se_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name);
+extern s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name);
 extern GLuint *se_shader_get_uniform_texture(se_shader *shader, const char *name);
 extern void se_shader_set_float(se_shader *shader, const char *name, f32 value);
-extern void se_shader_set_vec2(se_shader *shader, const char *name, const se_vec2 *value);
-extern void se_shader_set_vec3(se_shader *shader, const char *name, const se_vec3 *value);
-extern void se_shader_set_vec4(se_shader *shader, const char *name, const se_vec4 *value);
+extern void se_shader_set_vec2(se_shader *shader, const char *name, const s_vec2 *value);
+extern void se_shader_set_vec3(se_shader *shader, const char *name, const s_vec3 *value);
+extern void se_shader_set_vec4(se_shader *shader, const char *name, const s_vec4 *value);
 extern void se_shader_set_int(se_shader *shader, const char *name, i32 value);
-extern void se_shader_set_mat3(se_shader *shader, const char *name, const se_mat3 *value);
-extern void se_shader_set_mat4(se_shader *shader, const char *name, const se_mat4 *value);
+extern void se_shader_set_mat3(se_shader *shader, const char *name, const s_mat3 *value);
+extern void se_shader_set_mat4(se_shader *shader, const char *name, const s_mat4 *value);
 extern void se_shader_set_texture(se_shader *shader, const char *name, GLuint texture);
 extern void se_shader_set_buffer_texture(se_shader *shader, const char *name, se_render_buffer *buffer);
 
 // Mesh functions
-extern void se_mesh_translate(se_mesh *mesh, const se_vec3 *v);
-extern void se_mesh_rotate(se_mesh *mesh, const se_vec3 *v);
-extern void se_mesh_scale(se_mesh *mesh, const se_vec3 *v);
+extern void se_mesh_translate(se_mesh *mesh, const s_vec3 *v);
+extern void se_mesh_rotate(se_mesh *mesh, const s_vec3 *v);
+extern void se_mesh_scale(se_mesh *mesh, const s_vec3 *v);
 
 // Model functions
 extern se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders);
 extern void se_model_render(se_render_handle *render_handle, se_model *model, se_camera *camera);
 extern void se_model_cleanup(se_model *model);
-extern void se_model_translate(se_model *model, const se_vec3 *v);
-extern void se_model_rotate(se_model *model, const se_vec3 *v);
-extern void se_model_scale(se_model *model, const se_vec3 *v);
+extern void se_model_translate(se_model *model, const s_vec3 *v);
+extern void se_model_rotate(se_model *model, const s_vec3 *v);
+extern void se_model_scale(se_model *model, const s_vec3 *v);
 
 // camera functions
 extern se_camera *se_camera_create(se_render_handle *render_handle);
-extern se_mat4 se_camera_get_view_matrix(const se_camera *camera);
-extern se_mat4 se_camera_get_projection_matrix(const se_camera *camera);
+extern s_mat4 se_camera_get_view_matrix(const se_camera *camera);
+extern s_mat4 se_camera_get_projection_matrix(const se_camera *camera);
 extern void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height);
 extern void se_camera_destroy(se_render_handle *render_handle, se_camera *camera);
 
 // Framebuffer functions
-extern se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const se_vec2 *size);
-extern void se_framebuffer_set_size(se_framebuffer *framebuffer, const se_vec2 *size);
-extern void se_framebuffer_get_size(se_framebuffer *framebuffer, se_vec2 *out_size);
+extern se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_vec2 *size);
+extern void se_framebuffer_set_size(se_framebuffer *framebuffer, const s_vec2 *size);
+extern void se_framebuffer_get_size(se_framebuffer *framebuffer, s_vec2 *out_size);
 extern void se_framebuffer_bind(se_framebuffer *framebuffer);
 extern void se_framebuffer_unbind(se_framebuffer *framebuffer);
 extern void se_framebuffer_use_quad_shader(se_framebuffer *framebuffer, se_render_handle *render_handle);
@@ -270,18 +270,18 @@ extern void se_render_buffer_set_shader(se_render_buffer *buffer, se_shader *sha
 extern void se_render_buffer_unset_shader(se_render_buffer *buffer);
 extern void se_render_buffer_bind(se_render_buffer *buffer);
 extern void se_render_buffer_unbind(se_render_buffer *buf);
-extern void se_render_buffer_set_scale(se_render_buffer *buffer, const se_vec2 *scale);
-extern void se_render_buffer_set_position(se_render_buffer *buffer, const se_vec2 *position);
+extern void se_render_buffer_set_scale(se_render_buffer *buffer, const s_vec2 *scale);
+extern void se_render_buffer_set_position(se_render_buffer *buffer, const s_vec2 *position);
 extern void se_render_buffer_cleanup(se_render_buffer *buffer);
 
 // Uniform functions
 extern void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value);
-extern void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const se_vec2 *value);
-extern void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const se_vec3 *value);
-extern void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const se_vec4 *value);
+extern void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const s_vec2 *value);
+extern void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const s_vec3 *value);
+extern void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const s_vec4 *value);
 extern void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 value);
-extern void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const se_mat3 *value);
-extern void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const se_mat4 *value);
+extern void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const s_mat3 *value);
+extern void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *value);
 extern void se_uniform_set_texture(se_uniforms *uniforms, const char *name, GLuint texture);
 extern void se_uniform_set_buffer_texture(se_uniforms *uniforms, const char *name, se_render_buffer *buffer);
 extern void se_uniform_apply(se_render_handle *render_handle, se_shader *shader, const b8 update_global_uniforms);
@@ -289,7 +289,7 @@ extern void se_uniform_apply(se_render_handle *render_handle, se_shader *shader,
 // Quad functions
 extern void se_quad_3d_create(se_quad *out_quad);
 extern void se_quad_2d_create(se_quad *out_quad, const u32 instance_count);
-extern void se_quad_2d_add_instance_buffer(se_quad *quad, const se_mat4 *buffer, const sz instance_count);
+extern void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const sz instance_count);
 extern void se_quad_render(se_quad *quad, const sz instance_count);
 extern void se_quad_destroy(se_quad *quad);
 
@@ -299,6 +299,6 @@ extern c8 *load_file(const char *path);
 extern uc8 *load_file_uc8(const char *path, sz *out_size);
 
 // logging
-extern void se_print_mat4(const se_mat4 *mat);
+extern void se_print_mat4(const s_mat4 *mat);
 
 #endif // SE_RENDER_H

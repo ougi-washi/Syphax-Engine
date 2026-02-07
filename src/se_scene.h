@@ -17,8 +17,8 @@
 
 typedef i32 se_instance_id;
 typedef s_array(se_instance_id, se_instance_ids);
-typedef s_array(se_mat4, se_transforms);
-typedef s_array(se_mat4, se_buffers);
+typedef s_array(s_mat4, se_transforms);
+typedef s_array(s_mat4, se_buffers);
 typedef struct {
 	se_instance_ids ids;
 	se_transforms transforms;
@@ -31,7 +31,7 @@ typedef struct {
 } se_object_custom;
 
 typedef struct {
-	se_mat3 transform;
+	s_mat3 transform;
 	union {
 	struct {
 		se_quad quad;
@@ -50,7 +50,7 @@ typedef s_array(se_object_2d_ptr, se_objects_2d_ptr);
 
 typedef struct {
 	se_model *model;
-	se_mat4 transform;
+	s_mat4 transform;
 	se_instances instances;
 } se_object_3d;
 typedef s_array(se_object_3d, se_objects_3d);
@@ -96,22 +96,22 @@ extern se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, 
 extern void se_scene_handle_cleanup(se_scene_handle *scene_handle);
 
 // 2D objects functions
-extern se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const se_mat3 *transform, const sz max_instances_count);
-extern se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const se_mat3 *transform);
+extern se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count);
+extern se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform);
 extern void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object);
-extern void se_object_2d_set_transform(se_object_2d *object, const se_mat3 *transform);
-extern se_mat3 se_object_2d_get_transform(se_object_2d *object);
-extern void se_object_2d_set_position(se_object_2d *object, const se_vec2 *position);
-extern se_vec2 se_object_2d_get_position(se_object_2d *object);
-extern void se_object_2d_set_scale(se_object_2d *object, const se_vec2 *scale);
-extern se_vec2 se_object_2d_get_scale(se_object_2d *object);
+extern void se_object_2d_set_transform(se_object_2d *object, const s_mat3 *transform);
+extern s_mat3 se_object_2d_get_transform(se_object_2d *object);
+extern void se_object_2d_set_position(se_object_2d *object, const s_vec2 *position);
+extern s_vec2 se_object_2d_get_position(se_object_2d *object);
+extern void se_object_2d_set_scale(se_object_2d *object, const s_vec2 *scale);
+extern s_vec2 se_object_2d_get_scale(se_object_2d *object);
 extern void se_object_2d_get_box_2d(se_object_2d *object, se_box_2d *out_box);
 extern void se_object_2d_set_shader(se_object_2d *object, se_shader *shader);
 extern void se_object_2d_update_uniforms(se_object_2d *object);
-extern se_instance_id se_object_2d_add_instance(se_object_2d *object, const se_mat4 *transform, const se_mat4 *buffer);
+extern se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat4 *transform, const s_mat4 *buffer);
 extern i32 se_object_2d_get_instance_index(se_object_2d *object, const se_instance_id instance_id);
-extern void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance_id instance_id, const se_mat4 *transform);
-extern void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const se_mat4 *buffer);
+extern void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance_id instance_id, const s_mat4 *transform);
+extern void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const s_mat4 *buffer);
 extern void se_object_2d_set_instances_transforms(se_object_2d *object, const se_transforms *transforms);
 extern void se_object_2d_set_instances_buffers(se_object_2d *object, const se_buffers *buffers);
 extern void se_object_2d_set_instances_dirty(se_object_2d *object, const b8 dirty);
@@ -119,8 +119,8 @@ extern b8 se_object_2d_are_instances_dirty(se_object_2d *object);
 extern sz se_object_2d_get_instance_count(se_object_2d *object);
 
 // 2D scene functions
-extern se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle, const se_vec2 *size, const u16 object_count);
-extern void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const se_vec2 *ratio); // ratio can only be 1 for now
+extern se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
+extern void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio); // ratio can only be 1 for now
 extern void se_scene_2d_destroy(se_scene_handle *scene_handle, se_scene_2d *scene);
 extern void se_scene_2d_bind(se_scene_2d *scene);
 extern void se_scene_2d_unbind(se_scene_2d *scene);
@@ -131,7 +131,7 @@ extern void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object);
 extern void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object);
 
 // 3D scene functions
-extern se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const se_vec2 *size, const u16 object_count);
+extern se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
 extern void se_scene_3d_destroy(se_scene_handle *scene_handle, se_scene_3d *scene);
 extern void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle);
 extern void se_scene_3d_add_model(se_scene_3d *scene, se_model *model);

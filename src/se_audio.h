@@ -7,6 +7,6 @@
 
 void se_audio_input_init();
 void se_audio_input_cleanup();
-se_vec3 se_audio_input_get_amplitudes();
+s_vec3 se_audio_input_get_amplitudes();
 
 #endif // SE_AUDIO_H

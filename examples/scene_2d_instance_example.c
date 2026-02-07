@@ -25,23 +25,21 @@ i32 main() {
 	scene_params.scenes_2d_count = 2;
 	scene_params.scenes_3d_count = 0;
 	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, &scene_params);
-	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &se_vec2(WIDTH, HEIGHT), 4);
+	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
 
-	se_mat3 transform = mat3_identity();
+	s_mat3 transform = s_mat3_identity;
 	se_object_2d *button = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 16);
-	se_object_2d_set_position(button, &se_vec2(0.15, 0.));
-	se_object_2d_set_scale(button, &se_vec2(0.1, 0.1));
-	const se_mat4 identity = mat4_identity();
+	se_object_2d_set_position(button, &s_vec2(0.15, 0.));
+	se_object_2d_set_scale(button, &s_vec2(0.1, 0.1));
+	s_mat4 instance_transform = s_mat4_identity;
 	for (i32 i = 0; i < 16; i++) {
-	se_instance_id button_instance_id = se_object_2d_add_instance(button, &identity, &identity);
-	const se_mat4 translate = mat4_translate(&se_vec3(-15 + i * 1.5, 0., 0));
-	se_object_2d_set_instance_transform(button, button_instance_id, &translate);
+		s_mat4_translate(&instance_transform, &s_vec3(-15 + i * 1.5, 0., 0));
+		se_instance_id button_instance_id = se_object_2d_add_instance(button, &instance_transform, &s_mat4_identity);
 	}
 
-	se_shader_set_vec3(button->shader, "u_color", &se_vec3(0, 1, 0));
-
+	se_shader_set_vec3(button->shader, "u_color", &s_vec3(0, 1, 0));
 	se_scene_2d_add_object(scene_2d, button);
-	se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
+	se_scene_2d_set_auto_resize(scene_2d, window, &s_vec2(1., 1.));
 
 	// TODO: Edit syphax array and make this in a single line
 	se_key_combo exit_keys = {0};
@@ -50,16 +48,16 @@ i32 main() {
 	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
-	se_window_poll_events();
-	se_window_update(window);
-	se_render_handle_reload_changed_shaders(render_handle);
-	se_render_clear();
-	// Update position using setter
-	se_vec2 current_pos = se_object_2d_get_position(button);
-	se_object_2d_set_position(button, &se_vec2(current_pos.x + 0.001, current_pos.y));
-	se_scene_2d_render(scene_2d, render_handle);
-	se_scene_2d_render_to_screen(scene_2d, render_handle, window);
-	se_window_render_screen(window);
+		se_window_poll_events();
+		se_window_update(window);
+		se_render_handle_reload_changed_shaders(render_handle);
+		se_render_clear();
+		// Update position using setter
+		s_vec2 current_pos = se_object_2d_get_position(button);
+		se_object_2d_set_position(button, &s_vec2(current_pos.x + 0.001, current_pos.y));
+		se_scene_2d_render(scene_2d, render_handle);
+		se_scene_2d_render_to_screen(scene_2d, render_handle, window);
+		se_window_render_screen(window);
 	}
 
 	se_scene_handle_cleanup(scene_handle);

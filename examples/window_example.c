@@ -20,7 +20,7 @@ i32 main() {
 	while (!se_window_should_close(window)) {
 		se_window_poll_events();
 		se_render_clear();
-		se_render_set_background_color(se_vec(4, 0.5, 0.5, 0.5, 1));
+		se_render_set_background_color(s_vec(4, 0.5, 0.5, 0.5, 1));
 		se_window_render_screen(window);
 	}
 

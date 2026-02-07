@@ -6,11 +6,11 @@
 #define HEIGHT 1080
 
 void increment_button_color(se_object_2d *button) {
-	se_vec3 *color = se_shader_get_uniform_vec3(button->shader, "u_color");
+	s_vec3 *color = se_shader_get_uniform_vec3(button->shader, "u_color");
 	if (color) {
-	color->x = min(color->x * 1.1, 1);
-	color->y = min(color->y * 1.1, 1);
-	color->z = min(color->z * 1.1, 1);
+	color->x = s_min(color->x * 1.1, 1);
+	color->y = s_min(color->y * 1.1, 1);
+	color->z = s_min(color->z * 1.1, 1);
 	}
 }
 
@@ -29,11 +29,11 @@ void on_button_hovered(void *window, void *data) {
 
 void on_button_stop_hovered(void *window, void *data) {
 	se_object_2d *button = (se_object_2d *)data;
-	se_vec3 *color = se_shader_get_uniform_vec3(button->shader, "u_color");
+	s_vec3 *color = se_shader_get_uniform_vec3(button->shader, "u_color");
 	if (color) {
-	color->x = max(color->x / 2., 0);
-	color->y = max(color->y / 2., 0);
-	color->z = max(color->z / 2., 0);
+	color->x = s_max(color->x / 2., 0);
+	color->y = s_max(color->y / 2., 0);
+	color->z = s_max(color->z / 2., 0);
 	}
 }
 
@@ -58,18 +58,18 @@ i32 main() {
 	se_object_2d *button_minimize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
 	se_object_2d *button_maximize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
 	se_object_2d *button_exit = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	se_shader_set_vec3(button_minimize->shader, "u_color", &se_vec3(0, 0, .3));
-	se_shader_set_vec3(button_maximize->shader, "u_color", &se_vec3(0, .3, 0));
-	se_shader_set_vec3(button_exit->shader,     "u_color", &se_vec3(.3, 0, 0));
+	se_shader_set_vec3(button_minimize->shader, "u_color", &s_vec3(0, 0, .3));
+	se_shader_set_vec3(button_maximize->shader, "u_color", &s_vec3(0, .3, 0));
+	se_shader_set_vec3(button_exit->shader,     "u_color", &s_vec3(.3, 0, 0));
 
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
 	se_ui_element *content = se_ui_element_add_child(root, &ui_element_params);
 	se_object_2d *item_1 = se_ui_element_add_object(content, "examples/ui/button.glsl");
 	se_object_2d *item_2 = se_ui_element_add_object(content, "examples/ui/button.glsl");
 	se_object_2d *item_3 = se_ui_element_add_object(content, "examples/ui/button.glsl");
-	se_shader_set_vec3(item_1->shader, "u_color", &se_vec3(.5, .5, 0));
-	se_shader_set_vec3(item_2->shader, "u_color", &se_vec3(0, .5, .5));
-	se_shader_set_vec3(item_3->shader, "u_color", &se_vec3(.5, 0, .5));
+	se_shader_set_vec3(item_1->shader, "u_color", &s_vec3(.5, .5, 0));
+	se_shader_set_vec3(item_2->shader, "u_color", &s_vec3(0, .5, .5));
+	se_shader_set_vec3(item_3->shader, "u_color", &s_vec3(.5, 0, .5));
 
 	se_box_2d exit_box = {0};
 	se_object_2d_get_box_2d(button_exit, &exit_box);
@@ -93,7 +93,7 @@ i32 main() {
 	while (!se_window_should_close(window)) {
 	    se_window_poll_events();
 	    se_window_update(window);
-        se_vec2 normalized_mouse_position = {0};
+        s_vec2 normalized_mouse_position = {0};
 	    se_window_get_mouse_position_normalized(window, &normalized_mouse_position);
 	    c8 fps_text[1024] = "";
 	    sprintf(fps_text, "fps: %.2f\n mouse_pos: %.2f, %.2f (%.2f, %.2f)",

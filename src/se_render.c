@@ -50,7 +50,7 @@ void se_render_clear() {
 	glClearColor(0, 0, 0, 0);
 }
 
-void se_render_set_background_color(const se_vec4 color) {
+void se_render_set_background_color(const s_vec4 color) {
 	glClearColor(color.x, color.y, color.z, color.w);
 }
 
@@ -301,15 +301,15 @@ void se_shader_set_float(se_shader *shader, const char *name, f32 value) {
 	se_uniform_set_float(&shader->uniforms, name, value);
 }
 
-void se_shader_set_vec2(se_shader *shader, const char *name, const se_vec2 *value) {
+void se_shader_set_vec2(se_shader *shader, const char *name, const s_vec2 *value) {
 	se_uniform_set_vec2(&shader->uniforms, name, value);
 }
 
-void se_shader_set_vec3(se_shader *shader, const char *name, const se_vec3 *value) {
+void se_shader_set_vec3(se_shader *shader, const char *name, const s_vec3 *value) {
 	se_uniform_set_vec3(&shader->uniforms, name, value);
 }
 
-void se_shader_set_vec4(se_shader *shader, const char *name, const se_vec4 *value) {
+void se_shader_set_vec4(se_shader *shader, const char *name, const s_vec4 *value) {
 	se_uniform_set_vec4(&shader->uniforms, name, value);
 }
 
@@ -317,11 +317,11 @@ void se_shader_set_int(se_shader *shader, const char *name, i32 value) {
 	se_uniform_set_int(&shader->uniforms, name, value);
 }
 
-void se_shader_set_mat3(se_shader *shader, const char *name, const se_mat3 *value) {
+void se_shader_set_mat3(se_shader *shader, const char *name, const s_mat3 *value) {
 	se_uniform_set_mat3(&shader->uniforms, name, value);
 }
 
-void se_shader_set_mat4(se_shader *shader, const char *name, const se_mat4 *value) {
+void se_shader_set_mat4(se_shader *shader, const char *name, const s_mat4 *value) {
 	se_uniform_set_mat4(&shader->uniforms, name, value);
 }
 
@@ -334,18 +334,21 @@ void se_shader_set_buffer_texture(se_shader *shader, const char *name, se_render
 }
 
 // Mesh functions
-void se_mesh_translate(se_mesh *mesh, const se_vec3 *v) {
-	mesh->matrix = mat4_mul(mesh->matrix, mat4_translate(v));
+void se_mesh_translate(se_mesh *mesh, const s_vec3 *v) {
+    s_mat4_translate(&mesh->matrix, v);
 }
 
-void se_mesh_rotate(se_mesh *mesh, const se_vec3 *v) {
-	mesh->matrix = mat4_mul(mesh->matrix, mat4_rotate_x(mat4_identity(), v->x));
-	mesh->matrix = mat4_mul(mesh->matrix, mat4_rotate_y(mat4_identity(), v->y));
-	mesh->matrix = mat4_mul(mesh->matrix, mat4_rotate_z(mat4_identity(), v->z));
+void se_mesh_rotate(se_mesh *mesh, const s_vec3 *v) {
+	//mesh->matrix = mat4_mul(mesh->matrix, mat4_rotate_x(mat4_identity(), v->x));
+	//mesh->matrix = mat4_mul(mesh->matrix, mat4_rotate_y(mat4_identity(), v->y));
+	//mesh->matrix = mat4_mul(mesh->matrix, mat4_rotate_z(mat4_identity(), v->z));
+    s_mat4_rotate_x(&mesh->matrix, v->x);
+    s_mat4_rotate_y(&mesh->matrix, v->y);
+    s_mat4_rotate_z(&mesh->matrix, v->z);
 }
 
-void se_mesh_scale(se_mesh *mesh, const se_vec3 *v) {
-	mesh->matrix = mat4_mul(mesh->matrix, mat4_scale(v));
+void se_mesh_scale(se_mesh *mesh, const s_vec3 *v) {
+    s_mat4_scale(&mesh->matrix, v);
 }
 
 // Helper function to finalize a mesh
@@ -357,7 +360,7 @@ void finalize_mesh(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices, u32 vert
 	memcpy(mesh->indices, indices, index_count * sizeof(u32));
 	mesh->vertex_count = vertex_count;
 	mesh->index_count = index_count;
-	mesh->matrix = mat4_identity();
+	mesh->matrix = s_mat4_identity;
 
 	// Assign shader (cycle through available shaders)
 	if (s_array_get_size(shaders) > 0) {
@@ -409,9 +412,9 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	}
 
 	// Arrays for temporary storage (shared across all meshes)
-	se_vec3 *temp_vertices = malloc(SE_MAX_VERTICES * sizeof(se_vec3));
-	se_vec3 *temp_normals = malloc(SE_MAX_VERTICES * sizeof(se_vec3));
-	se_vec2 *temp_uvs = malloc(SE_MAX_VERTICES * sizeof(se_vec2));
+	s_vec3 *temp_vertices = malloc(SE_MAX_VERTICES * sizeof(s_vec3));
+	s_vec3 *temp_normals = malloc(SE_MAX_VERTICES * sizeof(s_vec3));
+	s_vec2 *temp_uvs = malloc(SE_MAX_VERTICES * sizeof(s_vec2));
 
 	u32 vertex_count = 0;
 	u32 normal_count = 0;
@@ -503,7 +506,7 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 
 			current_vertices[current_vertex_count].position = temp_vertices[vi];
 			current_vertices[current_vertex_count].normal = temp_normals[ni];
-			current_vertices[current_vertex_count].uv = (se_vec2){0.0f, 0.0f}; // Default UV
+			current_vertices[current_vertex_count].uv = (s_vec2){0.0f, 0.0f}; // Default UV
 
 			current_indices[current_index_count] = current_vertex_count;
 			current_vertex_count++;
@@ -542,25 +545,25 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 
 void se_model_render(se_render_handle *render_handle, se_model *model, se_camera *camera) {
 	// set up global view/proj once per frame
-	const se_mat4 proj = se_camera_get_projection_matrix(camera);
-	const se_mat4 view = se_camera_get_view_matrix(camera);
+	const s_mat4 proj = se_camera_get_projection_matrix(camera);
+	const s_mat4 view = se_camera_get_view_matrix(camera);
 	s_foreach(&model->meshes, i) {
 	se_mesh *mesh = s_array_get(&model->meshes, i);
 	se_shader *sh = mesh->shader;
 
 	se_shader_use(render_handle, sh, true, true);
 
-	se_mat4 vp = mat4_mul(proj, view);
-	se_mat4 mvp = mat4_mul(vp, mesh->matrix);
+	s_mat4 vp = s_mat4_mul(&proj, &view);
+	s_mat4 mvp = s_mat4_mul(&vp, &mesh->matrix);
 
 	GLint loc_mvp = glGetUniformLocation(sh->program, "u_mvp");
 	if (loc_mvp >= 0) {
-		glUniformMatrix4fv(loc_mvp, 1, GL_FALSE, mvp.m);
+		glUniformMatrix4fv(loc_mvp, 1, GL_FALSE, mvp.m[0]);
 	}
 
 	GLint loc_model = glGetUniformLocation(sh->program, "u_model");
 	if (loc_model >= 0) {
-		glUniformMatrix4fv(loc_model, 1, GL_FALSE, mesh->matrix.m);
+		glUniformMatrix4fv(loc_model, 1, GL_FALSE, mesh->matrix.m[0]);
 	}
 
 	// send to the GPU other uniforms (lights if forward rendering, etc)
@@ -591,21 +594,21 @@ void se_model_cleanup(se_model *model) {
 	s_array_clear(&model->meshes);
 }
 
-void se_model_translate(se_model *model, const se_vec3 *v) {
+void se_model_translate(se_model *model, const s_vec3 *v) {
 	s_foreach(&model->meshes, i) {
 	se_mesh *mesh = s_array_get(&model->meshes, i);
 	se_mesh_translate(mesh, v);
 	}
 }
 
-void se_model_rotate(se_model *model, const se_vec3 *v) {
+void se_model_rotate(se_model *model, const s_vec3 *v) {
 	s_foreach(&model->meshes, i) {
 	se_mesh *mesh = s_array_get(&model->meshes, i);
 	se_mesh_rotate(mesh, v);
 	}
 }
 
-void se_model_scale(se_model *model, const se_vec3 *v) {
+void se_model_scale(se_model *model, const s_vec3 *v) {
 	s_foreach(&model->meshes, i) {
 	se_mesh *mesh = s_array_get(&model->meshes, i);
 	se_mesh_scale(mesh, v);
@@ -615,10 +618,10 @@ void se_model_scale(se_model *model, const se_vec3 *v) {
 // camera functions
 se_camera *se_camera_create(se_render_handle *render_handle) {
 	se_camera *camera = s_array_increment(&render_handle->cameras);
-	camera->position = (se_vec3){0, 0, 5};
-	camera->target = (se_vec3){0, 0, 0};
-	camera->up = (se_vec3){0, 1, 0};
-	camera->right = (se_vec3){1, 0, 0};
+	camera->position = (s_vec3){0, 0, 5};
+	camera->target = (s_vec3){0, 0, 0};
+	camera->up = (s_vec3){0, 1, 0};
+	camera->right = (s_vec3){1, 0, 0};
 	camera->fov = 45.0f;
 	camera->near = 0.1f;
 	camera->far = 100.0f;
@@ -627,12 +630,12 @@ se_camera *se_camera_create(se_render_handle *render_handle) {
 	return camera;
 }
 
-se_mat4 se_camera_get_view_matrix(const se_camera *camera) {
-	return mat4_look_at(camera->position, camera->target, camera->up);
+s_mat4 se_camera_get_view_matrix(const se_camera *camera) {
+	return s_mat4_look_at(&camera->position, &camera->target, &camera->up);
 }
 
-se_mat4 se_camera_get_projection_matrix(const se_camera *camera) {
-	return mat4_perspective(camera->fov * (PI / 180.0f), camera->aspect, camera->near, camera->far);
+s_mat4 se_camera_get_projection_matrix(const se_camera *camera) {
+	return s_mat4_perspective(camera->fov * (PI / 180.0f), camera->aspect, camera->near, camera->far);
 }
 
 void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height) {
@@ -645,7 +648,7 @@ void se_camera_destroy(se_render_handle *render_handle, se_camera *camera) {
 }
 
 // Framebuffer functions
-se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const se_vec2 *size) {
+se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_vec2 *size) {
 	se_framebuffer *framebuffer = s_array_increment(&render_handle->framebuffers);
 	framebuffer->size = *size;
 
@@ -684,7 +687,7 @@ se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const se_
 	return framebuffer;
 }
 
-void se_framebuffer_set_size(se_framebuffer *framebuffer, const se_vec2 *size) {
+void se_framebuffer_set_size(se_framebuffer *framebuffer, const s_vec2 *size) {
 	s_assertf(framebuffer, "se_framebuffer_set_size :: framebuffer is null");
 	s_assertf(size, "se_framebuffer_set_size :: size is null");
 
@@ -704,7 +707,7 @@ void se_framebuffer_set_size(se_framebuffer *framebuffer, const se_vec2 *size) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void se_framebuffer_get_size(se_framebuffer *framebuffer, se_vec2 *out_size) {
+void se_framebuffer_get_size(se_framebuffer *framebuffer, s_vec2 *out_size) {
 	s_assertf(framebuffer, "se_framebuffer_get_size :: framebuffer is null");
 	s_assertf(out_size, "se_framebuffer_get_size :: out_size is null");
 	*out_size = framebuffer->size;
@@ -739,9 +742,9 @@ void se_framebuffer_cleanup(se_framebuffer *framebuffer) {
 se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const u32 width, const u32 height, const c8 *fragment_shader_path) {
 	se_render_buffer *buffer = s_array_increment(&render_handle->render_buffers);
 
-	buffer->texture_size = se_vec(2, width, height);
-	buffer->scale = se_vec(2, 1., 1.);
-	buffer->position = se_vec(2, 0., 0.);
+	buffer->texture_size = s_vec2(width, height);
+	buffer->scale = s_vec2(1., 1.);
+	buffer->position = s_vec2(0., 0.);
 
 	// Create framebuffer
 	glGenFramebuffers(1, &buffer->framebuffer);
@@ -831,11 +834,11 @@ void se_render_buffer_unbind(se_render_buffer *buf) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void se_render_buffer_set_scale(se_render_buffer *buffer, const se_vec2 *scale) {
+void se_render_buffer_set_scale(se_render_buffer *buffer, const s_vec2 *scale) {
 	buffer->scale = *scale;
 }
 
-void se_render_buffer_set_position(se_render_buffer *buffer, const se_vec2 *position) {
+void se_render_buffer_set_position(se_render_buffer *buffer, const s_vec2 *position) {
 	buffer->position = *position;
 }
 
@@ -865,7 +868,7 @@ f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-se_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
+s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
 	s_foreach(&shader->uniforms, i) {
 	se_uniform *uniform = s_array_get(&shader->uniforms, i);
 	if (uniform && strcmp(uniform->name, name) == 0) {
@@ -875,7 +878,7 @@ se_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-se_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
+s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
 	s_foreach(&shader->uniforms, i) {
 	se_uniform *uniform = s_array_get(&shader->uniforms, i);
 	if (uniform && strcmp(uniform->name, name) == 0) {
@@ -885,7 +888,7 @@ se_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-se_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name) {
+s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name) {
 	s_foreach(&shader->uniforms, i) {
 	se_uniform *uniform = s_array_get(&shader->uniforms, i);
 	if (uniform && strcmp(uniform->name, name) == 0) {
@@ -905,7 +908,7 @@ i32 *se_shader_get_uniform_int(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-se_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
+s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
 	s_foreach(&shader->uniforms, i) {
 	se_uniform *uniform = s_array_get(&shader->uniforms, i);
 	if (uniform && strcmp(uniform->name, name) == 0) {
@@ -941,22 +944,22 @@ void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value) {
 	new_uniform->value.f = value;
 }
 
-void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const se_vec2 *value) {
+void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const s_vec2 *value) {
 	s_foreach(uniforms, i) {
 	se_uniform *found_uniform = s_array_get(uniforms, i);
 	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 		found_uniform->type = SE_UNIFORM_VEC2;
-		memcpy(&found_uniform->value.vec2, value, sizeof(se_vec2));
+		memcpy(&found_uniform->value.vec2, value, sizeof(s_vec2));
 		return;
 	}
 	}
 	se_uniform *new_uniform = s_array_increment(uniforms);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC2;
-	memcpy(&new_uniform->value.vec2, value, sizeof(se_vec2));
+	memcpy(&new_uniform->value.vec2, value, sizeof(s_vec2));
 }
 
-void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const se_vec3 *value) {
+void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const s_vec3 *value) {
 	s_assertf(uniforms, "se_uniform_set_vec3 :: uniforms is null");
 	s_assertf(name, "se_uniform_set_vec3 :: name is null");
 	s_assertf(value, "se_uniform_set_vec3 :: value is null");
@@ -964,29 +967,29 @@ void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const se_vec3 
 	se_uniform *found_uniform = s_array_get(uniforms, i);
 	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 		found_uniform->type = SE_UNIFORM_VEC3;
-		memcpy(&found_uniform->value.vec3, value, sizeof(se_vec3));
+		memcpy(&found_uniform->value.vec3, value, sizeof(s_vec3));
 		return;
 	}
 	}
 	se_uniform *new_uniform = s_array_increment(uniforms);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC3;
-	memcpy(&new_uniform->value.vec3, value, sizeof(se_vec3));
+	memcpy(&new_uniform->value.vec3, value, sizeof(s_vec3));
 }
 
-void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const se_vec4 *value) {
+void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const s_vec4 *value) {
 	s_foreach(uniforms, i) {
 	se_uniform *found_uniform = s_array_get(uniforms, i);
 	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 		found_uniform->type = SE_UNIFORM_VEC4;
-		memcpy(&found_uniform->value.vec4, value, sizeof(se_vec4));
+		memcpy(&found_uniform->value.vec4, value, sizeof(s_vec4));
 		return;
 	}
 	}
 	se_uniform *new_uniform = s_array_increment(uniforms);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC4;
-	memcpy(&new_uniform->value.vec4, value, sizeof(se_vec4));
+	memcpy(&new_uniform->value.vec4, value, sizeof(s_vec4));
 }
 
 void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 value) {
@@ -1004,34 +1007,34 @@ void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 value) {
 	new_uniform->value.i = value;
 }
 
-void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const se_mat3 *value) {
+void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const s_mat3 *value) {
 	s_foreach(uniforms, i) {
 	se_uniform *found_uniform = s_array_get(uniforms, i);
 	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 		found_uniform->type = SE_UNIFORM_MAT3;
-		memcpy(&found_uniform->value.mat3, value, sizeof(se_mat3));
+		memcpy(&found_uniform->value.mat3, value, sizeof(s_mat3));
 		return;
 	}
 	}
 	se_uniform *new_uniform = s_array_increment(uniforms);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_MAT3;
-	memcpy(&new_uniform->value.mat3, value, sizeof(se_mat3));
+	memcpy(&new_uniform->value.mat3, value, sizeof(s_mat3));
 }
 
-void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const se_mat4 *value) {
+void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *value) {
 	s_foreach(uniforms, i) {
 	se_uniform *found_uniform = s_array_get(uniforms, i);
 	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 		found_uniform->type = SE_UNIFORM_MAT4;
-		memcpy(&found_uniform->value.mat4, value, sizeof(se_mat4));
+		memcpy(&found_uniform->value.mat4, value, sizeof(s_mat4));
 		return;
 	}
 	}
 	se_uniform *new_uniform = s_array_increment(uniforms);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_MAT4;
-	memcpy(&new_uniform->value.mat4, value, sizeof(se_mat4));
+	memcpy(&new_uniform->value.mat4, value, sizeof(s_mat4));
 }
 
 void se_uniform_set_texture(se_uniforms *uniforms, const char *name, GLuint texture) {
@@ -1083,10 +1086,10 @@ void se_uniform_apply(se_render_handle *render_handle, se_shader *shader, const 
 		glUniform1i(location, uniform->value.i);
 		break;
 	case SE_UNIFORM_MAT3:
-		glUniformMatrix3fv(location, 1, GL_FALSE, &uniform->value.mat3.m[0]);
+		glUniformMatrix3fv(location, 1, GL_FALSE, uniform->value.mat3.m[0]);
 		break;
 	case SE_UNIFORM_MAT4:
-		glUniformMatrix4fv(location, 1, GL_FALSE, &uniform->value.mat4.m[0]);
+		glUniformMatrix4fv(location, 1, GL_FALSE, uniform->value.mat4.m[0]);
 		break;
 	case SE_UNIFORM_TEXTURE:
 		glActiveTexture(GL_TEXTURE0 + texture_unit);
@@ -1127,10 +1130,10 @@ void se_uniform_apply(se_render_handle *render_handle, se_shader *shader, const 
 		glUniform1i(location, uniform->value.i);
 		break;
 	case SE_UNIFORM_MAT3:
-		glUniformMatrix3fv(location, 1, GL_FALSE, &uniform->value.mat3.m[0]);
+		glUniformMatrix3fv(location, 1, GL_FALSE, uniform->value.mat3.m[0]);
 		break;
 	case SE_UNIFORM_MAT4:
-		glUniformMatrix4fv(location, 1, GL_FALSE, &uniform->value.mat4.m[0]);
+		glUniformMatrix4fv(location, 1, GL_FALSE, uniform->value.mat4.m[0]);
 		break;
 	case SE_UNIFORM_TEXTURE:
 		glActiveTexture(GL_TEXTURE0 + texture_unit);
@@ -1218,7 +1221,7 @@ void se_quad_2d_create(se_quad *out_quad, const u32 instance_count) {
 	}
 }
 
-void se_quad_2d_add_instance_buffer(se_quad *quad, const se_mat4 *buffer, const sz instance_count) {
+void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const sz instance_count) {
 	s_assertf(quad, "se_quad_2d_add_instance_buffer :: quad is null");
 	s_assertf(buffer, "se_quad_2d_add_instance_buffer :: buffer is null");
 
@@ -1227,15 +1230,15 @@ void se_quad_2d_add_instance_buffer(se_quad *quad, const se_mat4 *buffer, const 
 	se_instance_buffer *new_buffer = s_array_increment(&quad->instance_buffers);
 	new_buffer->vbo = 0;
 	new_buffer->buffer_ptr = buffer;
-	new_buffer->buffer_size = sizeof(se_mat4) * instance_count;
+	new_buffer->buffer_size = sizeof(s_mat4) * instance_count;
 	glGenBuffers(1, &new_buffer->vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, new_buffer->vbo);
 	glBufferData(GL_ARRAY_BUFFER, new_buffer->buffer_size, new_buffer->buffer_ptr, GL_DYNAMIC_DRAW);
 
-	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void *)0, true);
-	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void *)(sizeof(se_vec4) * 1), true);
-	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void *)(sizeof(se_vec4) * 2), true);
-	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(se_mat4), (void *)(sizeof(se_vec4) * 3), true);
+	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(s_mat4), (void *)0, true);
+	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(s_mat4), (void *)(sizeof(s_vec4) * 1), true);
+	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(s_mat4), (void *)(sizeof(s_vec4) * 2), true);
+	se_quad_add_vertex_attribute(quad, 4, GL_FLOAT, GL_FALSE, sizeof(s_mat4), (void *)(sizeof(s_vec4) * 3), true);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
@@ -1384,7 +1387,7 @@ static GLuint create_shader_program(const char *vertex_source, const char *fragm
 	return program;
 }
 
-void se_print_mat4(const se_mat4 *mat) {
+void se_print_mat4(const s_mat4 *mat) {
 	printf("| %f, %f, %f, %f |\n", mat->m[0], mat->m[1], mat->m[2], mat->m[3]);
 	printf("| %f, %f, %f, %f |\n", mat->m[4], mat->m[5], mat->m[6], mat->m[7]);
 	printf("| %f, %f, %f, %f |\n", mat->m[8], mat->m[9], mat->m[10], mat->m[11]);

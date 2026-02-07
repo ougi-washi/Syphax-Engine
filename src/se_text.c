@@ -110,7 +110,7 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	return new_font;
 }
 
-void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, const se_vec2* position, const se_vec2* size, const f32 new_line_offset) {
+void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset) {
 	s_assertf(text_handle, "se_text_render :: text_handle is null");
 	se_render_handle* render_handle = text_handle->render_handle;
 	s_assertf(render_handle, "se_text_render :: render_handle is null");
@@ -124,9 +124,9 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 	glBindTexture(GL_TEXTURE_2D, font->atlas_texture);
 	se_shader_set_texture(text_handle->text_shader, "u_atlas_texture", font->atlas_texture);
 	
-	se_vec2 local_position = *position;
+	s_vec2 local_position = *position;
 	const f32 pixel_scale = 1.f / 1024.f; // TODO: dynamic pixel scale by screen size
-    se_vec2 text_scale = *size;
+    s_vec2 text_scale = *size;
     text_scale.x *= pixel_scale;
     text_scale.y *= pixel_scale;
 	i32 glyph_count = 0;
@@ -151,16 +151,16 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 			f32 glyph_x = packed_char->xoff * text_scale.x + glyph_width * 0.5f;
 			f32 glyph_y = -packed_char->yoff * text_scale.y - glyph_height * 0.5f;
 
-			text_handle->buffer[glyph_count].m[0] = glyph_x;
-			text_handle->buffer[glyph_count].m[1] = glyph_y;
-			text_handle->buffer[glyph_count].m[2] = glyph_width;
-			text_handle->buffer[glyph_count].m[3] = glyph_height;
-			text_handle->buffer[glyph_count].m[4] = aligned_quad->s0;
-			text_handle->buffer[glyph_count].m[5] = aligned_quad->t0;
-			text_handle->buffer[glyph_count].m[6] = aligned_quad->s1;
-			text_handle->buffer[glyph_count].m[7] = aligned_quad->t1;
-			text_handle->buffer[glyph_count].m[8] = local_position.x;
-			text_handle->buffer[glyph_count].m[9] = local_position.y;
+			text_handle->buffer[glyph_count].m[0][0] = glyph_x;
+			text_handle->buffer[glyph_count].m[0][1] = glyph_y;
+			text_handle->buffer[glyph_count].m[0][2] = glyph_width;
+			text_handle->buffer[glyph_count].m[0][3] = glyph_height;
+			text_handle->buffer[glyph_count].m[1][0] = aligned_quad->s0;
+			text_handle->buffer[glyph_count].m[1][1] = aligned_quad->t0;
+			text_handle->buffer[glyph_count].m[1][2] = aligned_quad->s1;
+			text_handle->buffer[glyph_count].m[1][3] = aligned_quad->t1;
+			text_handle->buffer[glyph_count].m[2][0] = local_position.x;
+			text_handle->buffer[glyph_count].m[2][1] = local_position.y;
 
 			// Advance cursor by xadvance (scaled)
 			local_position.x += packed_char->xadvance * text_scale.x;

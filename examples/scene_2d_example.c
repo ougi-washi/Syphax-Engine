@@ -41,41 +41,41 @@ i32 main() {
 	scene_params.scenes_2d_count = 2;
 	scene_params.scenes_3d_count = 0;
 	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, &scene_params);
-	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &se_vec2(WIDTH, HEIGHT), 4);
+	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
 
 	// Create objects with identity transform, then set position/scale
-	se_mat3 transform = mat3_identity();
+	s_mat3 transform = s_mat3_identity;
 
 	se_object_2d *borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &transform, 0);
-	se_object_2d_set_scale(borders, &se_vec2(0.95, 0.95));
+	se_object_2d_set_scale(borders, &s_vec2(0.95, 0.95));
 
 	se_object_2d *panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &transform, 0);
-	se_object_2d_set_scale(panel, &se_vec2(0.5, 0.5));
+	se_object_2d_set_scale(panel, &s_vec2(0.5, 0.5));
 
 	se_object_2d *button_yes = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
-	se_object_2d_set_position(button_yes, &se_vec2(0.15, 0.));
-	se_object_2d_set_scale(button_yes, &se_vec2(0.1, 0.1));
+	se_object_2d_set_position(button_yes, &s_vec2(0.15, 0.));
+	se_object_2d_set_scale(button_yes, &s_vec2(0.1, 0.1));
 
 	se_object_2d *button_no = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
-	se_object_2d_set_position(button_no, &se_vec2(-0.15, 0.));
-	se_object_2d_set_scale(button_no, &se_vec2(0.1, 0.1));
+	se_object_2d_set_position(button_no, &s_vec2(-0.15, 0.));
+	se_object_2d_set_scale(button_no, &s_vec2(0.1, 0.1));
 
-	se_shader_set_vec3(button_yes->shader, "u_color", &se_vec3(0, 1, 0));
-	se_shader_set_vec3(button_no->shader, "u_color", &se_vec3(1, 0, 0));
+	se_shader_set_vec3(button_yes->shader, "u_color", &s_vec3(0, 1, 0));
+	se_shader_set_vec3(button_no->shader, "u_color", &s_vec3(1, 0, 0));
 
 	// Compute bounding boxes from position and scale
-	se_vec2 btn_yes_pos = se_object_2d_get_position(button_yes);
-	se_vec2 btn_yes_scale = se_object_2d_get_scale(button_yes);
+	s_vec2 btn_yes_pos = se_object_2d_get_position(button_yes);
+	s_vec2 btn_yes_scale = se_object_2d_get_scale(button_yes);
 	se_box_2d button_box_yes = {
-		se_vec2(btn_yes_pos.x - btn_yes_scale.x, btn_yes_pos.y - btn_yes_scale.y),
-		se_vec2(btn_yes_pos.x + btn_yes_scale.x,
+		s_vec2(btn_yes_pos.x - btn_yes_scale.x, btn_yes_pos.y - btn_yes_scale.y),
+		s_vec2(btn_yes_pos.x + btn_yes_scale.x,
 				btn_yes_pos.y + btn_yes_scale.y)};
 
-	se_vec2 btn_no_pos = se_object_2d_get_position(button_no);
-	se_vec2 btn_no_scale = se_object_2d_get_scale(button_no);
+	s_vec2 btn_no_pos = se_object_2d_get_position(button_no);
+	s_vec2 btn_no_scale = se_object_2d_get_scale(button_no);
 	se_box_2d button_box_no = {
-		se_vec2(btn_no_pos.x - btn_no_scale.x, btn_no_pos.y - btn_no_scale.y),
-		se_vec2(btn_no_pos.x + btn_no_scale.x, btn_no_pos.y + btn_no_scale.y)};
+		s_vec2(btn_no_pos.x - btn_no_scale.x, btn_no_pos.y - btn_no_scale.y),
+		s_vec2(btn_no_pos.x + btn_no_scale.x, btn_no_pos.y + btn_no_scale.y)};
 
 	int button_yes_data = 0;
 	int button_no_data = 0;
@@ -91,7 +91,7 @@ i32 main() {
 	se_scene_2d_add_object(scene_2d, button_yes);
 	se_scene_2d_add_object(scene_2d, button_no);
 
-	se_scene_2d_set_auto_resize(scene_2d, window, &se_vec2(1., 1.));
+	se_scene_2d_set_auto_resize(scene_2d, window, &s_vec2(1., 1.));
 
 	// TODO: Edit syphax array and make this in a single line
 	se_key_combo exit_keys = {0};
@@ -105,14 +105,14 @@ i32 main() {
 	se_render_handle_reload_changed_shaders(render_handle);
 
 	// Update position using setter
-	se_vec2 current_pos = se_object_2d_get_position(button_yes);
-	se_object_2d_set_position(button_yes, &se_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
+	s_vec2 current_pos = se_object_2d_get_position(button_yes);
+	se_object_2d_set_position(button_yes, &s_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
 
 	// Update bounding box from position/scale
-	se_vec2 btn_pos = se_object_2d_get_position(button_yes);
-	se_vec2 btn_scale = se_object_2d_get_scale(button_yes);
-	button_box_yes.min = se_vec2(btn_pos.x - btn_scale.x, btn_pos.y - btn_scale.y);
-	button_box_yes.max = se_vec2(btn_pos.x + btn_scale.x, btn_pos.y + btn_scale.y);
+	s_vec2 btn_pos = se_object_2d_get_position(button_yes);
+	s_vec2 btn_scale = se_object_2d_get_scale(button_yes);
+	button_box_yes.min = s_vec2(btn_pos.x - btn_scale.x, btn_pos.y - btn_scale.y);
+	button_box_yes.max = s_vec2(btn_pos.x + btn_scale.x, btn_pos.y + btn_scale.y);
 	se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
 	se_scene_2d_render(scene_2d, render_handle);
 

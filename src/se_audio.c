@@ -10,7 +10,7 @@
 #define FRAMES_PER_BUFFER 1024
 
 typedef struct {
-	se_vec3 amps;
+	s_vec3 amps;
 	
 	// internal
 	b8 running;
@@ -97,7 +97,7 @@ static int se_audio_input_callback(const void* input_buffer, void* output_buffer
 	if (mid_percent > 100.0f) mid_percent = 100.0f;
 	if (high_percent > 100.0f) high_percent = 100.0f;
 	
-	data->amps = (se_vec3){low_vol, mid_vol, high_vol};
+	data->amps = (s_vec3){low_vol, mid_vol, high_vol};
 	return paContinue;
 }
 
@@ -197,7 +197,7 @@ cleanup:
 }
 
 
-se_vec3 se_audio_input_get_amplitudes(){
+s_vec3 se_audio_input_get_amplitudes(){
 	return se_audio_input_data.amps;
 }
 

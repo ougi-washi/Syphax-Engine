@@ -164,7 +164,7 @@ void se_window_poll_events(){
 	glfwPollEvents();
 	s_foreach(&windows_container, i) {
 		se_window* window = s_array_get(&windows_container, i);
-		se_vec2 mouse_position = {0};
+		s_vec2 mouse_position = {0};
 		se_window_get_mouse_position_normalized(window, &mouse_position);
 		se_input_event* out_event = NULL;
 		i32 out_depth = INT_MIN;
@@ -221,10 +221,10 @@ f32 se_window_get_mouse_position_y(se_window* window) {
 	return window->mouse_y;
 }
 
-void se_window_get_mouse_position_normalized(se_window* window, se_vec2* out_mouse_position) {
+void se_window_get_mouse_position_normalized(se_window* window, s_vec2* out_mouse_position) {
 	s_assertf(window, "se_window_get_mouse_position_normalized :: window is null");
 	s_assertf(out_mouse_position, "se_window_get_mouse_position_normalized :: out_mouse_position is null");
-	*out_mouse_position = se_vec2((window->mouse_x / window->width) - .5, window->mouse_y / window->height - .5);
+	*out_mouse_position = s_vec2((window->mouse_x / window->width) - .5, window->mouse_y / window->height - .5);
 	out_mouse_position->x *= 2.;
 	out_mouse_position->y *= 2.;
 }

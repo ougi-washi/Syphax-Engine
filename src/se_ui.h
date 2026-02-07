@@ -15,9 +15,9 @@ typedef enum {
 typedef struct se_ui{
 	struct se_ui_handle* ui_handle;
 	se_ui_layout layout;
-	se_vec2 position;
-	se_vec2 size;
-	se_vec2 padding;
+	s_vec2 position;
+	s_vec2 size;
+	s_vec2 padding;
 	se_scene_2d* scene_2d;
 	struct se_ui_text* text;
 	b8 visible : 1;
@@ -28,12 +28,12 @@ typedef se_ui_element* se_ui_element_ptr;
 
 typedef struct {
 	se_ui_layout layout;
-	se_vec2 position;
-	se_vec2 size;
-	se_vec2 padding;
+	s_vec2 position;
+	s_vec2 size;
+	s_vec2 padding;
 	b8 visible : 1;
 } se_ui_element_params;
-#define SE_UI_ELEMENT_PARAMS_DEFAULTS { .layout = SE_UI_LAYOUT_HORIZONTAL, .position = se_vec2(0, 0), .size = se_vec2(1, 1), .padding = se_vec2(.05, .05), .visible = 1 }
+#define SE_UI_ELEMENT_PARAMS_DEFAULTS { .layout = SE_UI_LAYOUT_HORIZONTAL, .position = s_vec2(0, 0), .size = s_vec2(1, 1), .padding = s_vec2(.05, .05), .visible = 1 }
 
 #define SE_MAX_UI_TEXT_LENGTH 1024
 typedef struct se_ui_text {
@@ -73,8 +73,8 @@ extern se_ui_element* se_ui_element_text_create(se_ui_handle* ui_handle, const s
 extern void se_ui_element_render(se_ui_element* ui);
 extern void se_ui_element_render_to_screen(se_ui_element* ui);
 extern void se_ui_element_destroy(se_ui_element* ui);
-extern void se_ui_element_set_position(se_ui_element* ui, const se_vec2* position);
-extern void se_ui_element_set_size(se_ui_element* ui, const se_vec2* size);
+extern void se_ui_element_set_position(se_ui_element* ui, const s_vec2* position);
+extern void se_ui_element_set_size(se_ui_element* ui, const s_vec2* size);
 extern void se_ui_element_set_layout(se_ui_element* ui, const se_ui_layout layout);
 extern void se_ui_element_set_visible(se_ui_element* ui, const b8 visible);
 extern void se_ui_element_set_text(se_ui_element* ui, const c8* text, const c8* font_path, const f32 font_size);

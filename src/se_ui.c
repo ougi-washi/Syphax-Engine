@@ -60,8 +60,8 @@ se_ui_element *se_ui_element_create(se_ui_handle *ui_handle, const se_ui_element
 	new_ui->size = params->size;
 	new_ui->padding = params->padding;
 
-	new_ui->scene_2d = se_scene_2d_create(ui_handle->scene_handle, &se_vec2(1920, 1080), ui_handle->objects_per_element_count); // TODO: maybe expose size
-	se_scene_2d_set_auto_resize(new_ui->scene_2d, ui_handle->window, &se_vec2(1., 1.)); // TODO: maybe expose option to enable/disable
+	new_ui->scene_2d = se_scene_2d_create(ui_handle->scene_handle, &s_vec2(1920, 1080), ui_handle->objects_per_element_count); // TODO: maybe expose size
+	se_scene_2d_set_auto_resize(new_ui->scene_2d, ui_handle->window, &s_vec2(1., 1.)); // TODO: maybe expose option to enable/disable
 	s_array_init(&new_ui->children, ui_handle->children_per_element_count);
 
 	return new_ui;
@@ -109,7 +109,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	if (ui->text) {
 	    se_font *curr_font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
 	    // TODO: add/store parameters, add allignment
-	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &se_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), &se_vec2(1., 1.), .03f); 
+	    se_text_render(ui_handle->text_handle, curr_font, ui->text->characters, &s_vec2(ui->position.x + ui->padding.x, ui->position.y - ui->padding.y), &s_vec2(1., 1.), .03f); 
 	}
 	se_scene_2d_unbind(ui->scene_2d);
 }
@@ -162,14 +162,14 @@ void se_ui_element_destroy(se_ui_element *ui) {
 	s_array_remove(&ui_handle->ui_elements, ui);
 }
 
-void se_ui_element_set_position(se_ui_element *ui, const se_vec2 *position) {
+void se_ui_element_set_position(se_ui_element *ui, const s_vec2 *position) {
 	s_assertf(ui, "se_ui_element_set_position :: ui is null");
 	s_assertf(position, "se_ui_element_set_position :: position is null");
 	ui->position = *position;
 	se_ui_element_update_objects(ui);
 }
 
-void se_ui_element_set_size(se_ui_element *ui, const se_vec2 *size) {
+void se_ui_element_set_size(se_ui_element *ui, const s_vec2 *size) {
 	s_assertf(ui, "se_ui_element_set_size :: ui is null");
 	s_assertf(size, "se_ui_element_set_size :: size is null");
 	ui->size = *size;
@@ -220,8 +220,8 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	sz object_count = s_array_get_size(&scene_2d->objects);
 	if (object_count == 0) return;
 
-	se_vec2 scale = {1, 1};
-	se_vec2 position = {0, 0};
+	s_vec2 scale = {1, 1};
+	s_vec2 position = {0, 0};
 
 	const f32 element_top = ui->position.y + ui->size.y;     // Top edge in screen coords
 	const f32 element_bottom = ui->position.y - ui->size.y;  // Bottom edge in screen coords
@@ -243,7 +243,7 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	    position.x = ui->position.x;  // Center horizontally in element
 	}
 
-	se_vec2 object_scale = {
+	s_vec2 object_scale = {
 	    (scale.x * 0.5f) - ui->padding.x,
 	    (scale.y * 0.5f) - ui->padding.y
 	};
@@ -272,8 +272,8 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 void se_ui_element_update_children(se_ui_element *ui) {
 	s_assertf(ui, "se_ui_element_update_children :: ui is null");
 	u32 child_count = s_array_get_size(&ui->children);
-	se_vec2 scale = {1, 1};
-	se_vec2 position = {0, 0};
+	s_vec2 scale = {1, 1};
+	s_vec2 position = {0, 0};
 
 	f32 available_width = 2.0f * ui->size.x;   // Total width in normalized coords (-1 to 1 = 2 units)
 	f32 available_height = 2.0f * ui->size.y;  // Total height in normalized coords
@@ -301,8 +301,8 @@ void se_ui_element_update_children(se_ui_element *ui) {
 	    	printf("se_ui_element_update_children :: ui %p children index %d is null\n", ui, i);
 	    	continue;
 	    }
-    se_ui_element_set_position(current_ui, &se_vec2(position.x + ui->position.x, position.y + ui->position.y));
-    se_ui_element_set_size(current_ui, &se_vec2(scale.x * 0.5f, scale.y * 0.5f));
+    se_ui_element_set_position(current_ui, &s_vec2(position.x + ui->position.x, position.y + ui->position.y));
+    se_ui_element_set_size(current_ui, &s_vec2(scale.x * 0.5f, scale.y * 0.5f));
 	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
 	    	position.x += scale.x;
 	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
@@ -329,7 +329,7 @@ se_object_2d_ptr se_ui_element_add_object(se_ui_element *ui, const c8 *fragment_
 
 	printf("se_ui_element_add_object :: ui: %p, fragment_shader_path: %s\n", ui, fragment_shader_path);
 
-	se_mat3 transform = mat3_identity();
+	s_mat3 transform = s_mat3_identity;
 	se_object_2d_ptr object_2d = se_object_2d_create(scene_handle, fragment_shader_path, &transform, 0);
 	se_scene_2d_add_object(ui->scene_2d, object_2d);
 	se_ui_element_update_objects(ui);
