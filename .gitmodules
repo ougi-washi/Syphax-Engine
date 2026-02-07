@@ -7,3 +7,6 @@
 [submodule "lib/syphax"]
 	path = lib/syphax
 	url = git@github.com:ougi-washi/Syphax.git
+[submodule "lib/miniaudio"]
+	path = lib/miniaudio
+	url = git@github.com:mackron/miniaudio.git

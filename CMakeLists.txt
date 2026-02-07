@@ -36,6 +36,10 @@ add_subdirectory(${LIB_DIR}/glfw)
 message(STATUS "Adding STB library")
 include_directories(${LIB_DIR}/stb)
 
+# MINIAUDIO
+message(STATUS "Adding MINIAUDIO library")
+add_subdirectory(${LIB_DIR}/miniaudio)
+
 # setup library macro
 macro(setup_library arg_lib_name arg_source_path arg_include_path)
 	message(STATUS "Adding ${arg_lib_name}")
@@ -51,7 +55,7 @@ endmacro()
 # Main module
 set(MAIN_MODULE_INCLUDES ${SRC_DIR} ${LIB_DIR})
 setup_library(MAIN ${SRC_DIR} "${MAIN_MODULE_INCLUDES}")
-target_link_libraries(MAIN PUBLIC glfw OpenGL::GL)
+target_link_libraries(MAIN PUBLIC glfw OpenGL::GL miniaudio)
 
 macro(setup_executable arg_exec_dir arg_exec_name modules)
     message(STATUS "Generating executable ${arg_exec_name}")

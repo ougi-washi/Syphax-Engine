@@ -34,6 +34,7 @@ To run an example, simply run:
 These submodules are added under `lib/`
 * [GLFW](https://github.com/glfw/glfw)
 * [STB](https://github.com/nothings/stb)
+* [miniaudio](https://github.com/mackron/miniaudio)
 
 ### License
 MIT License
