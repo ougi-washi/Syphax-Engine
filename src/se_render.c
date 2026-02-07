@@ -15,8 +15,6 @@
 
 #define SE_UNIFORMS_MAX 128
 
-static f64 se_target_fps = 60.0;
-
 static GLuint compile_shader(const char *source, GLenum type);
 static GLuint create_shader_program(const char *vertex_source, const char *fragment_source);
 
@@ -1387,9 +1385,3 @@ static GLuint create_shader_program(const char *vertex_source, const char *fragm
 	return program;
 }
 
-void se_print_mat4(const s_mat4 *mat) {
-	printf("| %f, %f, %f, %f |\n", mat->m[0], mat->m[1], mat->m[2], mat->m[3]);
-	printf("| %f, %f, %f, %f |\n", mat->m[4], mat->m[5], mat->m[6], mat->m[7]);
-	printf("| %f, %f, %f, %f |\n", mat->m[8], mat->m[9], mat->m[10], mat->m[11]);
-	printf("| %f, %f, %f, %f |\n", mat->m[12], mat->m[13], mat->m[14], mat->m[15]);
-}

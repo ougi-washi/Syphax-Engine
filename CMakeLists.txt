@@ -4,7 +4,10 @@
 cmake_minimum_required(VERSION 3.22.1)
 
 project(SYPHAX_ENGINE LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+add_compile_options(-Wall -O0)
 
 if(NOT CMAKE_GENERATOR)
     find_program(NINJA_EXECUTABLE ninja)
@@ -34,14 +37,6 @@ add_subdirectory(${LIB_DIR}/glfw)
 message(STATUS "Adding STB library")
 include_directories(${LIB_DIR}/stb)
 
-# PORTAUDIO
-message(STATUS "Adding PORTAUDIO library")
-set(PA_BUILD_SHARED_LIBS OFF CACHE BOOL "Build dynamic library" FORCE)
-set(PA_BUILD_TESTS OFF CACHE BOOL "Include test projects" FORCE)
-set(PA_BUILD_EXAMPLES OFF CACHE BOOL "Include example projects" FORCE)
-add_subdirectory(${LIB_DIR}/portaudio)
-target_compile_options(portaudio PRIVATE -Wno-deprecated-declarations)
-
 # setup library macro
 macro(setup_library arg_lib_name arg_source_path arg_include_path)
 	message(STATUS "Adding ${arg_lib_name}")
@@ -57,7 +52,7 @@ endmacro()
 # Main module
 set(MAIN_MODULE_INCLUDES ${SRC_DIR} ${LIB_DIR})
 setup_library(MAIN ${SRC_DIR} "${MAIN_MODULE_INCLUDES}")
-target_link_libraries(MAIN PUBLIC glfw OpenGL::GL portaudio)
+target_link_libraries(MAIN PUBLIC glfw OpenGL::GL)
 
 macro(setup_executable arg_exec_dir arg_exec_name modules)
     message(STATUS "Generating executable ${arg_exec_name}")

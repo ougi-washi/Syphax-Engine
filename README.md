@@ -35,8 +35,5 @@ These submodules are added under `lib/`
 * [GLFW](https://github.com/glfw/glfw)
 * [STB](https://github.com/nothings/stb)
 
-Deprecated submodules:
-* [portaudio](https://github.com/PortAudio/portaudio). This will change to miniaudio in the future.
-
 ### License
 MIT License

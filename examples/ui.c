@@ -8,16 +8,16 @@
 void increment_button_color(se_object_2d *button) {
 	s_vec3 *color = se_shader_get_uniform_vec3(button->shader, "u_color");
 	if (color) {
-	color->x = s_min(color->x * 1.1, 1);
-	color->y = s_min(color->y * 1.1, 1);
-	color->z = s_min(color->z * 1.1, 1);
+		color->x = s_min(color->x * 1.1, 1);
+		color->y = s_min(color->y * 1.1, 1);
+		color->z = s_min(color->z * 1.1, 1);
 	}
 }
 
 void on_button_exit_captured(void *window, void *data) {
 	se_object_2d *button_exit = (se_object_2d *)data;
 	if (se_window_is_mouse_down(window, 0)) {
-	se_window_set_should_close((se_window *)window, true);
+		se_window_set_should_close((se_window *)window, true);
 	}
 	increment_button_color(button_exit);
 }
@@ -31,9 +31,9 @@ void on_button_stop_hovered(void *window, void *data) {
 	se_object_2d *button = (se_object_2d *)data;
 	s_vec3 *color = se_shader_get_uniform_vec3(button->shader, "u_color");
 	if (color) {
-	color->x = s_max(color->x / 2., 0);
-	color->y = s_max(color->y / 2., 0);
-	color->z = s_max(color->z / 2., 0);
+		color->x = s_max(color->x / 2., 0);
+		color->y = s_max(color->y / 2., 0);
+		color->z = s_max(color->z / 2., 0);
 	}
 }
 
@@ -73,15 +73,15 @@ i32 main() {
 
 	se_box_2d exit_box = {0};
 	se_object_2d_get_box_2d(button_exit, &exit_box);
-	i32 exit_update_id = se_window_register_input_event(window, &exit_box, 0, &on_button_exit_captured, &on_button_stop_hovered, button_exit);
+	se_window_register_input_event(window, &exit_box, 0, &on_button_exit_captured, &on_button_stop_hovered, button_exit);
 
 	se_box_2d minimize_box = {0};
 	se_object_2d_get_box_2d(button_minimize, &minimize_box);
-	i32 minimize_update_id = se_window_register_input_event(window, &minimize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_minimize);
+	se_window_register_input_event(window, &minimize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_minimize);
 
 	se_box_2d maximize_box = {0};
 	se_object_2d_get_box_2d(button_maximize, &maximize_box);
-	i32 maximize_update_id = se_window_register_input_event(window, &maximize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_maximize);
+	se_window_register_input_event(window, &maximize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_maximize);
 
 	// TODO: Edit syphax array and make this in a single line
 	se_key_combo exit_keys = {0};

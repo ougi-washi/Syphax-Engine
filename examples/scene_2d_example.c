@@ -7,19 +7,19 @@
 
 void on_button_yes_pressed(void *window, void *data) {
 	if (se_window_is_mouse_down(window, 0)) {
-	if (data) {
-		(*(int *)data)++;
-		printf("Pressed yes, data: %d\n", *(int *)data);
-	}
+		if (data) {
+			(*(int *)data)++;
+			printf("Pressed yes, data: %d\n", *(int *)data);
+		}
 	}
 }
 
 void on_button_no_pressed(void *window, void *data) {
 	if (se_window_is_mouse_down(window, 0)) {
-	if (data) {
-		(*(int *)data)++;
-		printf("Pressed no, data: %d\n", *(int *)data);
-	}
+		if (data) {
+			(*(int *)data)++;
+			printf("Pressed no, data: %d\n", *(int *)data);
+		}
 	}
 }
 
@@ -80,11 +80,8 @@ i32 main() {
 	int button_yes_data = 0;
 	int button_no_data = 0;
 
-	i32 button_yes_update_id = se_window_register_input_event(
-		window, &button_box_yes, 0, &on_button_yes_pressed, NULL,
-		&button_yes_data);
-	i32 button_no_update_id = se_window_register_input_event(
-		window, &button_box_no, 0, &on_button_no_pressed, NULL, &button_no_data);
+	i32 button_yes_update_id = se_window_register_input_event(window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
+	se_window_register_input_event(window, &button_box_no, 0, &on_button_no_pressed, NULL, &button_no_data);
 
 	se_scene_2d_add_object(scene_2d, borders);
 	se_scene_2d_add_object(scene_2d, panel);
@@ -100,25 +97,25 @@ i32 main() {
 	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
-	se_window_poll_events();
-	se_window_update(window);
-	se_render_handle_reload_changed_shaders(render_handle);
+		se_window_poll_events();
+		se_window_update(window);
+		se_render_handle_reload_changed_shaders(render_handle);
 
-	// Update position using setter
-	s_vec2 current_pos = se_object_2d_get_position(button_yes);
-	se_object_2d_set_position(button_yes, &s_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
+		// Update position using setter
+		s_vec2 current_pos = se_object_2d_get_position(button_yes);
+		se_object_2d_set_position(button_yes, &s_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
 
-	// Update bounding box from position/scale
-	s_vec2 btn_pos = se_object_2d_get_position(button_yes);
-	s_vec2 btn_scale = se_object_2d_get_scale(button_yes);
-	button_box_yes.min = s_vec2(btn_pos.x - btn_scale.x, btn_pos.y - btn_scale.y);
-	button_box_yes.max = s_vec2(btn_pos.x + btn_scale.x, btn_pos.y + btn_scale.y);
-	se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
-	se_scene_2d_render(scene_2d, render_handle);
+		// Update bounding box from position/scale
+		s_vec2 btn_pos = se_object_2d_get_position(button_yes);
+		s_vec2 btn_scale = se_object_2d_get_scale(button_yes);
+		button_box_yes.min = s_vec2(btn_pos.x - btn_scale.x, btn_pos.y - btn_scale.y);
+		button_box_yes.max = s_vec2(btn_pos.x + btn_scale.x, btn_pos.y + btn_scale.y);
+		se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
+		se_scene_2d_render(scene_2d, render_handle);
 
-	se_render_clear();
-	se_scene_2d_render_to_screen(scene_2d, render_handle, window);
-	se_window_render_screen(window);
+		se_render_clear();
+		se_scene_2d_render_to_screen(scene_2d, render_handle, window);
+		se_window_render_screen(window);
 	}
 
 	se_scene_handle_cleanup(scene_handle);
