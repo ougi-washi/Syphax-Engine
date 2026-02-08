@@ -6,6 +6,7 @@
 
 #include "se_defines.h"
 #include "syphax/s_array.h"
+#include "syphax/s_files.h"
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -736,8 +737,7 @@ static char* se_audio_resolve_resource_path(const char* relative_path, char* out
 	if (!relative_path || !out_path || path_size == 0) {
 		return NULL;
 	}
-	int written = snprintf(out_path, path_size, "%s%s", RESOURCES_DIR, relative_path);
-	if (written < 0 || (sz)written >= path_size) {
+	if (!s_path_join(out_path, path_size, RESOURCES_DIR, relative_path)) {
 		fprintf(stderr, "se_audio :: path too long for %s\n", relative_path);
 		return NULL;
 	}

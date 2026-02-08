@@ -2,6 +2,7 @@
 
 #include "se_text.h"
 #include "se_gl.h"
+#include "syphax/s_files.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
@@ -50,14 +51,18 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 
 	se_font* new_font = s_array_increment(&text_handle->fonts);
 	 
-	sz font_file_size = 0;
-	
 	strcpy(new_font->path, path);
 
-	c8 new_path[SE_MAX_PATH_LENGTH] = "";
-	strncpy(new_path, RESOURCES_DIR, SE_MAX_PATH_LENGTH - 1);
-	strncat(new_path, path, SE_MAX_PATH_LENGTH - strlen(new_path) - 1);
-	uc8* font_file_data = se_file_load_uc8(new_path, &font_file_size);
+	c8 new_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!s_path_join(new_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, path)) {
+		fprintf(stderr, "se_font_load :: path too long for %s\n", path);
+		return NULL;
+	}
+	u8* font_file_data = NULL;
+	if (!s_file_read_binary(new_path, &font_file_data, NULL)) {
+		fprintf(stderr, "se_font_load :: failed to load font %s\n", path);
+		return NULL;
+	}
 
 	s_assertf(font_file_data, "se_font_load :: file_data is null");
 	

@@ -306,9 +306,6 @@ extern void se_mesh_instance_update(se_mesh_instance *instance);
 extern void se_mesh_instance_destroy(se_mesh_instance *instance);
 
 // Utility functions
-extern time_t se_file_get_mtime(const char *path);
-extern c8 *se_file_load(const char *path);
-extern uc8 *se_file_load_uc8(const char *path, sz *out_size);
 
 // logging
 extern void se_print_mat4(const s_mat4 *mat);

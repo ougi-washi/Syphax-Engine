@@ -2,6 +2,7 @@
 
 #include "se_render.h"
 #include "se_gl.h"
+#include "syphax/s_files.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,34 +130,21 @@ se_uniforms *se_render_handle_get_global_uniforms(se_render_handle *render_handl
 
 // Shader functions
 
-char *read_file(const char *path) {
-	FILE *f = fopen(path, "rb");
-	if (!f) {
-	perror(path);
-	return NULL;
-	}
-	fseek(f, 0, SEEK_END);
-	size_t len = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char *buf = malloc(len + 1);
-	fread(buf, 1, len, f);
-	buf[len] = '\0';
-	fclose(f);
-	return buf;
-}
-
 se_texture *se_texture_load(se_render_handle *render_handle, const char *file_path, const se_texture_wrap wrap) {
 	stbi_set_flip_vertically_on_load(1);
 
 	se_texture *texture = s_array_increment(&render_handle->textures);
 
-	const c8 full_path[SE_MAX_PATH_LENGTH] = RESOURCES_DIR;
-	strncat((c8 *)full_path, file_path, SE_MAX_PATH_LENGTH - strlen(full_path) - 1);
+	char full_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, file_path)) {
+		fprintf(stderr, "se_texture_load :: path too long for %s\n", file_path);
+		return NULL;
+	}
 
 	unsigned char *pixels = stbi_load(full_path, &texture->width, &texture->height, &texture->channels, 0);
 	if (!pixels) {
-	fprintf(stderr, "Error: could not load image %s\n", file_path);
-	return 0;
+		fprintf(stderr, "se_texture_load :: could not load image %s\n", file_path);
+		return NULL;
 	}
 
 	glGenTextures(1, &texture->id);
@@ -198,13 +186,14 @@ b8 se_shader_load_internal(se_shader *shader) {
 
 	se_shader_cleanup(shader);
 
-	char *vertex_source = se_file_load(shader->vertex_path);
-	char *fragment_source = se_file_load(shader->fragment_path);
+	char *vertex_source = NULL;
+	char *fragment_source = NULL;
 
-	if (!vertex_source || !fragment_source) {
-	free(vertex_source);
-	free(fragment_source);
-	return false;
+	if (!s_file_read(shader->vertex_path, &vertex_source, NULL) ||
+		!s_file_read(shader->fragment_path, &fragment_source, NULL)) {
+		free(vertex_source);
+		free(fragment_source);
+		return false;
 	}
 	shader->program = se_shader_create_program(vertex_source, fragment_source);
 	free(vertex_source);
@@ -214,8 +203,10 @@ b8 se_shader_load_internal(se_shader *shader) {
 	return false;
 	}
 
-	shader->vertex_mtime = se_file_get_mtime(shader->vertex_path);
-	shader->fragment_mtime = se_file_get_mtime(shader->fragment_path);
+	shader->vertex_mtime = 0;
+	shader->fragment_mtime = 0;
+	s_file_mtime(shader->vertex_path, &shader->vertex_mtime);
+	s_file_mtime(shader->fragment_path, &shader->fragment_mtime);
 	s_array_init(&shader->uniforms, SE_UNIFORMS_MAX);
 	printf("se_shader_load_internal :: created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
 	return true;
@@ -234,25 +225,23 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 	se_shader *new_shader = s_array_increment(&render_handle->shaders);
 
 	// make path absolute
-	char *new_vertex_path = NULL;
-	char *new_fragment_path = NULL;
-
 	if (strlen(vertex_file_path) > 0) {
-	new_vertex_path = malloc(strlen(RESOURCES_DIR) + strlen(vertex_file_path) + 1);
-	strcpy(new_vertex_path, RESOURCES_DIR);
-	strcat(new_vertex_path, vertex_file_path);
+		if (!s_path_join(new_shader->vertex_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, vertex_file_path)) {
+			fprintf(stderr, "se_shader_load :: vertex path too long for %s\n", vertex_file_path);
+			return NULL;
+		}
+	} else {
+		new_shader->vertex_path[0] = '\0';
 	}
 
 	if (strlen(fragment_file_path) > 0) {
-	new_fragment_path = malloc(strlen(RESOURCES_DIR) + strlen(fragment_file_path) + 1);
-	strcpy(new_fragment_path, RESOURCES_DIR);
-	strcat(new_fragment_path, fragment_file_path);
+		if (!s_path_join(new_shader->fragment_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, fragment_file_path)) {
+			fprintf(stderr, "se_shader_load :: fragment path too long for %s\n", fragment_file_path);
+			return NULL;
+		}
+	} else {
+		new_shader->fragment_path[0] = '\0';
 	}
-
-	strcpy(new_shader->vertex_path, new_vertex_path);
-	strcpy(new_shader->fragment_path, new_fragment_path);
-	free(new_vertex_path);
-	free(new_fragment_path);
 
 	if (se_shader_load_internal(new_shader)) {
 	return new_shader;
@@ -265,8 +254,10 @@ b8 se_shader_reload_if_changed(se_shader *shader) {
 	return false;
 	}
 
-	time_t vertex_mtime = se_file_get_mtime(shader->vertex_path);
-	time_t fragment_mtime = se_file_get_mtime(shader->fragment_path);
+	time_t vertex_mtime = 0;
+	time_t fragment_mtime = 0;
+	s_file_mtime(shader->vertex_path, &vertex_mtime);
+	s_file_mtime(shader->fragment_path, &fragment_mtime);
 
 	if (vertex_mtime != shader->vertex_mtime ||
 		fragment_mtime != shader->fragment_mtime) {
@@ -428,14 +419,16 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	se_model *model = s_array_increment(&render_handle->models);
 	s_array_init(&model->meshes, 64);
 
-	char full_path[SE_MAX_PATH_LENGTH];
-	strncpy(full_path, RESOURCES_DIR, SE_MAX_PATH_LENGTH - 1);
-	strncat(full_path, path, SE_MAX_PATH_LENGTH - strlen(full_path) - 1);
+	char full_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, path)) {
+		fprintf(stderr, "se_model_load_obj :: path too long for %s\n", path);
+		return NULL;
+	}
 
-	FILE *file = fopen(full_path, "r");
-	if (!file) {
-	fprintf(stderr, "Failed to open OBJ file: %s\n", path);
-	return NULL;
+	char *file_data = NULL;
+	if (!s_file_read(full_path, &file_data, NULL)) {
+		fprintf(stderr, "se_model_load_obj :: failed to open OBJ file: %s\n", path);
+		return NULL;
 	}
 
 	// Arrays for temporary storage (shared across all meshes)
@@ -465,7 +458,25 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	b8 hse_faces = false;
 	b8 ok = true;
 
-	while (fgets(line, sizeof(line), file)) {
+	const char *cursor = file_data;
+	while (cursor && *cursor) {
+		sz line_len = 0;
+		while (cursor[line_len] != '\0' && cursor[line_len] != '\n' && cursor[line_len] != '\r') {
+			line_len++;
+		}
+		sz copy_len = line_len;
+		if (copy_len >= sizeof(line)) {
+			copy_len = sizeof(line) - 1;
+		}
+		memcpy(line, cursor, copy_len);
+		line[copy_len] = '\0';
+		cursor += line_len;
+		if (*cursor == '\r') {
+			cursor++;
+		}
+		if (*cursor == '\n') {
+			cursor++;
+		}
 	if (strncmp(line, "v ", 2) == 0) {
 		// Vertex position
 		if (!se_ensure_capacity((void **)&temp_vertices, &temp_vertices_capacity, vertex_count + 1, sizeof(s_vec3), "vertex positions")) {
@@ -579,7 +590,7 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	se_mesh_finalize(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
 	}
 
-	fclose(file);
+	free(file_data);
 
 	// Cleanup temporary arrays
 	free(temp_vertices);
@@ -1441,63 +1452,6 @@ void se_quad_destroy(se_quad *quad) {
 	glDeleteVertexArrays(1, &quad->vao);
 	glDeleteBuffers(1, &quad->vbo);
 	glDeleteBuffers(1, &quad->ebo);
-}
-
-time_t se_file_get_mtime(const char *path) {
-	struct stat st;
-	if (stat(path, &st) == 0) {
-	return st.st_mtime;
-	}
-	return 0;
-}
-
-char *se_file_load(const char *path) {
-	FILE *file = fopen(path, "rb");
-	if (!file) {
-	fprintf(stderr, "se_file_load :: Failed to open file: %s\n", path);
-	return NULL;
-	}
-
-	fseek(file, 0, SEEK_END);
-	long size = ftell(file);
-	fseek(file, 0, SEEK_SET);
-
-	char *buffer = malloc(size + 1);
-	if (!buffer) {
-	fclose(file);
-	return NULL;
-	}
-
-	fread(buffer, 1, size, file);
-	buffer[size] = '\0';
-
-	fclose(file);
-	return buffer;
-}
-
-uc8 *se_file_load_uc8(const char *path, sz *out_size) {
-	FILE *file = fopen(path, "rb");
-	if (!file) {
-	fprintf(stderr, "se_file_load_uc8 :: Failed to open file: %s\n", path);
-	return NULL;
-	}
-
-	fseek(file, 0, SEEK_END);
-	u64 size = ftell(file);
-	fseek(file, 0, SEEK_SET);
-
-	uc8 *buffer = malloc(size + 1);
-	if (!buffer) {
-	fclose(file);
-	return NULL;
-	}
-
-	fread(buffer, 1, size, file);
-	buffer[size] = '\0';
-
-	fclose(file);
-	*out_size = size;
-	return buffer;
 }
 
 static GLuint se_shader_compile(const char *source, GLenum type) {
