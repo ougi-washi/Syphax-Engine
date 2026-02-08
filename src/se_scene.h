@@ -145,7 +145,7 @@ extern void se_scene_2d_destroy(se_scene_handle *scene_handle, se_scene_2d *scen
 extern void se_scene_2d_bind(se_scene_2d *scene);
 extern void se_scene_2d_unbind(se_scene_2d *scene);
 extern void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle); // Does not bind/unbind
-extern void se_scene_2d_render(se_scene_2d *scene, se_render_handle *render_handle); // Binds/unbinds the scene
+extern void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle); // Binds/unbinds the scene
 extern void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object);

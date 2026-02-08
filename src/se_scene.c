@@ -190,7 +190,7 @@ void se_scene_2d_resize_callback(void *window, void *scene) {
 	//}
 
 	se_framebuffer_set_size(framebuffer, &new_size);
-	se_scene_2d_render(scene, render_handle_ptr);
+	se_scene_2d_render_to_buffer(scene, render_handle_ptr);
 }
 
 void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio) {
@@ -638,7 +638,7 @@ void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle)
 		s_foreach(&scene->objects, i) {
 			se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene->objects, i);
 			if (current_object_2d_ptr == NULL) {
-			    printf("se_scene_2d_render :: current_object_2d_ptr is null\n");
+			    printf("se_scene_2d_render_to_buffer :: current_object_2d_ptr is null\n");
 			    continue;
 			}
 			se_object_2d *current_object_2d = *current_object_2d_ptr;
@@ -654,9 +654,9 @@ void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle)
 		}
 }
 
-void se_scene_2d_render(se_scene_2d *scene, se_render_handle *render_handle) {
-	s_assertf(scene, "se_scene_2d_render :: scene is null");
-	s_assertf(render_handle, "se_scene_2d_render :: render_handle is null");
+void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle) {
+	s_assertf(scene, "se_scene_2d_render_to_buffer :: scene is null");
+	s_assertf(render_handle, "se_scene_2d_render_to_buffer :: render_handle is null");
 
 	se_scene_2d_bind(scene);
 	se_scene_2d_render_raw(scene, render_handle);
@@ -676,7 +676,7 @@ void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_h
 }
 
 void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
-	se_scene_2d_render(scene, render_handle);
+	se_scene_2d_render_to_buffer(scene, render_handle);
 	se_render_clear();
 	se_scene_2d_render_to_screen(scene, render_handle, window);
 	se_window_render_screen(window);
