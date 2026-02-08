@@ -34,7 +34,7 @@ i32 main() {
 	s_mat3 instance_transform = s_mat3_identity;
 	for (i32 i = 0; i < 16; i++) {
 		s_mat3_set_translation(&instance_transform, &s_vec2(-0.8f + i * 0.1f, 0.0f));
-		se_object_2d_add_instance(button, &instance_transform, &s_mat3_identity);
+		se_object_2d_add_instance(button, &instance_transform, &s_mat4_identity);
 	}
 
 	se_shader_set_vec3(button->shader, "u_color", &s_vec3(0, 1, 0));

@@ -69,7 +69,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	}
 	se_object_2d *new_object = s_array_increment(&scene_handle->objects_2d);
 	const sz instance_capacity = (max_instances_count > 0) ? max_instances_count : 1;
-	se_quad_2d_create(&new_object->quad, (u32)instance_capacity);
+	se_quad_2d_create(&new_object->quad, (u32)(instance_capacity * 2));
 	new_object->transform = *transform;
 	new_object->is_custom = false;
 	new_object->is_visible = true;
@@ -96,16 +96,22 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	s_array_init(&new_object->instances.ids, instance_capacity);
 	s_array_init(&new_object->instances.transforms, instance_capacity);
 	s_array_init(&new_object->instances.buffers, instance_capacity);
+	s_array_init(&new_object->render_transforms, instance_capacity);
 	se_quad_2d_add_instance_buffer_mat3(&new_object->quad,
+							 new_object->render_transforms.data,
+							 instance_capacity);
+	se_quad_2d_add_instance_buffer(&new_object->quad,
 							 new_object->instances.buffers.data,
 							 instance_capacity);
 	if (max_instances_count == 0) {
 		se_instance_id *new_instance_id = s_array_increment(&new_object->instances.ids);
 		s_mat3 *new_transform = s_array_increment(&new_object->instances.transforms);
-		s_mat3 *new_buffer = s_array_increment(&new_object->instances.buffers);
+		s_mat4 *new_buffer = s_array_increment(&new_object->instances.buffers);
+		s_mat3 *new_render_transform = s_array_increment(&new_object->render_transforms);
 		*new_instance_id = 0;
 		*new_transform = s_mat3_identity;
-		*new_buffer = *transform;
+		*new_buffer = s_mat4_identity;
+		*new_render_transform = *transform;
 		se_object_2d_set_instances_dirty(new_object, true);
 	}
 	return new_object;
@@ -228,6 +234,10 @@ void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object) {
 	s_assertf(scene_handle, "se_object_2d_destroy :: scene_handle is null");
 	s_assertf(object, "se_object_2d_destroy :: object is null");
 	printf("se_object_2d_destroy :: scene_handle: %p, object: %p\n", scene_handle, object);
+	s_array_clear(&object->render_transforms);
+	s_array_clear(&object->instances.ids);
+	s_array_clear(&object->instances.transforms);
+	s_array_clear(&object->instances.buffers);
 	s_array_remove(&scene_handle->objects_2d, object);
 }
 
@@ -237,8 +247,8 @@ void se_object_2d_set_transform(se_object_2d *object, const s_mat3 *transform) {
 	object->transform = *transform;
 	s_foreach(&object->instances.transforms, i) {
 		s_mat3 *current_transform = s_array_get(&object->instances.transforms, i);
-		s_mat3 *current_buffer = s_array_get(&object->instances.buffers, i);
-		*current_buffer = s_mat3_mul(&object->transform, current_transform);
+		s_mat3 *current_render_transform = s_array_get(&object->render_transforms, i);
+		*current_render_transform = s_mat3_mul(&object->transform, current_transform);
 	}
 	se_object_2d_set_instances_dirty(object, true);
 }
@@ -254,8 +264,8 @@ void se_object_2d_set_position(se_object_2d *object, const s_vec2 *position) {
     s_mat3_set_translation(&object->transform, position);
 	s_foreach(&object->instances.transforms, i) {
 		s_mat3 *current_transform = s_array_get(&object->instances.transforms, i);
-		s_mat3 *current_buffer = s_array_get(&object->instances.buffers, i);
-		*current_buffer = s_mat3_mul(&object->transform, current_transform);
+		s_mat3 *current_render_transform = s_array_get(&object->render_transforms, i);
+		*current_render_transform = s_mat3_mul(&object->transform, current_transform);
 	}
 	se_object_2d_set_instances_dirty(object, true);
 }
@@ -272,8 +282,8 @@ void se_object_2d_set_scale(se_object_2d *object, const s_vec2 *scale) {
     s_mat3_set_scale(&object->transform, scale);
 	s_foreach(&object->instances.transforms, i) {
 		s_mat3 *current_transform = s_array_get(&object->instances.transforms, i);
-		s_mat3 *current_buffer = s_array_get(&object->instances.buffers, i);
-		*current_buffer = s_mat3_mul(&object->transform, current_transform);
+		s_mat3 *current_render_transform = s_array_get(&object->render_transforms, i);
+		*current_render_transform = s_mat3_mul(&object->transform, current_transform);
 	}
 	se_object_2d_set_instances_dirty(object, true);
 }
@@ -298,12 +308,11 @@ void se_object_2d_update_uniforms(se_object_2d *object) {
 	(void)object;
 }
 
-se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat3 *transform, const s_mat3 *buffer) {
+se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat3 *transform, const s_mat4 *buffer) {
 	s_assertf(object, "se_object_2d_set_instance_add :: object is null");
 	s_assertf(transform, "se_object_2d_set_instance_add :: transform is null");
 	s_assertf(buffer, "se_object_2d_set_instance_add :: buffer is null");
 	s_assertf(s_array_get_capacity(&object->instances.ids) > 0, "se_object_2d_set_instance_add :: object instances capacity is 0");
-	(void)buffer;
 
 	const sz prev_instances_count = s_array_get_size(&object->instances.ids);
 	se_instance_id new_id = 0;
@@ -313,11 +322,13 @@ se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat3 *tra
 
 	se_instance_id *new_instance_id = s_array_increment(&object->instances.ids);
 	s_mat3 *new_transform = s_array_increment(&object->instances.transforms);
-	s_mat3 *new_buffer = s_array_increment(&object->instances.buffers);
+	s_mat4 *new_buffer = s_array_increment(&object->instances.buffers);
+	s_mat3 *new_render_transform = s_array_increment(&object->render_transforms);
 
 	*new_instance_id = new_id;
 	*new_transform = *transform;
-	*new_buffer = s_mat3_mul(&object->transform, transform);
+	*new_buffer = *buffer;
+	*new_render_transform = s_mat3_mul(&object->transform, transform);
 	se_object_2d_set_instances_dirty(object, true);
 
 	return *new_instance_id;
@@ -343,8 +354,8 @@ void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance
 		s_mat3 *current_transform =
 			s_array_get(&object->instances.transforms, index);
 		*current_transform = *transform;
-		s_mat3 *current_buffer = s_array_get(&object->instances.buffers, index);
-		*current_buffer = s_mat3_mul(&object->transform, current_transform);
+		s_mat3 *current_render_transform = s_array_get(&object->render_transforms, index);
+		*current_render_transform = s_mat3_mul(&object->transform, current_transform);
 		se_object_2d_set_instances_dirty(object, true);
 	} else {
 		printf("se_object_2d_set_instance_transform :: instance id %d not found\n",
@@ -352,12 +363,12 @@ void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance
 	}
 }
 
-void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const s_mat3 *buffer) {
+void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const s_mat4 *buffer) {
 	s_assertf(object, "se_object_2d_set_instance_buffer :: object is null");
 	s_assertf(buffer, "se_object_2d_set_instance_buffer :: buffer is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index >= 0) {
-		s_mat3 *current_buffer = s_array_get(&object->instances.buffers, index);
+		s_mat4 *current_buffer = s_array_get(&object->instances.buffers, index);
 		*current_buffer = *buffer;
 		se_object_2d_set_instances_dirty(object, true);
 	} else {
@@ -372,15 +383,16 @@ void se_object_2d_set_instances_transforms(se_object_2d *object, const se_transf
 	s_assertf(s_array_get_capacity(&object->instances.transforms) == s_array_get_capacity(transforms), "se_object_2d_set_instances_transforms :: transforms capacity is not equal to object capacity");
 	object->instances.transforms.size = s_array_get_size(transforms);
 	*object->instances.transforms.data = *(transforms->data);
+	object->render_transforms.size = object->instances.transforms.size;
 	s_foreach(&object->instances.transforms, i) {
 		s_mat3 *current_transform = s_array_get(&object->instances.transforms, i);
-		s_mat3 *current_buffer = s_array_get(&object->instances.buffers, i);
-		*current_buffer = s_mat3_mul(&object->transform, current_transform);
+		s_mat3 *current_render_transform = s_array_get(&object->render_transforms, i);
+		*current_render_transform = s_mat3_mul(&object->transform, current_transform);
 	}
 	se_object_2d_set_instances_dirty(object, true);
 }
 
-void se_object_2d_set_instances_buffers(se_object_2d *object, const se_buffers_2d *buffers) {
+void se_object_2d_set_instances_buffers(se_object_2d *object, const se_buffers *buffers) {
 	s_assertf(object, "se_object_2d_set_instances_buffers :: object is null");
 	s_assertf(buffers, "se_object_2d_set_instances_buffers :: buffers is null");
 	s_assertf(s_array_get_capacity(&object->instances.buffers) == s_array_get_capacity(buffers), "se_object_2d_set_instances_buffers :: buffers capacity is not equal to object capacity");
@@ -422,6 +434,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 	s_array_init(&new_object->instances.ids, instance_capacity);
 	s_array_init(&new_object->instances.transforms, instance_capacity);
 	s_array_init(&new_object->instances.buffers, instance_capacity);
+	s_array_init(&new_object->render_transforms, instance_capacity);
 
 	const sz mesh_count = s_array_get_size(&model->meshes);
 	if (mesh_count > 0) {
@@ -430,7 +443,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 			se_mesh *mesh = s_array_get(&model->meshes, i);
 			se_mesh_instance *mesh_instance = s_array_increment(&new_object->mesh_instances);
 			se_mesh_instance_create(mesh_instance, mesh, (u32)instance_capacity);
-			se_mesh_instance_add_buffer(mesh_instance, new_object->instances.buffers.data, instance_capacity);
+			se_mesh_instance_add_buffer(mesh_instance, new_object->render_transforms.data, instance_capacity);
 		}
 	}
 
@@ -438,9 +451,11 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 		se_instance_id *new_instance_id = s_array_increment(&new_object->instances.ids);
 		s_mat4 *new_transform = s_array_increment(&new_object->instances.transforms);
 		s_mat4 *new_buffer = s_array_increment(&new_object->instances.buffers);
+		s_mat4 *new_render_transform = s_array_increment(&new_object->render_transforms);
 		*new_instance_id = 0;
 		*new_transform = s_mat4_identity;
 		*new_buffer = s_mat4_identity;
+		*new_render_transform = s_mat4_identity;
 		se_object_3d_set_instances_dirty(new_object, true);
 	}
 
@@ -455,6 +470,7 @@ void se_object_3d_destroy(se_scene_handle *scene_handle, se_object_3d *object) {
 		se_mesh_instance_destroy(mesh_instance);
 	}
 	s_array_clear(&object->mesh_instances);
+	s_array_clear(&object->render_transforms);
 	s_array_clear(&object->instances.ids);
 	s_array_clear(&object->instances.transforms);
 	s_array_clear(&object->instances.buffers);
@@ -487,10 +503,12 @@ se_instance_id se_object_3d_add_instance(se_object_3d *object, const s_mat4 *tra
 	se_instance_id *new_instance_id = s_array_increment(&object->instances.ids);
 	s_mat4 *new_transform = s_array_increment(&object->instances.transforms);
 	s_mat4 *new_buffer = s_array_increment(&object->instances.buffers);
+	s_mat4 *new_render_transform = s_array_increment(&object->render_transforms);
 
 	*new_instance_id = new_id;
 	*new_transform = *transform;
 	*new_buffer = *buffer;
+	*new_render_transform = s_mat4_identity;
 	se_object_3d_set_instances_dirty(object, true);
 
 	return *new_instance_id;
@@ -721,7 +739,7 @@ void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle) {
 
 			s_foreach(&object->instances.transforms, j) {
 				s_mat4 *instance_transform = s_array_get(&object->instances.transforms, j);
-				s_mat4 *out_buffer = s_array_get(&object->instances.buffers, j);
+				s_mat4 *out_buffer = s_array_get(&object->render_transforms, j);
 				s_mat4 model = s_mat4_mul(&object->transform, instance_transform);
 				model = s_mat4_mul(&model, &mesh->matrix);
 				*out_buffer = s_mat4_mul(&vp, &model);

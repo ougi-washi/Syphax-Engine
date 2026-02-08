@@ -26,11 +26,10 @@ typedef struct {
 } se_instances;
 
 typedef s_array(s_mat3, se_transforms_2d);
-typedef s_array(s_mat3, se_buffers_2d);
 typedef struct {
 	se_instance_ids ids;
 	se_transforms_2d transforms;
-	se_buffers_2d buffers;
+	se_buffers buffers;
 } se_instances_2d;
 
 typedef void (*se_object_custom_callback)(se_render_handle *render_handle, void *data);
@@ -50,6 +49,7 @@ typedef struct {
 			se_quad quad;
 			se_shader_ptr shader;
 			se_instances_2d instances;
+			se_transforms_2d render_transforms;
 		};
 		se_object_custom custom;
 	};
@@ -66,6 +66,7 @@ typedef struct {
 	s_mat4 transform;
 	se_instances instances;
 	se_mesh_instances mesh_instances;
+	se_transforms render_transforms;
 	b8 is_visible : 1;
 } se_object_3d;
 typedef s_array(se_object_3d, se_objects_3d);
@@ -124,12 +125,12 @@ extern s_vec2 se_object_2d_get_scale(se_object_2d *object);
 extern void se_object_2d_get_box_2d(se_object_2d *object, se_box_2d *out_box);
 extern void se_object_2d_set_shader(se_object_2d *object, se_shader *shader);
 extern void se_object_2d_update_uniforms(se_object_2d *object);
-extern se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat3 *transform, const s_mat3 *buffer);
+extern se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat3 *transform, const s_mat4 *buffer);
 extern i32 se_object_2d_get_instance_index(se_object_2d *object, const se_instance_id instance_id);
 extern void se_object_2d_set_instance_transform(se_object_2d *object, const se_instance_id instance_id, const s_mat3 *transform);
-extern void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const s_mat3 *buffer);
+extern void se_object_2d_set_instance_buffer(se_object_2d *object, const se_instance_id instance_id, const s_mat4 *buffer);
 extern void se_object_2d_set_instances_transforms(se_object_2d *object, const se_transforms_2d *transforms);
-extern void se_object_2d_set_instances_buffers(se_object_2d *object, const se_buffers_2d *buffers);
+extern void se_object_2d_set_instances_buffers(se_object_2d *object, const se_buffers *buffers);
 extern void se_object_2d_set_instances_dirty(se_object_2d *object, const b8 dirty);
 extern b8 se_object_2d_are_instances_dirty(se_object_2d *object);
 extern sz se_object_2d_get_instance_count(se_object_2d *object);
