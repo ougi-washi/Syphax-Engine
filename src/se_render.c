@@ -281,6 +281,7 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 	}
 
 	se_shader *new_shader = s_array_increment(&render_handle->shaders);
+	memset(new_shader, 0, sizeof(*new_shader));
 
 	// make path absolute
 	if (strlen(vertex_file_path) > 0) {
@@ -747,7 +748,22 @@ void se_model_scale(se_model *model, const s_vec3 *v) {
 
 // camera functions
 se_camera *se_camera_create(se_render_handle *render_handle) {
-	se_camera *camera = s_array_increment(&render_handle->cameras);
+	se_camera *camera = NULL;
+	s_foreach(&render_handle->cameras, i) {
+		se_camera *slot = s_array_get(&render_handle->cameras, i);
+		if (slot->fov == 0.0f && slot->near == 0.0f && slot->far == 0.0f) {
+			camera = slot;
+			break;
+		}
+	}
+	if (!camera) {
+		if (s_array_get_capacity(&render_handle->cameras) == s_array_get_size(&render_handle->cameras)) {
+			printf("se_camera_create :: render_handle->cameras is full\n");
+			return NULL;
+		}
+		camera = s_array_increment(&render_handle->cameras);
+	}
+	memset(camera, 0, sizeof(*camera));
 	camera->position = (s_vec3){0, 0, 5};
 	camera->target = (s_vec3){0, 0, 0};
 	camera->up = (s_vec3){0, 1, 0};
@@ -772,9 +788,20 @@ void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height) 
 	camera->aspect = width / height;
 }
 
-void se_camera_destroy(se_render_handle *render_handle, se_camera *camera) {
-	printf("se_camera_destroy :: camera: %p\n", camera);
-	s_array_remove(&render_handle->cameras, camera);
+void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera *camera) {
+	printf("se_render_handle_destroy_camera :: camera: %p\n", camera);
+	s_assertf(render_handle, "se_render_handle_destroy_camera :: render_handle is null");
+	s_assertf(camera, "se_render_handle_destroy_camera :: camera is null");
+	if (camera->fov == 0.0f && camera->near == 0.0f && camera->far == 0.0f) {
+		return;
+	}
+	camera->position = s_vec3(0.0f, 0.0f, 0.0f);
+	camera->target = s_vec3(0.0f, 0.0f, 0.0f);
+	camera->up = s_vec3(0.0f, 1.0f, 0.0f);
+	camera->fov = 0.0f;
+	camera->near = 0.0f;
+	camera->far = 0.0f;
+	camera->aspect = 0.0f;
 }
 
 // Framebuffer functions

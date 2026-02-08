@@ -1,9 +1,6 @@
 // Syphax-Engine - Ougi Washi
 
-// Scenes are used as a collection of pointers to rendering instances
-// They are not responsible for handling memory, and are only used for
-// referencing the rendering instances Render handles are the ones responsible
-// for handling memory, so no allocation and deallocation is needed here
+// Ownership: the scene handle owns scene/object arrays and is responsible for cleanup.
 
 #ifndef SE_SCENE_H
 #define SE_SCENE_H
@@ -111,6 +108,7 @@ typedef struct {
 } se_scene_handle;
 
 // scene handle functions
+// Ownership: only the scene handle may remove/free objects and scenes it owns.
 extern se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const se_scene_handle_params *params);
 extern void se_scene_handle_cleanup(se_scene_handle *scene_handle);
 
@@ -118,7 +116,7 @@ extern void se_scene_handle_cleanup(se_scene_handle *scene_handle);
 extern se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count);
 extern se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform);
 extern void se_object_custom_set_data(se_object_custom *custom, const void *data, const sz size);
-extern void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object);
+extern void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_2d *object);
 extern void se_object_2d_set_transform(se_object_2d *object, const s_mat3 *transform);
 extern s_mat3 se_object_2d_get_transform(se_object_2d *object);
 extern void se_object_2d_set_position(se_object_2d *object, const s_vec2 *position);
@@ -141,7 +139,7 @@ extern sz se_object_2d_get_instance_count(se_object_2d *object);
 // 2D scene functions
 extern se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
 extern void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio); // ratio can only be 1 for now
-extern void se_scene_2d_destroy(se_scene_handle *scene_handle, se_scene_2d *scene);
+extern void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d *scene);
 extern void se_scene_2d_bind(se_scene_2d *scene);
 extern void se_scene_2d_unbind(se_scene_2d *scene);
 extern void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle); // Does not bind/unbind
@@ -154,7 +152,7 @@ extern void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object);
 // 3D scene functions
 extern se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
 extern void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio);
-extern void se_scene_3d_destroy(se_scene_handle *scene_handle, se_scene_3d *scene);
+extern void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene);
 extern void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle);
 extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
@@ -167,7 +165,7 @@ extern void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render
 
 // 3D objects functions
 extern se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model, const s_mat4 *transform, const sz max_instances_count);
-extern void se_object_3d_destroy(se_scene_handle *scene_handle, se_object_3d *object);
+extern void se_scene_handle_destroy_object_3d(se_scene_handle *scene_handle, se_object_3d *object);
 extern void se_object_3d_set_transform(se_object_3d *object, const s_mat4 *transform);
 extern s_mat4 se_object_3d_get_transform(se_object_3d *object);
 extern se_instance_id se_object_3d_add_instance(se_object_3d *object, const s_mat4 *transform, const s_mat4 *buffer);

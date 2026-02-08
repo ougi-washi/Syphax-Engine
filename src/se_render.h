@@ -258,11 +258,12 @@ extern void se_model_rotate(se_model *model, const s_vec3 *v);
 extern void se_model_scale(se_model *model, const s_vec3 *v);
 
 // camera functions
+// Ownership: render handle owns cameras created from it.
 extern se_camera *se_camera_create(se_render_handle *render_handle);
 extern s_mat4 se_camera_get_view_matrix(const se_camera *camera);
 extern s_mat4 se_camera_get_projection_matrix(const se_camera *camera);
 extern void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height);
-extern void se_camera_destroy(se_render_handle *render_handle, se_camera *camera);
+extern void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera *camera);
 
 // Framebuffer functions
 extern se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_vec2 *size);
