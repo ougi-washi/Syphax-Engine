@@ -230,7 +230,7 @@ void se_scene_3d_resize_callback(void *window, void *scene) {
 	if (scene_ptr->camera) {
 		se_camera_set_aspect(scene_ptr->camera, new_size.x, new_size.y);
 	}
-	se_scene_3d_render(scene_ptr, render_handle_ptr);
+	se_scene_3d_render_to_buffer(scene_ptr, render_handle_ptr);
 }
 
 void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio) {
@@ -731,12 +731,12 @@ void se_scene_3d_destroy(se_scene_handle *scene_handle, se_scene_3d *scene) {
 	s_array_remove(&scene_handle->scenes_3d, scene);
 }
 
-void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle) {
+void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle) {
 	if (render_handle == NULL) {
 		return;
 	}
-	s_assertf(scene, "se_scene_3d_render :: scene is null");
-	s_assertf(scene->output, "se_scene_3d_render :: scene output is null");
+	s_assertf(scene, "se_scene_3d_render_to_buffer :: scene is null");
+	s_assertf(scene->output, "se_scene_3d_render_to_buffer :: scene output is null");
 
 	se_framebuffer_bind(scene->output);
 	se_render_clear();
@@ -822,7 +822,7 @@ void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_h
 }
 
 void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
-	se_scene_3d_render(scene, render_handle);
+	se_scene_3d_render_to_buffer(scene, render_handle);
 	se_scene_3d_render_to_screen(scene, render_handle, window);
 	se_window_render_screen(window);
 }

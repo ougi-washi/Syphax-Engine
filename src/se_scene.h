@@ -155,7 +155,7 @@ extern void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object);
 extern se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
 extern void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio);
 extern void se_scene_3d_destroy(se_scene_handle *scene_handle, se_scene_3d *scene);
-extern void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle);
+extern void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle);
 extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object);
