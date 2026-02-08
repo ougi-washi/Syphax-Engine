@@ -229,6 +229,18 @@ void se_window_get_mouse_position_normalized(se_window* window, s_vec2* out_mous
 	out_mouse_position->y *= 2.;
 }
 
+void se_window_get_mouse_delta(se_window* window, s_vec2* out_mouse_delta) {
+	s_assertf(window, "se_window_get_mouse_delta :: window is null");
+	s_assertf(out_mouse_delta, "se_window_get_mouse_delta :: out_mouse_delta is null");
+	*out_mouse_delta = s_vec2(window->mouse_dx, window->mouse_dy);
+}
+
+void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_mouse_delta) {
+	s_assertf(window, "se_window_get_mouse_delta_normalized :: window is null");
+	s_assertf(out_mouse_delta, "se_window_get_mouse_delta_normalized :: out_mouse_delta is null");
+	*out_mouse_delta = s_vec2((window->mouse_dx / window->width), (window->mouse_dy / window->height));
+}
+
 b8 se_window_should_close(se_window* window) {
 	s_assertf(window, "se_window_should_close :: window is null");
 	return glfwWindowShouldClose(window->handle);
@@ -265,6 +277,10 @@ void se_window_check_exit_keys(se_window* window) {
 
 f64 se_window_get_delta_time(se_window* window) {
 	return window->time.delta;
+}
+
+f64 se_window_get_fps(se_window* window) {
+	return 1. / window->time.delta;
 }
 
 f64 se_window_get_time(se_window* window) {

@@ -4,6 +4,7 @@
 #include "se_scene.h"
 #include "syphax/s_files.h"
 
+#include <math.h>
 #include <stdio.h>
 
 #define WINDOW_WIDTH 1280
@@ -202,34 +203,69 @@ int main() {
 		scene->camera->near = 0.1f;
 	}
 
+	f32 camera_yaw = 0.0f;
+	f32 camera_pitch = 0.0f;
+	if (scene->camera) {
+		s_vec3 forward = s_vec3_sub(&scene->camera->target, &scene->camera->position);
+		forward = s_vec3_normalize(&forward);
+		camera_yaw = atan2f(forward.x, forward.z);
+		camera_pitch = asinf(forward.y);
+	}
+
+	s_vec2 mouse_delta_clicked = {0};
+
 	while (!se_window_should_close(window)) {
 		se_window_poll_events();
 		se_window_update(window);
 		se_render_handle_reload_changed_shaders(render_handle);
 
 		se_camera* camera = scene->camera;
-		s_vec3 target = camera->target;
-		if (se_window_is_key_down(window, GLFW_KEY_RIGHT)) {
-			camera->position.x += 100.f;
+		const f32 dt = (f32)se_window_get_delta_time(window);
+		const f32 base_speed = 600.0f;
+		const f32 fast_speed = 1400.0f;
+		const f32 look_sensitivity = 15.0f;
+		const b8 fast = se_window_is_key_down(window, GLFW_KEY_LEFT_SHIFT) || se_window_is_key_down(window, GLFW_KEY_RIGHT_SHIFT);
+		const f32 move_speed = fast ? fast_speed : base_speed;
+
+		if (se_window_is_mouse_down(window, GLFW_MOUSE_BUTTON_RIGHT)) {
+			se_window_get_mouse_delta_normalized(window, &mouse_delta_clicked);
+			camera_yaw 		+= mouse_delta_clicked.x * look_sensitivity;
+			camera_pitch 	-= mouse_delta_clicked.y * look_sensitivity;
+			if (camera_pitch > 1.55f) camera_pitch = 1.55f;
+			if (camera_pitch < -1.55f) camera_pitch = -1.55f;
 		}
-		if (se_window_is_key_down(window, GLFW_KEY_LEFT)) {
-			camera->position.x -= 100.f;
+		else {
+			mouse_delta_clicked = s_vec2(0.0f, 0.0f);
 		}
-		if (se_window_is_key_down(window, GLFW_KEY_UP)) {
-			camera->position.y += 100.f;
+		s_vec3 forward = s_vec3(
+			sinf(camera_yaw) * cosf(camera_pitch),
+			sinf(camera_pitch),
+			cosf(camera_yaw) * cosf(camera_pitch));
+		forward = s_vec3_normalize(&forward);
+		s_vec3 right = s_vec3_cross(&forward, &camera->up);
+		right = s_vec3_normalize(&right);
+		s_vec3 up = camera->up;
+		up = s_vec3_normalize(&up);
+
+		s_vec3 move = s_vec3(0.0f, 0.0f, 0.0f);
+		s_vec3 forward_neg = s_vec3_muls(&forward, -1.0f);
+		s_vec3 right_neg = s_vec3_muls(&right, -1.0f);
+		s_vec3 up_neg = s_vec3_muls(&up, -1.0f);
+		if (se_window_is_key_down(window, GLFW_KEY_W)) move = s_vec3_add(&move, &forward);
+		if (se_window_is_key_down(window, GLFW_KEY_S)) move = s_vec3_add(&move, &forward_neg);
+		if (se_window_is_key_down(window, GLFW_KEY_D)) move = s_vec3_add(&move, &right);
+		if (se_window_is_key_down(window, GLFW_KEY_A)) move = s_vec3_add(&move, &right_neg);
+		if (se_window_is_key_down(window, GLFW_KEY_E)) move = s_vec3_add(&move, &up);
+		if (se_window_is_key_down(window, GLFW_KEY_Q)) move = s_vec3_add(&move, &up_neg);
+
+		if (s_vec3_length(&move) > 0.0f) {
+			move = s_vec3_normalize(&move);
+			move = s_vec3_muls(&move, move_speed * dt);
+			camera->position = s_vec3_add(&camera->position, &move);
 		}
-		if (se_window_is_key_down(window, GLFW_KEY_DOWN)) {
-			camera->position.y -= 100.f;
-		}
-		if (se_window_is_key_down(window, GLFW_KEY_W)) {
-			camera->position.z += 100.f;
-		}
-		if (se_window_is_key_down(window, GLFW_KEY_S)) {
-			camera->position.z -= 100.f;
-		}
+		camera->target = s_vec3_add(&camera->position, &forward);
 
 		se_scene_3d_render(scene, render_handle);
-		se_render_clear();
 		se_scene_3d_render_to_screen(scene, render_handle, window);
 		se_window_render_screen(window);
 	}

@@ -774,6 +774,7 @@ void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_h
 	}
 
 	se_unbind_framebuffer();
+	se_render_clear();
 	se_enable_blending();
 	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
 	se_window_render_quad(window);
