@@ -66,6 +66,7 @@ typedef s_array(se_window, se_windows);
 
 extern se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
+extern void se_window_tick(se_window* window); // update + poll events (single-window convenience)
 extern void se_window_render_quad(se_window* window);	 // mid-frame: draws using window's quad
 extern void se_window_render_screen(se_window* window); // frame end: clear, renders the frame and swaps buffers
 extern void se_window_poll_events();

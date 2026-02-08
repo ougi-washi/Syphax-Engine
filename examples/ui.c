@@ -16,7 +16,7 @@ void increment_button_color(se_object_2d *button) {
 
 void on_button_exit_captured(void *window, void *data) {
 	se_object_2d *button_exit = (se_object_2d *)data;
-	if (se_window_is_mouse_down(window, 0)) {
+	if (se_window_is_mouse_pressed(window, 0)) {
 		se_window_set_should_close((se_window *)window, true);
 	}
 	increment_button_color(button_exit);
@@ -38,11 +38,7 @@ void on_button_stop_hovered(void *window, void *data) {
 }
 
 i32 main() {
-	se_render_handle_params params = {0};
-	params.framebuffers_count = 8;
-	params.render_buffers_count = 8;
-	params.shaders_count = 16;
-	se_render_handle *render_handle = se_render_handle_create(&params);
+	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
 
@@ -94,8 +90,7 @@ i32 main() {
 
 	se_window_set_target_fps(window, 30);
 	while (!se_window_should_close(window)) {
-	    se_window_poll_events();
-	    se_window_update(window);
+	    se_window_tick(window);
         s_vec2 normalized_mouse_position = {0};
 	    se_window_get_mouse_position_normalized(window, &normalized_mouse_position);
 	    c8 fps_text[1024] = "";

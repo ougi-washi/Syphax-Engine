@@ -147,6 +147,7 @@ extern void se_scene_2d_unbind(se_scene_2d *scene);
 extern void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle); // Does not bind/unbind
 extern void se_scene_2d_render(se_scene_2d *scene, se_render_handle *render_handle); // Binds/unbinds the scene
 extern void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window);
+extern void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object);
 extern void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object);
 
@@ -156,6 +157,7 @@ extern void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, c
 extern void se_scene_3d_destroy(se_scene_handle *scene_handle, se_scene_3d *scene);
 extern void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle);
 extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
+extern void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object);
 extern void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object);
 extern void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera);

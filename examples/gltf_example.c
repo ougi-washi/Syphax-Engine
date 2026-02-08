@@ -215,8 +215,7 @@ int main() {
 	s_vec2 mouse_delta_clicked = {0};
 
 	while (!se_window_should_close(window)) {
-		se_window_poll_events();
-		se_window_update(window);
+		se_window_tick(window);
 		se_render_handle_reload_changed_shaders(render_handle);
 
 		se_camera* camera = scene->camera;
@@ -265,9 +264,7 @@ int main() {
 		}
 		camera->target = s_vec3_add(&camera->position, &forward);
 
-		se_scene_3d_render(scene, render_handle);
-		se_scene_3d_render_to_screen(scene, render_handle, window);
-		se_window_render_screen(window);
+		se_scene_3d_draw(scene, render_handle, window);
 	}
 
 	se_gltf_free(asset);

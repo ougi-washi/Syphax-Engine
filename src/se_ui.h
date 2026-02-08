@@ -12,7 +12,7 @@ typedef enum {
 	SE_UI_LAYOUT_VERTICAL
 } se_ui_layout;
 
-typedef struct se_ui{
+typedef struct se_ui_element{
 	struct se_ui_handle* ui_handle;
 	se_ui_layout layout;
 	s_vec2 position;
@@ -21,7 +21,7 @@ typedef struct se_ui{
 	se_scene_2d* scene_2d;
 	struct se_ui_text* text;
 	b8 visible : 1;
-	s_array(struct se_ui*, children);
+	s_array(struct se_ui_element*, children);
 } se_ui_element;
 typedef s_array(se_ui_element, se_ui_elements);
 typedef se_ui_element* se_ui_element_ptr;

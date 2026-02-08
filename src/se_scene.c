@@ -675,6 +675,13 @@ void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_h
 	se_disable_blending();
 }
 
+void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
+	se_scene_2d_render(scene, render_handle);
+	se_render_clear();
+	se_scene_2d_render_to_screen(scene, render_handle, window);
+	se_window_render_screen(window);
+}
+
 void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object) {
 	s_assertf(scene, "se_scene_2d_add_object :: scene is null");
 	s_assertf(object, "se_scene_2d_add_object :: object is null");
@@ -812,6 +819,12 @@ void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_h
 	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
 	se_window_render_quad(window);
 	se_disable_blending();
+}
+
+void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
+	se_scene_3d_render(scene, render_handle);
+	se_scene_3d_render_to_screen(scene, render_handle, window);
+	se_window_render_screen(window);
 }
 
 void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object) {

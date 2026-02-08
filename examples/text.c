@@ -7,11 +7,7 @@
 #define HEIGHT 1080
 
 i32 main() {
-	
-	se_render_handle_params params = {0};
-	params.framebuffers_count = 1;
-	params.shaders_count = 2; // 1 for screen, 1 for text
-	se_render_handle* render_handle = se_render_handle_create(&params);
+	se_render_handle* render_handle = se_render_handle_create(NULL);
 	
 	se_window* window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
 	
@@ -25,8 +21,7 @@ i32 main() {
 	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
-		se_window_poll_events();
-		se_window_update(window);
+		se_window_tick(window);
 		se_render_clear();
 		se_text_render(text_handle, font, "yer7am dinek, ch'hal boubli \nMa nedri welou", &s_vec2(0., 0.), &s_vec2(1, 1), .03f);
 		se_window_render_screen(window);

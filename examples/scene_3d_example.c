@@ -14,14 +14,7 @@ typedef struct {
 } se_instance_slot;
 
 int main() {
-	se_render_handle_params render_params = {0};
-	render_params.framebuffers_count = 8;
-	render_params.render_buffers_count = 4;
-	render_params.textures_count = 8;
-	render_params.shaders_count = 16;
-	render_params.models_count = 8;
-	render_params.cameras_count = 4;
-	se_render_handle *render_handle = se_render_handle_create(&render_params);
+	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_key_combo exit_keys = {0};
@@ -29,12 +22,7 @@ int main() {
 	s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
 	se_window_set_exit_keys(window, &exit_keys);
 
-	se_scene_handle_params scene_params = {0};
-	scene_params.objects_2d_count = 0;
-	scene_params.objects_3d_count = INSTANCE_TOTAL + 4;
-	scene_params.scenes_2d_count = 0;
-	scene_params.scenes_3d_count = 2;
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, &scene_params);
+	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
 
 	se_scene_3d *scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), INSTANCE_TOTAL + 4);
 	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
@@ -77,8 +65,7 @@ int main() {
 	}
 
 	while (!se_window_should_close(window)) {
-		se_window_poll_events();
-		se_window_update(window);
+		se_window_tick(window);
 		se_render_handle_reload_changed_shaders(render_handle);
 
 		const f32 time = (f32)se_window_get_time(window);
@@ -90,10 +77,7 @@ int main() {
 			se_object_3d_set_instance_transform(cube_field, slots[i].id, &transform);
 		}
 
-		se_scene_3d_render(scene, render_handle);
-		se_render_clear();
-		se_scene_3d_render_to_screen(scene, render_handle, window);
-		se_window_render_screen(window);
+		se_scene_3d_draw(scene, render_handle, window);
 	}
 
 	s_array_clear(&shader_list);

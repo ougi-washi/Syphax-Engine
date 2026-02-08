@@ -36,8 +36,13 @@ void se_ui_handle_cleanup(se_ui_handle *ui_handle) {
 	s_assertf(ui_handle, "se_ui_handle_cleanup :: ui_handle is null");
 	printf("se_ui_handle_cleanup :: ui_handle: %p\n", ui_handle);
 	s_foreach(&ui_handle->ui_elements, i) {
-	    se_ui_element *current_ui = s_array_get(&ui_handle->ui_elements, i);
-	    se_ui_element_destroy(current_ui);
+		se_ui_element *current_ui = s_array_get(&ui_handle->ui_elements, i);
+		if (!current_ui) {
+			continue;
+		}
+		s_array_clear(&current_ui->children);
+		current_ui->scene_2d = NULL;
+		current_ui->text = NULL;
 	}
 	s_array_clear(&ui_handle->ui_elements);
 	se_scene_handle_cleanup(ui_handle->scene_handle);
@@ -146,22 +151,8 @@ void se_ui_element_destroy(se_ui_element *ui) {
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_destroy :: ui_handle is null");
 	printf("se_ui_element_destroy :: ui: %p, ui_handle: %p\n", ui, ui_handle);
-	s_foreach(&ui->children, i) {
-	    se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
-	    if (!current_ui_ptr) {
-	    	printf("se_ui_element_destroy :: children index %zu is null\n", i);
-	    	continue;
-	    }
-	se_ui_element *current_ui = *current_ui_ptr;
-	if (!current_ui) {
-		printf("se_ui_element_destroy :: children index %zu is null\n", i);
-		continue;
-	}
-	se_ui_element_destroy(current_ui);
-	}
 	s_array_clear(&ui->children);
 	se_scene_2d_destroy(ui_handle->scene_handle, ui->scene_2d);
-	s_array_remove(&ui_handle->ui_elements, ui);
 }
 
 void se_ui_element_set_position(se_ui_element *ui, const s_vec2 *position) {

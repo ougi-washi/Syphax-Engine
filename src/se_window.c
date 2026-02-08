@@ -143,6 +143,11 @@ extern void se_window_update(se_window* window) {
 	window->frame_count++;
 }
 
+void se_window_tick(se_window* window) {
+	se_window_update(window);
+	se_window_poll_events();
+}
+
 void se_window_render_quad(se_window* window) {
 	se_shader_use(window->render_handle, window->shader, true, false);
 	se_quad_render(&window->quad, 0);

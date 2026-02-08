@@ -6,7 +6,7 @@
 #define HEIGHT 1080
 
 void on_button_yes_pressed(void *window, void *data) {
-	if (se_window_is_mouse_down(window, 0)) {
+	if (se_window_is_mouse_pressed(window, 0)) {
 		if (data) {
 			(*(int *)data)++;
 			printf("Pressed yes, data: %d\n", *(int *)data);
@@ -15,7 +15,7 @@ void on_button_yes_pressed(void *window, void *data) {
 }
 
 void on_button_no_pressed(void *window, void *data) {
-	if (se_window_is_mouse_down(window, 0)) {
+	if (se_window_is_mouse_pressed(window, 0)) {
 		if (data) {
 			(*(int *)data)++;
 			printf("Pressed no, data: %d\n", *(int *)data);
@@ -24,23 +24,11 @@ void on_button_no_pressed(void *window, void *data) {
 }
 
 i32 main() {
-	se_render_handle_params params = {0};
-	params.framebuffers_count = 8;
-	params.render_buffers_count = 8;
-	params.textures_count = 0;
-	params.shaders_count = 8;
-	params.models_count = 0;
-	params.cameras_count = 0;
-	se_render_handle *render_handle = se_render_handle_create(&params);
+	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
 
-	se_scene_handle_params scene_params = {0};
-	scene_params.objects_2d_count = 4;
-	scene_params.objects_3d_count = 0;
-	scene_params.scenes_2d_count = 2;
-	scene_params.scenes_3d_count = 0;
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, &scene_params);
+	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
 	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
 
 	// Create objects with identity transform, then set position/scale
@@ -88,19 +76,14 @@ i32 main() {
 	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
-		se_window_poll_events();
-		se_window_update(window);
+		se_window_tick(window);
 		se_render_handle_reload_changed_shaders(render_handle);
 
 		s_vec2 current_pos = se_object_2d_get_position(button_yes);
 		se_object_2d_set_position(button_yes, &s_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
 		se_object_2d_get_box_2d(button_yes, &button_box_yes);
 		se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
-		se_scene_2d_render(scene_2d, render_handle);
-
-		se_render_clear();
-		se_scene_2d_render_to_screen(scene_2d, render_handle, window);
-		se_window_render_screen(window);
+		se_scene_2d_draw(scene_2d, render_handle, window);
 	}
 
 	se_scene_handle_cleanup(scene_handle);
