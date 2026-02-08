@@ -7,6 +7,7 @@
 #include "stb_truetype.h"
 
 #define SE_TEXT_CHAR_COUNT 1024 * 8
+#define SE_TEXT_HANDLE_DEFAULT_FONTS 4
 
 typedef struct {
 	c8 path[SE_MAX_PATH_LENGTH];

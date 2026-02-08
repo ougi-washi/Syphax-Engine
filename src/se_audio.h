@@ -23,6 +23,8 @@ typedef struct {
 	b8 enable_capture : 1;
 } se_audio_config;
 
+#define SE_AUDIO_CONFIG_DEFAULTS ((se_audio_config){ .sample_rate = 48000, .channels = 2, .max_clips = 32, .max_streams = 8, .max_captures = 2, .enable_capture = true })
+
 typedef struct {
 	f32 volume;
 	f32 pan;

@@ -10,15 +10,10 @@ i32 main() {
 	se_render_handle* render_handle = se_render_handle_create(NULL);
 	
 	se_window* window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
+	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
 	
-	se_text_handle* text_handle = se_text_handle_create(render_handle, 1);
+	se_text_handle* text_handle = se_text_handle_create(render_handle, 0);
 	se_font* font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.f);
-
-	// TODO: Edit syphax array and make this in a single line
-	se_key_combo exit_keys = {0};
-	s_array_init(&exit_keys, 1);
-	s_array_add(&exit_keys, GLFW_KEY_ESCAPE); 
-	se_window_set_exit_keys(window, &exit_keys);
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);

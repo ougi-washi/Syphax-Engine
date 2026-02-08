@@ -13,6 +13,23 @@
 
 static se_windows windows_container = { 0 };
 
+static void se_window_init_render(se_window* window, se_render_handle* render_handle) {
+	s_assertf(window, "se_window_init_render :: window is null");
+	if (!render_handle) {
+		return;
+	}
+	if (window->render_handle == render_handle && window->shader) {
+		return;
+	}
+	window->render_handle = render_handle;
+	if (window->quad.vao == 0) {
+		se_quad_2d_create(&window->quad, 0);
+	}
+	if (!window->shader) {
+		window->shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+	}
+}
+
 static void key_callback(GLFWwindow* glfw_handle, i32 key, i32 scancode, i32 action, i32 mods) {
 	se_window* window = (se_window*)glfwGetWindowUserPointer(glfw_handle);
 	if (key >= 0 && key < 1024) {
@@ -63,7 +80,6 @@ void gl_error_callback(i32 error, const c8* description) {
 }
 
 se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height) {
-	s_assertf(render_handle, "se_window_create :: render_handle is null");
 	s_assertf(title, "se_window_create :: title is null");
 
 	glfwSetErrorCallback(gl_error_callback);
@@ -79,7 +95,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	se_window* new_window = s_array_increment(&windows_container);
 	memset(new_window, 0, sizeof(se_window));
 	s_assertf(new_window, "Failed to create window");
-	new_window->render_handle = render_handle;
+	new_window->render_handle = NULL;
 
 	if (new_window == NULL) {
 		printf("Failed to create window\n");
@@ -118,8 +134,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	glEnable(GL_DEPTH_TEST);
 	
 	//create_fullscreen_quad(&new_window->quad_vao, &new_window->quad_vbo, &new_window->quad_ebo);
-	se_quad_2d_create(&new_window->quad, 0);
-	new_window->shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+	se_window_init_render(new_window, render_handle);
 
 	new_window->time.current = glfwGetTime();
 	new_window->time.last_frame = new_window->time.current;
@@ -128,6 +143,11 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->target_fps = 30;
 	printf("se_window_create :: created window %p\n", new_window);
 	return new_window;
+}
+
+void se_window_attach_render(se_window* window, se_render_handle* render_handle) {
+	s_assertf(window, "se_window_attach_render :: window is null");
+	se_window_init_render(window, render_handle);
 }
 
 extern void se_window_update(se_window* window) {
@@ -149,6 +169,7 @@ void se_window_tick(se_window* window) {
 }
 
 void se_window_render_quad(se_window* window) {
+	s_assertf(window->shader, "se_window_render_quad :: shader is null");
 	se_shader_use(window->render_handle, window->shader, true, false);
 	se_quad_render(&window->quad, 0);
 }
@@ -169,6 +190,18 @@ void se_window_render_screen(se_window* window) {
 	}
 	
 	glfwSwapBuffers(window->handle);
+}
+
+void se_window_present(se_window* window) {
+	se_window_render_screen(window);
+}
+
+void se_window_present_frame(se_window* window, const s_vec4* clear_color) {
+	if (clear_color) {
+		se_render_set_background_color(*clear_color);
+	}
+	se_render_clear();
+	se_window_render_screen(window);
 }
 
 void se_window_poll_events(){
@@ -286,10 +319,23 @@ void se_window_set_exit_keys(se_window* window, se_key_combo* keys) {
 	s_assertf(window, "se_window_set_exit_keys :: window is null");
 	s_assertf(keys, "se_window_set_exit_keys :: keys is null");
 	window->exit_keys = keys;
+	window->use_exit_key = false;
+}
+
+void se_window_set_exit_key(se_window* window, i32 key) {
+	s_assertf(window, "se_window_set_exit_key :: window is null");
+	window->exit_key = key;
+	window->use_exit_key = true;
 }
 
 void se_window_check_exit_keys(se_window* window) {
 	s_assertf(window, "se_window_check_exit_keys :: window is null");
+	if (window->use_exit_key) {
+		if (window->exit_key >= 0 && window->exit_key < 1024 && se_window_is_key_down(window, window->exit_key)) {
+			glfwSetWindowShouldClose(window->handle, GLFW_TRUE);
+			return;
+		}
+	}
 	if (!window->exit_keys) {
 		return;
 	}

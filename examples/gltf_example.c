@@ -48,10 +48,7 @@ int main() {
 	se_render_handle *render_handle = se_render_handle_create(&render_params);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - glTF Example", WINDOW_WIDTH, WINDOW_HEIGHT);
-	se_key_combo exit_keys = {0};
-	s_array_init(&exit_keys, 1);
-	s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
-	se_window_set_exit_keys(window, &exit_keys);
+	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
 
 	se_scene_handle_params scene_params = {0};
 	scene_params.objects_2d_count = 0;

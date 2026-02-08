@@ -9,11 +9,11 @@
 
 se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32 fonts_count) {
 	s_assertf(render_handle, "se_init_text_render :: render_handle is null");
-	s_assertf(fonts_count > 0, "se_init_text_render :: fonts_count is 0");
+	u32 resolved_fonts = fonts_count > 0 ? fonts_count : SE_TEXT_HANDLE_DEFAULT_FONTS;
 	se_text_handle* text_handle = malloc(sizeof(se_text_handle));
 	memset(text_handle, 0, sizeof(se_text_handle));
 	text_handle->render_handle = render_handle;
-	s_array_init(&text_handle->fonts, fonts_count);
+	s_array_init(&text_handle->fonts, resolved_fonts);
 	se_quad_2d_create(&text_handle->quad, SE_TEXT_CHAR_COUNT);
 	se_quad_2d_add_instance_buffer(&text_handle->quad, text_handle->buffer, SE_TEXT_CHAR_COUNT);
 	s_assertf(text_handle, "se_init_text_render :: text_handle is null");

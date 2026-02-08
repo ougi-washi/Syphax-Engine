@@ -7,26 +7,44 @@
 se_ui_handle *se_ui_handle_create(se_window *window, se_render_handle *render_handle, const se_ui_handle_params *params) {
 	s_assertf(window, "se_ui_handle_create :: window is null");
 	s_assertf(render_handle, "se_ui_handle_create :: render_handle is null");
-	s_assertf(params, "se_ui_handle_create :: params is null");
+	se_ui_handle_params resolved = SE_UI_HANDLE_PARAMS_DEFAULTS;
+	if (params) {
+		resolved = *params;
+		if (resolved.elements_count == 0) {
+			resolved.elements_count = SE_UI_HANDLE_PARAMS_DEFAULTS.elements_count;
+		}
+		if (resolved.children_per_element_count == 0) {
+			resolved.children_per_element_count = SE_UI_HANDLE_PARAMS_DEFAULTS.children_per_element_count;
+		}
+		if (resolved.objects_per_element_count == 0) {
+			resolved.objects_per_element_count = SE_UI_HANDLE_PARAMS_DEFAULTS.objects_per_element_count;
+		}
+		if (resolved.texts_count == 0) {
+			resolved.texts_count = SE_UI_HANDLE_PARAMS_DEFAULTS.texts_count;
+		}
+		if (resolved.fonts_count == 0) {
+			resolved.fonts_count = SE_UI_HANDLE_PARAMS_DEFAULTS.fonts_count;
+		}
+	}
 
 	se_ui_handle *ui_handle = malloc(sizeof(se_ui_handle));
 	memset(ui_handle, 0, sizeof(se_ui_handle));
 	ui_handle->window = window;
 	ui_handle->render_handle = render_handle;
-	s_array_init(&ui_handle->ui_elements, params->elements_count);
-	ui_handle->objects_per_element_count = params->objects_per_element_count;
-	ui_handle->children_per_element_count = params->children_per_element_count;
+	s_array_init(&ui_handle->ui_elements, resolved.elements_count);
+	ui_handle->objects_per_element_count = resolved.objects_per_element_count;
+	ui_handle->children_per_element_count = resolved.children_per_element_count;
 
 	se_scene_handle_params scene_params = {0};
-	scene_params.objects_2d_count = params->elements_count * params->objects_per_element_count + 1;
+	scene_params.objects_2d_count = resolved.elements_count * resolved.objects_per_element_count + 1;
 	scene_params.objects_3d_count = 0;
-	scene_params.scenes_2d_count = params->elements_count * params->children_per_element_count + 1;
+	scene_params.scenes_2d_count = resolved.elements_count * resolved.children_per_element_count + 1;
 	scene_params.scenes_3d_count = 0;
 	ui_handle->scene_handle = se_scene_handle_create(render_handle, &scene_params);
 
-	if (params->fonts_count > 0) {
-		ui_handle->text_handle = se_text_handle_create(render_handle, params->fonts_count);
-		s_array_init(&ui_handle->ui_texts, params->texts_count);
+	if (resolved.fonts_count > 0) {
+		ui_handle->text_handle = se_text_handle_create(render_handle, resolved.fonts_count);
+		s_array_init(&ui_handle->ui_texts, resolved.texts_count);
 	}
 	printf("se_ui_handle_create :: created ui handle %p\n", ui_handle);
 	return ui_handle;

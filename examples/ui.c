@@ -41,6 +41,7 @@ i32 main() {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
+	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
 
 	se_ui_handle_params ui_handle_params = SE_UI_HANDLE_PARAMS_DEFAULTS;
 	se_ui_handle *ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
@@ -81,12 +82,6 @@ i32 main() {
 	se_box_2d maximize_box = {0};
 	se_object_2d_get_box_2d(button_maximize, &maximize_box);
 	se_window_register_input_event(window, &maximize_box, 0, &on_button_hovered, &on_button_stop_hovered, button_maximize);
-
-	// TODO: Edit syphax array and make this in a single line
-	se_key_combo exit_keys = {0};
-	s_array_init(&exit_keys, 1);
-	s_array_add(&exit_keys, GLFW_KEY_ESCAPE);
-	se_window_set_exit_keys(window, &exit_keys);
 
 	se_window_set_target_fps(window, 30);
 	while (!se_window_should_close(window)) {

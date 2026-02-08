@@ -58,6 +58,8 @@ typedef struct {
 	u64 frame_count;
 
 	se_key_combo* exit_keys;
+	i32 exit_key;
+	b8 use_exit_key : 1;
 	s_array(se_resize_handle, resize_handles);
 	s_array(se_input_event, input_events);
 } se_window;
@@ -65,10 +67,13 @@ typedef struct {
 typedef s_array(se_window, se_windows);
 
 extern se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height);
+extern void se_window_attach_render(se_window* window, se_render_handle* render_handle);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
 extern void se_window_tick(se_window* window); // update + poll events (single-window convenience)
 extern void se_window_render_quad(se_window* window);	 // mid-frame: draws using window's quad
 extern void se_window_render_screen(se_window* window); // frame end: clear, renders the frame and swaps buffers
+extern void se_window_present(se_window* window); // swaps buffers (alias for render_screen)
+extern void se_window_present_frame(se_window* window, const s_vec4* clear_color);
 extern void se_window_poll_events();
 extern b8 se_window_is_key_down(se_window* window, i32 key);
 extern b8 se_window_is_key_pressed(se_window* window, i32 key);
@@ -84,6 +89,7 @@ extern void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_
 extern b8 se_window_should_close(se_window* window);
 extern void se_window_set_should_close(se_window* window, const b8 should_close);
 extern void se_window_set_exit_keys(se_window* window, se_key_combo* keys);
+extern void se_window_set_exit_key(se_window* window, i32 key);
 extern void se_window_check_exit_keys(se_window* window);
 extern f64 se_window_get_delta_time(se_window* window);
 extern f64 se_window_get_fps(se_window* window);
@@ -94,5 +100,13 @@ extern void se_window_update_input_event(const i32 input_event_id, se_window* wi
 extern void se_window_register_resize_event(se_window* window, se_resize_event_callback callback, void* data);
 extern void se_window_destroy(se_window* window);
 extern void se_window_destroy_all();
+
+#define se_window_loop(_window, ...) do { \
+	while (!se_window_should_close((_window))) { \
+		se_window_tick((_window)); \
+		__VA_ARGS__ \
+		se_window_present((_window)); \
+	} \
+} while (0)
 
 #endif // SE_WINDOW_H
