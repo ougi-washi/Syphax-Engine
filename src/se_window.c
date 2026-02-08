@@ -4,6 +4,7 @@
 #include "se_gl.h"
 #include <unistd.h>
 #include <limits.h>
+#include <string.h>
 
 #define SE_MAX_WINDOWS 8
 #define SE_MAX_KEY_COMBOS 8
@@ -76,6 +77,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 		s_array_init(&windows_container, SE_MAX_WINDOWS);
 	}
 	se_window* new_window = s_array_increment(&windows_container);
+	memset(new_window, 0, sizeof(se_window));
 	s_assertf(new_window, "Failed to create window");
 	new_window->render_handle = render_handle;
 
@@ -130,6 +132,10 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 
 extern void se_window_update(se_window* window) {
 	se_window_check_exit_keys(window);
+	memcpy(window->keys_prev, window->keys, sizeof(window->keys));
+	memcpy(window->mouse_buttons_prev, window->mouse_buttons, sizeof(window->mouse_buttons));
+	window->mouse_dx = 0.0;
+	window->mouse_dy = 0.0;
 	window->time.last_frame = window->time.current;
 	window->time.current = glfwGetTime();
 	window->time.delta = window->time.current - window->time.last_frame;
@@ -206,9 +212,29 @@ b8 se_window_is_key_down(se_window* window, i32 key) {
 	return window->keys[key];
 }
 
+b8 se_window_is_key_pressed(se_window* window, i32 key) {
+	s_assertf(window, "se_window_is_key_pressed :: window is null");
+	return window->keys[key] && !window->keys_prev[key];
+}
+
+b8 se_window_is_key_released(se_window* window, i32 key) {
+	s_assertf(window, "se_window_is_key_released :: window is null");
+	return !window->keys[key] && window->keys_prev[key];
+}
+
 b8 se_window_is_mouse_down(se_window* window, i32 button) {
 	s_assertf(window, "se_window_is_mouse_down :: window is null");
 	return window->mouse_buttons[button];
+}
+
+b8 se_window_is_mouse_pressed(se_window* window, i32 button) {
+	s_assertf(window, "se_window_is_mouse_pressed :: window is null");
+	return window->mouse_buttons[button] && !window->mouse_buttons_prev[button];
+}
+
+b8 se_window_is_mouse_released(se_window* window, i32 button) {
+	s_assertf(window, "se_window_is_mouse_released :: window is null");
+	return !window->mouse_buttons[button] && window->mouse_buttons_prev[button];
 }
 
 f32 se_window_get_mouse_position_x(se_window* window) {
@@ -362,6 +388,8 @@ void se_window_destroy(se_window* window) {
 	s_assertf(window->handle, "se_window_destroy :: window->handle is null");
 
 	se_quad_destroy(&window->quad);
+	s_array_clear(&window->input_events);
+	s_array_clear(&window->resize_handles);
 
 	glfwDestroyWindow(window->handle);
 	window->handle = NULL;
@@ -381,4 +409,3 @@ void se_window_destroy_all(){
 		se_window_destroy(window);
 	}
 }
-

@@ -44,9 +44,11 @@ typedef struct {
 	u32 height;
 
 	b8 keys[1024];
+	b8 keys_prev[1024];
 	f64 mouse_x, mouse_y;
 	f64 mouse_dx, mouse_dy;
 	b8 mouse_buttons[8];
+	b8 mouse_buttons_prev[8];
 
 	se_quad quad;
 	se_shader* shader;
@@ -68,7 +70,11 @@ extern void se_window_render_quad(se_window* window);	 // mid-frame: draws using
 extern void se_window_render_screen(se_window* window); // frame end: clear, renders the frame and swaps buffers
 extern void se_window_poll_events();
 extern b8 se_window_is_key_down(se_window* window, i32 key);
+extern b8 se_window_is_key_pressed(se_window* window, i32 key);
+extern b8 se_window_is_key_released(se_window* window, i32 key);
 extern b8 se_window_is_mouse_down(se_window* window, i32 button);
+extern b8 se_window_is_mouse_pressed(se_window* window, i32 button);
+extern b8 se_window_is_mouse_released(se_window* window, i32 button);
 extern f32 se_window_get_mouse_position_x(se_window* window);
 extern f32 se_window_get_mouse_position_y(se_window* window);
 extern void se_window_get_mouse_position_normalized(se_window* window, s_vec2* out_mouse_position);

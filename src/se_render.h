@@ -185,6 +185,8 @@ typedef struct {
 	u16 cameras_count;
 } se_render_handle_params;
 
+#define SE_RENDER_HANDLE_PARAMS_DEFAULTS ((se_render_handle_params){ .framebuffers_count = 8, .render_buffers_count = 8, .textures_count = 64, .shaders_count = 32, .models_count = 16, .cameras_count = 8 })
+
 // TODO: maybe this should not be accessible by the user, and instead it should
 // be in the .c file, as there seem no need for direct access. All the following
 // data is accessed through other handles.
@@ -308,6 +310,8 @@ extern void se_mesh_instance_update(se_mesh_instance *instance);
 extern void se_mesh_instance_destroy(se_mesh_instance *instance);
 
 // Utility functions
+
+#define se_render_command(...) do { __VA_ARGS__ } while (0)
 
 // logging
 extern void se_print_mat4(const s_mat4 *mat);

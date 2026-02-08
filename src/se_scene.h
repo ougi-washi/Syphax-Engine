@@ -100,6 +100,8 @@ typedef struct {
 	u16 scenes_3d_count;
 } se_scene_handle_params;
 
+#define SE_SCENE_HANDLE_PARAMS_DEFAULTS ((se_scene_handle_params){ .objects_2d_count = 128, .objects_3d_count = 128, .scenes_2d_count = 16, .scenes_3d_count = 16 })
+
 typedef struct {
 	se_render_handle *render_handle;
 	se_objects_2d objects_2d;

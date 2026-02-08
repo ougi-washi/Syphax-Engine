@@ -48,7 +48,6 @@ void se_unbind_framebuffer() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
 
 void se_render_clear() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0, 0, 0, 0);
 }
 
 void se_render_set_background_color(const s_vec4 color) {
@@ -56,17 +55,39 @@ void se_render_set_background_color(const s_vec4 color) {
 }
 
 se_render_handle *se_render_handle_create(const se_render_handle_params *params) {
-	s_assertf(params, "se_render_handle_create :: params is null");
+	se_render_handle_params resolved = SE_RENDER_HANDLE_PARAMS_DEFAULTS;
+	if (params) {
+		resolved = *params;
+		if (resolved.framebuffers_count == 0) {
+			resolved.framebuffers_count = SE_RENDER_HANDLE_PARAMS_DEFAULTS.framebuffers_count;
+		}
+		if (resolved.render_buffers_count == 0) {
+			resolved.render_buffers_count = SE_RENDER_HANDLE_PARAMS_DEFAULTS.render_buffers_count;
+		}
+		if (resolved.textures_count == 0) {
+			resolved.textures_count = SE_RENDER_HANDLE_PARAMS_DEFAULTS.textures_count;
+		}
+		if (resolved.shaders_count == 0) {
+			resolved.shaders_count = SE_RENDER_HANDLE_PARAMS_DEFAULTS.shaders_count;
+		}
+		if (resolved.models_count == 0) {
+			resolved.models_count = SE_RENDER_HANDLE_PARAMS_DEFAULTS.models_count;
+		}
+		if (resolved.cameras_count == 0) {
+			resolved.cameras_count = SE_RENDER_HANDLE_PARAMS_DEFAULTS.cameras_count;
+		}
+	}
 	se_render_handle *render_handle = malloc(sizeof(se_render_handle));
 	memset(render_handle, 0, sizeof(se_render_handle));
 
-	s_array_init(&render_handle->framebuffers, params->framebuffers_count);
-	s_array_init(&render_handle->render_buffers, params->render_buffers_count);
-	s_array_init(&render_handle->textures, params->textures_count);
-	s_array_init(&render_handle->shaders, params->shaders_count);
-	s_array_init(&render_handle->models, params->models_count);
-	s_array_init(&render_handle->cameras, params->cameras_count);
+	s_array_init(&render_handle->framebuffers, resolved.framebuffers_count);
+	s_array_init(&render_handle->render_buffers, resolved.render_buffers_count);
+	s_array_init(&render_handle->textures, resolved.textures_count);
+	s_array_init(&render_handle->shaders, resolved.shaders_count);
+	s_array_init(&render_handle->models, resolved.models_count);
+	s_array_init(&render_handle->cameras, resolved.cameras_count);
 	s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
+	se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 	printf("se_render_handle_create :: created render handle %p\n", render_handle);
 	return render_handle;
@@ -93,12 +114,8 @@ void se_render_handle_cleanup(se_render_handle *render_handle) {
 	se_shader_cleanup(curr_shader);
 	}
 	s_array_clear(&render_handle->shaders);
-
-	s_foreach(&render_handle->models, i) {
-	se_model *curr_model = s_array_get(&render_handle->models, i);
-	se_model_cleanup(curr_model);
-	}
-	s_array_clear(&render_handle->models);
+	s_array_clear(&render_handle->cameras);
+	s_array_clear(&render_handle->global_uniforms);
 
 	s_foreach(&render_handle->framebuffers, i) {
 	se_framebuffer *curr_framebuffer =
@@ -961,9 +978,17 @@ void se_render_buffer_cleanup(se_render_buffer *buffer) {
 	glDeleteFramebuffers(1, &buffer->framebuffer);
 	buffer->framebuffer = 0;
 	}
+	if (buffer->prev_framebuffer) {
+		glDeleteFramebuffers(1, &buffer->prev_framebuffer);
+		buffer->prev_framebuffer = 0;
+	}
 	if (buffer->texture) {
 	glDeleteTextures(1, &buffer->texture);
 	buffer->texture = 0;
+	}
+	if (buffer->prev_texture) {
+		glDeleteTextures(1, &buffer->prev_texture);
+		buffer->prev_texture = 0;
 	}
 	if (buffer->depth_buffer) {
 	glDeleteRenderbuffers(1, &buffer->depth_buffer);

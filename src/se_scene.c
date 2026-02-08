@@ -12,13 +12,29 @@
 #define SE_OBJECT_2D_VERTEX_SHADER_PATH "shaders/object_2d_vertex.glsl"
 
 se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const se_scene_handle_params *params) {
+	se_scene_handle_params resolved = SE_SCENE_HANDLE_PARAMS_DEFAULTS;
+	if (params) {
+		resolved = *params;
+		if (resolved.objects_2d_count == 0) {
+			resolved.objects_2d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.objects_2d_count;
+		}
+		if (resolved.objects_3d_count == 0) {
+			resolved.objects_3d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.objects_3d_count;
+		}
+		if (resolved.scenes_2d_count == 0) {
+			resolved.scenes_2d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.scenes_2d_count;
+		}
+		if (resolved.scenes_3d_count == 0) {
+			resolved.scenes_3d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.scenes_3d_count;
+		}
+	}
 	se_scene_handle *scene_handle = (se_scene_handle *)malloc(sizeof(se_scene_handle));
 	memset(scene_handle, 0, sizeof(se_scene_handle));
 
-	s_array_init(&scene_handle->objects_2d, params->objects_2d_count);
-	s_array_init(&scene_handle->objects_3d, params->objects_3d_count);
-	s_array_init(&scene_handle->scenes_2d, params->scenes_2d_count);
-	s_array_init(&scene_handle->scenes_3d, params->scenes_3d_count);
+	s_array_init(&scene_handle->objects_2d, resolved.objects_2d_count);
+	s_array_init(&scene_handle->objects_3d, resolved.objects_3d_count);
+	s_array_init(&scene_handle->scenes_2d, resolved.scenes_2d_count);
+	s_array_init(&scene_handle->scenes_3d, resolved.scenes_3d_count);
 
 	// if render handle is null, this is a scene handle that is not used for
 	// rendering (eg. server side implementation)
@@ -234,6 +250,9 @@ void se_object_2d_destroy(se_scene_handle *scene_handle, se_object_2d *object) {
 	s_assertf(scene_handle, "se_object_2d_destroy :: scene_handle is null");
 	s_assertf(object, "se_object_2d_destroy :: object is null");
 	printf("se_object_2d_destroy :: scene_handle: %p, object: %p\n", scene_handle, object);
+	if (!object->is_custom) {
+		se_quad_destroy(&object->quad);
+	}
 	s_array_clear(&object->render_transforms);
 	s_array_clear(&object->instances.ids);
 	s_array_clear(&object->instances.transforms);
@@ -591,7 +610,11 @@ se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
 void se_scene_2d_destroy(se_scene_handle *scene_handle, se_scene_2d *scene) {
 	s_assertf(scene_handle, "se_scene_2d_destroy :: scene_handle is null");
 	s_assertf(scene, "se_scene_2d_destroy :: scene is null");
-	// TODO: unsure if we should request cleanup of all render buffers and shaders
+	if (scene->output) {
+		se_framebuffer_cleanup(scene->output);
+		scene->output = NULL;
+	}
+	s_array_clear(&scene->objects);
 	s_array_remove(&scene_handle->scenes_2d, scene);
 }
 
@@ -688,6 +711,16 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 
 void se_scene_3d_destroy(se_scene_handle *scene_handle, se_scene_3d *scene) {
 	printf("se_scene_3d_destroy :: scene: %p\n", scene);
+	if (scene->camera && scene_handle->render_handle) {
+		se_camera_destroy(scene_handle->render_handle, scene->camera);
+		scene->camera = NULL;
+	}
+	if (scene->output) {
+		se_framebuffer_cleanup(scene->output);
+		scene->output = NULL;
+	}
+	s_array_clear(&scene->post_process);
+	s_array_clear(&scene->objects);
 	s_array_remove(&scene_handle->scenes_3d, scene);
 }
 
@@ -811,4 +844,3 @@ void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *b
 void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
 	s_array_remove(&scene->post_process, &buffer);
 }
-
