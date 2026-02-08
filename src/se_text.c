@@ -57,7 +57,7 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	c8 new_path[SE_MAX_PATH_LENGTH] = "";
 	strncpy(new_path, RESOURCES_DIR, SE_MAX_PATH_LENGTH - 1);
 	strncat(new_path, path, SE_MAX_PATH_LENGTH - strlen(new_path) - 1);
-	uc8* font_file_data = load_file_uc8(new_path, &font_file_size);
+	uc8* font_file_data = se_file_load_uc8(new_path, &font_file_size);
 
 	s_assertf(font_file_data, "se_font_load :: file_data is null");
 	

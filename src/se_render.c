@@ -15,8 +15,10 @@
 
 #define SE_UNIFORMS_MAX 128
 
-static GLuint compile_shader(const char *source, GLenum type);
-static GLuint create_shader_program(const char *vertex_source, const char *fragment_source);
+static GLuint se_shader_compile(const char *source, GLenum type);
+static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source);
+
+static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_size, const char *label);
 
 static b8 se_is_blending = false;
 void se_enable_blending() {
@@ -196,15 +198,15 @@ b8 se_shader_load_internal(se_shader *shader) {
 
 	se_shader_cleanup(shader);
 
-	char *vertex_source = load_file(shader->vertex_path);
-	char *fragment_source = load_file(shader->fragment_path);
+	char *vertex_source = se_file_load(shader->vertex_path);
+	char *fragment_source = se_file_load(shader->fragment_path);
 
 	if (!vertex_source || !fragment_source) {
 	free(vertex_source);
 	free(fragment_source);
 	return false;
 	}
-	shader->program = create_shader_program(vertex_source, fragment_source);
+	shader->program = se_shader_create_program(vertex_source, fragment_source);
 	free(vertex_source);
 	free(fragment_source);
 
@@ -212,8 +214,8 @@ b8 se_shader_load_internal(se_shader *shader) {
 	return false;
 	}
 
-	shader->vertex_mtime = get_file_mtime(shader->vertex_path);
-	shader->fragment_mtime = get_file_mtime(shader->fragment_path);
+	shader->vertex_mtime = se_file_get_mtime(shader->vertex_path);
+	shader->fragment_mtime = se_file_get_mtime(shader->fragment_path);
 	s_array_init(&shader->uniforms, SE_UNIFORMS_MAX);
 	printf("se_shader_load_internal :: created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
 	return true;
@@ -263,8 +265,8 @@ b8 se_shader_reload_if_changed(se_shader *shader) {
 	return false;
 	}
 
-	time_t vertex_mtime = get_file_mtime(shader->vertex_path);
-	time_t fragment_mtime = get_file_mtime(shader->fragment_path);
+	time_t vertex_mtime = se_file_get_mtime(shader->vertex_path);
+	time_t fragment_mtime = se_file_get_mtime(shader->fragment_path);
 
 	if (vertex_mtime != shader->vertex_mtime ||
 		fragment_mtime != shader->fragment_mtime) {
@@ -349,8 +351,34 @@ void se_mesh_scale(se_mesh *mesh, const s_vec3 *v) {
     s_mat4_scale(&mesh->matrix, v);
 }
 
+static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_size, const char *label) {
+	if (needed <= *capacity) {
+		return true;
+	}
+
+	u32 new_capacity = *capacity ? *capacity : 64;
+	while (new_capacity < needed) {
+		u32 next_capacity = new_capacity * 2;
+		if (next_capacity < new_capacity) {
+			new_capacity = needed;
+			break;
+		}
+		new_capacity = next_capacity;
+	}
+
+	void *new_data = realloc(*data, (sz)new_capacity * elem_size);
+	if (!new_data) {
+		fprintf(stderr, "se_model_load_obj :: out of memory for %s\n", label);
+		return false;
+	}
+
+	*data = new_data;
+	*capacity = new_capacity;
+	return true;
+}
+
 // Helper function to finalize a mesh
-void finalize_mesh(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices, u32 vertex_count, u32 index_count, se_shaders_ptr *shaders, u32 se_mesh_index) {
+static void se_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices, u32 vertex_count, u32 index_count, se_shaders_ptr *shaders, u32 se_mesh_index) {
 	// Allocate mesh data
 	mesh->vertices = malloc(vertex_count * sizeof(se_vertex_3d));
 	mesh->indices = malloc(index_count * sizeof(u32));
@@ -411,9 +439,12 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	}
 
 	// Arrays for temporary storage (shared across all meshes)
-	s_vec3 *temp_vertices = malloc(SE_MAX_VERTICES * sizeof(s_vec3));
-	s_vec3 *temp_normals = malloc(SE_MAX_VERTICES * sizeof(s_vec3));
-	s_vec2 *temp_uvs = malloc(SE_MAX_VERTICES * sizeof(s_vec2));
+	s_vec3 *temp_vertices = NULL;
+	s_vec3 *temp_normals = NULL;
+	s_vec2 *temp_uvs = NULL;
+	u32 temp_vertices_capacity = 0;
+	u32 temp_normals_capacity = 0;
+	u32 temp_uvs_capacity = 0;
 
 	u32 vertex_count = 0;
 	u32 normal_count = 0;
@@ -422,28 +453,43 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	// Dynamic array for meshes
 
 	// Current mesh data
-	se_vertex_3d *current_vertices = malloc(SE_MAX_VERTICES * sizeof(se_vertex_3d));
-	u32 *current_indices = malloc(SE_MAX_INDICES * sizeof(u32));
+	se_vertex_3d *current_vertices = NULL;
+	u32 *current_indices = NULL;
+	u32 current_vertices_capacity = 0;
+	u32 current_indices_capacity = 0;
 	u32 current_vertex_count = 0;
 	u32 current_index_count = 0;
 
 	char line[256];
 	char current_object[256] = "default";
 	b8 hse_faces = false;
+	b8 ok = true;
 
 	while (fgets(line, sizeof(line), file)) {
 	if (strncmp(line, "v ", 2) == 0) {
 		// Vertex position
+		if (!se_ensure_capacity((void **)&temp_vertices, &temp_vertices_capacity, vertex_count + 1, sizeof(s_vec3), "vertex positions")) {
+			ok = false;
+			break;
+		}
 		sscanf(line, "v %f %f %f", &temp_vertices[vertex_count].x,
 			 &temp_vertices[vertex_count].y, &temp_vertices[vertex_count].z);
 		vertex_count++;
 	} else if (strncmp(line, "vn ", 3) == 0) {
 		// Vertex normal
+		if (!se_ensure_capacity((void **)&temp_normals, &temp_normals_capacity, normal_count + 1, sizeof(s_vec3), "vertex normals")) {
+			ok = false;
+			break;
+		}
 		sscanf(line, "vn %f %f %f", &temp_normals[normal_count].x,
 			 &temp_normals[normal_count].y, &temp_normals[normal_count].z);
 		normal_count++;
 	} else if (strncmp(line, "vt ", 3) == 0) {
 		// Vertex texture coordinate
+		if (!se_ensure_capacity((void **)&temp_uvs, &temp_uvs_capacity, uv_count + 1, sizeof(s_vec2), "vertex uvs")) {
+			ok = false;
+			break;
+		}
 		sscanf(line, "vt %f %f", &temp_uvs[uv_count].x, &temp_uvs[uv_count].y);
 		uv_count++;
 	} else if (strncmp(line, "o ", 2) == 0 || strncmp(line, "g ", 2) == 0) {
@@ -452,7 +498,7 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 		se_mesh *new_mesh = s_array_increment(&model->meshes);
 		const sz mesh_count = s_array_get_size(&model->meshes);
 		if (mesh_count > 0) {
-			finalize_mesh(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
+			se_mesh_finalize(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
 		}
 		// Reset for next mesh
 		current_vertex_count = 0;
@@ -467,9 +513,14 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 		hse_faces = true;
 		u32 v1, v2, v3, n1, n2, n3, t1, t2, t3;
 		i32 matches = sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d", &v1, &t1, &n1,
-							 &v2, &t2, &n2, &v3, &t3, &n3);
+					 &v2, &t2, &n2, &v3, &t3, &n3);
 
 		if (matches == 9) {
+			if (!se_ensure_capacity((void **)&current_vertices, &current_vertices_capacity, current_vertex_count + 3, sizeof(se_vertex_3d), "mesh vertices") ||
+				!se_ensure_capacity((void **)&current_indices, &current_indices_capacity, current_index_count + 3, sizeof(u32), "mesh indices")) {
+				ok = false;
+				break;
+			}
 		// Create vertices for this face
 		for (i32 i = 0; i < 3; i++) {
 			u32 vi = (i == 0) ? v1 - 1 : (i == 1) ? v2 - 1 : v3 - 1;
@@ -494,9 +545,14 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 		// Try to parse face without texture coordinates (v//n format)
 		matches = sscanf(line, "f %d//%d %d//%d %d//%d", &v1, &n1, &v2, &n2, &v3, &n3);
 		if (matches == 6) {
+			if (!se_ensure_capacity((void **)&current_vertices, &current_vertices_capacity, current_vertex_count + 3, sizeof(se_vertex_3d), "mesh vertices") ||
+				!se_ensure_capacity((void **)&current_indices, &current_indices_capacity, current_index_count + 3, sizeof(u32), "mesh indices")) {
+				ok = false;
+				break;
+			}
 			for (i32 i = 0; i < 3; i++) {
-			u32 vi = (i == 0) ? v1 - 1 : (i == 1) ? v2 - 1 : v3 - 1;
-			u32 ni = (i == 0) ? n1 - 1 : (i == 1) ? n2 - 1 : n3 - 1;
+				u32 vi = (i == 0) ? v1 - 1 : (i == 1) ? v2 - 1 : v3 - 1;
+				u32 ni = (i == 0) ? n1 - 1 : (i == 1) ? n2 - 1 : n3 - 1;
 
 			if (vi >= vertex_count || ni >= normal_count) {
 				fprintf(stderr, "OBJ file contains invalid face indices\n");
@@ -517,10 +573,10 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	}
 
 	// Finalize the last mesh
-	if (hse_faces && current_vertex_count > 0) {
+	if (ok && hse_faces && current_vertex_count > 0) {
 	const sz mesh_count = s_array_get_size(&model->meshes);
 	se_mesh *new_mesh = s_array_increment(&model->meshes);
-	finalize_mesh(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
+	se_mesh_finalize(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
 	}
 
 	fclose(file);
@@ -531,6 +587,11 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	free(temp_uvs);
 	free(current_vertices);
 	free(current_indices);
+
+	if (!ok) {
+		se_model_cleanup(model);
+		return NULL;
+	}
 
 	// If no meshes were created, create a default one
 	if (s_array_get_size(&model->meshes) == 0) {
@@ -1382,7 +1443,7 @@ void se_quad_destroy(se_quad *quad) {
 	glDeleteBuffers(1, &quad->ebo);
 }
 
-time_t get_file_mtime(const char *path) {
+time_t se_file_get_mtime(const char *path) {
 	struct stat st;
 	if (stat(path, &st) == 0) {
 	return st.st_mtime;
@@ -1390,10 +1451,10 @@ time_t get_file_mtime(const char *path) {
 	return 0;
 }
 
-char *load_file(const char *path) {
+char *se_file_load(const char *path) {
 	FILE *file = fopen(path, "rb");
 	if (!file) {
-	fprintf(stderr, "load_file :: Failed to open file: %s\n", path);
+	fprintf(stderr, "se_file_load :: Failed to open file: %s\n", path);
 	return NULL;
 	}
 
@@ -1414,10 +1475,10 @@ char *load_file(const char *path) {
 	return buffer;
 }
 
-uc8 *load_file_uc8(const char *path, sz *out_size) {
+uc8 *se_file_load_uc8(const char *path, sz *out_size) {
 	FILE *file = fopen(path, "rb");
 	if (!file) {
-	fprintf(stderr, "load_file_uc8 :: Failed to open file: %s\n", path);
+	fprintf(stderr, "se_file_load_uc8 :: Failed to open file: %s\n", path);
 	return NULL;
 	}
 
@@ -1439,7 +1500,7 @@ uc8 *load_file_uc8(const char *path, sz *out_size) {
 	return buffer;
 }
 
-static GLuint compile_shader(const char *source, GLenum type) {
+static GLuint se_shader_compile(const char *source, GLenum type) {
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &source, NULL);
 	glCompileShader(shader);
@@ -1449,7 +1510,7 @@ static GLuint compile_shader(const char *source, GLenum type) {
 	if (!success) {
 	char info_log[512];
 	glGetShaderInfoLog(shader, 512, NULL, info_log);
-	fprintf(stderr, "compile_shader :: Shader compilation failed: %s\n", info_log);
+	fprintf(stderr, "se_shader_compile :: Shader compilation failed: %s\n", info_log);
 	glDeleteShader(shader);
 	return 0;
 	}
@@ -1457,9 +1518,9 @@ static GLuint compile_shader(const char *source, GLenum type) {
 	return shader;
 }
 
-static GLuint create_shader_program(const char *vertex_source, const char *fragment_source) {
-	GLuint vertex_shader = compile_shader(vertex_source, GL_VERTEX_SHADER);
-	GLuint fragment_shader = compile_shader(fragment_source, GL_FRAGMENT_SHADER);
+static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source) {
+	GLuint vertex_shader = se_shader_compile(vertex_source, GL_VERTEX_SHADER);
+	GLuint fragment_shader = se_shader_compile(fragment_source, GL_FRAGMENT_SHADER);
 	if (!vertex_shader || !fragment_shader) {
 	if (vertex_shader) {
 		glDeleteShader(vertex_shader);
@@ -1467,7 +1528,7 @@ static GLuint create_shader_program(const char *vertex_source, const char *fragm
 	if (fragment_shader) {
 		glDeleteShader(fragment_shader);
 	}
-	printf("create_shader_program :: Failed to create shader program, vertex or fragment shaders are invalid\n");
+	printf("se_shader_create_program :: Failed to create shader program, vertex or fragment shaders are invalid\n");
 	return 0;
 	}
 
@@ -1481,7 +1542,7 @@ static GLuint create_shader_program(const char *vertex_source, const char *fragm
 	if (!success) {
 	char info_log[512];
 	glGetProgramInfoLog(program, 512, NULL, info_log);
-	fprintf(stderr, "create_shader_program :: Shader program linking failed: %s\n", info_log);
+	fprintf(stderr, "se_shader_create_program :: Shader program linking failed: %s\n", info_log);
 	glDeleteProgram(program);
 	program = 0;
 	}
