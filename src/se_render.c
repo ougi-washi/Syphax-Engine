@@ -1355,19 +1355,18 @@ void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, co
 void se_quad_render(se_quad *quad, const sz instance_count) {
 	glBindVertexArray(quad->vao);
 	if (instance_count > 0) {
-	if (quad->instance_buffers_dirty) {
-		s_foreach(&quad->instance_buffers, i) {
-		se_instance_buffer *current_buffer = s_array_get(&quad->instance_buffers, i);
-		glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		if (quad->instance_buffers_dirty) {
+			s_foreach(&quad->instance_buffers, i) {
+			se_instance_buffer *current_buffer = s_array_get(&quad->instance_buffers, i);
+			glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
+			glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			}
+			quad->instance_buffers_dirty = false;
 		}
-		quad->instance_buffers_dirty = false;
-	}
-	glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0,
-							instance_count);
+		glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, instance_count);
 	} else {
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 	glBindVertexArray(0);
 }
