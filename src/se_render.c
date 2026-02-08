@@ -171,6 +171,47 @@ se_texture *se_texture_load(se_render_handle *render_handle, const char *file_pa
 	return texture;
 }
 
+se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u8 *data, const sz size, const se_texture_wrap wrap) {
+	stbi_set_flip_vertically_on_load(1);
+
+	se_texture *texture = s_array_increment(&render_handle->textures);
+
+	int width = 0;
+	int height = 0;
+	int channels = 0;
+	unsigned char *pixels = stbi_load_from_memory(data, (int)size, &width, &height, &channels, 0);
+	if (!pixels) {
+		fprintf(stderr, "se_texture_load_from_memory :: could not load image from memory\n");
+		return NULL;
+	}
+
+	texture->width = width;
+	texture->height = height;
+	texture->channels = channels;
+	texture->path[0] = '\0';
+
+	glGenTextures(1, &texture->id);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture->id);
+
+	GLenum format = (texture->channels == 4) ? GL_RGBA : GL_RGB;
+	glTexImage2D(GL_TEXTURE_2D, 0, format, texture->width, texture->height, 0, format, GL_UNSIGNED_BYTE, pixels);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	if (wrap == SE_CLAMP) {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	} else if (wrap == SE_REPEAT) {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	}
+
+	stbi_image_free(pixels);
+	return texture;
+}
+
 void se_texture_cleanup(se_texture *texture) {
 	glDeleteTextures(1, &texture->id);
 	texture->id = 0;
@@ -378,6 +419,7 @@ static void se_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices
 	mesh->vertex_count = vertex_count;
 	mesh->index_count = index_count;
 	mesh->matrix = s_mat4_identity;
+	mesh->texture_id = 0;
 
 	// Assign shader (cycle through available shaders)
 	if (s_array_get_size(shaders) > 0) {

@@ -87,6 +87,7 @@ typedef struct {
 	se_render_buffers_ptr post_process;
 	se_shader_ptr output_shader;
 	se_framebuffer_ptr output;
+	b8 enable_culling : 1;
 } se_scene_3d;
 typedef s_array(se_scene_3d, se_scenes_3d);
 typedef se_scene_3d *se_scene_3d_ptr;
@@ -156,6 +157,7 @@ extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *r
 extern void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object);
 extern void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object);
 extern void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera);
+extern void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled);
 extern void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer);
 extern void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer);
 

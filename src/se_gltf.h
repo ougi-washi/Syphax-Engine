@@ -383,5 +383,7 @@ extern se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *
 extern void se_gltf_free(se_gltf_asset *asset);
 extern b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_write_params *params);
 extern se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index);
+extern se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap);
+extern se_texture *se_gltf_texture_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 texture_index, const se_texture_wrap wrap);
 
 #endif // SE_GLTF_H

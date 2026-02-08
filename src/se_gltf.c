@@ -1089,7 +1089,6 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 
 se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params) {
 	if (path == NULL || path[0] == '\0') return NULL;
-	printf("se_gltf_load :: path=%s\n", path);
 	se_gltf_load_params cfg;
 	se_gltf_set_default_load_params(&cfg, params);
 	se_gltf_asset *asset = (se_gltf_asset *)malloc(sizeof(se_gltf_asset));
@@ -1124,13 +1123,11 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 	}
 	root = s_json_parse(json_text);
 	if (root == NULL) {
-		printf("se_gltf_load :: failed to parse json\n");
 		free(json_text);
 		se_gltf_glb_data_free(&glb);
 		se_gltf_free(asset);
 		return NULL;
 	}
-	printf("se_gltf_load :: parsed json ok\n");
 	if (!se_gltf_parse_asset_info(root, &asset->asset) ||
 		!se_gltf_parse_top_level(root, asset) ||
 		!se_gltf_parse_buffers(root, asset, &cfg, bin_data, bin_size) ||
@@ -1152,14 +1149,6 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 		se_gltf_free(asset);
 		return NULL;
 	}
-	printf("se_gltf_load :: buffers=%zu bufferViews=%zu accessors=%zu meshes=%zu nodes=%zu scenes=%zu images=%zu\n",
-		asset->buffers.size,
-		asset->buffer_views.size,
-		asset->accessors.size,
-		asset->meshes.size,
-		asset->nodes.size,
-		asset->scenes.size,
-		asset->images.size);
 	s_json_free(root);
 	free(json_text);
 	se_gltf_glb_data_free(&glb);
@@ -1441,6 +1430,7 @@ static void se_gltf_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *in
 	mesh->index_count = index_count;
 	mesh->matrix = s_mat4_identity;
 	mesh->shader = NULL;
+	mesh->texture_id = 0;
 	glGenVertexArrays(1, &mesh->vao);
 	glGenBuffers(1, &mesh->vbo);
 	glGenBuffers(1, &mesh->ebo);
@@ -2020,22 +2010,14 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index) {
 	if (render_handle == NULL || asset == NULL) return NULL;
 	if (mesh_index < 0 || (sz)mesh_index >= asset->meshes.size) return NULL;
-	printf("se_gltf_to_model :: mesh_index=%d\n", mesh_index);
 	se_gltf_mesh *mesh = s_array_get(&asset->meshes, mesh_index);
-	printf("se_gltf_to_model :: primitives=%zu\n", mesh->primitives.size);
 	se_model *model = s_array_increment(&render_handle->models);
 	s_array_init(&model->meshes, mesh->primitives.size);
 	for (sz i = 0; i < mesh->primitives.size; i++) {
 		se_gltf_primitive *prim = s_array_get(&mesh->primitives, i);
 		if (prim->has_mode && prim->mode != 4) {
-			printf("se_gltf_to_model :: unsupported primitive mode %d\n", prim->mode);
 			return NULL;
 		}
-		printf("se_gltf_to_model :: primitive %zu attrs=%zu indices=%d has_indices=%d\n",
-			i,
-			prim->attributes.attributes.size,
-			prim->indices,
-			prim->has_indices);
 		se_mesh *out_mesh = s_array_increment(&model->meshes);
 		memset(out_mesh, 0, sizeof(*out_mesh));
 		se_gltf_attribute *pos_attr = NULL;
@@ -2050,11 +2032,6 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 		if (pos_attr == NULL) return NULL;
 		if (pos_attr->accessor < 0 || (sz)pos_attr->accessor >= asset->accessors.size) return NULL;
 		se_gltf_accessor *pos_acc = s_array_get(&asset->accessors, pos_attr->accessor);
-		printf("se_gltf_to_model :: POSITION accessor=%d count=%u type=%d componentType=%d\n",
-			pos_attr->accessor,
-			pos_acc->count,
-			pos_acc->type,
-			pos_acc->component_type);
 		if (pos_acc->component_type != 5126 || pos_acc->type != SE_GLTF_ACCESSOR_VEC3) return NULL;
 		if (!pos_acc->has_buffer_view) return NULL;
 		se_gltf_buffer_view *pos_view = s_array_get(&asset->buffer_views, pos_acc->buffer_view);
@@ -2071,12 +2048,6 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 			tmp_vertices[v].position = s_vec3(fptr[0], fptr[1], fptr[2]);
 			tmp_vertices[v].normal = s_vec3(0.0f, 0.0f, 1.0f);
 			tmp_vertices[v].uv = s_vec2(0.0f, 0.0f);
-		}
-		if (vertex_count > 0) {
-			printf("se_gltf_to_model :: first position=(%f,%f,%f)\n",
-				tmp_vertices[0].position.x,
-				tmp_vertices[0].position.y,
-				tmp_vertices[0].position.z);
 		}
 		if (norm_attr) {
 			se_gltf_accessor *nacc = s_array_get(&asset->accessors, norm_attr->accessor);
@@ -2119,12 +2090,6 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 				else if (iacc->component_type == 5121) tmp_indices[idx] = *(const u8 *)ptr;
 				else tmp_indices[idx] = 0;
 			}
-			if (index_count >= 3) {
-				printf("se_gltf_to_model :: indices[0..2]=%u,%u,%u\n",
-					tmp_indices[0],
-					tmp_indices[1],
-					tmp_indices[2]);
-			}
 			se_gltf_mesh_finalize(out_mesh, tmp_vertices, tmp_indices, vertex_count, index_count);
 			free(tmp_vertices);
 			free(tmp_indices);
@@ -2139,4 +2104,25 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 		}
 	}
 	return model;
+}
+
+se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap) {
+	if (render_handle == NULL || asset == NULL) return NULL;
+	if (image_index < 0 || (sz)image_index >= asset->images.size) return NULL;
+	se_gltf_image *image = s_array_get(&asset->images, image_index);
+	if (image->data && image->data_size > 0) {
+		return se_texture_load_from_memory(render_handle, image->data, image->data_size, wrap);
+	}
+	if (image->uri && image->uri[0] != '\0') {
+		return se_texture_load(render_handle, image->uri, wrap);
+	}
+	return NULL;
+}
+
+se_texture *se_gltf_texture_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 texture_index, const se_texture_wrap wrap) {
+	if (render_handle == NULL || asset == NULL) return NULL;
+	if (texture_index < 0 || (sz)texture_index >= asset->textures.size) return NULL;
+	se_gltf_texture *texture = s_array_get(&asset->textures, texture_index);
+	if (!texture->has_source) return NULL;
+	return se_gltf_image_load(render_handle, asset, texture->source, wrap);
 }

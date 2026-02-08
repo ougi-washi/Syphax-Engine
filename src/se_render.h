@@ -101,6 +101,7 @@ typedef struct {
 	GLuint vbo;
 	GLuint ebo;
 	se_shader *shader;
+	GLuint texture_id;
 	s_mat4 matrix;
 } se_mesh;
 typedef s_array(se_mesh, se_meshes);
@@ -214,6 +215,7 @@ extern se_uniforms *se_render_handle_get_global_uniforms(se_render_handle *rende
 // Texture functions
 typedef enum { SE_REPEAT, SE_CLAMP } se_texture_wrap;
 extern se_texture *se_texture_load(se_render_handle *render_handle, const char *path, const se_texture_wrap wrap);
+extern se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u8 *data, const sz size, const se_texture_wrap wrap);
 extern void se_texture_cleanup(se_texture *texture);
 
 // Shader functions

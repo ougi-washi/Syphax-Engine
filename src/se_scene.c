@@ -678,6 +678,7 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	s_array_init(&new_scene->post_process, object_count);
 	new_scene->output_shader = NULL;
 	new_scene->camera = se_camera_create(scene_handle->render_handle);
+	new_scene->enable_culling = true;
 	if (new_scene->camera) {
 		se_camera_set_aspect(new_scene->camera, size->x, size->y);
 	}
@@ -701,9 +702,13 @@ void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle) {
 	se_render_clear();
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
-	glFrontFace(GL_CCW);
+	if (scene->enable_culling) {
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+		glFrontFace(GL_CCW);
+	} else {
+		glDisable(GL_CULL_FACE);
+	}
 
 	s_mat4 view = s_mat4_identity;
 	s_mat4 proj = s_mat4_identity;
@@ -751,6 +756,9 @@ void se_scene_3d_render(se_scene_3d *scene, se_render_handle *render_handle) {
 			if (!shader) {
 				continue;
 			}
+			if (mesh->texture_id != 0) {
+				se_shader_set_texture(shader, "u_texture", mesh->texture_id);
+			}
 
 			se_shader_use(render_handle, shader, true, true);
 			glBindVertexArray(mesh_instance->vao);
@@ -790,6 +798,11 @@ void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera) {
 	scene->camera = camera;
 }
 
+void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled) {
+	s_assertf(scene, "se_scene_3d_set_culling :: scene is null");
+	scene->enable_culling = enabled;
+}
+
 void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
 	s_array_add(&scene->post_process, buffer);
 }
@@ -797,5 +810,4 @@ void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *b
 void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
 	s_array_remove(&scene->post_process, &buffer);
 }
-#include <stdlib.h>
-#include <string.h>
+
