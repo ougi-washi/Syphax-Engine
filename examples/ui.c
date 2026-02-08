@@ -59,7 +59,7 @@ i32 main() {
 	se_object_2d *button_minimize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
 	se_object_2d *button_maximize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
 	se_object_2d *button_exit = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	se_object_2d *button_text = se_ui_element_add_text(toolbar, "Hello World!", "fonts/ithaca.ttf", 32.f);
+	se_ui_element_add_text(toolbar, "Hello World!", "fonts/ithaca.ttf", 32.f);
 
 	se_shader_set_vec3(button_minimize->shader, "u_color", &s_vec3(0, 0, .3));
 	se_shader_set_vec3(button_maximize->shader, "u_color", &s_vec3(0, .3, 0));
