@@ -398,6 +398,7 @@ void finalize_mesh(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices, u32 vert
 
 se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders) {
 	se_model *model = s_array_increment(&render_handle->models);
+	s_array_init(&model->meshes, 64);
 
 	char full_path[SE_MAX_PATH_LENGTH];
 	strncpy(full_path, RESOURCES_DIR, SE_MAX_PATH_LENGTH - 1);
@@ -1157,7 +1158,7 @@ void se_quad_add_vertex_attribute(se_quad *out_quad, const sz size,
 	out_quad->last_attribute++;
 }
 
-void se_quad3d_create(se_quad *out_quad) {
+void se_quad_3d_create(se_quad *out_quad) {
 	s_assertf(out_quad, "se_quad_create :: out_quad is null");
 
 	out_quad->vao = 0;
@@ -1187,6 +1188,88 @@ void se_quad3d_create(se_quad *out_quad) {
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void *)offsetof(se_vertex_3d, uv));
 
 	glBindVertexArray(0);
+}
+
+void se_mesh_instance_create(se_mesh_instance *out_instance, const se_mesh *mesh, const u32 instance_count) {
+	s_assertf(out_instance, "se_mesh_instance_create :: out_instance is null");
+	s_assertf(mesh, "se_mesh_instance_create :: mesh is null");
+
+	memset(out_instance, 0, sizeof(se_mesh_instance));
+	glGenVertexArrays(1, &out_instance->vao);
+	glBindVertexArray(out_instance->vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void *)offsetof(se_vertex_3d, position));
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void *)offsetof(se_vertex_3d, normal));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void *)offsetof(se_vertex_3d, uv));
+
+	glBindVertexArray(0);
+
+	if (instance_count > 0) {
+		s_array_init(&out_instance->instance_buffers, instance_count);
+		out_instance->instance_buffers_dirty = true;
+	}
+}
+
+void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffer, const sz instance_count) {
+	s_assertf(instance, "se_mesh_instance_add_buffer :: instance is null");
+	s_assertf(buffer, "se_mesh_instance_add_buffer :: buffer is null");
+
+	glBindVertexArray(instance->vao);
+
+	se_instance_buffer *new_buffer = s_array_increment(&instance->instance_buffers);
+	new_buffer->vbo = 0;
+	new_buffer->buffer_ptr = buffer;
+	new_buffer->buffer_size = sizeof(s_mat4) * instance_count;
+	glGenBuffers(1, &new_buffer->vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, new_buffer->vbo);
+	glBufferData(GL_ARRAY_BUFFER, new_buffer->buffer_size, new_buffer->buffer_ptr, GL_DYNAMIC_DRAW);
+
+	for (u32 i = 0; i < 4; i++) {
+		const u32 attrib = 3 + i;
+		glEnableVertexAttribArray(attrib);
+		glVertexAttribPointer(attrib, 4, GL_FLOAT, GL_FALSE, sizeof(s_mat4), (void *)(sizeof(s_vec4) * i));
+		glVertexAttribDivisor(attrib, 1);
+	}
+	instance->instance_buffers_dirty = true;
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+}
+
+void se_mesh_instance_update(se_mesh_instance *instance) {
+	s_assertf(instance, "se_mesh_instance_update :: instance is null");
+	if (!instance->instance_buffers_dirty) {
+		return;
+	}
+
+	s_foreach(&instance->instance_buffers, i) {
+		se_instance_buffer *current_buffer = s_array_get(&instance->instance_buffers, i);
+		glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+	instance->instance_buffers_dirty = false;
+}
+
+void se_mesh_instance_destroy(se_mesh_instance *instance) {
+	s_assertf(instance, "se_mesh_instance_destroy :: instance is null");
+	s_foreach(&instance->instance_buffers, i) {
+		se_instance_buffer *current_buffer = s_array_get(&instance->instance_buffers, i);
+		glDeleteBuffers(1, &current_buffer->vbo);
+	}
+	s_array_clear(&instance->instance_buffers);
+	if (instance->vao) {
+		glDeleteVertexArrays(1, &instance->vao);
+		instance->vao = 0;
+	}
 }
 
 void se_quad_2d_create(se_quad *out_quad, const u32 instance_count) {
@@ -1243,6 +1326,30 @@ void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const s
 	glBindVertexArray(0);
 
 	printf("se_quad_2d_add_instance_buffer :: buffer: %p\n", buffer);
+}
+
+void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, const sz instance_count) {
+	s_assertf(quad, "se_quad_2d_add_instance_buffer_mat3 :: quad is null");
+	s_assertf(buffer, "se_quad_2d_add_instance_buffer_mat3 :: buffer is null");
+
+	glBindVertexArray(quad->vao);
+
+	se_instance_buffer *new_buffer = s_array_increment(&quad->instance_buffers);
+	new_buffer->vbo = 0;
+	new_buffer->buffer_ptr = buffer;
+	new_buffer->buffer_size = sizeof(s_mat3) * instance_count;
+	glGenBuffers(1, &new_buffer->vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, new_buffer->vbo);
+	glBufferData(GL_ARRAY_BUFFER, new_buffer->buffer_size, new_buffer->buffer_ptr, GL_DYNAMIC_DRAW);
+
+	se_quad_add_vertex_attribute(quad, 3, GL_FLOAT, GL_FALSE, sizeof(s_mat3), (void *)0, true);
+	se_quad_add_vertex_attribute(quad, 3, GL_FLOAT, GL_FALSE, sizeof(s_mat3), (void *)(sizeof(s_vec3) * 1), true);
+	se_quad_add_vertex_attribute(quad, 3, GL_FLOAT, GL_FALSE, sizeof(s_mat3), (void *)(sizeof(s_vec3) * 2), true);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	printf("se_quad_2d_add_instance_buffer_mat3 :: buffer: %p\n", buffer);
 }
 
 void se_quad_render(se_quad *quad, const sz instance_count) {
@@ -1385,4 +1492,3 @@ static GLuint create_shader_program(const char *vertex_source, const char *fragm
 
 	return program;
 }
-

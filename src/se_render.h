@@ -163,6 +163,13 @@ typedef struct {
 
 typedef struct {
 	GLuint vao;
+	s_array(se_instance_buffer, instance_buffers);
+	b8 instance_buffers_dirty;
+} se_mesh_instance;
+typedef s_array(se_mesh_instance, se_mesh_instances);
+
+typedef struct {
+	GLuint vao;
 	GLuint ebo;
 	GLuint vbo;
 	s_array(se_instance_buffer, instance_buffers);
@@ -290,8 +297,15 @@ extern void se_uniform_apply(se_render_handle *render_handle, se_shader *shader,
 extern void se_quad_3d_create(se_quad *out_quad);
 extern void se_quad_2d_create(se_quad *out_quad, const u32 instance_count);
 extern void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const sz instance_count);
+extern void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, const sz instance_count);
 extern void se_quad_render(se_quad *quad, const sz instance_count);
 extern void se_quad_destroy(se_quad *quad);
+
+// Mesh instance functions
+extern void se_mesh_instance_create(se_mesh_instance *out_instance, const se_mesh *mesh, const u32 instance_count);
+extern void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffer, const sz instance_count);
+extern void se_mesh_instance_update(se_mesh_instance *instance);
+extern void se_mesh_instance_destroy(se_mesh_instance *instance);
 
 // Utility functions
 extern time_t get_file_mtime(const char *path);
