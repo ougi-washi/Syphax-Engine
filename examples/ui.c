@@ -38,24 +38,66 @@ void on_button_stop_hovered(void *window, void *data) {
 }
 
 i32 main() {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
+	se_render_handle *render_handle = NULL;
+	se_window *window = NULL;
+	se_ui_handle *ui_handle = NULL;
+	se_ui_element *root = NULL;
+	se_ui_element *toolbar = NULL;
+	se_ui_element *content = NULL;
+	se_object_2d *button_minimize = NULL;
+	se_object_2d *button_maximize = NULL;
+	se_object_2d *button_exit = NULL;
+	se_object_2d *item_1 = NULL;
+	se_object_2d *item_2 = NULL;
+	se_object_2d *item_3 = NULL;
+	render_handle = se_render_handle_create(NULL);
+	if (!render_handle) {
+		return 1;
+	}
 
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
+	window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
+	if (!window) {
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_ui_handle_params ui_handle_params = SE_UI_HANDLE_PARAMS_DEFAULTS;
-	se_ui_handle *ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
+	ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
+	if (!ui_handle) {
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 
 	se_ui_element_params ui_element_params = SE_UI_ELEMENT_PARAMS_DEFAULTS;
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
-	se_ui_element *root = se_ui_element_create(ui_handle, &ui_element_params);
+	root = se_ui_element_create(ui_handle, &ui_element_params);
+	if (!root) {
+		se_ui_handle_destroy(ui_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 
 	ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
-	se_ui_element *toolbar = se_ui_element_add_child(root, &ui_element_params);
+	toolbar = se_ui_element_add_child(root, &ui_element_params);
+	if (!toolbar) {
+		se_ui_handle_destroy(ui_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 	
-	se_object_2d *button_minimize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	se_object_2d *button_maximize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	se_object_2d *button_exit = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
+	button_minimize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
+	button_maximize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
+	button_exit = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
+	if (!button_minimize || !button_maximize || !button_exit) {
+		se_ui_handle_destroy(ui_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 	se_ui_element_add_text(toolbar, "Hello World!", "fonts/ithaca.ttf", 32.f);
 
 	se_shader_set_vec3(button_minimize->shader, "u_color", &s_vec3(0, 0, .3));
@@ -63,10 +105,22 @@ i32 main() {
 	se_shader_set_vec3(button_exit->shader,     "u_color", &s_vec3(.3, 0, 0));
 
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
-	se_ui_element *content = se_ui_element_add_child(root, &ui_element_params);
-	se_object_2d *item_1 = se_ui_element_add_object(content, "examples/ui/button.glsl");
-	se_object_2d *item_2 = se_ui_element_add_object(content, "examples/ui/button.glsl");
-	se_object_2d *item_3 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+	content = se_ui_element_add_child(root, &ui_element_params);
+	if (!content) {
+		se_ui_handle_destroy(ui_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
+	item_1 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+	item_2 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+	item_3 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+	if (!item_1 || !item_2 || !item_3) {
+		se_ui_handle_destroy(ui_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 	se_shader_set_vec3(item_1->shader, "u_color", &s_vec3(.5, .5, 0));
 	se_shader_set_vec3(item_2->shader, "u_color", &s_vec3(0, .5, .5));
 	se_shader_set_vec3(item_3->shader, "u_color", &s_vec3(.5, 0, .5));
@@ -101,7 +155,7 @@ i32 main() {
 	    se_window_render_screen(window);
 	}
 
-	se_ui_handle_cleanup(ui_handle);
+	se_ui_handle_destroy(ui_handle);
 	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;

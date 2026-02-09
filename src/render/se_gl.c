@@ -303,6 +303,10 @@ se_render_handle *se_render_handle_create(const se_render_handle_params *params)
 		}
 	}
 	se_render_handle *render_handle = malloc(sizeof(se_render_handle));
+	if (!render_handle) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
 	memset(render_handle, 0, sizeof(se_render_handle));
 
 	s_array_init(&render_handle->framebuffers, resolved.framebuffers_count);
@@ -316,7 +320,7 @@ se_render_handle *se_render_handle_create(const se_render_handle_params *params)
 		se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 1.0f));
 	}
 
-	printf("se_render_handle_create :: created render handle %p\n", render_handle);
+	se_set_last_error(SE_RESULT_OK);
 	return render_handle;
 }
 
@@ -377,7 +381,12 @@ se_uniforms *se_render_handle_get_global_uniforms(se_render_handle *render_handl
 
 // Shader functions
 
+
 se_texture *se_texture_load(se_render_handle *render_handle, const char *file_path, const se_texture_wrap wrap) {
+	if (!render_handle || !file_path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	stbi_set_flip_vertically_on_load(1);
 	se_texture *texture = NULL;
 	s_foreach(&render_handle->textures, i) {
@@ -389,7 +398,7 @@ se_texture *se_texture_load(se_render_handle *render_handle, const char *file_pa
 	}
 	if (!texture) {
 		if (s_array_get_capacity(&render_handle->textures) == s_array_get_size(&render_handle->textures)) {
-			printf("se_texture_load :: render_handle->textures is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		texture = s_array_increment(&render_handle->textures);
@@ -398,13 +407,13 @@ se_texture *se_texture_load(se_render_handle *render_handle, const char *file_pa
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, file_path)) {
-		fprintf(stderr, "se_texture_load :: path too long for %s\n", file_path);
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 
 	unsigned char *pixels = stbi_load(full_path, &texture->width, &texture->height, &texture->channels, 0);
 	if (!pixels) {
-		fprintf(stderr, "se_texture_load :: could not load image %s\n", file_path);
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 
@@ -430,10 +439,15 @@ se_texture *se_texture_load(se_render_handle *render_handle, const char *file_pa
 
 	stbi_image_free(pixels);
 	texture->is_valid = true;
+	se_set_last_error(SE_RESULT_OK);
 	return texture;
 }
 
 se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u8 *data, const sz size, const se_texture_wrap wrap) {
+	if (!render_handle || !data || size == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	stbi_set_flip_vertically_on_load(1);
 
 	se_texture *texture = NULL;
@@ -446,7 +460,7 @@ se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u
 	}
 	if (!texture) {
 		if (s_array_get_capacity(&render_handle->textures) == s_array_get_size(&render_handle->textures)) {
-			printf("se_texture_load_from_memory :: render_handle->textures is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		texture = s_array_increment(&render_handle->textures);
@@ -458,7 +472,7 @@ se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u
 	int channels = 0;
 	unsigned char *pixels = stbi_load_from_memory(data, (int)size, &width, &height, &channels, 0);
 	if (!pixels) {
-		fprintf(stderr, "se_texture_load_from_memory :: could not load image from memory\n");
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 
@@ -487,6 +501,7 @@ se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u
 
 	stbi_image_free(pixels);
 	texture->is_valid = true;
+	se_set_last_error(SE_RESULT_OK);
 	return texture;
 }
 
@@ -542,9 +557,10 @@ b8 se_shader_load_internal(se_shader *shader) {
 }
 
 se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_file_path, const char *fragment_file_path) {
-	s_assertf(render_handle, "se_shader_load :: render_handle is null");
-	s_assertf(vertex_file_path, "se_shader_load :: vertex_file_path is null");
-	s_assertf(fragment_file_path, "se_shader_load :: fragment_file_path is null");
+	if (!render_handle || !vertex_file_path || !fragment_file_path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_shader *new_shader = NULL;
 	s_foreach(&render_handle->shaders, i) {
 		se_shader *slot = s_array_get(&render_handle->shaders, i);
@@ -555,7 +571,7 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 	}
 	if (!new_shader) {
 		if (s_array_get_capacity(&render_handle->shaders) <= s_array_get_size(&render_handle->shaders)) {
-			printf("se_shader_load :: error, render_handle->shaders is full, allocate more space\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		new_shader = s_array_increment(&render_handle->shaders);
@@ -565,7 +581,7 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 	// make path absolute
 	if (strlen(vertex_file_path) > 0) {
 		if (!s_path_join(new_shader->vertex_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, vertex_file_path)) {
-			fprintf(stderr, "se_shader_load :: vertex path too long for %s\n", vertex_file_path);
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 			return NULL;
 		}
 	} else {
@@ -574,7 +590,7 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 
 	if (strlen(fragment_file_path) > 0) {
 		if (!s_path_join(new_shader->fragment_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, fragment_file_path)) {
-			fprintf(stderr, "se_shader_load :: fragment path too long for %s\n", fragment_file_path);
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 			return NULL;
 		}
 	} else {
@@ -583,8 +599,10 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 
 	if (se_shader_load_internal(new_shader)) {
 		new_shader->is_valid = true;
+		se_set_last_error(SE_RESULT_OK);
 		return new_shader;
 	}
+	se_set_last_error(SE_RESULT_IO);
 	return NULL;
 }
 
@@ -839,6 +857,10 @@ static void se_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices
 }
 
 se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders) {
+	if (!render_handle || !path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_model *model = NULL;
 	s_foreach(&render_handle->models, i) {
 		se_model *slot = s_array_get(&render_handle->models, i);
@@ -849,7 +871,7 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	}
 	if (!model) {
 		if (s_array_get_capacity(&render_handle->models) == s_array_get_size(&render_handle->models)) {
-			fprintf(stderr, "se_model_load_obj :: render_handle->models is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		model = s_array_increment(&render_handle->models);
@@ -859,17 +881,17 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, path)) {
-		fprintf(stderr, "se_model_load_obj :: path too long for %s\n", path);
 		se_model_cleanup(model);
 		memset(model, 0, sizeof(*model));
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 
 	char *file_data = NULL;
 	if (!s_file_read(full_path, &file_data, NULL)) {
-		fprintf(stderr, "se_model_load_obj :: failed to open OBJ file: %s\n", path);
 		se_model_cleanup(model);
 		memset(model, 0, sizeof(*model));
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 
@@ -1044,19 +1066,21 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	if (!ok) {
 		se_model_cleanup(model);
 		memset(model, 0, sizeof(*model));
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 
 	// If no meshes were created, create a default one
 	if (s_array_get_size(&model->meshes) == 0) {
-	fprintf(stderr, "No valid meshes found in OBJ file: %s\n", path);
 	s_array_clear(&model->meshes);
 	memset(model, 0, sizeof(*model));
+	se_set_last_error(SE_RESULT_NOT_FOUND);
 	return NULL;
 	}
 
 	model->is_valid = true;
 
+	se_set_last_error(SE_RESULT_OK);
 	return model;
 }
 
@@ -1144,6 +1168,10 @@ void se_model_scale(se_model *model, const s_vec3 *v) {
 
 // camera functions
 se_camera *se_render_handle_create_camera(se_render_handle *render_handle) {
+	if (!render_handle) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_camera *camera = NULL;
 	s_foreach(&render_handle->cameras, i) {
 		se_camera *slot = s_array_get(&render_handle->cameras, i);
@@ -1154,7 +1182,7 @@ se_camera *se_render_handle_create_camera(se_render_handle *render_handle) {
 	}
 	if (!camera) {
 		if (s_array_get_capacity(&render_handle->cameras) == s_array_get_size(&render_handle->cameras)) {
-			printf("se_render_handle_create_camera :: render_handle->cameras is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		camera = s_array_increment(&render_handle->cameras);
@@ -1169,7 +1197,7 @@ se_camera *se_render_handle_create_camera(se_render_handle *render_handle) {
 	camera->far = 100.0f;
 	camera->aspect = 1.78;
 	camera->is_valid = true;
-	printf("se_render_handle_create_camera :: created camera %p\n", camera);
+	se_set_last_error(SE_RESULT_OK);
 	return camera;
 }
 
@@ -1197,6 +1225,10 @@ void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height) 
 
 // Framebuffer functions
 se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_vec2 *size) {
+	if (!render_handle || !size) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_framebuffer *framebuffer = NULL;
 	s_foreach(&render_handle->framebuffers, i) {
 		se_framebuffer *slot = s_array_get(&render_handle->framebuffers, i);
@@ -1207,7 +1239,7 @@ se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_v
 	}
 	if (!framebuffer) {
 		if (s_array_get_capacity(&render_handle->framebuffers) == s_array_get_size(&render_handle->framebuffers)) {
-			printf("se_framebuffer_create :: render_handle->framebuffers is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		framebuffer = s_array_increment(&render_handle->framebuffers);
@@ -1237,9 +1269,9 @@ se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_v
 
 	// Check framebuffer completeness
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-	fprintf(stderr, "se_framebuffer_create :: framebuffer not complete!\n");
 	se_framebuffer_cleanup(framebuffer);
 	memset(framebuffer, 0, sizeof(*framebuffer));
+	se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 	return NULL;
 	}
 
@@ -1249,6 +1281,7 @@ se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_v
 
 	printf("se_framebuffer_create :: created framebuffer %p\n", framebuffer);
 	framebuffer->is_valid = true;
+	se_set_last_error(SE_RESULT_OK);
 	return framebuffer;
 }
 
@@ -1315,6 +1348,10 @@ static void se_framebuffer_cleanup(se_framebuffer *framebuffer) {
 
 // Render buffer functions
 se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const u32 width, const u32 height, const c8 *fragment_shader_path) {
+	if (!render_handle || !fragment_shader_path || width == 0 || height == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_render_buffer *buffer = NULL;
 	s_foreach(&render_handle->render_buffers, i) {
 		se_render_buffer *slot = s_array_get(&render_handle->render_buffers, i);
@@ -1325,7 +1362,7 @@ se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const
 	}
 	if (!buffer) {
 		if (s_array_get_capacity(&render_handle->render_buffers) == s_array_get_size(&render_handle->render_buffers)) {
-			printf("se_render_buffer_create :: render_handle->render_buffers is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		buffer = s_array_increment(&render_handle->render_buffers);
@@ -1370,19 +1407,25 @@ se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const
 	glBindFramebuffer(GL_FRAMEBUFFER, buffer->prev_framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, buffer->prev_texture, 0);
 
-	buffer->shader = se_shader_load(render_handle, "shaders/render_buffer_vert.glsl", fragment_shader_path);
+	se_shader *shader = se_shader_load(render_handle, "shaders/render_buffer_vert.glsl", fragment_shader_path);
+	if (!shader) {
+		se_render_buffer_cleanup(buffer);
+		memset(buffer, 0, sizeof(*buffer));
+		return NULL;
+	}
+	buffer->shader = shader;
 
 	// Check framebuffer completeness
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-	fprintf(stderr, "se_render_buffer_create :: Framebuffer not complete!\n");
 	se_render_buffer_cleanup(buffer);
 	memset(buffer, 0, sizeof(*buffer));
+	se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 	return NULL;
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	printf("se_render_buffer_create :: created render buffer %p\n", buffer);
 	buffer->is_valid = true;
+	se_set_last_error(SE_RESULT_OK);
 	return buffer;
 }
 
@@ -1964,11 +2007,11 @@ static GLuint se_shader_create_program(const char *vertex_source, const char *fr
 	GLint success;
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
-	char info_log[512];
-	glGetProgramInfoLog(program, 512, NULL, info_log);
-	fprintf(stderr, "se_shader_create_program :: Shader program linking failed: %s\n", info_log);
-	glDeleteProgram(program);
-	program = 0;
+		char info_log[512];
+		glGetProgramInfoLog(program, 512, NULL, info_log);
+		fprintf(stderr, "se_shader_create_program :: Shader program linking failed: %s\n", info_log);
+		glDeleteProgram(program);
+		program = 0;
 	}
 
 	glDeleteShader(vertex_shader);

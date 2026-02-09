@@ -129,7 +129,7 @@ se_audio_engine* se_audio_init(const se_audio_config* config) {
 
 	se_audio_engine* engine = malloc(sizeof(se_audio_engine));
 	if (!engine) {
-		fprintf(stderr, "se_audio_init :: failed to allocate engine\n");
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return NULL;
 	}
 	memset(engine, 0, sizeof(se_audio_engine));
@@ -138,10 +138,10 @@ se_audio_engine* se_audio_init(const se_audio_config* config) {
 		engine->bus_volumes[i] = 1.0f;
 	}
 
-	ma_result result = ma_context_init(NULL, 0, NULL, &engine->context);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_init :: failed to init context (%d)\n", result);
+	ma_result ma_res = ma_context_init(NULL, 0, NULL, &engine->context);
+	if (ma_res != MA_SUCCESS) {
 		free(engine);
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -150,11 +150,11 @@ se_audio_engine* se_audio_init(const se_audio_config* config) {
 	engine_config.sampleRate = engine->config.sample_rate;
 	engine_config.channels = engine->config.channels;
 	engine_config.noAutoStart = MA_FALSE;
-	result = ma_engine_init(&engine_config, &engine->engine);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_init :: failed to init engine (%d)\n", result);
+	ma_res = ma_engine_init(&engine_config, &engine->engine);
+	if (ma_res != MA_SUCCESS) {
 		ma_context_uninit(&engine->context);
 		free(engine);
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -162,7 +162,7 @@ se_audio_engine* se_audio_init(const se_audio_config* config) {
 	s_array_init(&engine->streams, engine->config.max_streams);
 	s_array_init(&engine->captures, engine->config.max_captures);
 	engine->initialized = true;
-	printf("se_audio_init :: initialized audio engine\n");
+	se_set_last_error(SE_RESULT_OK);
 	return engine;
 }
 
@@ -268,24 +268,26 @@ f32 se_audio_bus_get_volume(se_audio_engine* engine, se_audio_bus bus) {
 
 se_audio_clip* se_audio_clip_load(se_audio_engine* engine, const char* relative_path) {
 	if (!engine || !engine->initialized || !relative_path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	se_audio_clip* clip = se_audio_acquire_clip_slot(engine);
 	if (!clip) {
-		fprintf(stderr, "se_audio_clip_load :: no capacity for additional clips\n");
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!se_audio_resolve_resource_path(relative_path, full_path, sizeof(full_path))) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 
-	ma_result result = ma_sound_init_from_file(&engine->engine, full_path, MA_SOUND_FLAG_DECODE, NULL, NULL, &clip->sound);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_clip_load :: failed to load %s (%d)\n", full_path, result);
+	ma_result ma_res = ma_sound_init_from_file(&engine->engine, full_path, MA_SOUND_FLAG_DECODE, NULL, NULL, &clip->sound);
+	if (ma_res != MA_SUCCESS) {
 		memset(clip, 0, sizeof(se_audio_clip));
 		clip->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -295,6 +297,7 @@ se_audio_clip* se_audio_clip_load(se_audio_engine* engine, const char* relative_
 	clip->base_volume = 1.0f;
 	strncpy(clip->path, relative_path, sizeof(clip->path) - 1);
 	se_audio_load_analysis_data(full_path, clip);
+	se_set_last_error(SE_RESULT_OK);
 	return clip;
 }
 
@@ -357,24 +360,26 @@ b8 se_audio_clip_is_playing(const se_audio_clip* clip) {
 
 se_audio_stream* se_audio_stream_open(se_audio_engine* engine, const char* relative_path, const se_audio_play_params* params) {
 	if (!engine || !engine->initialized || !relative_path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	se_audio_stream* stream = se_audio_acquire_stream_slot(engine);
 	if (!stream) {
-		fprintf(stderr, "se_audio_stream_open :: no capacity for additional streams\n");
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!se_audio_resolve_resource_path(relative_path, full_path, sizeof(full_path))) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 
-	ma_result result = ma_sound_init_from_file(&engine->engine, full_path, MA_SOUND_FLAG_STREAM, NULL, NULL, &stream->sound);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_stream_open :: failed to open %s (%d)\n", full_path, result);
+	ma_result ma_res = ma_sound_init_from_file(&engine->engine, full_path, MA_SOUND_FLAG_STREAM, NULL, NULL, &stream->sound);
+	if (ma_res != MA_SUCCESS) {
 		memset(stream, 0, sizeof(se_audio_stream));
 		stream->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -388,6 +393,7 @@ se_audio_stream* se_audio_stream_open(se_audio_engine* engine, const char* relat
 	ma_sound_set_looping(&stream->sound, resolved->looping);
 	se_audio_stream_refresh_volume(stream);
 	ma_sound_start(&stream->sound);
+	se_set_last_error(SE_RESULT_OK);
 	return stream;
 }
 
@@ -461,11 +467,12 @@ u32 se_audio_capture_list_devices(se_audio_engine* engine, se_audio_device_info*
 
 se_audio_capture* se_audio_capture_start(se_audio_engine* engine, const se_audio_capture_config* config) {
 	if (!engine || !engine->initialized || !engine->config.enable_capture) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	se_audio_capture* capture = se_audio_acquire_capture_slot(engine);
 	if (!capture) {
-		fprintf(stderr, "se_audio_capture_start :: no capacity for capture devices\n");
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
 
@@ -485,11 +492,11 @@ se_audio_capture* se_audio_capture_start(se_audio_engine* engine, const se_audio
 
 	ma_device_info* capture_infos = NULL;
 	ma_uint32 capture_count = 0;
-	ma_result result = ma_context_get_devices(&engine->context, NULL, NULL, &capture_infos, &capture_count);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_capture_start :: failed to enumerate devices (%d)\n", result);
+	ma_result ma_res = ma_context_get_devices(&engine->context, NULL, NULL, &capture_infos, &capture_count);
+	if (ma_res != MA_SUCCESS) {
 		memset(capture, 0, sizeof(se_audio_capture));
 		capture->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 	ma_device_id* selected_id = NULL;
@@ -500,9 +507,9 @@ se_audio_capture* se_audio_capture_start(se_audio_engine* engine, const se_audio
 
 	ma_result rb_result = ma_pcm_rb_init(ma_format_f32, resolved.channels, resolved.frames_per_buffer * 8, NULL, NULL, &capture->ring_buffer);
 	if (rb_result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_capture_start :: failed to init ring buffer (%d)\n", rb_result);
 		memset(capture, 0, sizeof(se_audio_capture));
 		capture->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -510,21 +517,21 @@ se_audio_capture* se_audio_capture_start(se_audio_engine* engine, const se_audio
 	sz analysis_samples = capture->analysis_capacity_frames * resolved.channels;
 	capture->analysis_buffer = malloc(sizeof(f32) * analysis_samples);
 	if (!capture->analysis_buffer) {
-		fprintf(stderr, "se_audio_capture_start :: failed to allocate analysis buffer\n");
 		ma_pcm_rb_uninit(&capture->ring_buffer);
 		memset(capture, 0, sizeof(se_audio_capture));
 		capture->owner = engine;
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return NULL;
 	}
 	memset(capture->analysis_buffer, 0, sizeof(f32) * analysis_samples);
 	capture->analysis_frames_valid = 0;
 	capture->analysis_sample_write = 0;
 	if (pthread_mutex_init(&capture->analysis_mutex, NULL) != 0) {
-		fprintf(stderr, "se_audio_capture_start :: failed to init mutex\n");
 		free(capture->analysis_buffer);
 		ma_pcm_rb_uninit(&capture->ring_buffer);
 		memset(capture, 0, sizeof(se_audio_capture));
 		capture->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -535,30 +542,31 @@ se_audio_capture* se_audio_capture_start(se_audio_engine* engine, const se_audio
 	device_config.sampleRate = resolved.sample_rate;
 	device_config.pUserData = capture;
 	device_config.dataCallback = se_audio_capture_data_callback;
-	result = ma_device_init(&engine->context, &device_config, &capture->device);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_capture_start :: failed to init device (%d)\n", result);
+	ma_res = ma_device_init(&engine->context, &device_config, &capture->device);
+	if (ma_res != MA_SUCCESS) {
 		ma_pcm_rb_uninit(&capture->ring_buffer);
 		memset(capture, 0, sizeof(se_audio_capture));
 		capture->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
-	result = ma_device_start(&capture->device);
-	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_capture_start :: failed to start device (%d)\n", result);
+	ma_res = ma_device_start(&capture->device);
+	if (ma_res != MA_SUCCESS) {
 		ma_device_uninit(&capture->device);
 		ma_pcm_rb_uninit(&capture->ring_buffer);
 		pthread_mutex_destroy(&capture->analysis_mutex);
 		free(capture->analysis_buffer);
 		memset(capture, 0, sizeof(se_audio_capture));
 		capture->owner = engine;
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
 	capture->config = resolved;
 	capture->owner = engine;
 	capture->active = true;
+	se_set_last_error(SE_RESULT_OK);
 	return capture;
 }
 

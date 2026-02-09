@@ -3,6 +3,7 @@
 #ifndef SE_AUDIO_H
 #define SE_AUDIO_H
 
+#include "se_defines.h"
 #include "syphax/s_types.h"
 
 #define SE_AUDIO_DEVICE_NAME_MAX 128

@@ -24,28 +24,57 @@ void on_button_no_pressed(void *window, void *data) {
 }
 
 i32 main() {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
+	se_render_handle *render_handle = NULL;
+	se_window *window = NULL;
+	se_scene_handle *scene_handle = NULL;
+	se_scene_2d *scene_2d = NULL;
+	se_object_2d *borders = NULL;
+	se_object_2d *panel = NULL;
+	se_object_2d *button_yes = NULL;
+	se_object_2d *button_no = NULL;
+	render_handle = se_render_handle_create(NULL);
+	if (!render_handle) {
+		return 1;
+	}
 
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
+	window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
+	if (!window) {
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
-	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
+	scene_handle = se_scene_handle_create(render_handle, NULL);
+	if (!scene_handle) {
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
+	scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
+	if (!scene_2d) {
+		se_scene_handle_destroy(scene_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 
 	// Create objects with identity transform, then set position/scale
 	s_mat3 transform = s_mat3_identity;
 
-	se_object_2d *borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &transform, 0);
+	borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &transform, 0);
+	panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &transform, 0);
+	button_yes = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
+	button_no = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
+	if (!borders || !panel || !button_yes || !button_no) {
+		se_scene_handle_destroy(scene_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		return 1;
+	}
 	se_object_2d_set_scale(borders, &s_vec2(0.95, 0.95));
-
-	se_object_2d *panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &transform, 0);
 	se_object_2d_set_scale(panel, &s_vec2(0.5, 0.5));
-
-	se_object_2d *button_yes = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
 	se_object_2d_set_position(button_yes, &s_vec2(0.15, 0.));
 	se_object_2d_set_scale(button_yes, &s_vec2(0.1, 0.1));
-
-	se_object_2d *button_no = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
 	se_object_2d_set_position(button_no, &s_vec2(-0.15, 0.));
 	se_object_2d_set_scale(button_no, &s_vec2(0.1, 0.1));
 
@@ -81,7 +110,7 @@ i32 main() {
 		se_scene_2d_draw(scene_2d, render_handle, window);
 	}
 
-	se_scene_handle_cleanup(scene_handle);
+	se_scene_handle_destroy(scene_handle);
 	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;

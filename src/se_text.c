@@ -8,23 +8,35 @@
 #include "stb_truetype.h"
 
 se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32 fonts_count) {
-	s_assertf(render_handle, "se_init_text_render :: render_handle is null");
+	if (!render_handle) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	u32 resolved_fonts = fonts_count > 0 ? fonts_count : SE_TEXT_HANDLE_DEFAULT_FONTS;
 	se_text_handle* text_handle = malloc(sizeof(se_text_handle));
+	if (!text_handle) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
 	memset(text_handle, 0, sizeof(se_text_handle));
 	text_handle->render_handle = render_handle;
 	s_array_init(&text_handle->fonts, resolved_fonts);
 	se_quad_2d_create(&text_handle->quad, SE_TEXT_CHAR_COUNT);
 	se_quad_2d_add_instance_buffer(&text_handle->quad, text_handle->buffer, SE_TEXT_CHAR_COUNT);
-	s_assertf(text_handle, "se_init_text_render :: text_handle is null");
-	text_handle->text_shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
-	printf("se_text_handle_create :: created text handle %p\n", text_handle);
+	se_shader* shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
+	if (!shader) {
+		se_quad_destroy(&text_handle->quad);
+		s_array_clear(&text_handle->fonts);
+		free(text_handle);
+		return NULL;
+	}
+	text_handle->text_shader = shader;
+	se_set_last_error(SE_RESULT_OK);
 	return text_handle;
 }
 
-void se_text_handle_cleanup(se_text_handle* text_handle) {
-	s_assertf(text_handle, "se_text_handle_cleanup :: text_handle is null");
-	printf("se_text_handle_cleanup :: text_handle: %p\n", text_handle);
+void se_text_handle_destroy(se_text_handle* text_handle) {
+	s_assertf(text_handle, "se_text_handle_destroy :: text_handle is null");
 	s_foreach(&text_handle->fonts, i) {
 		se_font* curr_font = s_array_get(&text_handle->fonts, i);
 		glDeleteTextures(1, &curr_font->atlas_texture);
@@ -36,15 +48,21 @@ void se_text_handle_cleanup(se_text_handle* text_handle) {
 }
 
 se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 size) {
-	s_assertf(text_handle, "se_font_load :: text_handle is null");
+	if (!text_handle || !path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_render_handle* render_handle = text_handle->render_handle;
-	s_assertf(render_handle, "se_font_load :: render_handle is null");
-	s_assertf(path, "se_font_load :: path is null");
+	if (!render_handle) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	
 	// Check if font is already loaded
 	s_foreach(&text_handle->fonts, i) {
 		se_font* curr_font = s_array_get(&text_handle->fonts, i);
 		if (strcmp(curr_font->path, path) == 0 && curr_font->size == size) {
+			se_set_last_error(SE_RESULT_OK);
 			return curr_font;
 		}
 	}
@@ -55,12 +73,12 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 
 	c8 new_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!s_path_join(new_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, path)) {
-		fprintf(stderr, "se_font_load :: path too long for %s\n", path);
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	u8* font_file_data = NULL;
 	if (!s_file_read_binary(new_path, &font_file_data, NULL)) {
-		fprintf(stderr, "se_font_load :: failed to load font %s\n", path);
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 
@@ -68,7 +86,8 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	
 	const i32 font_count = stbtt_GetNumberOfFonts(font_file_data);
 	if (font_count == 0) {
-		printf("se_font_load :: No fonts found in file: %s\n", path);
+		free(font_file_data);
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
 		return NULL;
 	}
 	
@@ -113,6 +132,7 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	free(font_file_data);
 	free(atlas_bitmap);
 
+	se_set_last_error(SE_RESULT_OK);
 	return new_font;
 }
 

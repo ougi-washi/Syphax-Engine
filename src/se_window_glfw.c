@@ -16,21 +16,26 @@
 static se_windows windows_container = { 0 };
 static GLFWwindow* current_conext_window = NULL;
 
-static void se_window_init_render(se_window* window, se_render_handle* render_handle) {
+static se_result se_window_init_render(se_window* window, se_render_handle* render_handle) {
 	s_assertf(window, "se_window_init_render :: window is null");
 	if (!render_handle) {
-		return;
+		return SE_RESULT_INVALID_ARGUMENT;
 	}
 	if (window->render_handle == render_handle && window->shader) {
-		return;
+		return SE_RESULT_OK;
 	}
 	window->render_handle = render_handle;
 	if (window->quad.vao == 0) {
 		se_quad_2d_create(&window->quad, 0);
 	}
 	if (!window->shader) {
-		window->shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+		se_shader *shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+		if (!shader) {
+			return se_get_last_error();
+		}
+		window->shader = shader;
 	}
+	return SE_RESULT_OK;
 }
 
 static se_key se_window_map_glfw_key(const i32 key) {
@@ -91,12 +96,15 @@ void gl_error_callback(i32 error, const c8* description) {
 }
 
 se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height) {
-	s_assertf(title, "se_window_create :: title is null");
+	if (!title) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 
 	glfwSetErrorCallback(gl_error_callback);
 	
 	if (!glfwInit()) {
-		printf("Failed to initialize GLFW\n");
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 
@@ -105,11 +113,10 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	}
 	se_window* new_window = s_array_increment(&windows_container);
 	memset(new_window, 0, sizeof(se_window));
-	s_assertf(new_window, "Failed to create window");
 	new_window->render_handle = NULL;
 
 	if (new_window == NULL) {
-		printf("Failed to create window\n");
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return NULL;
 	}
 	s_array_init(&new_window->input_events, SE_MAX_INPUT_EVENTS);
@@ -124,7 +131,10 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 #endif
 	 
 	new_window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
-	s_assertf(new_window->handle, "Failed to create GLFW window");
+	if (!new_window->handle) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		return NULL;
+	}
 	
 	
 	new_window->width = width;
@@ -145,14 +155,18 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	glEnable(GL_DEPTH_TEST);
 	
 	//create_fullscreen_quad(&new_window->quad_vao, &new_window->quad_vbo, &new_window->quad_ebo);
-	se_window_init_render(new_window, render_handle);
+	se_result render_result = se_window_init_render(new_window, render_handle);
+	if (render_result != SE_RESULT_OK) {
+		se_set_last_error(render_result);
+		return NULL;
+	}
 
 	new_window->time.current = glfwGetTime();
 	new_window->time.last_frame = new_window->time.current;
 	new_window->time.delta = 0;
 	new_window->frame_count = 0;
 	new_window->target_fps = 30;
-	printf("se_window_create :: created window %p\n", new_window);
+	se_set_last_error(SE_RESULT_OK);
 	return new_window;
 }
 

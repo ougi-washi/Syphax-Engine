@@ -10,7 +10,10 @@
 static se_windows windows_container = { 0 };
 
 se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height) {
-	s_assertf(title, "se_window_create :: title is null");
+	if (!title) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	if (s_array_get_capacity(&windows_container) == 0) {
 		s_array_init(&windows_container, 8);
 	}
@@ -23,6 +26,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->target_fps = 30;
 	new_window->time.current = 0.0;
 	printf("[terminal] window: %s (%u x %u)\n", title, width, height);
+	se_set_last_error(SE_RESULT_OK);
 	return new_window;
 }
 

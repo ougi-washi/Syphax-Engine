@@ -114,7 +114,7 @@ typedef struct {
 // scene handle functions
 // Ownership: only the scene handle may remove/free objects and scenes it owns.
 extern se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const se_scene_handle_params *params);
-extern void se_scene_handle_cleanup(se_scene_handle *scene_handle);
+extern void se_scene_handle_destroy(se_scene_handle *scene_handle);
 
 // 2D objects functions
 extern se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count);

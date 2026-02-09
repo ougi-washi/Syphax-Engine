@@ -67,7 +67,7 @@ typedef struct {
 #define SE_UI_HANDLE_PARAMS_DEFAULTS ((se_ui_handle_params){ .elements_count = 8, .children_per_element_count = 8, .objects_per_element_count = 16, .texts_count = 128, .fonts_count = 1 })
 
 extern se_ui_handle* se_ui_handle_create(se_window* window, se_render_handle* render_handle, const se_ui_handle_params* params);
-extern void se_ui_handle_cleanup(se_ui_handle* ui_handle);
+extern void se_ui_handle_destroy(se_ui_handle* ui_handle);
 // Ownership: only the UI handle may remove/free elements it owns.
 extern void se_ui_handle_destroy_element(se_ui_handle* ui_handle, se_ui_element* ui);
 #define se_ui_element_destroy(ui_handle, ui) se_ui_handle_destroy_element((ui_handle), (ui))

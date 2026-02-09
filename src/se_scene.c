@@ -27,6 +27,10 @@ se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const s
 		}
 	}
 	se_scene_handle *scene_handle = (se_scene_handle *)malloc(sizeof(se_scene_handle));
+	if (!scene_handle) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
 	memset(scene_handle, 0, sizeof(se_scene_handle));
 
 	s_array_init(&scene_handle->objects_2d, resolved.objects_2d_count);
@@ -42,12 +46,12 @@ se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const s
 		scene_handle->render_handle = NULL;
 	}
 
+	se_set_last_error(SE_RESULT_OK);
 	return scene_handle;
 }
 
-void se_scene_handle_cleanup(se_scene_handle *scene_handle) {
-	s_assertf(scene_handle, "se_scene_handle_cleanup :: scene_handle is null");
-	printf("se_scene_handle_cleanup :: scene_handle: %p\n", scene_handle);
+void se_scene_handle_destroy(se_scene_handle *scene_handle) {
+	s_assertf(scene_handle, "se_scene_handle_destroy :: scene_handle is null");
 	s_foreach(&scene_handle->objects_2d, i) {
 		se_object_2d *current_object = s_array_get(&scene_handle->objects_2d, i);
 		se_scene_handle_destroy_object_2d(scene_handle, current_object);
@@ -74,9 +78,10 @@ void se_scene_handle_cleanup(se_scene_handle *scene_handle) {
 }
 
 se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count) {
-	s_assertf(scene_handle, "se_object_2d_create :: scene_handle is null");
-	s_assertf(fragment_shader_path, "se_object_2d_create :: fragment_shader_path is null");
-	s_assertf(transform, "se_object_2d_create :: transform is null");
+	if (!scene_handle || !fragment_shader_path || !transform) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_object_2d *new_object = NULL;
 	s_foreach(&scene_handle->objects_2d, i) {
 		se_object_2d *slot = s_array_get(&scene_handle->objects_2d, i);
@@ -87,7 +92,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	}
 	if (!new_object) {
 		if (s_array_get_capacity(&scene_handle->objects_2d) == s_array_get_size(&scene_handle->objects_2d)) {
-			printf("se_object_2d_create :: scene_handle->objects_2d is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		new_object = s_array_increment(&scene_handle->objects_2d);
@@ -99,7 +104,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	new_object->is_custom = false;
 	new_object->is_visible = true;
 	new_object->is_valid = true;
-    if (scene_handle->render_handle) {
+	if (scene_handle->render_handle) {
 		s_foreach(&scene_handle->render_handle->shaders, i) {
 		    se_shader *curr_shader = s_array_get(&scene_handle->render_handle->shaders, i);
 		    if (curr_shader && strcmp(curr_shader->fragment_path, fragment_shader_path) == 0) {
@@ -108,14 +113,18 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 		    }
 		}
 		if (!new_object->shader) {
-		    new_object->shader = se_shader_load(
-		                    scene_handle->render_handle,
-		                    SE_OBJECT_2D_VERTEX_SHADER_PATH,
-			            fragment_shader_path);
+			se_shader *shader = se_shader_load(
+				scene_handle->render_handle,
+				SE_OBJECT_2D_VERTEX_SHADER_PATH,
+				fragment_shader_path);
+			if (!shader) {
+				se_quad_destroy(&new_object->quad);
+				memset(new_object, 0, sizeof(*new_object));
+				return NULL;
+			}
+			new_object->shader = shader;
 		}
-		s_assertf(new_object->shader, "se_object_2d_create :: failed to load shader: %s", fragment_shader_path);
-    } 
-    else {
+	} else {
 		new_object->shader = NULL;
 	}
 
@@ -140,13 +149,15 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 		*new_render_transform = *transform;
 		se_object_2d_set_instances_dirty(new_object, true);
 	}
+	se_set_last_error(SE_RESULT_OK);
 	return new_object;
 }
 
 se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform) {
-	s_assertf(scene_handle, "se_object_2d_create_custom :: scene_handle is null");
-	s_assertf(custom, "se_object_2d_create_custom :: custom is null");
-	s_assertf(transform, "se_object_2d_create_custom :: transform is null");
+	if (!scene_handle || !custom || !transform) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	s_assertf(custom->data_size <= SE_OBJECT_CUSTOM_DATA_SIZE, "se_object_2d_create_custom :: data_size exceeds SE_OBJECT_CUSTOM_DATA_SIZE");
 	se_object_2d *new_object = NULL;
 	s_foreach(&scene_handle->objects_2d, i) {
@@ -158,7 +169,7 @@ se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_objec
 	}
 	if (!new_object) {
 		if (s_array_get_capacity(&scene_handle->objects_2d) == s_array_get_size(&scene_handle->objects_2d)) {
-			printf("se_object_2d_create_custom :: scene_handle->objects_2d is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		new_object = s_array_increment(&scene_handle->objects_2d);
@@ -169,6 +180,7 @@ se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_objec
 	new_object->is_visible = true;
 	new_object->is_valid = true;
 	memcpy(&new_object->custom, custom, sizeof(se_object_custom));
+	se_set_last_error(SE_RESULT_OK);
 	return new_object;
 }
 
@@ -383,11 +395,10 @@ sz se_object_2d_get_instance_count(se_object_2d *object) {
 
 se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
 							const s_vec2 *size, const u16 object_count) {
-	s_assertf(scene_handle->render_handle,
-				"se_scene_2d_create :: scene_handle->render_handle is null");
-	s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
-	s_assertf(size, "se_scene_2d_create :: size is null");
-	s_assertf(object_count > 0, "se_scene_2d_create :: object_count is 0");
+	if (!scene_handle || !scene_handle->render_handle || !size || object_count == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_scene_2d *new_scene = NULL;
 	s_foreach(&scene_handle->scenes_2d, i) {
 		se_scene_2d *slot = s_array_get(&scene_handle->scenes_2d, i);
@@ -398,16 +409,21 @@ se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
 	}
 	if (!new_scene) {
 		if (s_array_get_capacity(&scene_handle->scenes_2d) == s_array_get_size(&scene_handle->scenes_2d)) {
-			printf("se_scene_2d_create :: scene_handle->scenes_2d is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		new_scene = s_array_increment(&scene_handle->scenes_2d);
 	}
 	memset(new_scene, 0, sizeof(*new_scene));
-	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
+	se_framebuffer *framebuffer = se_framebuffer_create(scene_handle->render_handle, size);
+	if (!framebuffer) {
+		memset(new_scene, 0, sizeof(*new_scene));
+		return NULL;
+	}
+	new_scene->output = framebuffer;
 	s_array_init(&new_scene->objects, object_count);
 	new_scene->is_valid = true;
-	printf("se_scene_2d_create :: created scene 2D %p\n", new_scene);
+	se_set_last_error(SE_RESULT_OK);
 	return new_scene;
 }
 
@@ -568,11 +584,10 @@ void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object) {
 }
 
 se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count) {
-	s_assertf(scene_handle, "se_scene_3d_create :: scene_handle is null");
-	s_assertf(scene_handle->render_handle,
-			"se_scene_3d_create :: scene_handle->render_handle is null");
-	s_assertf(size, "se_scene_3d_create :: size is null");
-	s_assertf(object_count > 0, "se_scene_3d_create :: object_count is 0");
+	if (!scene_handle || !scene_handle->render_handle || !size || object_count == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_scene_3d *new_scene = NULL;
 	s_foreach(&scene_handle->scenes_3d, i) {
 		se_scene_3d *slot = s_array_get(&scene_handle->scenes_3d, i);
@@ -583,23 +598,34 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	}
 	if (!new_scene) {
 		if (s_array_get_capacity(&scene_handle->scenes_3d) == s_array_get_size(&scene_handle->scenes_3d)) {
-			printf("se_scene_3d_create :: scene_handle->scenes_3d is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		new_scene = s_array_increment(&scene_handle->scenes_3d);
 	}
 	memset(new_scene, 0, sizeof(*new_scene));
-	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
+	se_framebuffer *framebuffer = se_framebuffer_create(scene_handle->render_handle, size);
+	if (!framebuffer) {
+		memset(new_scene, 0, sizeof(*new_scene));
+		return NULL;
+	}
+	new_scene->output = framebuffer;
 	s_array_init(&new_scene->objects, object_count);
 	s_array_init(&new_scene->post_process, object_count);
 	new_scene->output_shader = NULL;
-	new_scene->camera = se_render_handle_create_camera(scene_handle->render_handle);
+	se_camera *camera = se_render_handle_create_camera(scene_handle->render_handle);
+	if (!camera) {
+		se_render_handle_destroy_framebuffer(scene_handle->render_handle, new_scene->output);
+		memset(new_scene, 0, sizeof(*new_scene));
+		return NULL;
+	}
+	new_scene->camera = camera;
 	new_scene->enable_culling = true;
 	new_scene->is_valid = true;
 	if (new_scene->camera) {
 		se_camera_set_aspect(new_scene->camera, size->x, size->y);
 	}
-	printf("se_scene_3d_create :: created scene 3D %p\n", new_scene);
+	se_set_last_error(SE_RESULT_OK);
 	return new_scene;
 }
 
@@ -793,9 +819,10 @@ void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer
 }
 
 se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model, const s_mat4 *transform, const sz max_instances_count) {
-	s_assertf(scene_handle, "se_object_3d_create :: scene_handle is null");
-	s_assertf(model, "se_object_3d_create :: model is null");
-	s_assertf(transform, "se_object_3d_create :: transform is null");
+	if (!scene_handle || !model || !transform) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_object_3d *new_object = NULL;
 	s_foreach(&scene_handle->objects_3d, i) {
 		se_object_3d *slot = s_array_get(&scene_handle->objects_3d, i);
@@ -806,7 +833,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 	}
 	if (!new_object) {
 		if (s_array_get_capacity(&scene_handle->objects_3d) == s_array_get_size(&scene_handle->objects_3d)) {
-			printf("se_object_3d_create :: scene_handle->objects_3d is full\n");
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
 		new_object = s_array_increment(&scene_handle->objects_3d);
@@ -845,6 +872,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 		se_object_3d_set_instances_dirty(new_object, true);
 	}
 
+	se_set_last_error(SE_RESULT_OK);
 	return new_object;
 }
 

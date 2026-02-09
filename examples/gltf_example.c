@@ -21,8 +21,9 @@ int main() {
 	load_params.load_buffers = true;
 	load_params.load_images = true;
 	load_params.decode_data_uris = true;
-	se_gltf_asset *asset = se_gltf_load(gltf_path, &load_params);
-	if (asset == NULL) {
+	se_gltf_asset *asset = NULL;
+	asset = se_gltf_load(gltf_path, &load_params);
+	if (!asset) {
 		printf("gltf_example :: failed to load gltf asset\n");
 		return 1;
 	}
@@ -45,9 +46,24 @@ int main() {
 	render_params.shaders_count = (u16)(total_primitives + 8);
 	render_params.models_count = (u16)(asset->meshes.size + 8);
 	render_params.cameras_count = 2;
-	se_render_handle *render_handle = se_render_handle_create(&render_params);
+	se_render_handle *render_handle = NULL;
+	se_window *window = NULL;
+	se_scene_handle *scene_handle = NULL;
+	se_scene_3d *scene = NULL;
+	se_shader *mesh_shader = NULL;
+	se_texture *default_texture = NULL;
+	render_handle = se_render_handle_create(&render_params);
+	if (!render_handle) {
+		se_gltf_free(asset);
+		return 1;
+	}
 
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - glTF Example", WINDOW_WIDTH, WINDOW_HEIGHT);
+	window = se_window_create(render_handle, "Syphax-Engine - glTF Example", WINDOW_WIDTH, WINDOW_HEIGHT);
+	if (!window) {
+		se_render_handle_destroy(render_handle);
+		se_gltf_free(asset);
+		return 1;
+	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_scene_handle_params scene_params = {0};
@@ -55,13 +71,26 @@ int main() {
 	scene_params.objects_3d_count = (u16)s_array_get_size(&asset->meshes);
 	scene_params.scenes_2d_count = 0;
 	scene_params.scenes_3d_count = 1;
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, &scene_params);
+	scene_handle = se_scene_handle_create(render_handle, &scene_params);
+	if (!scene_handle) {
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		se_gltf_free(asset);
+		return 1;
+	}
 
-	se_scene_3d *scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), scene_params.objects_3d_count);
+	scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), scene_params.objects_3d_count);
+	if (!scene) {
+		se_scene_handle_destroy(scene_handle);
+		se_window_destroy(window);
+		se_render_handle_destroy(render_handle);
+		se_gltf_free(asset);
+		return 1;
+	}
 	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
 	se_scene_3d_set_culling(scene, false);
 
-	se_shader *mesh_shader = se_shader_load(render_handle, "shaders/gltf_3d_vertex.glsl", "shaders/gltf_3d_fragment.glsl");
+	mesh_shader = se_shader_load(render_handle, "shaders/gltf_3d_vertex.glsl", "shaders/gltf_3d_fragment.glsl");
 	if (!mesh_shader) {
 		printf("gltf_example :: failed to load mesh shader\n");
 		se_gltf_free(asset);
@@ -126,7 +155,7 @@ int main() {
 		bounds_radius = bounds_radius > 1.0f ? bounds_radius : 1.0f;
 	}
 
-	se_texture *default_texture = se_texture_load(render_handle, "examples/gltf/Sponza/white.png", SE_REPEAT);
+	default_texture = se_texture_load(render_handle, "examples/gltf/Sponza/white.png", SE_REPEAT);
 	if (!default_texture) {
 		printf("gltf_example :: failed to load default texture\n");
 		se_gltf_free(asset);
@@ -165,12 +194,12 @@ int main() {
 						i32 tex_index = material->pbr_metallic_roughness.base_color_texture.index;
 						if (tex_index >= 0 && (sz)tex_index < texture_cache.size) {
 							se_texture **cached = s_array_get(&texture_cache, tex_index);
-							if (*cached == NULL) {
-								*cached = se_gltf_texture_load(render_handle, asset, tex_index, SE_REPEAT);
-							}
-							if (*cached) {
-								mesh_texture = *cached;
-							}
+						if (*cached == NULL) {
+							*cached = se_gltf_texture_load(render_handle, asset, tex_index, SE_REPEAT);
+						}
+						if (*cached) {
+							mesh_texture = *cached;
+						}
 						}
 					}
 				}
@@ -180,8 +209,10 @@ int main() {
 		}
 
 		se_object_3d *object = se_object_3d_create(scene_handle, model, &model_transform, 1);
-		se_object_3d_add_instance(object, &identity, &identity);
-		se_scene_3d_add_object(scene, object);
+		if (object) {
+			se_object_3d_add_instance(object, &identity, &identity);
+			se_scene_3d_add_object(scene, object);
+		}
 	}
 
 	if (scene->camera) {
@@ -266,7 +297,7 @@ int main() {
 
 	se_gltf_free(asset);
 	s_array_clear(&texture_cache);
-	se_scene_handle_cleanup(scene_handle);
+	se_scene_handle_destroy(scene_handle);
 	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;

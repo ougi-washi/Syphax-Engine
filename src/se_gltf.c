@@ -1088,11 +1088,17 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 }
 
 se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params) {
-	if (path == NULL || path[0] == '\0') return NULL;
+	if (path == NULL || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
 	se_gltf_load_params cfg;
 	se_gltf_set_default_load_params(&cfg, params);
 	se_gltf_asset *asset = (se_gltf_asset *)malloc(sizeof(se_gltf_asset));
-	if (asset == NULL) return NULL;
+	if (asset == NULL) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
 	se_gltf_asset_init(asset);
 	asset->source_path = s_files_strdup(path);
 	{
@@ -1110,6 +1116,7 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 	if (ext && strcmp(ext, ".glb") == 0) {
 		if (!se_gltf_read_glb(path, &glb)) {
 			se_gltf_free(asset);
+			se_set_last_error(SE_RESULT_IO);
 			return NULL;
 		}
 		json_text = glb.json_text;
@@ -1118,6 +1125,7 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 	} else {
 		if (!s_file_read(path, &json_text, NULL)) {
 			se_gltf_free(asset);
+			se_set_last_error(SE_RESULT_IO);
 			return NULL;
 		}
 	}
@@ -1126,6 +1134,7 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 		free(json_text);
 		se_gltf_glb_data_free(&glb);
 		se_gltf_free(asset);
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 	if (!se_gltf_parse_asset_info(root, &asset->asset) ||
@@ -1147,11 +1156,13 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 		free(json_text);
 		se_gltf_glb_data_free(&glb);
 		se_gltf_free(asset);
+		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 	s_json_free(root);
 	free(json_text);
 	se_gltf_glb_data_free(&glb);
+	se_set_last_error(SE_RESULT_OK);
 	return asset;
 }
 
@@ -2008,14 +2019,19 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 }
 
 se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index) {
-	if (render_handle == NULL || asset == NULL) return NULL;
-	if (mesh_index < 0 || (sz)mesh_index >= asset->meshes.size) return NULL;
+	if (render_handle == NULL || asset == NULL) { se_set_last_error(SE_RESULT_INVALID_ARGUMENT); return NULL; }
+	if (mesh_index < 0 || (sz)mesh_index >= asset->meshes.size) { se_set_last_error(SE_RESULT_INVALID_ARGUMENT); return NULL; }
+	if (s_array_get_capacity(&render_handle->models) == s_array_get_size(&render_handle->models)) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return NULL;
+	}
 	se_gltf_mesh *mesh = s_array_get(&asset->meshes, mesh_index);
 	se_model *model = s_array_increment(&render_handle->models);
 	s_array_init(&model->meshes, mesh->primitives.size);
 	for (sz i = 0; i < mesh->primitives.size; i++) {
 		se_gltf_primitive *prim = s_array_get(&mesh->primitives, i);
 		if (prim->has_mode && prim->mode != 4) {
+			se_set_last_error(SE_RESULT_UNSUPPORTED);
 			return NULL;
 		}
 		se_mesh *out_mesh = s_array_increment(&model->meshes);
@@ -2029,19 +2045,19 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 			else if (strcmp(attr->name, "NORMAL") == 0) norm_attr = attr;
 			else if (strcmp(attr->name, "TEXCOORD_0") == 0) uv_attr = attr;
 		}
-		if (pos_attr == NULL) return NULL;
-		if (pos_attr->accessor < 0 || (sz)pos_attr->accessor >= asset->accessors.size) return NULL;
+		if (pos_attr == NULL) { se_set_last_error(SE_RESULT_IO); return NULL; }
+		if (pos_attr->accessor < 0 || (sz)pos_attr->accessor >= asset->accessors.size) { se_set_last_error(SE_RESULT_IO); return NULL; }
 		se_gltf_accessor *pos_acc = s_array_get(&asset->accessors, pos_attr->accessor);
-		if (pos_acc->component_type != 5126 || pos_acc->type != SE_GLTF_ACCESSOR_VEC3) return NULL;
-		if (!pos_acc->has_buffer_view) return NULL;
+		if (pos_acc->component_type != 5126 || pos_acc->type != SE_GLTF_ACCESSOR_VEC3) { se_set_last_error(SE_RESULT_UNSUPPORTED); return NULL; }
+		if (!pos_acc->has_buffer_view) { se_set_last_error(SE_RESULT_IO); return NULL; }
 		se_gltf_buffer_view *pos_view = s_array_get(&asset->buffer_views, pos_acc->buffer_view);
 		se_gltf_buffer *pos_buf = s_array_get(&asset->buffers, pos_view->buffer);
-		if (pos_buf->data == NULL) return NULL;
+		if (pos_buf->data == NULL) { se_set_last_error(SE_RESULT_IO); return NULL; }
 		u32 stride = pos_view->has_byte_stride ? pos_view->byte_stride : sizeof(f32) * 3;
 		u32 offset = pos_view->byte_offset + pos_acc->byte_offset;
 		u32 vertex_count = pos_acc->count;
 		se_vertex_3d *tmp_vertices = (se_vertex_3d *)malloc(sizeof(se_vertex_3d) * vertex_count);
-		if (tmp_vertices == NULL) return NULL;
+		if (tmp_vertices == NULL) { se_set_last_error(SE_RESULT_OUT_OF_MEMORY); return NULL; }
 		for (u32 v = 0; v < vertex_count; v++) {
 			const u8 *ptr = pos_buf->data + offset + (v * stride);
 			const f32 *fptr = (const f32 *)ptr;
@@ -2081,7 +2097,7 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 			u32 ioffset = iview->byte_offset + iacc->byte_offset;
 			u32 index_count = iacc->count;
 			u32 *tmp_indices = (u32 *)malloc(sizeof(u32) * index_count);
-			if (tmp_indices == NULL) { free(tmp_vertices); return NULL; }
+			if (tmp_indices == NULL) { free(tmp_vertices); se_set_last_error(SE_RESULT_OUT_OF_MEMORY); return NULL; }
 			u32 component_size = (iacc->component_type == 5125) ? 4 : (iacc->component_type == 5123) ? 2 : 1;
 			for (u32 idx = 0; idx < index_count; idx++) {
 				const u8 *ptr = ibuf->data + ioffset + (stride_idx ? idx * stride_idx : idx * component_size);
@@ -2096,19 +2112,21 @@ se_model *se_gltf_to_model(se_render_handle *render_handle, const se_gltf_asset 
 		} else {
 			u32 index_count = vertex_count;
 			u32 *tmp_indices = (u32 *)malloc(sizeof(u32) * index_count);
-			if (tmp_indices == NULL) { free(tmp_vertices); return NULL; }
+			if (tmp_indices == NULL) { free(tmp_vertices); se_set_last_error(SE_RESULT_OUT_OF_MEMORY); return NULL; }
 			for (u32 idx = 0; idx < index_count; idx++) tmp_indices[idx] = idx;
 			se_gltf_mesh_finalize(out_mesh, tmp_vertices, tmp_indices, vertex_count, index_count);
 			free(tmp_vertices);
 			free(tmp_indices);
 		}
 	}
+	model->is_valid = true;
+	se_set_last_error(SE_RESULT_OK);
 	return model;
 }
 
 se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap) {
-	if (render_handle == NULL || asset == NULL) return NULL;
-	if (image_index < 0 || (sz)image_index >= asset->images.size) return NULL;
+	if (render_handle == NULL || asset == NULL) { se_set_last_error(SE_RESULT_INVALID_ARGUMENT); return NULL; }
+	if (image_index < 0 || (sz)image_index >= asset->images.size) { se_set_last_error(SE_RESULT_INVALID_ARGUMENT); return NULL; }
 	se_gltf_image *image = s_array_get(&asset->images, image_index);
 	if (image->data && image->data_size > 0) {
 		return se_texture_load_from_memory(render_handle, image->data, image->data_size, wrap);
@@ -2116,13 +2134,17 @@ se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_as
 	if (image->uri && image->uri[0] != '\0') {
 		return se_texture_load(render_handle, image->uri, wrap);
 	}
+	se_set_last_error(SE_RESULT_NOT_FOUND);
 	return NULL;
 }
 
 se_texture *se_gltf_texture_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 texture_index, const se_texture_wrap wrap) {
-	if (render_handle == NULL || asset == NULL) return NULL;
-	if (texture_index < 0 || (sz)texture_index >= asset->textures.size) return NULL;
+	if (render_handle == NULL || asset == NULL) { se_set_last_error(SE_RESULT_INVALID_ARGUMENT); return NULL; }
+	if (texture_index < 0 || (sz)texture_index >= asset->textures.size) { se_set_last_error(SE_RESULT_INVALID_ARGUMENT); return NULL; }
 	se_gltf_texture *texture = s_array_get(&asset->textures, texture_index);
-	if (!texture->has_source) return NULL;
+	if (!texture->has_source) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return NULL;
+	}
 	return se_gltf_image_load(render_handle, asset, texture->source, wrap);
 }
