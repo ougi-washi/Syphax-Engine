@@ -209,6 +209,7 @@ extern se_window* se_window_create(se_render_handle* render_handle, const char* 
 extern void se_window_attach_render(se_window* window, se_render_handle* render_handle);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
 extern void se_window_tick(se_window* window); // update + poll events (single-window convenience)
+extern void se_window_set_current_context(se_window* window);
 extern void se_window_render_quad(se_window* window);	 // mid-frame: draws using window's quad
 extern void se_window_render_screen(se_window* window); // frame end: clear, renders the frame and swaps buffers
 extern void se_window_present(se_window* window); // swaps buffers (alias for render_screen)

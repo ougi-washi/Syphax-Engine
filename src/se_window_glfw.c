@@ -14,6 +14,7 @@
 #define SE_MAX_RESIZE_HANDLE 1024
 
 static se_windows windows_container = { 0 };
+static GLFWwindow* current_conext_window = NULL;
 
 static void se_window_init_render(se_window* window, se_render_handle* render_handle) {
 	s_assertf(window, "se_window_init_render :: window is null");
@@ -129,7 +130,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->width = width;
 	new_window->height = height;
 	
-	glfwMakeContextCurrent((GLFWwindow*)new_window->handle);
+	se_window_set_current_context(new_window);
 	glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, new_window);
 	glfwSwapInterval(0); 
 	
@@ -176,6 +177,11 @@ extern void se_window_update(se_window* window) {
 void se_window_tick(se_window* window) {
 	se_window_update(window);
 	se_window_poll_events();
+}
+
+void se_window_set_current_context(se_window* window) {
+	current_conext_window = (GLFWwindow*)window->handle;
+	glfwMakeContextCurrent((GLFWwindow*)window->handle);
 }
 
 void se_window_render_quad(se_window* window) {
