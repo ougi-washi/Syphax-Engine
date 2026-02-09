@@ -19,7 +19,9 @@ if(NOT CMAKE_GENERATOR)
 endif()
 
 # Directory setup
+set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 set(BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
@@ -53,8 +55,9 @@ macro(setup_library arg_lib_name arg_source_path arg_include_path)
 endmacro()
 
 # Main module
-set(MAIN_MODULE_INCLUDES ${SRC_DIR} ${LIB_DIR})
+set(MAIN_MODULE_INCLUDES ${INCLUDE_DIR} ${LIB_DIR})
 setup_library(MAIN ${SRC_DIR} "${MAIN_MODULE_INCLUDES}")
+target_include_directories(MAIN PRIVATE ${SRC_DIR})
 target_link_libraries(MAIN PUBLIC glfw OpenGL::GL miniaudio)
 
 macro(setup_executable arg_exec_dir arg_exec_name modules)
@@ -75,4 +78,3 @@ foreach(EXAMPLE ${EXAMPLES})
    	message(STATUS "Adding example ${EXAMPLE_NAME}")
     setup_executable(${EXAMPLES_DIR} ${EXAMPLE_NAME} MAIN)
 endforeach()
-

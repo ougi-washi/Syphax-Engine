@@ -418,6 +418,76 @@ GLuint se_shader_get_uniform_location(se_shader *shader, const char *name) {
 	return glGetUniformLocation(shader->program, name);
 }
 
+f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.f;
+		}
+	}
+	return NULL;
+}
+
+s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.vec2;
+		}
+	}
+	return NULL;
+}
+
+s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.vec3;
+		}
+	}
+	return NULL;
+}
+
+s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.vec4;
+		}
+	}
+	return NULL;
+}
+
+i32 *se_shader_get_uniform_int(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.i;
+		}
+	}
+	return NULL;
+}
+
+s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.mat4;
+		}
+	}
+	return NULL;
+}
+
+GLuint *se_shader_get_uniform_texture(se_shader *shader, const char *name) {
+	s_foreach(&shader->uniforms, i) {
+		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+		if (uniform && strcmp(uniform->name, name) == 0) {
+			return &uniform->value.texture;
+		}
+	}
+	return NULL;
+}
+
 void se_shader_set_float(se_shader *shader, const char *name, f32 value) {
 	se_uniform_set_float(&shader->uniforms, name, value);
 }
@@ -1174,76 +1244,6 @@ static void se_render_buffer_cleanup(se_render_buffer *buffer) {
 	glDeleteRenderbuffers(1, &buffer->depth_buffer);
 	buffer->depth_buffer = 0;
 	}
-}
-
-f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.f;
-	}
-	}
-	return NULL;
-}
-
-s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.vec2;
-	}
-	}
-	return NULL;
-}
-
-s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.vec3;
-	}
-	}
-	return NULL;
-}
-
-s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.vec4;
-	}
-	}
-	return NULL;
-}
-
-i32 *se_shader_get_uniform_int(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.i;
-	}
-	}
-	return NULL;
-}
-
-s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.mat4;
-	}
-	}
-	return NULL;
-}
-
-GLuint *se_shader_get_uniform_texture(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	if (uniform && strcmp(uniform->name, name) == 0) {
-		return &uniform->value.texture;
-	}
-	}
-	return NULL;
 }
 
 // Uniform functions

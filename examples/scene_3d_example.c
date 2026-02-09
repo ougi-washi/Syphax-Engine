@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_scene.h"
+#include "se_rhi.h"
 #include <math.h>
 
 #define WINDOW_WIDTH 1280

@@ -3,6 +3,7 @@
 #include "se_window.h"
 #include "se_render.h"
 #include "se_text.h"
+#include "se_rhi.h"
 
 int main() {
 	se_render_handle *render = se_render_handle_create(NULL);

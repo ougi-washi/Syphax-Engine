@@ -2,6 +2,7 @@
 
 #include "se_gltf.h"
 #include "se_scene.h"
+#include "se_rhi.h"
 #include "syphax/s_files.h"
 
 #include <math.h>

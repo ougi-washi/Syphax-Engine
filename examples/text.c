@@ -2,6 +2,7 @@
 
 #include "se_window.h"
 #include "se_text.h"
+#include "se_rhi.h"
 
 #define WIDTH 1920
 #define HEIGHT 1080

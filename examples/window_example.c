@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_window.h"
+#include "se_rhi.h"
 #include "se_render.h"
 
 #define WIDTH 1920
