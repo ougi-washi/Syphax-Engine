@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_gltf.h"
-#include "se_gl.h"
+#include "render/se_gl.h"
 
 #include "syphax/s_files.h"
 #include "syphax/s_json.h"

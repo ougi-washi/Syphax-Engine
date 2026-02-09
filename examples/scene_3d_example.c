@@ -1,7 +1,6 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_scene.h"
-#include "se_rhi.h"
 #include <math.h>
 
 #define WINDOW_WIDTH 1280
@@ -18,7 +17,7 @@ int main() {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
-	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
 
@@ -80,7 +79,7 @@ int main() {
 
 	s_array_clear(&shader_list);
 	se_scene_handle_cleanup(scene_handle);
-	se_render_handle_cleanup(render_handle);
+	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;
 }

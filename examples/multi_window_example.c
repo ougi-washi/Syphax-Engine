@@ -13,7 +13,7 @@ i32 main() {
 	se_window* window_main = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
 	se_window* window_1 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
 	se_window* window_2 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
-	se_window_set_exit_key(window_main, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window_main, SE_KEY_ESCAPE);
 
 	while (!se_window_should_close(window_main)) {
 		se_window_update(window_main);
@@ -21,17 +21,17 @@ i32 main() {
 		se_window_update(window_2);
 		se_window_poll_events();
 
-		glfwMakeContextCurrent(window_main->handle);
+		glfwMakeContextCurrent((GLFWwindow*)window_main->handle);
 		se_render_set_background_color(s_vec4(0.5f, 0.1f, 0.1f, 1.0f));
 		se_render_clear();
 		se_window_present(window_main);
 
-		glfwMakeContextCurrent(window_1->handle);
+		glfwMakeContextCurrent((GLFWwindow*)window_1->handle);
 		se_render_set_background_color(s_vec4(0.1f, 0.5f, 0.1f, 1.0f));
 		se_render_clear();
 		se_window_present(window_1);
 		
-		glfwMakeContextCurrent(window_2->handle);
+		glfwMakeContextCurrent((GLFWwindow*)window_2->handle);
 		se_render_set_background_color(s_vec4(0.1f, 0.1f, 0.5f, 1.0f));
 		se_render_clear();
 		se_window_present(window_2);

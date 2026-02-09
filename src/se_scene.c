@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_scene.h"
-#include "se_gl.h"
+#include "render/se_gl.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -480,13 +480,13 @@ void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d
 void se_scene_2d_bind(se_scene_2d *scene) {
 	s_assertf(scene, "se_scene_2d_bind :: scene is null");
 	se_framebuffer_bind(scene->output);
-	se_enable_blending();
+	se_render_set_blending(true);
 }
 
 void se_scene_2d_unbind(se_scene_2d *scene) {
 	s_assertf(scene, "se_scene_2d_unbind :: scene is null");
 	se_framebuffer_unbind(scene->output);
-	se_disable_blending();
+	se_render_set_blending(false);
 }
 
 void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle) {
@@ -539,11 +539,11 @@ void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_h
 		return;
 	}
 
-	se_unbind_framebuffer();
-	se_enable_blending();
+	se_render_unbind_framebuffer();
+	se_render_set_blending(true);
 	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
 	se_window_render_quad(window);
-	se_disable_blending();
+	se_render_set_blending(false);
 }
 
 void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
@@ -747,12 +747,12 @@ void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_h
 		return;
 	}
 
-	se_unbind_framebuffer();
+	se_render_unbind_framebuffer();
 	se_render_clear();
-	se_enable_blending();
+	se_render_set_blending(true);
 	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
 	se_window_render_quad(window);
-	se_disable_blending();
+	se_render_set_blending(false);
 }
 
 void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {

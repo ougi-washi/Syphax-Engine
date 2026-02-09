@@ -1,13 +1,12 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_scene.h"
-#include "se_rhi.h"
 
 #define WIDTH 1920
 #define HEIGHT 1080
 
 void on_button_yes_pressed(void *window, void *data) {
-	if (se_window_is_mouse_pressed(window, 0)) {
+	if (se_window_is_mouse_pressed(window, SE_MOUSE_LEFT)) {
 		if (data) {
 			(*(int *)data)++;
 			printf("Pressed yes, data: %d\n", *(int *)data);
@@ -16,7 +15,7 @@ void on_button_yes_pressed(void *window, void *data) {
 }
 
 void on_button_no_pressed(void *window, void *data) {
-	if (se_window_is_mouse_pressed(window, 0)) {
+	if (se_window_is_mouse_pressed(window, SE_MOUSE_LEFT)) {
 		if (data) {
 			(*(int *)data)++;
 			printf("Pressed no, data: %d\n", *(int *)data);
@@ -28,7 +27,7 @@ i32 main() {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
-	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
 	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
@@ -83,7 +82,7 @@ i32 main() {
 	}
 
 	se_scene_handle_cleanup(scene_handle);
-	se_render_handle_cleanup(render_handle);
+	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;
 }

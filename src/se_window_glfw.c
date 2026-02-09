@@ -1,7 +1,9 @@
 // Syphax-Engine - Ougi Washi
 
+#if defined(SE_WINDOW_BACKEND_GLFW)
+
 #include "se_window.h"
-#include "se_gl.h"
+#include "render/se_gl.h"
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
@@ -30,13 +32,21 @@ static void se_window_init_render(se_window* window, se_render_handle* render_ha
 	}
 }
 
+static se_key se_window_map_glfw_key(const i32 key) {
+	if (key >= SE_KEY_SPACE && key <= SE_KEY_MENU) {
+		return (se_key)key;
+	}
+	return SE_KEY_UNKNOWN;
+}
+
 static void key_callback(GLFWwindow* glfw_handle, i32 key, i32 scancode, i32 action, i32 mods) {
 	se_window* window = (se_window*)glfwGetWindowUserPointer(glfw_handle);
-	if (key >= 0 && key < 1024) {
+	se_key mapped = se_window_map_glfw_key(key);
+	if (mapped != SE_KEY_UNKNOWN) {
 		if (action == GLFW_PRESS) {
-			window->keys[key] = true;
+			window->keys[mapped] = true;
 		} else if (action == GLFW_RELEASE) {
-			window->keys[key] = false;
+			window->keys[mapped] = false;
 		}
 	}
 }
@@ -51,7 +61,7 @@ static void mouse_callback(GLFWwindow* glfw_handle, double xpos, double ypos) {
 
 static void mouse_button_callback(GLFWwindow* glfw_handle, i32 button, i32 action, i32 mods) {
 	se_window* window = (se_window*)glfwGetWindowUserPointer(glfw_handle);
-	if (button >= 0 && button < 8) {
+	if (button >= 0 && button < SE_MOUSE_BUTTON_COUNT) {
 		if (action == GLFW_PRESS) {
 			window->mouse_buttons[button] = true;
 		} else if (action == GLFW_RELEASE) {
@@ -119,17 +129,17 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->width = width;
 	new_window->height = height;
 	
-	glfwMakeContextCurrent(new_window->handle);
-	glfwSetWindowUserPointer(new_window->handle, new_window);
+	glfwMakeContextCurrent((GLFWwindow*)new_window->handle);
+	glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, new_window);
 	glfwSwapInterval(0); 
 	
 	// Set callbacks
-	glfwSetKeyCallback(new_window->handle, key_callback);
-	glfwSetCursorPosCallback(new_window->handle, mouse_callback);
-	glfwSetMouseButtonCallback(new_window->handle, mouse_button_callback);
-	glfwSetFramebufferSizeCallback(new_window->handle, framebuffer_size_callback);
+	glfwSetKeyCallback((GLFWwindow*)new_window->handle, key_callback);
+	glfwSetCursorPosCallback((GLFWwindow*)new_window->handle, mouse_callback);
+	glfwSetMouseButtonCallback((GLFWwindow*)new_window->handle, mouse_button_callback);
+	glfwSetFramebufferSizeCallback((GLFWwindow*)new_window->handle, framebuffer_size_callback);
 	
-	se_init_opengl();
+	se_render_init();
 	
 	glEnable(GL_DEPTH_TEST);
 	
@@ -189,7 +199,7 @@ void se_window_render_screen(se_window* window) {
         usleep(1000);
 	}
 	
-	glfwSwapBuffers(window->handle);
+	glfwSwapBuffers((GLFWwindow*)window->handle);
 }
 
 void se_window_present(se_window* window) {
@@ -245,33 +255,51 @@ void se_window_poll_events(){
 	}
 }
 
-b8 se_window_is_key_down(se_window* window, i32 key) {
+b8 se_window_is_key_down(se_window* window, se_key key) {
 	s_assertf(window, "se_window_is_key_down :: window is null");
+	if (key < 0 || key >= SE_KEY_COUNT) {
+		return false;
+	}
 	return window->keys[key];
 }
 
-b8 se_window_is_key_pressed(se_window* window, i32 key) {
+b8 se_window_is_key_pressed(se_window* window, se_key key) {
 	s_assertf(window, "se_window_is_key_pressed :: window is null");
+	if (key < 0 || key >= SE_KEY_COUNT) {
+		return false;
+	}
 	return window->keys[key] && !window->keys_prev[key];
 }
 
-b8 se_window_is_key_released(se_window* window, i32 key) {
+b8 se_window_is_key_released(se_window* window, se_key key) {
 	s_assertf(window, "se_window_is_key_released :: window is null");
+	if (key < 0 || key >= SE_KEY_COUNT) {
+		return false;
+	}
 	return !window->keys[key] && window->keys_prev[key];
 }
 
-b8 se_window_is_mouse_down(se_window* window, i32 button) {
+b8 se_window_is_mouse_down(se_window* window, se_mouse_button button) {
 	s_assertf(window, "se_window_is_mouse_down :: window is null");
+	if (button < 0 || button >= SE_MOUSE_BUTTON_COUNT) {
+		return false;
+	}
 	return window->mouse_buttons[button];
 }
 
-b8 se_window_is_mouse_pressed(se_window* window, i32 button) {
+b8 se_window_is_mouse_pressed(se_window* window, se_mouse_button button) {
 	s_assertf(window, "se_window_is_mouse_pressed :: window is null");
+	if (button < 0 || button >= SE_MOUSE_BUTTON_COUNT) {
+		return false;
+	}
 	return window->mouse_buttons[button] && !window->mouse_buttons_prev[button];
 }
 
-b8 se_window_is_mouse_released(se_window* window, i32 button) {
+b8 se_window_is_mouse_released(se_window* window, se_mouse_button button) {
 	s_assertf(window, "se_window_is_mouse_released :: window is null");
+	if (button < 0 || button >= SE_MOUSE_BUTTON_COUNT) {
+		return false;
+	}
 	return !window->mouse_buttons[button] && window->mouse_buttons_prev[button];
 }
 
@@ -307,12 +335,12 @@ void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_mouse_d
 
 b8 se_window_should_close(se_window* window) {
 	s_assertf(window, "se_window_should_close :: window is null");
-	return glfwWindowShouldClose(window->handle);
+	return glfwWindowShouldClose((GLFWwindow*)window->handle);
 }
 
 void se_window_set_should_close(se_window* window, const b8 should_close) {
 	s_assertf(window, "se_window_set_should_close :: window is null");
-	glfwSetWindowShouldClose(window->handle, should_close);
+	glfwSetWindowShouldClose((GLFWwindow*)window->handle, should_close);
 }
 
 void se_window_set_exit_keys(se_window* window, se_key_combo* keys) {
@@ -322,7 +350,7 @@ void se_window_set_exit_keys(se_window* window, se_key_combo* keys) {
 	window->use_exit_key = false;
 }
 
-void se_window_set_exit_key(se_window* window, i32 key) {
+void se_window_set_exit_key(se_window* window, se_key key) {
 	s_assertf(window, "se_window_set_exit_key :: window is null");
 	window->exit_key = key;
 	window->use_exit_key = true;
@@ -331,8 +359,8 @@ void se_window_set_exit_key(se_window* window, i32 key) {
 void se_window_check_exit_keys(se_window* window) {
 	s_assertf(window, "se_window_check_exit_keys :: window is null");
 	if (window->use_exit_key) {
-		if (window->exit_key >= 0 && window->exit_key < 1024 && se_window_is_key_down(window, window->exit_key)) {
-			glfwSetWindowShouldClose(window->handle, GLFW_TRUE);
+		if (window->exit_key != SE_KEY_UNKNOWN && se_window_is_key_down(window, window->exit_key)) {
+			glfwSetWindowShouldClose((GLFWwindow*)window->handle, GLFW_TRUE);
 			return;
 		}
 	}
@@ -344,12 +372,12 @@ void se_window_check_exit_keys(se_window* window) {
 		return;
 	}
 	s_foreach(keys, i) {
-		i32* current_key = s_array_get(keys, i);
+		se_key* current_key = s_array_get(keys, i);
 		if (!se_window_is_key_down(window, *current_key)) {
 			return;
 		}
 	}
-	glfwSetWindowShouldClose(window->handle, GLFW_TRUE);
+	glfwSetWindowShouldClose((GLFWwindow*)window->handle, GLFW_TRUE);
 }
 
 f64 se_window_get_delta_time(se_window* window) {
@@ -442,7 +470,7 @@ void se_window_destroy(se_window* window) {
 	s_array_clear(&window->input_events);
 	s_array_clear(&window->resize_handles);
 
-	glfwDestroyWindow(window->handle);
+	glfwDestroyWindow((GLFWwindow*)window->handle);
 	window->handle = NULL;
 
 	s_array_remove(&windows_container, window);
@@ -460,3 +488,5 @@ void se_window_destroy_all(){
 		se_window_destroy(window);
 	}
 }
+
+#endif // SE_WINDOW_BACKEND_GLFW

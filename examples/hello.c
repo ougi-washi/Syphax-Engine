@@ -3,12 +3,11 @@
 #include "se_window.h"
 #include "se_render.h"
 #include "se_text.h"
-#include "se_rhi.h"
 
 int main() {
 	se_render_handle *render = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render, "Syphax Hello", 1280, 720);
-	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.08f, 0.08f, 0.1f, 1.0f));
 
 	se_text_handle* text_handle = se_text_handle_create(render, 0);
@@ -21,6 +20,6 @@ int main() {
 
 	se_text_handle_cleanup(text_handle);
 	se_window_destroy(window);
-	se_render_handle_cleanup(render);
+	se_render_handle_destroy(render);
 	return 0;
 }

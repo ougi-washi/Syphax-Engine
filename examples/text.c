@@ -2,7 +2,6 @@
 
 #include "se_window.h"
 #include "se_text.h"
-#include "se_rhi.h"
 
 #define WIDTH 1920
 #define HEIGHT 1080
@@ -11,7 +10,7 @@ i32 main() {
 	se_render_handle* render_handle = se_render_handle_create(NULL);
 	
 	se_window* window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
-	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	
 	se_text_handle* text_handle = se_text_handle_create(render_handle, 0);
 	se_font* font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.f);
@@ -24,7 +23,7 @@ i32 main() {
 	}
 
 	se_text_handle_cleanup(text_handle);
-	se_render_handle_cleanup(render_handle);
+	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;
 }

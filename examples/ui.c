@@ -1,7 +1,6 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_ui.h"
-#include "se_rhi.h"
 
 #define WIDTH 1920
 #define HEIGHT 1080
@@ -17,7 +16,7 @@ void increment_button_color(se_object_2d *button) {
 
 void on_button_exit_captured(void *window, void *data) {
 	se_object_2d *button_exit = (se_object_2d *)data;
-	if (se_window_is_mouse_pressed(window, 0)) {
+	if (se_window_is_mouse_pressed(window, SE_MOUSE_LEFT)) {
 		se_window_set_should_close((se_window *)window, true);
 	}
 	increment_button_color(button_exit);
@@ -42,7 +41,7 @@ i32 main() {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
-	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_ui_handle_params ui_handle_params = SE_UI_HANDLE_PARAMS_DEFAULTS;
 	se_ui_handle *ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
@@ -103,7 +102,7 @@ i32 main() {
 	}
 
 	se_ui_handle_cleanup(ui_handle);
-	se_render_handle_cleanup(render_handle);
+	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;
 }

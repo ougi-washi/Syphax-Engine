@@ -3,7 +3,11 @@
 #ifndef SE_GL_H
 #define SE_GL_H
 
+#if defined(SE_RENDER_BACKEND_GLES)
+#include <GLES3/gl3.h>
+#else
 #include <GL/gl.h>
+#endif
 #include <GLFW/glfw3.h>
 #include <stddef.h>
 
@@ -125,61 +129,117 @@ typedef void(APIENTRY *PFNGLBLITFRAMEBUFFER)(GLint srcX0, GLint srcY0,
 											 GLint dstX1, GLint dstY1,
 											 GLbitfield mask, GLenum filter);
 
-extern PFNGLDELETEBUFFERS glDeleteBuffers;
-extern PFNGLGENBUFFERS glGenBuffers;
-extern PFNGLBINDBUFFER glBindBuffer;
-extern PFNGLBUFFERSUBDATA glBufferSubData;
-extern PFNGLBUFFERDATA glBufferData;
-extern PFNGLUSEPROGRAM glUseProgram;
-extern PFNGLCREATESHADER glCreateShader;
-extern PFNGLSHADERSOURCE glShaderSource;
-extern PFNGLCOMPILESHADER glCompileShader;
-extern PFNGLCREATEPROGRAM glCreateProgram;
-extern PFNGLLINKPROGRAM glLinkProgram;
-extern PFNGLATTACHSHADER glAttachShader;
-extern PFNGLDELETEPROGRAM glDeleteProgram;
-extern PFNGLDELETESHADER glDeleteShader;
-extern PFNGLGENRENDERBUFFERS glGenRenderbuffers;
-extern PFNGLBINDFRAMEBUFFER glBindFramebuffer;
-extern PFNGLFRAMEBUFFERRENDERBUFFER glFramebufferRenderbuffer;
-extern PFNGLFRAMEBUFFERTEXTURE glFramebufferTexture;
-extern PFNGLBINDVERTEXARRAY glBindVertexArray;
-extern PFNGLGENVERTEXARRAYS glGenVertexArrays;
-extern PFNGLDELETEVERTEXARRAYS glDeleteVertexArrays;
-extern PFNGLVERTEXATTRIBPOINTER glVertexAttribPointer;
-extern PFNGLENABLEVERTEXATTRIBARRAY glEnableVertexAttribArray;
-extern PFNGLDISABLEVERTEXATTRIBARRAY glDisableVertexAttribArray;
-extern PFNGLVERTEXATTRIBDIVISOR glVertexAttribDivisor;
-extern PFNGLDRAWARRAYSINSTANCED glDrawArraysInstanced;
-extern PFNGLGENFRAMEBUFFERS glGenFramebuffers;
-extern PFNGLFRAMEBUFFERTEXTURE2D glFramebufferTexture2D;
-extern PFNGLGETSHADERIV glGetShaderiv;
-extern PFNGLGETSHADERINFOLOG glGetShaderInfoLog;
-extern PFNGLGETPROGRAMIV glGetProgramiv;
-extern PFNGLGETPROGRAMINFOLOG glGetProgramInfoLog;
-extern PFNGLDRAWELEMENTSINSTANCED glDrawElementsInstanced;
-extern PFNGLMAPBUFFER glMapBuffer;
-extern PFNGLUNMAPBUFFER glUnmapBuffer;
-extern PFNGLGETUNIFORMLOCATION glGetUniformLocation;
-extern PFNGLUNIFORM1I glUniform1i;
-extern PFNGLUNIFORM1F glUniform1f;
-extern PFNGLUNIFORM1FV glUniform1fv;
-extern PFNGLUNIFORM2FV glUniform2fv;
-extern PFNGLUNIFORM3FV glUniform3fv;
-extern PFNGLUNIFORM4FV glUniform4fv;
-extern PFNGLUNIFORM1IV glUniform1iv;
-extern PFNGLUNIFORM2IV glUniform2iv;
-extern PFNGLUNIFORM3IV glUniform3iv;
-extern PFNGLUNIFORM4IV glUniform4iv;
-extern PFNGLUNIFORMMATRIX3FV glUniformMatrix3fv;
-extern PFNGLUNIFORMMATRIX4FV glUniformMatrix4fv;
-extern PFNGLBINDRENDERBUFFER glBindRenderbuffer;
-extern PFNGLDELETERENDERBUFFERS glDeleteRenderbuffers;
-extern PFNGLDELETEFRAMEBUFFERS glDeleteFramebuffers;
-extern PFNGLRENDERBUFFERSTORAGE glRenderbufferStorage;
-extern PFNGLCHECKFRAMEBUFFERSTATUS glCheckFramebufferStatus;
-extern PFNGLGENERATEMIPMAP glGenerateMipmap;
-extern PFNGLBLITFRAMEBUFFER glBlitFramebuffer;
+extern PFNGLDELETEBUFFERS se_glDeleteBuffers;
+extern PFNGLGENBUFFERS se_glGenBuffers;
+extern PFNGLBINDBUFFER se_glBindBuffer;
+extern PFNGLBUFFERSUBDATA se_glBufferSubData;
+extern PFNGLBUFFERDATA se_glBufferData;
+extern PFNGLUSEPROGRAM se_glUseProgram;
+extern PFNGLCREATESHADER se_glCreateShader;
+extern PFNGLSHADERSOURCE se_glShaderSource;
+extern PFNGLCOMPILESHADER se_glCompileShader;
+extern PFNGLCREATEPROGRAM se_glCreateProgram;
+extern PFNGLLINKPROGRAM se_glLinkProgram;
+extern PFNGLATTACHSHADER se_glAttachShader;
+extern PFNGLDELETEPROGRAM se_glDeleteProgram;
+extern PFNGLDELETESHADER se_glDeleteShader;
+extern PFNGLGENRENDERBUFFERS se_glGenRenderbuffers;
+extern PFNGLBINDFRAMEBUFFER se_glBindFramebuffer;
+extern PFNGLFRAMEBUFFERRENDERBUFFER se_glFramebufferRenderbuffer;
+extern PFNGLFRAMEBUFFERTEXTURE se_glFramebufferTexture;
+extern PFNGLBINDVERTEXARRAY se_glBindVertexArray;
+extern PFNGLGENVERTEXARRAYS se_glGenVertexArrays;
+extern PFNGLDELETEVERTEXARRAYS se_glDeleteVertexArrays;
+extern PFNGLVERTEXATTRIBPOINTER se_glVertexAttribPointer;
+extern PFNGLENABLEVERTEXATTRIBARRAY se_glEnableVertexAttribArray;
+extern PFNGLDISABLEVERTEXATTRIBARRAY se_glDisableVertexAttribArray;
+extern PFNGLVERTEXATTRIBDIVISOR se_glVertexAttribDivisor;
+extern PFNGLDRAWARRAYSINSTANCED se_glDrawArraysInstanced;
+extern PFNGLGENFRAMEBUFFERS se_glGenFramebuffers;
+extern PFNGLFRAMEBUFFERTEXTURE2D se_glFramebufferTexture2D;
+extern PFNGLGETSHADERIV se_glGetShaderiv;
+extern PFNGLGETSHADERINFOLOG se_glGetShaderInfoLog;
+extern PFNGLGETPROGRAMIV se_glGetProgramiv;
+extern PFNGLGETPROGRAMINFOLOG se_glGetProgramInfoLog;
+extern PFNGLDRAWELEMENTSINSTANCED se_glDrawElementsInstanced;
+extern PFNGLMAPBUFFER se_glMapBuffer;
+extern PFNGLUNMAPBUFFER se_glUnmapBuffer;
+extern PFNGLGETUNIFORMLOCATION se_glGetUniformLocation;
+extern PFNGLUNIFORM1I se_glUniform1i;
+extern PFNGLUNIFORM1F se_glUniform1f;
+extern PFNGLUNIFORM1FV se_glUniform1fv;
+extern PFNGLUNIFORM2FV se_glUniform2fv;
+extern PFNGLUNIFORM3FV se_glUniform3fv;
+extern PFNGLUNIFORM4FV se_glUniform4fv;
+extern PFNGLUNIFORM1IV se_glUniform1iv;
+extern PFNGLUNIFORM2IV se_glUniform2iv;
+extern PFNGLUNIFORM3IV se_glUniform3iv;
+extern PFNGLUNIFORM4IV se_glUniform4iv;
+extern PFNGLUNIFORMMATRIX3FV se_glUniformMatrix3fv;
+extern PFNGLUNIFORMMATRIX4FV se_glUniformMatrix4fv;
+extern PFNGLBINDRENDERBUFFER se_glBindRenderbuffer;
+extern PFNGLDELETERENDERBUFFERS se_glDeleteRenderbuffers;
+extern PFNGLDELETEFRAMEBUFFERS se_glDeleteFramebuffers;
+extern PFNGLRENDERBUFFERSTORAGE se_glRenderbufferStorage;
+extern PFNGLCHECKFRAMEBUFFERSTATUS se_glCheckFramebufferStatus;
+extern PFNGLGENERATEMIPMAP se_glGenerateMipmap;
+extern PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer;
+
+#define glDeleteBuffers se_glDeleteBuffers
+#define glGenBuffers se_glGenBuffers
+#define glBindBuffer se_glBindBuffer
+#define glBufferSubData se_glBufferSubData
+#define glBufferData se_glBufferData
+#define glUseProgram se_glUseProgram
+#define glCreateShader se_glCreateShader
+#define glShaderSource se_glShaderSource
+#define glCompileShader se_glCompileShader
+#define glCreateProgram se_glCreateProgram
+#define glLinkProgram se_glLinkProgram
+#define glAttachShader se_glAttachShader
+#define glDeleteProgram se_glDeleteProgram
+#define glDeleteShader se_glDeleteShader
+#define glGenRenderbuffers se_glGenRenderbuffers
+#define glBindFramebuffer se_glBindFramebuffer
+#define glFramebufferRenderbuffer se_glFramebufferRenderbuffer
+#define glFramebufferTexture se_glFramebufferTexture
+#define glBindVertexArray se_glBindVertexArray
+#define glGenVertexArrays se_glGenVertexArrays
+#define glDeleteVertexArrays se_glDeleteVertexArrays
+#define glVertexAttribPointer se_glVertexAttribPointer
+#define glEnableVertexAttribArray se_glEnableVertexAttribArray
+#define glDisableVertexAttribArray se_glDisableVertexAttribArray
+#define glVertexAttribDivisor se_glVertexAttribDivisor
+#define glDrawArraysInstanced se_glDrawArraysInstanced
+#define glGenFramebuffers se_glGenFramebuffers
+#define glFramebufferTexture2D se_glFramebufferTexture2D
+#define glGetShaderiv se_glGetShaderiv
+#define glGetShaderInfoLog se_glGetShaderInfoLog
+#define glGetProgramiv se_glGetProgramiv
+#define glGetProgramInfoLog se_glGetProgramInfoLog
+#define glDrawElementsInstanced se_glDrawElementsInstanced
+#define glMapBuffer se_glMapBuffer
+#define glUnmapBuffer se_glUnmapBuffer
+#define glGetUniformLocation se_glGetUniformLocation
+#define glUniform1i se_glUniform1i
+#define glUniform1f se_glUniform1f
+#define glUniform1fv se_glUniform1fv
+#define glUniform2fv se_glUniform2fv
+#define glUniform3fv se_glUniform3fv
+#define glUniform4fv se_glUniform4fv
+#define glUniform1iv se_glUniform1iv
+#define glUniform2iv se_glUniform2iv
+#define glUniform3iv se_glUniform3iv
+#define glUniform4iv se_glUniform4iv
+#define glUniformMatrix3fv se_glUniformMatrix3fv
+#define glUniformMatrix4fv se_glUniformMatrix4fv
+#define glBindRenderbuffer se_glBindRenderbuffer
+#define glDeleteRenderbuffers se_glDeleteRenderbuffers
+#define glDeleteFramebuffers se_glDeleteFramebuffers
+#define glRenderbufferStorage se_glRenderbufferStorage
+#define glCheckFramebufferStatus se_glCheckFramebufferStatus
+#define glGenerateMipmap se_glGenerateMipmap
+#define glBlitFramebuffer se_glBlitFramebuffer
 
 extern void se_init_opengl();
 

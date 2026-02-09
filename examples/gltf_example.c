@@ -2,7 +2,6 @@
 
 #include "se_gltf.h"
 #include "se_scene.h"
-#include "se_rhi.h"
 #include "syphax/s_files.h"
 
 #include <math.h>
@@ -49,7 +48,7 @@ int main() {
 	se_render_handle *render_handle = se_render_handle_create(&render_params);
 
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - glTF Example", WINDOW_WIDTH, WINDOW_HEIGHT);
-	se_window_set_exit_key(window, GLFW_KEY_ESCAPE);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_scene_handle_params scene_params = {0};
 	scene_params.objects_2d_count = 0;
@@ -221,10 +220,10 @@ int main() {
 		const f32 base_speed = 600.0f;
 		const f32 fast_speed = 1400.0f;
 		const f32 look_sensitivity = 15.0f;
-		const b8 fast = se_window_is_key_down(window, GLFW_KEY_LEFT_SHIFT) || se_window_is_key_down(window, GLFW_KEY_RIGHT_SHIFT);
+		const b8 fast = se_window_is_key_down(window, SE_KEY_LEFT_SHIFT) || se_window_is_key_down(window, SE_KEY_RIGHT_SHIFT);
 		const f32 move_speed = fast ? fast_speed : base_speed;
 
-		if (se_window_is_mouse_down(window, GLFW_MOUSE_BUTTON_RIGHT)) {
+		if (se_window_is_mouse_down(window, SE_MOUSE_RIGHT)) {
 			se_window_get_mouse_delta_normalized(window, &mouse_delta_clicked);
 			camera_yaw 		+= mouse_delta_clicked.x * look_sensitivity;
 			camera_pitch 	-= mouse_delta_clicked.y * look_sensitivity;
@@ -248,12 +247,12 @@ int main() {
 		s_vec3 forward_neg = s_vec3_muls(&forward, -1.0f);
 		s_vec3 right_neg = s_vec3_muls(&right, -1.0f);
 		s_vec3 up_neg = s_vec3_muls(&up, -1.0f);
-		if (se_window_is_key_down(window, GLFW_KEY_W)) move = s_vec3_add(&move, &forward);
-		if (se_window_is_key_down(window, GLFW_KEY_S)) move = s_vec3_add(&move, &forward_neg);
-		if (se_window_is_key_down(window, GLFW_KEY_D)) move = s_vec3_add(&move, &right);
-		if (se_window_is_key_down(window, GLFW_KEY_A)) move = s_vec3_add(&move, &right_neg);
-		if (se_window_is_key_down(window, GLFW_KEY_E)) move = s_vec3_add(&move, &up);
-		if (se_window_is_key_down(window, GLFW_KEY_Q)) move = s_vec3_add(&move, &up_neg);
+		if (se_window_is_key_down(window, SE_KEY_W)) move = s_vec3_add(&move, &forward);
+		if (se_window_is_key_down(window, SE_KEY_S)) move = s_vec3_add(&move, &forward_neg);
+		if (se_window_is_key_down(window, SE_KEY_D)) move = s_vec3_add(&move, &right);
+		if (se_window_is_key_down(window, SE_KEY_A)) move = s_vec3_add(&move, &right_neg);
+		if (se_window_is_key_down(window, SE_KEY_E)) move = s_vec3_add(&move, &up);
+		if (se_window_is_key_down(window, SE_KEY_Q)) move = s_vec3_add(&move, &up_neg);
 
 		if (s_vec3_length(&move) > 0.0f) {
 			move = s_vec3_normalize(&move);
@@ -268,7 +267,7 @@ int main() {
 	se_gltf_free(asset);
 	s_array_clear(&texture_cache);
 	se_scene_handle_cleanup(scene_handle);
-	se_render_handle_cleanup(render_handle);
+	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
 	return 0;
 }

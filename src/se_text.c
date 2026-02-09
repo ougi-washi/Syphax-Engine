@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_text.h"
-#include "se_gl.h"
+#include "render/se_gl.h"
 #include "syphax/s_files.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -174,9 +174,9 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 		}
 	}
 	
-	se_enable_blending();
+	se_render_set_blending(true);
 	se_shader_use(text_handle->render_handle, text_handle->text_shader, true, true);
 	text_handle->quad.instance_buffers_dirty = true;
 	se_quad_render(&text_handle->quad, glyph_count);
-	se_disable_blending();
+	se_render_set_blending(false);
 }

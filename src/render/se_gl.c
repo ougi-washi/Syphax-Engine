@@ -1,8 +1,13 @@
-// Syphax-render_handle - Ougi Washi
+// Syphax-Engine - Ougi Washi
 
-#include "se_render.h"
+#if defined(SE_RENDER_BACKEND_OPENGL) || defined(SE_RENDER_BACKEND_GLES)
+
 #include "se_gl.h"
+#include "se_render.h"
 #include "syphax/s_files.h"
+#if defined(SE_RENDER_BACKEND_GLES)
+#include <EGL/egl.h>
+#endif
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +15,21 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+static void *se_gl_get_proc_address(const char *name) {
+#if defined(SE_RENDER_BACKEND_GLES)
+	return (void *)eglGetProcAddress(name);
+#else
+	return (void *)glfwGetProcAddress(name);
+#endif
+}
+
+#define INIT_OPENGL_FUNCTION(func, func_type, name) \
+	func = (func_type)se_gl_get_proc_address(name); \
+	if (!func) { \
+		fprintf(stderr, "Failed to load OpenGL function: %s\n", name); \
+		exit(1); \
+	}
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -24,34 +44,230 @@ static void se_model_cleanup(se_model *model);
 static void se_framebuffer_cleanup(se_framebuffer *framebuffer);
 static void se_render_buffer_cleanup(se_render_buffer *buffer);
 
+static b8 se_render_initialized = false;
+
+PFNGLDELETEBUFFERS se_glDeleteBuffers = NULL;
+PFNGLGENBUFFERS se_glGenBuffers = NULL;
+PFNGLBINDBUFFER se_glBindBuffer = NULL;
+PFNGLBUFFERSUBDATA se_glBufferSubData = NULL;
+PFNGLBUFFERDATA se_glBufferData = NULL;
+PFNGLUSEPROGRAM se_glUseProgram = NULL;
+PFNGLCREATESHADER se_glCreateShader = NULL;
+PFNGLSHADERSOURCE se_glShaderSource = NULL;
+PFNGLCOMPILESHADER se_glCompileShader = NULL;
+PFNGLCREATEPROGRAM se_glCreateProgram = NULL;
+PFNGLLINKPROGRAM se_glLinkProgram = NULL;
+PFNGLATTACHSHADER se_glAttachShader = NULL;
+PFNGLDELETEPROGRAM se_glDeleteProgram = NULL;
+PFNGLDELETESHADER se_glDeleteShader = NULL;
+PFNGLGENRENDERBUFFERS se_glGenRenderbuffers = NULL;
+PFNGLBINDFRAMEBUFFER se_glBindFramebuffer = NULL;
+PFNGLFRAMEBUFFERRENDERBUFFER se_glFramebufferRenderbuffer = NULL;
+PFNGLFRAMEBUFFERTEXTURE se_glFramebufferTexture = NULL;
+PFNGLBINDVERTEXARRAY se_glBindVertexArray = NULL;
+PFNGLGENVERTEXARRAYS se_glGenVertexArrays = NULL;
+PFNGLDELETEVERTEXARRAYS se_glDeleteVertexArrays = NULL;
+PFNGLVERTEXATTRIBPOINTER se_glVertexAttribPointer = NULL;
+PFNGLENABLEVERTEXATTRIBARRAY se_glEnableVertexAttribArray = NULL;
+PFNGLDISABLEVERTEXATTRIBARRAY se_glDisableVertexAttribArray = NULL;
+PFNGLVERTEXATTRIBDIVISOR se_glVertexAttribDivisor = NULL;
+PFNGLDRAWARRAYSINSTANCED se_glDrawArraysInstanced = NULL;
+PFNGLGENFRAMEBUFFERS se_glGenFramebuffers = NULL;
+PFNGLFRAMEBUFFERTEXTURE2D se_glFramebufferTexture2D = NULL;
+PFNGLGETSHADERIV se_glGetShaderiv = NULL;
+PFNGLGETSHADERINFOLOG se_glGetShaderInfoLog = NULL;
+PFNGLGETPROGRAMIV se_glGetProgramiv = NULL;
+PFNGLGETPROGRAMINFOLOG se_glGetProgramInfoLog = NULL;
+PFNGLDRAWELEMENTSINSTANCED se_glDrawElementsInstanced = NULL;
+PFNGLMAPBUFFER se_glMapBuffer = NULL;
+PFNGLUNMAPBUFFER se_glUnmapBuffer = NULL;
+PFNGLGETUNIFORMLOCATION se_glGetUniformLocation = NULL;
+PFNGLUNIFORM1I se_glUniform1i = NULL;
+PFNGLUNIFORM1F se_glUniform1f = NULL;
+PFNGLUNIFORM1FV se_glUniform1fv = NULL;
+PFNGLUNIFORM2FV se_glUniform2fv = NULL;
+PFNGLUNIFORM3FV se_glUniform3fv = NULL;
+PFNGLUNIFORM4FV se_glUniform4fv = NULL;
+PFNGLUNIFORM1IV se_glUniform1iv = NULL;
+PFNGLUNIFORM2IV se_glUniform2iv = NULL;
+PFNGLUNIFORM3IV se_glUniform3iv = NULL;
+PFNGLUNIFORM4IV se_glUniform4iv = NULL;
+PFNGLUNIFORMMATRIX3FV se_glUniformMatrix3fv = NULL;
+PFNGLUNIFORMMATRIX4FV se_glUniformMatrix4fv = NULL;
+PFNGLBINDRENDERBUFFER se_glBindRenderbuffer = NULL;
+PFNGLDELETERENDERBUFFERS se_glDeleteRenderbuffers = NULL;
+PFNGLDELETEFRAMEBUFFERS se_glDeleteFramebuffers = NULL;
+PFNGLRENDERBUFFERSTORAGE se_glRenderbufferStorage = NULL;
+PFNGLCHECKFRAMEBUFFERSTATUS se_glCheckFramebufferStatus = NULL;
+PFNGLGENERATEMIPMAP se_glGenerateMipmap = NULL;
+PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer = NULL;
+
+#define SE_GL_ASSIGN(func, func_type, name, fallback) \
+	func = (func_type)se_gl_get_proc_address(name); \
+	if (!func) { \
+		func = (func_type)(fallback); \
+	} \
+	if (!func) { \
+		fprintf(stderr, "Failed to load OpenGL function: %s\n", name); \
+		exit(1); \
+	}
+
+void se_init_opengl(void) {
+#if defined(SE_RENDER_BACKEND_GLES)
+	SE_GL_ASSIGN(se_glDeleteBuffers, PFNGLDELETEBUFFERS, "glDeleteBuffers", glDeleteBuffers);
+	SE_GL_ASSIGN(se_glGenBuffers, PFNGLGENBUFFERS, "glGenBuffers", glGenBuffers);
+	SE_GL_ASSIGN(se_glBindBuffer, PFNGLBINDBUFFER, "glBindBuffer", glBindBuffer);
+	SE_GL_ASSIGN(se_glBufferSubData, PFNGLBUFFERSUBDATA, "glBufferSubData", glBufferSubData);
+	SE_GL_ASSIGN(se_glBufferData, PFNGLBUFFERDATA, "glBufferData", glBufferData);
+	SE_GL_ASSIGN(se_glUseProgram, PFNGLUSEPROGRAM, "glUseProgram", glUseProgram);
+	SE_GL_ASSIGN(se_glCreateShader, PFNGLCREATESHADER, "glCreateShader", glCreateShader);
+	SE_GL_ASSIGN(se_glShaderSource, PFNGLSHADERSOURCE, "glShaderSource", glShaderSource);
+	SE_GL_ASSIGN(se_glCompileShader, PFNGLCOMPILESHADER, "glCompileShader", glCompileShader);
+	SE_GL_ASSIGN(se_glCreateProgram, PFNGLCREATEPROGRAM, "glCreateProgram", glCreateProgram);
+	SE_GL_ASSIGN(se_glLinkProgram, PFNGLLINKPROGRAM, "glLinkProgram", glLinkProgram);
+	SE_GL_ASSIGN(se_glAttachShader, PFNGLATTACHSHADER, "glAttachShader", glAttachShader);
+	SE_GL_ASSIGN(se_glDeleteProgram, PFNGLDELETEPROGRAM, "glDeleteProgram", glDeleteProgram);
+	SE_GL_ASSIGN(se_glDeleteShader, PFNGLDELETESHADER, "glDeleteShader", glDeleteShader);
+	SE_GL_ASSIGN(se_glGenRenderbuffers, PFNGLGENRENDERBUFFERS, "glGenRenderbuffers", glGenRenderbuffers);
+	SE_GL_ASSIGN(se_glBindFramebuffer, PFNGLBINDFRAMEBUFFER, "glBindFramebuffer", glBindFramebuffer);
+	SE_GL_ASSIGN(se_glFramebufferRenderbuffer, PFNGLFRAMEBUFFERRENDERBUFFER, "glFramebufferRenderbuffer", glFramebufferRenderbuffer);
+	SE_GL_ASSIGN(se_glFramebufferTexture, PFNGLFRAMEBUFFERTEXTURE, "glFramebufferTexture", glFramebufferTexture);
+	SE_GL_ASSIGN(se_glBindVertexArray, PFNGLBINDVERTEXARRAY, "glBindVertexArray", glBindVertexArray);
+	SE_GL_ASSIGN(se_glGenVertexArrays, PFNGLGENVERTEXARRAYS, "glGenVertexArrays", glGenVertexArrays);
+	SE_GL_ASSIGN(se_glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYS, "glDeleteVertexArrays", glDeleteVertexArrays);
+	SE_GL_ASSIGN(se_glVertexAttribPointer, PFNGLVERTEXATTRIBPOINTER, "glVertexAttribPointer", glVertexAttribPointer);
+	SE_GL_ASSIGN(se_glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAY, "glEnableVertexAttribArray", glEnableVertexAttribArray);
+	SE_GL_ASSIGN(se_glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAY, "glDisableVertexAttribArray", glDisableVertexAttribArray);
+	SE_GL_ASSIGN(se_glVertexAttribDivisor, PFNGLVERTEXATTRIBDIVISOR, "glVertexAttribDivisor", glVertexAttribDivisor);
+	SE_GL_ASSIGN(se_glDrawArraysInstanced, PFNGLDRAWARRAYSINSTANCED, "glDrawArraysInstanced", glDrawArraysInstanced);
+	SE_GL_ASSIGN(se_glGenFramebuffers, PFNGLGENFRAMEBUFFERS, "glGenFramebuffers", glGenFramebuffers);
+	SE_GL_ASSIGN(se_glFramebufferTexture2D, PFNGLFRAMEBUFFERTEXTURE2D, "glFramebufferTexture2D", glFramebufferTexture2D);
+	SE_GL_ASSIGN(se_glGetShaderiv, PFNGLGETSHADERIV, "glGetShaderiv", glGetShaderiv);
+	SE_GL_ASSIGN(se_glGetShaderInfoLog, PFNGLGETSHADERINFOLOG, "glGetShaderInfoLog", glGetShaderInfoLog);
+	SE_GL_ASSIGN(se_glGetProgramiv, PFNGLGETPROGRAMIV, "glGetProgramiv", glGetProgramiv);
+	SE_GL_ASSIGN(se_glGetProgramInfoLog, PFNGLGETPROGRAMINFOLOG, "glGetProgramInfoLog", glGetProgramInfoLog);
+	SE_GL_ASSIGN(se_glDrawElementsInstanced, PFNGLDRAWELEMENTSINSTANCED, "glDrawElementsInstanced", glDrawElementsInstanced);
+	SE_GL_ASSIGN(se_glMapBuffer, PFNGLMAPBUFFER, "glMapBuffer", glMapBuffer);
+	SE_GL_ASSIGN(se_glUnmapBuffer, PFNGLUNMAPBUFFER, "glUnmapBuffer", glUnmapBuffer);
+	SE_GL_ASSIGN(se_glGetUniformLocation, PFNGLGETUNIFORMLOCATION, "glGetUniformLocation", glGetUniformLocation);
+	SE_GL_ASSIGN(se_glUniform1i, PFNGLUNIFORM1I, "glUniform1i", glUniform1i);
+	SE_GL_ASSIGN(se_glUniform1f, PFNGLUNIFORM1F, "glUniform1f", glUniform1f);
+	SE_GL_ASSIGN(se_glUniform1fv, PFNGLUNIFORM1FV, "glUniform1fv", glUniform1fv);
+	SE_GL_ASSIGN(se_glUniform2fv, PFNGLUNIFORM2FV, "glUniform2fv", glUniform2fv);
+	SE_GL_ASSIGN(se_glUniform3fv, PFNGLUNIFORM3FV, "glUniform3fv", glUniform3fv);
+	SE_GL_ASSIGN(se_glUniform4fv, PFNGLUNIFORM4FV, "glUniform4fv", glUniform4fv);
+	SE_GL_ASSIGN(se_glUniform1iv, PFNGLUNIFORM1IV, "glUniform1iv", glUniform1iv);
+	SE_GL_ASSIGN(se_glUniform2iv, PFNGLUNIFORM2IV, "glUniform2iv", glUniform2iv);
+	SE_GL_ASSIGN(se_glUniform3iv, PFNGLUNIFORM3IV, "glUniform3iv", glUniform3iv);
+	SE_GL_ASSIGN(se_glUniform4iv, PFNGLUNIFORM4IV, "glUniform4iv", glUniform4iv);
+	SE_GL_ASSIGN(se_glUniformMatrix3fv, PFNGLUNIFORMMATRIX3FV, "glUniformMatrix3fv", glUniformMatrix3fv);
+	SE_GL_ASSIGN(se_glUniformMatrix4fv, PFNGLUNIFORMMATRIX4FV, "glUniformMatrix4fv", glUniformMatrix4fv);
+	SE_GL_ASSIGN(se_glBindRenderbuffer, PFNGLBINDRENDERBUFFER, "glBindRenderbuffer", glBindRenderbuffer);
+	SE_GL_ASSIGN(se_glDeleteRenderbuffers, PFNGLDELETERENDERBUFFERS, "glDeleteRenderbuffers", glDeleteRenderbuffers);
+	SE_GL_ASSIGN(se_glDeleteFramebuffers, PFNGLDELETEFRAMEBUFFERS, "glDeleteFramebuffers", glDeleteFramebuffers);
+	SE_GL_ASSIGN(se_glRenderbufferStorage, PFNGLRENDERBUFFERSTORAGE, "glRenderbufferStorage", glRenderbufferStorage);
+	SE_GL_ASSIGN(se_glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUS, "glCheckFramebufferStatus", glCheckFramebufferStatus);
+	SE_GL_ASSIGN(se_glGenerateMipmap, PFNGLGENERATEMIPMAP, "glGenerateMipmap", glGenerateMipmap);
+	SE_GL_ASSIGN(se_glBlitFramebuffer, PFNGLBLITFRAMEBUFFER, "glBlitFramebuffer", glBlitFramebuffer);
+#else
+	SE_GL_ASSIGN(se_glDeleteBuffers, PFNGLDELETEBUFFERS, "glDeleteBuffers", NULL);
+	SE_GL_ASSIGN(se_glGenBuffers, PFNGLGENBUFFERS, "glGenBuffers", NULL);
+	SE_GL_ASSIGN(se_glBindBuffer, PFNGLBINDBUFFER, "glBindBuffer", NULL);
+	SE_GL_ASSIGN(se_glBufferSubData, PFNGLBUFFERSUBDATA, "glBufferSubData", NULL);
+	SE_GL_ASSIGN(se_glBufferData, PFNGLBUFFERDATA, "glBufferData", NULL);
+	SE_GL_ASSIGN(se_glUseProgram, PFNGLUSEPROGRAM, "glUseProgram", NULL);
+	SE_GL_ASSIGN(se_glCreateShader, PFNGLCREATESHADER, "glCreateShader", NULL);
+	SE_GL_ASSIGN(se_glShaderSource, PFNGLSHADERSOURCE, "glShaderSource", NULL);
+	SE_GL_ASSIGN(se_glCompileShader, PFNGLCOMPILESHADER, "glCompileShader", NULL);
+	SE_GL_ASSIGN(se_glCreateProgram, PFNGLCREATEPROGRAM, "glCreateProgram", NULL);
+	SE_GL_ASSIGN(se_glLinkProgram, PFNGLLINKPROGRAM, "glLinkProgram", NULL);
+	SE_GL_ASSIGN(se_glAttachShader, PFNGLATTACHSHADER, "glAttachShader", NULL);
+	SE_GL_ASSIGN(se_glDeleteProgram, PFNGLDELETEPROGRAM, "glDeleteProgram", NULL);
+	SE_GL_ASSIGN(se_glDeleteShader, PFNGLDELETESHADER, "glDeleteShader", NULL);
+	SE_GL_ASSIGN(se_glGenRenderbuffers, PFNGLGENRENDERBUFFERS, "glGenRenderbuffers", NULL);
+	SE_GL_ASSIGN(se_glBindFramebuffer, PFNGLBINDFRAMEBUFFER, "glBindFramebuffer", NULL);
+	SE_GL_ASSIGN(se_glFramebufferRenderbuffer, PFNGLFRAMEBUFFERRENDERBUFFER, "glFramebufferRenderbuffer", NULL);
+	SE_GL_ASSIGN(se_glFramebufferTexture, PFNGLFRAMEBUFFERTEXTURE, "glFramebufferTexture", NULL);
+	SE_GL_ASSIGN(se_glBindVertexArray, PFNGLBINDVERTEXARRAY, "glBindVertexArray", NULL);
+	SE_GL_ASSIGN(se_glGenVertexArrays, PFNGLGENVERTEXARRAYS, "glGenVertexArrays", NULL);
+	SE_GL_ASSIGN(se_glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYS, "glDeleteVertexArrays", NULL);
+	SE_GL_ASSIGN(se_glVertexAttribPointer, PFNGLVERTEXATTRIBPOINTER, "glVertexAttribPointer", NULL);
+	SE_GL_ASSIGN(se_glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAY, "glEnableVertexAttribArray", NULL);
+	SE_GL_ASSIGN(se_glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAY, "glDisableVertexAttribArray", NULL);
+	SE_GL_ASSIGN(se_glVertexAttribDivisor, PFNGLVERTEXATTRIBDIVISOR, "glVertexAttribDivisor", NULL);
+	SE_GL_ASSIGN(se_glDrawArraysInstanced, PFNGLDRAWARRAYSINSTANCED, "glDrawArraysInstanced", NULL);
+	SE_GL_ASSIGN(se_glGenFramebuffers, PFNGLGENFRAMEBUFFERS, "glGenFramebuffers", NULL);
+	SE_GL_ASSIGN(se_glFramebufferTexture2D, PFNGLFRAMEBUFFERTEXTURE2D, "glFramebufferTexture2D", NULL);
+	SE_GL_ASSIGN(se_glGetShaderiv, PFNGLGETSHADERIV, "glGetShaderiv", NULL);
+	SE_GL_ASSIGN(se_glGetShaderInfoLog, PFNGLGETSHADERINFOLOG, "glGetShaderInfoLog", NULL);
+	SE_GL_ASSIGN(se_glGetProgramiv, PFNGLGETPROGRAMIV, "glGetProgramiv", NULL);
+	SE_GL_ASSIGN(se_glGetProgramInfoLog, PFNGLGETPROGRAMINFOLOG, "glGetProgramInfoLog", NULL);
+	SE_GL_ASSIGN(se_glDrawElementsInstanced, PFNGLDRAWELEMENTSINSTANCED, "glDrawElementsInstanced", NULL);
+	SE_GL_ASSIGN(se_glMapBuffer, PFNGLMAPBUFFER, "glMapBuffer", NULL);
+	SE_GL_ASSIGN(se_glUnmapBuffer, PFNGLUNMAPBUFFER, "glUnmapBuffer", NULL);
+	SE_GL_ASSIGN(se_glGetUniformLocation, PFNGLGETUNIFORMLOCATION, "glGetUniformLocation", NULL);
+	SE_GL_ASSIGN(se_glUniform1i, PFNGLUNIFORM1I, "glUniform1i", NULL);
+	SE_GL_ASSIGN(se_glUniform1f, PFNGLUNIFORM1F, "glUniform1f", NULL);
+	SE_GL_ASSIGN(se_glUniform1fv, PFNGLUNIFORM1FV, "glUniform1fv", NULL);
+	SE_GL_ASSIGN(se_glUniform2fv, PFNGLUNIFORM2FV, "glUniform2fv", NULL);
+	SE_GL_ASSIGN(se_glUniform3fv, PFNGLUNIFORM3FV, "glUniform3fv", NULL);
+	SE_GL_ASSIGN(se_glUniform4fv, PFNGLUNIFORM4FV, "glUniform4fv", NULL);
+	SE_GL_ASSIGN(se_glUniform1iv, PFNGLUNIFORM1IV, "glUniform1iv", NULL);
+	SE_GL_ASSIGN(se_glUniform2iv, PFNGLUNIFORM2IV, "glUniform2iv", NULL);
+	SE_GL_ASSIGN(se_glUniform3iv, PFNGLUNIFORM3IV, "glUniform3iv", NULL);
+	SE_GL_ASSIGN(se_glUniform4iv, PFNGLUNIFORM4IV, "glUniform4iv", NULL);
+	SE_GL_ASSIGN(se_glUniformMatrix3fv, PFNGLUNIFORMMATRIX3FV, "glUniformMatrix3fv", NULL);
+	SE_GL_ASSIGN(se_glUniformMatrix4fv, PFNGLUNIFORMMATRIX4FV, "glUniformMatrix4fv", NULL);
+	SE_GL_ASSIGN(se_glBindRenderbuffer, PFNGLBINDRENDERBUFFER, "glBindRenderbuffer", NULL);
+	SE_GL_ASSIGN(se_glDeleteRenderbuffers, PFNGLDELETERENDERBUFFERS, "glDeleteRenderbuffers", NULL);
+	SE_GL_ASSIGN(se_glDeleteFramebuffers, PFNGLDELETEFRAMEBUFFERS, "glDeleteFramebuffers", NULL);
+	SE_GL_ASSIGN(se_glRenderbufferStorage, PFNGLRENDERBUFFERSTORAGE, "glRenderbufferStorage", NULL);
+	SE_GL_ASSIGN(se_glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUS, "glCheckFramebufferStatus", NULL);
+	SE_GL_ASSIGN(se_glGenerateMipmap, PFNGLGENERATEMIPMAP, "glGenerateMipmap", NULL);
+	SE_GL_ASSIGN(se_glBlitFramebuffer, PFNGLBLITFRAMEBUFFER, "glBlitFramebuffer", NULL);
+#endif
+}
+
+b8 se_render_init(void) {
+	if (se_render_initialized) {
+		return true;
+	}
+#if defined(SE_WINDOW_BACKEND_GLFW)
+	if (!glfwGetCurrentContext()) {
+		printf("se_render_init :: no active OpenGL context\n");
+		return false;
+	}
+#endif
+	se_init_opengl();
+	se_render_initialized = true;
+	return true;
+}
 static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_size, const char *label);
 
 static b8 se_is_blending = false;
-void se_enable_blending() {
-	if (se_is_blending) {
-	return;
+void se_render_set_blending(const b8 active) {
+	if (active) {
+		if (se_is_blending) {
+			return;
+		}
+		glEnable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+		se_is_blending = true;
+		return;
 	}
-	glEnable(GL_BLEND);
-	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	// Also disable depth testing if you have it on
-	glDisable(GL_DEPTH_TEST);
-	se_is_blending = true;
-}
-
-void se_disable_blending() {
 	if (!se_is_blending) {
-	return;
+		return;
 	}
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	se_is_blending = false;
 }
 
-void se_unbind_framebuffer() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
+void se_render_unbind_framebuffer(void) { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
 
-void se_render_clear() {
+void se_render_clear(void) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -60,6 +276,10 @@ void se_render_set_background_color(const s_vec4 color) {
 }
 
 se_render_handle *se_render_handle_create(const se_render_handle_params *params) {
+	b8 render_ready = se_render_init();
+	if (!render_ready) {
+		printf("se_render_handle_create :: render init deferred\n");
+	}
 	se_render_handle_params resolved = SE_RENDER_HANDLE_PARAMS_DEFAULTS;
 	if (params) {
 		resolved = *params;
@@ -92,16 +312,18 @@ se_render_handle *se_render_handle_create(const se_render_handle_params *params)
 	s_array_init(&render_handle->models, resolved.models_count);
 	s_array_init(&render_handle->cameras, resolved.cameras_count);
 	s_array_init(&render_handle->global_uniforms, SE_UNIFORMS_MAX);
-	se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	if (render_ready) {
+		se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	}
 
 	printf("se_render_handle_create :: created render handle %p\n", render_handle);
 	return render_handle;
 }
 
-void se_render_handle_cleanup(se_render_handle *render_handle) {
-	s_assertf(render_handle, "se_render_handle_cleanup :: render_handle is null");
+void se_render_handle_destroy(se_render_handle *render_handle) {
+	s_assertf(render_handle, "se_render_handle_destroy :: render_handle is null");
 
-	printf("se_render_handle_cleanup :: render handle: %p\n", render_handle);
+	printf("se_render_handle_destroy :: render handle: %p\n", render_handle);
 	s_foreach(&render_handle->models, i) {
 		se_model *curr_model = s_array_get(&render_handle->models, i);
 		se_render_handle_destroy_model(render_handle, curr_model);
@@ -137,7 +359,7 @@ void se_render_handle_cleanup(se_render_handle *render_handle) {
 	s_array_clear(&render_handle->render_buffers);
 
 	free(render_handle);
-	printf("se_render_handle_cleanup :: finished cleanup\n");
+	printf("se_render_handle_destroy :: finished cleanup\n");
 }
 
 void se_render_handle_reload_changed_shaders(se_render_handle *render_handle) {
@@ -414,8 +636,8 @@ static void se_shader_cleanup(se_shader *shader) {
 	}
 }
 
-GLuint se_shader_get_uniform_location(se_shader *shader, const char *name) {
-	return glGetUniformLocation(shader->program, name);
+i32 se_shader_get_uniform_location(se_shader *shader, const char *name) {
+	return (i32)glGetUniformLocation(shader->program, name);
 }
 
 f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
@@ -478,7 +700,7 @@ s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-GLuint *se_shader_get_uniform_texture(se_shader *shader, const char *name) {
+u32 *se_shader_get_uniform_texture(se_shader *shader, const char *name) {
 	s_foreach(&shader->uniforms, i) {
 		se_uniform *uniform = s_array_get(&shader->uniforms, i);
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -516,7 +738,7 @@ void se_shader_set_mat4(se_shader *shader, const char *name, const s_mat4 *value
 	se_uniform_set_mat4(&shader->uniforms, name, value);
 }
 
-void se_shader_set_texture(se_shader *shader, const char *name, GLuint texture) {
+void se_shader_set_texture(se_shader *shader, const char *name, const u32 texture) {
 	se_uniform_set_texture(&shader->uniforms, name, texture);
 }
 
@@ -1355,7 +1577,7 @@ void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *
 	memcpy(&new_uniform->value.mat4, value, sizeof(s_mat4));
 }
 
-void se_uniform_set_texture(se_uniforms *uniforms, const char *name, GLuint texture) {
+void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 texture) {
 	s_assertf(uniforms, "se_uniform_set_texture :: uniforms is null");
 	s_assertf(name, "se_uniform_set_texture :: name is null");
 	s_foreach(uniforms, i) {
@@ -1719,6 +1941,7 @@ static GLuint se_shader_compile(const char *source, GLenum type) {
 	return shader;
 }
 
+
 static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source) {
 	GLuint vertex_shader = se_shader_compile(vertex_source, GL_VERTEX_SHADER);
 	GLuint fragment_shader = se_shader_compile(fragment_source, GL_FRAGMENT_SHADER);
@@ -1753,3 +1976,5 @@ static GLuint se_shader_create_program(const char *vertex_source, const char *fr
 
 	return program;
 }
+
+#endif // SE_RENDER_BACKEND_OPENGL || SE_RENDER_BACKEND_GLES
