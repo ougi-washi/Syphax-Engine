@@ -75,6 +75,7 @@ typedef struct {
 	time_t fragment_mtime;
 	se_uniforms uniforms;
 	b8 needs_reload;
+	b8 is_valid : 1;
 } se_shader;
 typedef s_array(se_shader, se_shaders);
 typedef se_shader *se_shader_ptr;
@@ -86,6 +87,7 @@ typedef struct se_texture {
 	i32 width;
 	i32 height;
 	i32 channels;
+	b8 is_valid : 1;
 } se_texture;
 typedef s_array(se_texture, se_textures);
 typedef se_texture *se_texture_ptr;
@@ -108,6 +110,7 @@ typedef s_array(se_mesh, se_meshes);
 
 typedef struct {
 	se_meshes meshes;
+	b8 is_valid : 1;
 } se_model;
 typedef s_array(se_model, se_models);
 typedef se_model *se_model_ptr;
@@ -135,6 +138,7 @@ typedef struct {
 	s_vec2 size;
 	s_vec2 ratio;
 	b8 auto_resize : 1;
+	b8 is_valid : 1;
 } se_framebuffer;
 typedef s_array(se_framebuffer, se_framebuffers);
 typedef se_framebuffer *se_framebuffer_ptr;
@@ -150,6 +154,7 @@ typedef struct {
 	s_vec2 scale;
 	s_vec2 position;
 	se_shader_ptr shader;
+	b8 is_valid : 1;
 } se_render_buffer;
 typedef s_array(se_render_buffer, se_render_buffers);
 typedef se_render_buffer *se_render_buffer_ptr;
@@ -209,24 +214,27 @@ extern void se_render_clear();
 extern void se_render_set_background_color(const s_vec4 color);
 
 // render_handle functions
-extern se_render_handle *
-se_render_handle_create(const se_render_handle_params *params);
+extern se_render_handle *se_render_handle_create(const se_render_handle_params *params);
 extern void se_render_handle_cleanup(se_render_handle *render_handle);
 extern void se_render_handle_reload_changed_shaders(se_render_handle *render_handle);
 extern se_uniforms *se_render_handle_get_global_uniforms(se_render_handle *render_handle);
 
 // Texture functions
+// Ownership: render handle owns textures created from it.
 typedef enum { SE_REPEAT, SE_CLAMP } se_texture_wrap;
 extern se_texture *se_texture_load(se_render_handle *render_handle, const char *path, const se_texture_wrap wrap);
 extern se_texture *se_texture_load_from_memory(se_render_handle *render_handle, const u8 *data, const sz size, const se_texture_wrap wrap);
-extern void se_texture_cleanup(se_texture *texture);
+extern void se_render_handle_destroy_texture(se_render_handle *render_handle, se_texture *texture);
+#define se_texture_destroy(render_handle, texture) se_render_handle_destroy_texture((render_handle), (texture))
 
 // Shader functions
+// Ownership: render handle owns shaders created from it.
 extern se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_file_path, const char *fragment_file_path);
 extern se_shader *se_shader_load_from_memory(se_render_handle *render_handle, const char *vertex_data, const char *fragment_data);
 extern b8 se_shader_reload_if_changed(se_shader *shader);
 extern void se_shader_use(se_render_handle *render_handle, se_shader *shader, const b8 update_uniforms, const b8 update_global_uniforms);
-extern void se_shader_cleanup(se_shader *shader);
+extern void se_render_handle_destroy_shader(se_render_handle *render_handle, se_shader *shader);
+#define se_shader_destroy(render_handle, shader) se_render_handle_destroy_shader((render_handle), (shader))
 extern GLuint se_shader_get_uniform_location(se_shader *shader, const char *name);
 extern f32 *se_shader_get_uniform_float(se_shader *shader, const char *name);
 extern s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name);
@@ -251,39 +259,47 @@ extern void se_mesh_rotate(se_mesh *mesh, const s_vec3 *v);
 extern void se_mesh_scale(se_mesh *mesh, const s_vec3 *v);
 
 // Model functions
+// Ownership: render handle owns models created from it.
 extern se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders);
 extern void se_model_render(se_render_handle *render_handle, se_model *model, se_camera *camera);
-extern void se_model_cleanup(se_model *model);
+extern void se_render_handle_destroy_model(se_render_handle *render_handle, se_model *model);
+#define se_model_destroy(render_handle, model) se_render_handle_destroy_model((render_handle), (model))
 extern void se_model_translate(se_model *model, const s_vec3 *v);
 extern void se_model_rotate(se_model *model, const s_vec3 *v);
 extern void se_model_scale(se_model *model, const s_vec3 *v);
 
 // camera functions
 // Ownership: render handle owns cameras created from it.
-extern se_camera *se_camera_create(se_render_handle *render_handle);
+extern se_camera *se_render_handle_create_camera(se_render_handle *render_handle);
+extern void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera *camera);
+#define se_camera_create(render_handle) se_render_handle_create_camera((render_handle))
+#define se_camera_destroy(render_handle, camera) se_render_handle_destroy_camera((render_handle), (camera))
 extern s_mat4 se_camera_get_view_matrix(const se_camera *camera);
 extern s_mat4 se_camera_get_projection_matrix(const se_camera *camera);
 extern void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height);
-extern void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera *camera);
 
 // Framebuffer functions
+// Ownership: render handle owns framebuffers created from it.
 extern se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_vec2 *size);
+extern void se_render_handle_destroy_framebuffer(se_render_handle *render_handle, se_framebuffer *framebuffer);
+#define se_framebuffer_destroy(render_handle, framebuffer) se_render_handle_destroy_framebuffer((render_handle), (framebuffer))
 extern void se_framebuffer_set_size(se_framebuffer *framebuffer, const s_vec2 *size);
 extern void se_framebuffer_get_size(se_framebuffer *framebuffer, s_vec2 *out_size);
 extern void se_framebuffer_bind(se_framebuffer *framebuffer);
 extern void se_framebuffer_unbind(se_framebuffer *framebuffer);
 extern void se_framebuffer_use_quad_shader(se_framebuffer *framebuffer, se_render_handle *render_handle);
-extern void se_framebuffer_cleanup(se_framebuffer *framebuffer);
 
 // Render buffer functions
+// Ownership: render handle owns render buffers created from it.
 extern se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const u32 width, const u32 height, const c8 *fragment_shader_path);
+extern void se_render_handle_destroy_render_buffer(se_render_handle *render_handle, se_render_buffer *buffer);
+#define se_render_buffer_destroy(render_handle, buffer) se_render_handle_destroy_render_buffer((render_handle), (buffer))
 extern void se_render_buffer_set_shader(se_render_buffer *buffer, se_shader *shader);
 extern void se_render_buffer_unset_shader(se_render_buffer *buffer);
 extern void se_render_buffer_bind(se_render_buffer *buffer);
 extern void se_render_buffer_unbind(se_render_buffer *buf);
 extern void se_render_buffer_set_scale(se_render_buffer *buffer, const s_vec2 *scale);
 extern void se_render_buffer_set_position(se_render_buffer *buffer, const s_vec2 *position);
-extern void se_render_buffer_cleanup(se_render_buffer *buffer);
 
 // Uniform functions
 extern void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value);

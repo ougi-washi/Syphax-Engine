@@ -682,7 +682,7 @@ void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d
 	if (!scene->is_valid) {
 		return;
 	}
-	se_framebuffer_cleanup(scene->output);
+	se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
 	scene->output = NULL;
 	s_array_clear(&scene->objects);
 	scene->is_valid = false;
@@ -804,7 +804,7 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	s_array_init(&new_scene->objects, object_count);
 	s_array_init(&new_scene->post_process, object_count);
 	new_scene->output_shader = NULL;
-	new_scene->camera = se_camera_create(scene_handle->render_handle);
+	new_scene->camera = se_render_handle_create_camera(scene_handle->render_handle);
 	new_scene->enable_culling = true;
 	new_scene->is_valid = true;
 	if (new_scene->camera) {
@@ -824,7 +824,7 @@ void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d
 		scene->camera = NULL;
 	}
 	if (scene->output) {
-		se_framebuffer_cleanup(scene->output);
+		se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
 		scene->output = NULL;
 	}
 	s_array_clear(&scene->post_process);

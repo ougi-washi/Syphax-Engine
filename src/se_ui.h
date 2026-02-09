@@ -70,6 +70,7 @@ extern se_ui_handle* se_ui_handle_create(se_window* window, se_render_handle* re
 extern void se_ui_handle_cleanup(se_ui_handle* ui_handle);
 // Ownership: only the UI handle may remove/free elements it owns.
 extern void se_ui_handle_destroy_element(se_ui_handle* ui_handle, se_ui_element* ui);
+#define se_ui_element_destroy(ui_handle, ui) se_ui_handle_destroy_element((ui_handle), (ui))
 
 extern se_ui_element* se_ui_element_create(se_ui_handle* ui_handle, const se_ui_element_params* params);
 extern se_ui_element* se_ui_element_text_create(se_ui_handle* ui_handle, const se_ui_element_params* params, const c8* text, const c8* font_path, const f32 font_size);
