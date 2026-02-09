@@ -751,7 +751,7 @@ se_camera *se_camera_create(se_render_handle *render_handle) {
 	se_camera *camera = NULL;
 	s_foreach(&render_handle->cameras, i) {
 		se_camera *slot = s_array_get(&render_handle->cameras, i);
-		if (slot->fov == 0.0f && slot->near == 0.0f && slot->far == 0.0f) {
+		if (!slot->is_valid) {
 			camera = slot;
 			break;
 		}
@@ -772,6 +772,7 @@ se_camera *se_camera_create(se_render_handle *render_handle) {
 	camera->near = 0.1f;
 	camera->far = 100.0f;
 	camera->aspect = 1.78;
+	camera->is_valid = true;
 	printf("se_camera_create :: created camera %p\n", camera);
 	return camera;
 }
@@ -792,16 +793,10 @@ void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera 
 	printf("se_render_handle_destroy_camera :: camera: %p\n", camera);
 	s_assertf(render_handle, "se_render_handle_destroy_camera :: render_handle is null");
 	s_assertf(camera, "se_render_handle_destroy_camera :: camera is null");
-	if (camera->fov == 0.0f && camera->near == 0.0f && camera->far == 0.0f) {
+	if (!camera->is_valid) {
 		return;
 	}
-	camera->position = s_vec3(0.0f, 0.0f, 0.0f);
-	camera->target = s_vec3(0.0f, 0.0f, 0.0f);
-	camera->up = s_vec3(0.0f, 1.0f, 0.0f);
-	camera->fov = 0.0f;
-	camera->near = 0.0f;
-	camera->far = 0.0f;
-	camera->aspect = 0.0f;
+	memset(camera, 0, sizeof(*camera));
 }
 
 // Framebuffer functions

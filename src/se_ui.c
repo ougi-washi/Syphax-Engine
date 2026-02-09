@@ -74,12 +74,12 @@ void se_ui_handle_cleanup(se_ui_handle *ui_handle) {
 void se_ui_handle_destroy_element(se_ui_handle *ui_handle, se_ui_element *ui) {
 	s_assertf(ui_handle, "se_ui_handle_destroy_element :: ui_handle is null");
 	s_assertf(ui, "se_ui_handle_destroy_element :: ui is null");
-	if (!ui->scene_2d) {
+	if (!ui->is_valid) {
 		return;
 	}
 	while (s_array_get_size(&ui->children) > 0) {
 		se_ui_element_ptr *child_ptr = s_array_get(&ui->children, 0);
-		if (!child_ptr || !*child_ptr) {
+		if (!child_ptr || !*child_ptr || !(*child_ptr)->is_valid) {
 			s_array_remove_at(&ui->children, 0);
 			continue;
 		}
@@ -93,13 +93,29 @@ void se_ui_handle_destroy_element(se_ui_handle *ui_handle, se_ui_element *ui) {
 	ui->scene_2d = NULL;
 	ui->text = NULL;
 	ui->parent = NULL;
+	ui->is_valid = false;
 }
 
 se_ui_element *se_ui_element_create(se_ui_handle *ui_handle, const se_ui_element_params *params) {
 	s_assertf(ui_handle, "se_ui_element_create :: ui_handle is null");
 	s_assertf(params, "se_ui_element_create :: params is null");
 
-	se_ui_element *new_ui = s_array_increment(&ui_handle->ui_elements);
+	se_ui_element *new_ui = NULL;
+	s_foreach(&ui_handle->ui_elements, i) {
+		se_ui_element *slot = s_array_get(&ui_handle->ui_elements, i);
+		if (!slot->is_valid) {
+			new_ui = slot;
+			break;
+		}
+	}
+	if (!new_ui) {
+		if (s_array_get_capacity(&ui_handle->ui_elements) == s_array_get_size(&ui_handle->ui_elements)) {
+			printf("se_ui_element_create :: ui_handle->ui_elements is full\n");
+			return NULL;
+		}
+		new_ui = s_array_increment(&ui_handle->ui_elements);
+	}
+	memset(new_ui, 0, sizeof(*new_ui));
 	new_ui->ui_handle = ui_handle;
 	new_ui->parent = NULL;
 	new_ui->visible = params->visible;
@@ -107,6 +123,7 @@ se_ui_element *se_ui_element_create(se_ui_handle *ui_handle, const se_ui_element
 	new_ui->position = params->position;
 	new_ui->size = params->size;
 	new_ui->padding = params->padding;
+	new_ui->is_valid = true;
 
 	new_ui->scene_2d = se_scene_2d_create(ui_handle->scene_handle, &s_vec2(1920, 1080), ui_handle->objects_per_element_count); // TODO: maybe expose size
 	se_scene_2d_set_auto_resize(new_ui->scene_2d, ui_handle->window, &s_vec2(1., 1.)); // TODO: maybe expose option to enable/disable
@@ -134,7 +151,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_render :: ui_handle is null");
 
-	if (!ui->visible) {
+	if (!ui->is_valid || !ui->visible) {
 	    return;
 	}
 
@@ -145,7 +162,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	    	continue;
 	    }
 	    se_ui_element *current_ui = *current_ui_ptr;
-	    if (!current_ui) {
+	    if (!current_ui || !current_ui->is_valid) {
 	    	printf("se_ui_element_render :: children index %zu is null\n", i);
 	    	continue;
 	    }
@@ -169,6 +186,9 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
 	s_assertf(ui_handle, "se_ui_element_render_to_screen :: ui_handle is null");
 	s_assertf(ui_handle->render_handle, "se_ui_element_render_to_screen :: render_handle is null");
 	s_assertf(ui_handle->window, "se_ui_element_render_to_screen :: window is null");
+	if (!ui->is_valid || !ui->visible) {
+		return;
+	}
 
 	s_foreach(&ui->children, i) {
 	    se_ui_element_ptr *current_ui_ptr = s_array_get(&ui->children, i);
@@ -177,7 +197,7 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
 	    	continue;
 	    }
 	    se_ui_element *current_ui = *current_ui_ptr;
-	    if (!current_ui) {
+	    if (!current_ui || !current_ui->is_valid) {
 	    	printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
 	    	continue;
 	    }

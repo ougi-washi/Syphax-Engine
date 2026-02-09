@@ -80,11 +80,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	se_object_2d *new_object = NULL;
 	s_foreach(&scene_handle->objects_2d, i) {
 		se_object_2d *slot = s_array_get(&scene_handle->objects_2d, i);
-		if (!slot->is_custom && slot->quad.vao == 0) {
-			new_object = slot;
-			break;
-		}
-		if (slot->is_custom && slot->custom.render == NULL) {
+		if (!slot->is_valid) {
 			new_object = slot;
 			break;
 		}
@@ -102,6 +98,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	new_object->transform = *transform;
 	new_object->is_custom = false;
 	new_object->is_visible = true;
+	new_object->is_valid = true;
     if (scene_handle->render_handle) {
 		s_foreach(&scene_handle->render_handle->shaders, i) {
 		    se_shader *curr_shader = s_array_get(&scene_handle->render_handle->shaders, i);
@@ -154,11 +151,7 @@ se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_objec
 	se_object_2d *new_object = NULL;
 	s_foreach(&scene_handle->objects_2d, i) {
 		se_object_2d *slot = s_array_get(&scene_handle->objects_2d, i);
-		if (!slot->is_custom && slot->quad.vao == 0) {
-			new_object = slot;
-			break;
-		}
-		if (slot->is_custom && slot->custom.render == NULL) {
+		if (!slot->is_valid) {
 			new_object = slot;
 			break;
 		}
@@ -174,6 +167,7 @@ se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_objec
 	new_object->transform = *transform;
 	new_object->is_custom = true;
 	new_object->is_visible = true;
+	new_object->is_valid = true;
 	memcpy(&new_object->custom, custom, sizeof(se_object_custom));
 	return new_object;
 }
@@ -281,10 +275,7 @@ void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_
 void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_2d *object) {
 	s_assertf(scene_handle, "se_scene_handle_destroy_object_2d :: scene_handle is null");
 	s_assertf(object, "se_scene_handle_destroy_object_2d :: object is null");
-	if (!object->is_custom && object->quad.vao == 0) {
-		return;
-	}
-	if (object->is_custom && object->custom.render == NULL) {
+	if (!object->is_valid) {
 		return;
 	}
 	printf("se_scene_handle_destroy_object_2d :: scene_handle: %p, object: %p\n", scene_handle, object);
@@ -300,6 +291,7 @@ void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_
 	s_array_clear(&object->instances.transforms);
 	s_array_clear(&object->instances.buffers);
 	object->is_visible = false;
+	object->is_valid = false;
 	if (object->is_custom) {
 		object->custom.render = NULL;
 		object->custom.data_size = 0;
@@ -488,7 +480,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 	se_object_3d *new_object = NULL;
 	s_foreach(&scene_handle->objects_3d, i) {
 		se_object_3d *slot = s_array_get(&scene_handle->objects_3d, i);
-		if (slot->model == NULL && slot->render_transforms.data == NULL) {
+		if (!slot->is_valid) {
 			new_object = slot;
 			break;
 		}
@@ -504,6 +496,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 	new_object->model = model;
 	new_object->transform = *transform;
 	new_object->is_visible = true;
+	new_object->is_valid = true;
 	const sz instance_capacity = (max_instances_count > 0) ? max_instances_count : 1;
 	s_array_init(&new_object->instances.ids, instance_capacity);
 	s_array_init(&new_object->instances.transforms, instance_capacity);
@@ -539,7 +532,7 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 void se_scene_handle_destroy_object_3d(se_scene_handle *scene_handle, se_object_3d *object) {
 	s_assertf(scene_handle, "se_scene_handle_destroy_object_3d :: scene_handle is null");
 	s_assertf(object, "se_scene_handle_destroy_object_3d :: object is null");
-	if (object->model == NULL && object->render_transforms.data == NULL) {
+	if (!object->is_valid) {
 		return;
 	}
 	s_foreach(&object->mesh_instances, i) {
@@ -553,6 +546,7 @@ void se_scene_handle_destroy_object_3d(se_scene_handle *scene_handle, se_object_
 	s_array_clear(&object->instances.buffers);
 	object->model = NULL;
 	object->is_visible = false;
+	object->is_valid = false;
 }
 
 void se_object_3d_set_transform(se_object_3d *object, const s_mat4 *transform) {
@@ -662,7 +656,7 @@ se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
 	se_scene_2d *new_scene = NULL;
 	s_foreach(&scene_handle->scenes_2d, i) {
 		se_scene_2d *slot = s_array_get(&scene_handle->scenes_2d, i);
-		if (slot->output == NULL) {
+		if (!slot->is_valid) {
 			new_scene = slot;
 			break;
 		}
@@ -677,6 +671,7 @@ se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
 	memset(new_scene, 0, sizeof(*new_scene));
 	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
 	s_array_init(&new_scene->objects, object_count);
+	new_scene->is_valid = true;
 	printf("se_scene_2d_create :: created scene 2D %p\n", new_scene);
 	return new_scene;
 }
@@ -684,13 +679,13 @@ se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
 void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d *scene) {
 	s_assertf(scene_handle, "se_scene_handle_destroy_scene_2d :: scene_handle is null");
 	s_assertf(scene, "se_scene_handle_destroy_scene_2d :: scene is null");
-	if (scene->output) {
-		se_framebuffer_cleanup(scene->output);
-		scene->output = NULL;
-	} else {
+	if (!scene->is_valid) {
 		return;
 	}
+	se_framebuffer_cleanup(scene->output);
+	scene->output = NULL;
 	s_array_clear(&scene->objects);
+	scene->is_valid = false;
 }
 
 void se_scene_2d_bind(se_scene_2d *scene) {
@@ -708,6 +703,9 @@ void se_scene_2d_unbind(se_scene_2d *scene) {
 void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle) {
 	s_assertf(scene, "se_scene_2d_render_raw :: scene is null");
 	s_assertf(render_handle, "se_scene_2d_render_raw :: render_handle is null");
+	if (!scene->is_valid) {
+		return;
+	}
 
 	se_render_clear();
 		s_foreach(&scene->objects, i) {
@@ -717,14 +715,17 @@ void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle)
 			    continue;
 			}
 			se_object_2d *current_object_2d = *current_object_2d_ptr;
-			if (current_object_2d) {
-			    if (current_object_2d->is_custom) {
-			    	current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
-			    } else {
-			    	se_shader_use(render_handle, current_object_2d->shader, true, true);
-			    	const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
-			    	se_quad_render(&current_object_2d->quad, instance_count);
-			    }
+			if (!current_object_2d || !current_object_2d->is_valid || !current_object_2d->is_visible) {
+				continue;
+			}
+			if (current_object_2d->is_custom) {
+				if (current_object_2d->custom.render) {
+					current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
+				}
+			} else {
+				se_shader_use(render_handle, current_object_2d->shader, true, true);
+				const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
+				se_quad_render(&current_object_2d->quad, instance_count);
 			}
 		}
 }
@@ -732,6 +733,9 @@ void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle)
 void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle) {
 	s_assertf(scene, "se_scene_2d_render_to_buffer :: scene is null");
 	s_assertf(render_handle, "se_scene_2d_render_to_buffer :: render_handle is null");
+	if (!scene->is_valid) {
+		return;
+	}
 
 	se_scene_2d_bind(scene);
 	se_scene_2d_render_raw(scene, render_handle);
@@ -740,6 +744,9 @@ void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_h
 
 void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
 	if (render_handle == NULL) {
+		return;
+	}
+	if (!scene->is_valid) {
 		return;
 	}
 
@@ -780,7 +787,7 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	se_scene_3d *new_scene = NULL;
 	s_foreach(&scene_handle->scenes_3d, i) {
 		se_scene_3d *slot = s_array_get(&scene_handle->scenes_3d, i);
-		if (slot->output == NULL) {
+		if (!slot->is_valid) {
 			new_scene = slot;
 			break;
 		}
@@ -799,6 +806,7 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	new_scene->output_shader = NULL;
 	new_scene->camera = se_camera_create(scene_handle->render_handle);
 	new_scene->enable_culling = true;
+	new_scene->is_valid = true;
 	if (new_scene->camera) {
 		se_camera_set_aspect(new_scene->camera, size->x, size->y);
 	}
@@ -808,7 +816,7 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 
 void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene) {
 	printf("se_scene_handle_destroy_scene_3d :: scene: %p\n", scene);
-	if (!scene->output) {
+	if (!scene->is_valid) {
 		return;
 	}
 	if (scene->camera && scene_handle->render_handle) {
@@ -821,6 +829,7 @@ void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d
 	}
 	s_array_clear(&scene->post_process);
 	s_array_clear(&scene->objects);
+	scene->is_valid = false;
 }
 
 void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle) {
@@ -828,6 +837,9 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 		return;
 	}
 	s_assertf(scene, "se_scene_3d_render_to_buffer :: scene is null");
+	if (!scene->is_valid) {
+		return;
+	}
 	s_assertf(scene->output, "se_scene_3d_render_to_buffer :: scene output is null");
 
 	se_framebuffer_bind(scene->output);
@@ -856,7 +868,7 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 			continue;
 		}
 		se_object_3d *object = *object_ptr;
-		if (!object->is_visible || object->model == NULL) {
+		if (!object->is_valid || !object->is_visible || object->model == NULL) {
 			continue;
 		}
 
@@ -902,6 +914,9 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 
 void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
 	if (render_handle == NULL) {
+		return;
+	}
+	if (!scene->is_valid) {
 		return;
 	}
 

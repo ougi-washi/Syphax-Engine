@@ -22,6 +22,7 @@ typedef struct se_ui_element{
 	se_scene_2d* scene_2d;
 	struct se_ui_text* text;
 	b8 visible : 1;
+	b8 is_valid : 1;
 	s_array(struct se_ui_element*, children);
 } se_ui_element;
 typedef s_array(se_ui_element, se_ui_elements);

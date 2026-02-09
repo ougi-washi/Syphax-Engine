@@ -122,6 +122,7 @@ typedef struct {
 	f32 near;
 	f32 far;
 	f32 aspect;
+	b8 is_valid : 1;
 } se_camera;
 typedef s_array(se_camera, se_cameras);
 typedef se_camera *se_camera_ptr;
