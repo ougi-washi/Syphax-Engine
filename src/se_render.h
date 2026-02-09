@@ -231,9 +231,9 @@ extern void se_render_handle_destroy_texture(se_render_handle *render_handle, se
 // Ownership: render handle owns shaders created from it.
 extern se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_file_path, const char *fragment_file_path);
 extern se_shader *se_shader_load_from_memory(se_render_handle *render_handle, const char *vertex_data, const char *fragment_data);
+extern void se_render_handle_destroy_shader(se_render_handle *render_handle, se_shader *shader);
 extern b8 se_shader_reload_if_changed(se_shader *shader);
 extern void se_shader_use(se_render_handle *render_handle, se_shader *shader, const b8 update_uniforms, const b8 update_global_uniforms);
-extern void se_render_handle_destroy_shader(se_render_handle *render_handle, se_shader *shader);
 #define se_shader_destroy(render_handle, shader) se_render_handle_destroy_shader((render_handle), (shader))
 extern GLuint se_shader_get_uniform_location(se_shader *shader, const char *name);
 extern f32 *se_shader_get_uniform_float(se_shader *shader, const char *name);
@@ -261,9 +261,9 @@ extern void se_mesh_scale(se_mesh *mesh, const s_vec3 *v);
 // Model functions
 // Ownership: render handle owns models created from it.
 extern se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders);
-extern void se_model_render(se_render_handle *render_handle, se_model *model, se_camera *camera);
 extern void se_render_handle_destroy_model(se_render_handle *render_handle, se_model *model);
 #define se_model_destroy(render_handle, model) se_render_handle_destroy_model((render_handle), (model))
+extern void se_model_render(se_render_handle *render_handle, se_model *model, se_camera *camera);
 extern void se_model_translate(se_model *model, const s_vec3 *v);
 extern void se_model_rotate(se_model *model, const s_vec3 *v);
 extern void se_model_scale(se_model *model, const s_vec3 *v);

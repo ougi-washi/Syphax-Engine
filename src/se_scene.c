@@ -180,98 +180,6 @@ void se_object_custom_set_data(se_object_custom *custom, const void *data, const
 	custom->data_size = size;
 }
 
-void se_scene_2d_resize_callback(void *window, void *scene) {
-	s_assertf(window, "se_scene_2d_resize_callback :: window is null");
-	s_assertf(scene, "se_scene_2d_resize_callback :: scene is null");
-
-	se_window *window_ptr = (se_window *)window;
-	se_scene_2d *scene_ptr = (se_scene_2d *)scene;
-	s_assertf(window_ptr, "se_scene_2d_resize_callback :: window_ptr is null");
-	s_assertf(scene_ptr, "se_scene_2d_resize_callback :: scene_ptr is null");
-
-	se_render_handle *render_handle_ptr = window_ptr->render_handle;
-	s_assertf(render_handle_ptr, "se_scene_2d_resize_callback :: render_handle_ptr is null");
-
-	se_framebuffer_ptr framebuffer = scene_ptr->output;
-	s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
-	s_vec2 old_size = {0};
-	se_framebuffer_get_size(framebuffer, &old_size);
-	s_vec2 new_size = {framebuffer->ratio.x * window_ptr->width,
-						framebuffer->ratio.y * window_ptr->height};
-
-	// TODO: update object positions and scales
-	// s_foreach(&scene_ptr->objects, i) {
-	//	se_object_2d_ptr* current_object_ptr = s_array_get(&scene_ptr->objects,
-	//	i); if (current_object_ptr == NULL || *current_object_ptr == NULL) {
-	//		continue;
-	//	}
-	//	se_object_2d* current_object = *current_object_ptr;
-	//	s_vec2* current_position = &current_object->position;
-	//	s_vec2* current_scale = &current_object->scale;
-	//	se_object_2d_set_position(current_object, &s_vec2(current_position->x *
-	//	new_size.x / old_size.x, current_position->y * new_size.y /
-	//	old_size.y)); se_object_2d_set_scale(current_object,
-	//	&s_vec2(current_scale->x * new_size.x / old_size.x, current_scale->y *
-	//	new_size.y / old_size.y));
-	//}
-
-	se_framebuffer_set_size(framebuffer, &new_size);
-	se_scene_2d_render_to_buffer(scene, render_handle_ptr);
-}
-
-void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio) {
-	s_assertf(scene, "se_scene_2d_set_auto_resize :: scene is null");
-	s_assertf(window, "se_scene_2d_set_auto_resize :: window is null");
-	s_assertf(ratio, "se_scene_2d_set_auto_resize :: ratio is null");
-
-	// ratio can only be 1 for now as we are not updating the object positions and
-	// scales to match the new ratio
-	s_assertf(ratio->x == 1.0 && ratio->y == 1.0,
-				"se_scene_2d_set_auto_resize :: ratio can only be 1 for now, "
-				"please wait for the next update");
-	scene->output->auto_resize = true;
-	scene->output->ratio = *ratio;
-	se_window_register_resize_event(window, se_scene_2d_resize_callback, scene);
-}
-
-void se_scene_3d_resize_callback(void *window, void *scene) {
-	s_assertf(window, "se_scene_3d_resize_callback :: window is null");
-	s_assertf(scene, "se_scene_3d_resize_callback :: scene is null");
-
-	se_window *window_ptr = (se_window *)window;
-	se_scene_3d *scene_ptr = (se_scene_3d *)scene;
-	s_assertf(window_ptr, "se_scene_3d_resize_callback :: window_ptr is null");
-	s_assertf(scene_ptr, "se_scene_3d_resize_callback :: scene_ptr is null");
-
-	se_render_handle *render_handle_ptr = window_ptr->render_handle;
-	s_assertf(render_handle_ptr, "se_scene_3d_resize_callback :: render_handle_ptr is null");
-
-	se_framebuffer_ptr framebuffer = scene_ptr->output;
-	s_assertf(framebuffer, "se_scene_3d_resize_callback :: framebuffer is null");
-
-	s_vec2 new_size = {framebuffer->ratio.x * window_ptr->width,
-						framebuffer->ratio.y * window_ptr->height};
-
-	se_framebuffer_set_size(framebuffer, &new_size);
-	if (scene_ptr->camera) {
-		se_camera_set_aspect(scene_ptr->camera, new_size.x, new_size.y);
-	}
-	se_scene_3d_render_to_buffer(scene_ptr, render_handle_ptr);
-}
-
-void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio) {
-	s_assertf(scene, "se_scene_3d_set_auto_resize :: scene is null");
-	s_assertf(window, "se_scene_3d_set_auto_resize :: window is null");
-	s_assertf(ratio, "se_scene_3d_set_auto_resize :: ratio is null");
-
-	s_assertf(ratio->x == 1.0 && ratio->y == 1.0,
-			"se_scene_3d_set_auto_resize :: ratio can only be 1 for now, "
-			"please wait for the next update");
-	scene->output->auto_resize = true;
-	scene->output->ratio = *ratio;
-	se_window_register_resize_event(window, se_scene_3d_resize_callback, scene);
-}
-
 void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_2d *object) {
 	s_assertf(scene_handle, "se_scene_handle_destroy_object_2d :: scene_handle is null");
 	s_assertf(object, "se_scene_handle_destroy_object_2d :: object is null");
@@ -473,6 +381,417 @@ sz se_object_2d_get_instance_count(se_object_2d *object) {
 	return s_array_get_size(&object->instances.ids);
 }
 
+se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
+							const s_vec2 *size, const u16 object_count) {
+	s_assertf(scene_handle->render_handle,
+				"se_scene_2d_create :: scene_handle->render_handle is null");
+	s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
+	s_assertf(size, "se_scene_2d_create :: size is null");
+	s_assertf(object_count > 0, "se_scene_2d_create :: object_count is 0");
+	se_scene_2d *new_scene = NULL;
+	s_foreach(&scene_handle->scenes_2d, i) {
+		se_scene_2d *slot = s_array_get(&scene_handle->scenes_2d, i);
+		if (!slot->is_valid) {
+			new_scene = slot;
+			break;
+		}
+	}
+	if (!new_scene) {
+		if (s_array_get_capacity(&scene_handle->scenes_2d) == s_array_get_size(&scene_handle->scenes_2d)) {
+			printf("se_scene_2d_create :: scene_handle->scenes_2d is full\n");
+			return NULL;
+		}
+		new_scene = s_array_increment(&scene_handle->scenes_2d);
+	}
+	memset(new_scene, 0, sizeof(*new_scene));
+	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
+	s_array_init(&new_scene->objects, object_count);
+	new_scene->is_valid = true;
+	printf("se_scene_2d_create :: created scene 2D %p\n", new_scene);
+	return new_scene;
+}
+
+void se_scene_2d_resize_callback(void *window, void *scene) {
+	s_assertf(window, "se_scene_2d_resize_callback :: window is null");
+	s_assertf(scene, "se_scene_2d_resize_callback :: scene is null");
+
+	se_window *window_ptr = (se_window *)window;
+	se_scene_2d *scene_ptr = (se_scene_2d *)scene;
+	s_assertf(window_ptr, "se_scene_2d_resize_callback :: window_ptr is null");
+	s_assertf(scene_ptr, "se_scene_2d_resize_callback :: scene_ptr is null");
+
+	se_render_handle *render_handle_ptr = window_ptr->render_handle;
+	s_assertf(render_handle_ptr, "se_scene_2d_resize_callback :: render_handle_ptr is null");
+
+	se_framebuffer_ptr framebuffer = scene_ptr->output;
+	s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
+	s_vec2 old_size = {0};
+	se_framebuffer_get_size(framebuffer, &old_size);
+	s_vec2 new_size = {framebuffer->ratio.x * window_ptr->width,
+						framebuffer->ratio.y * window_ptr->height};
+
+	// TODO: update object positions and scales
+	// s_foreach(&scene_ptr->objects, i) {
+	//	se_object_2d_ptr* current_object_ptr = s_array_get(&scene_ptr->objects,
+	//	i); if (current_object_ptr == NULL || *current_object_ptr == NULL) {
+	//		continue;
+	//	}
+	//	se_object_2d* current_object = *current_object_ptr;
+	//	s_vec2* current_position = &current_object->position;
+	//	s_vec2* current_scale = &current_object->scale;
+	//	se_object_2d_set_position(current_object, &s_vec2(current_position->x *
+	//	new_size.x / old_size.x, current_position->y * new_size.y /
+	//	old_size.y)); se_object_2d_set_scale(current_object,
+	//	&s_vec2(current_scale->x * new_size.x / old_size.x, current_scale->y *
+	//	new_size.y / old_size.y));
+	//}
+
+	se_framebuffer_set_size(framebuffer, &new_size);
+	se_scene_2d_render_to_buffer(scene, render_handle_ptr);
+}
+
+void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio) {
+	s_assertf(scene, "se_scene_2d_set_auto_resize :: scene is null");
+	s_assertf(window, "se_scene_2d_set_auto_resize :: window is null");
+	s_assertf(ratio, "se_scene_2d_set_auto_resize :: ratio is null");
+
+	// ratio can only be 1 for now as we are not updating the object positions and
+	// scales to match the new ratio
+	s_assertf(ratio->x == 1.0 && ratio->y == 1.0,
+				"se_scene_2d_set_auto_resize :: ratio can only be 1 for now, "
+				"please wait for the next update");
+	scene->output->auto_resize = true;
+	scene->output->ratio = *ratio;
+	se_window_register_resize_event(window, se_scene_2d_resize_callback, scene);
+}
+
+void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d *scene) {
+	s_assertf(scene_handle, "se_scene_handle_destroy_scene_2d :: scene_handle is null");
+	s_assertf(scene, "se_scene_handle_destroy_scene_2d :: scene is null");
+	if (!scene->is_valid) {
+		return;
+	}
+	se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
+	scene->output = NULL;
+	s_array_clear(&scene->objects);
+	scene->is_valid = false;
+}
+
+void se_scene_2d_bind(se_scene_2d *scene) {
+	s_assertf(scene, "se_scene_2d_bind :: scene is null");
+	se_framebuffer_bind(scene->output);
+	se_enable_blending();
+}
+
+void se_scene_2d_unbind(se_scene_2d *scene) {
+	s_assertf(scene, "se_scene_2d_unbind :: scene is null");
+	se_framebuffer_unbind(scene->output);
+	se_disable_blending();
+}
+
+void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle) {
+	s_assertf(scene, "se_scene_2d_render_raw :: scene is null");
+	s_assertf(render_handle, "se_scene_2d_render_raw :: render_handle is null");
+	if (!scene->is_valid) {
+		return;
+	}
+
+	se_render_clear();
+		s_foreach(&scene->objects, i) {
+			se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene->objects, i);
+			if (current_object_2d_ptr == NULL) {
+			    printf("se_scene_2d_render_to_buffer :: current_object_2d_ptr is null\n");
+			    continue;
+			}
+			se_object_2d *current_object_2d = *current_object_2d_ptr;
+			if (!current_object_2d || !current_object_2d->is_valid || !current_object_2d->is_visible) {
+				continue;
+			}
+			if (current_object_2d->is_custom) {
+				if (current_object_2d->custom.render) {
+					current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
+				}
+			} else {
+				se_shader_use(render_handle, current_object_2d->shader, true, true);
+				const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
+				se_quad_render(&current_object_2d->quad, instance_count);
+			}
+		}
+}
+
+void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle) {
+	s_assertf(scene, "se_scene_2d_render_to_buffer :: scene is null");
+	s_assertf(render_handle, "se_scene_2d_render_to_buffer :: render_handle is null");
+	if (!scene->is_valid) {
+		return;
+	}
+
+	se_scene_2d_bind(scene);
+	se_scene_2d_render_raw(scene, render_handle);
+	se_scene_2d_unbind(scene);
+}
+
+void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
+	if (render_handle == NULL) {
+		return;
+	}
+	if (!scene->is_valid) {
+		return;
+	}
+
+	se_unbind_framebuffer();
+	se_enable_blending();
+	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
+	se_window_render_quad(window);
+	se_disable_blending();
+}
+
+void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
+	se_scene_2d_render_to_buffer(scene, render_handle);
+	se_render_clear();
+	se_scene_2d_render_to_screen(scene, render_handle, window);
+	se_window_render_screen(window);
+}
+
+void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object) {
+	s_assertf(scene, "se_scene_2d_add_object :: scene is null");
+	s_assertf(object, "se_scene_2d_add_object :: object is null");
+	printf("se_scene_2d_add_object :: scene: %p, object: %p\n", scene, object);
+	s_array_add(&scene->objects, object);
+}
+
+void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object) {
+	s_assertf(scene, "se_scene_2d_remove_object :: scene is null");
+	s_assertf(object, "se_scene_2d_remove_object :: object is null");
+	printf("se_scene_2d_remove_object :: scene: %p, object: %p\n", scene, object);
+	s_array_remove(&scene->objects, &object);
+}
+
+se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count) {
+	s_assertf(scene_handle, "se_scene_3d_create :: scene_handle is null");
+	s_assertf(scene_handle->render_handle,
+			"se_scene_3d_create :: scene_handle->render_handle is null");
+	s_assertf(size, "se_scene_3d_create :: size is null");
+	s_assertf(object_count > 0, "se_scene_3d_create :: object_count is 0");
+	se_scene_3d *new_scene = NULL;
+	s_foreach(&scene_handle->scenes_3d, i) {
+		se_scene_3d *slot = s_array_get(&scene_handle->scenes_3d, i);
+		if (!slot->is_valid) {
+			new_scene = slot;
+			break;
+		}
+	}
+	if (!new_scene) {
+		if (s_array_get_capacity(&scene_handle->scenes_3d) == s_array_get_size(&scene_handle->scenes_3d)) {
+			printf("se_scene_3d_create :: scene_handle->scenes_3d is full\n");
+			return NULL;
+		}
+		new_scene = s_array_increment(&scene_handle->scenes_3d);
+	}
+	memset(new_scene, 0, sizeof(*new_scene));
+	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
+	s_array_init(&new_scene->objects, object_count);
+	s_array_init(&new_scene->post_process, object_count);
+	new_scene->output_shader = NULL;
+	new_scene->camera = se_render_handle_create_camera(scene_handle->render_handle);
+	new_scene->enable_culling = true;
+	new_scene->is_valid = true;
+	if (new_scene->camera) {
+		se_camera_set_aspect(new_scene->camera, size->x, size->y);
+	}
+	printf("se_scene_3d_create :: created scene 3D %p\n", new_scene);
+	return new_scene;
+}
+
+void se_scene_3d_resize_callback(void *window, void *scene) {
+	s_assertf(window, "se_scene_3d_resize_callback :: window is null");
+	s_assertf(scene, "se_scene_3d_resize_callback :: scene is null");
+
+	se_window *window_ptr = (se_window *)window;
+	se_scene_3d *scene_ptr = (se_scene_3d *)scene;
+	s_assertf(window_ptr, "se_scene_3d_resize_callback :: window_ptr is null");
+	s_assertf(scene_ptr, "se_scene_3d_resize_callback :: scene_ptr is null");
+
+	se_render_handle *render_handle_ptr = window_ptr->render_handle;
+	s_assertf(render_handle_ptr, "se_scene_3d_resize_callback :: render_handle_ptr is null");
+
+	se_framebuffer_ptr framebuffer = scene_ptr->output;
+	s_assertf(framebuffer, "se_scene_3d_resize_callback :: framebuffer is null");
+
+	s_vec2 new_size = {framebuffer->ratio.x * window_ptr->width,
+						framebuffer->ratio.y * window_ptr->height};
+
+	se_framebuffer_set_size(framebuffer, &new_size);
+	if (scene_ptr->camera) {
+		se_camera_set_aspect(scene_ptr->camera, new_size.x, new_size.y);
+	}
+	se_scene_3d_render_to_buffer(scene_ptr, render_handle_ptr);
+}
+
+void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio) {
+	s_assertf(scene, "se_scene_3d_set_auto_resize :: scene is null");
+	s_assertf(window, "se_scene_3d_set_auto_resize :: window is null");
+	s_assertf(ratio, "se_scene_3d_set_auto_resize :: ratio is null");
+
+	s_assertf(ratio->x == 1.0 && ratio->y == 1.0,
+			"se_scene_3d_set_auto_resize :: ratio can only be 1 for now, "
+			"please wait for the next update");
+	scene->output->auto_resize = true;
+	scene->output->ratio = *ratio;
+	se_window_register_resize_event(window, se_scene_3d_resize_callback, scene);
+}
+
+void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene) {
+	printf("se_scene_handle_destroy_scene_3d :: scene: %p\n", scene);
+	if (!scene->is_valid) {
+		return;
+	}
+	if (scene->camera && scene_handle->render_handle) {
+		se_render_handle_destroy_camera(scene_handle->render_handle, scene->camera);
+		scene->camera = NULL;
+	}
+	if (scene->output) {
+		se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
+		scene->output = NULL;
+	}
+	s_array_clear(&scene->post_process);
+	s_array_clear(&scene->objects);
+	scene->is_valid = false;
+}
+
+void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle) {
+	if (render_handle == NULL) {
+		return;
+	}
+	s_assertf(scene, "se_scene_3d_render_to_buffer :: scene is null");
+	if (!scene->is_valid) {
+		return;
+	}
+	s_assertf(scene->output, "se_scene_3d_render_to_buffer :: scene output is null");
+
+	se_framebuffer_bind(scene->output);
+	se_render_clear();
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	if (scene->enable_culling) {
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+		glFrontFace(GL_CCW);
+	} else {
+		glDisable(GL_CULL_FACE);
+	}
+
+	s_mat4 view = s_mat4_identity;
+	s_mat4 proj = s_mat4_identity;
+	if (scene->camera) {
+		view = se_camera_get_view_matrix(scene->camera);
+		proj = se_camera_get_projection_matrix(scene->camera);
+	}
+	s_mat4 vp = s_mat4_mul(&proj, &view);
+
+	s_foreach(&scene->objects, i) {
+		se_object_3d_ptr *object_ptr = s_array_get(&scene->objects, i);
+		if (object_ptr == NULL || *object_ptr == NULL) {
+			continue;
+		}
+		se_object_3d *object = *object_ptr;
+		if (!object->is_valid || !object->is_visible || object->model == NULL) {
+			continue;
+		}
+
+		const sz instance_count = se_object_3d_get_instance_count(object);
+		const sz mesh_count = s_array_get_size(&object->mesh_instances);
+		sz mesh_index = 0;
+		s_foreach(&object->model->meshes, m) {
+			se_mesh *mesh = s_array_get(&object->model->meshes, m);
+			if (mesh_index >= mesh_count) {
+				break;
+			}
+			se_mesh_instance *mesh_instance = s_array_get(&object->mesh_instances, mesh_index);
+			mesh_index++;
+			if (mesh_instance == NULL) {
+				continue;
+			}
+
+			s_foreach(&object->instances.transforms, j) {
+				s_mat4 *instance_transform = s_array_get(&object->instances.transforms, j);
+				s_mat4 *out_buffer = s_array_get(&object->render_transforms, j);
+				s_mat4 model = s_mat4_mul(&object->transform, instance_transform);
+				model = s_mat4_mul(&model, &mesh->matrix);
+				*out_buffer = s_mat4_mul(&vp, &model);
+			}
+			mesh_instance->instance_buffers_dirty = true;
+			se_mesh_instance_update(mesh_instance);
+
+			se_shader *shader = mesh->shader;
+			if (!shader) {
+				continue;
+			}
+			if (mesh->texture_id != 0) {
+				se_shader_set_texture(shader, "u_texture", mesh->texture_id);
+			}
+
+			se_shader_use(render_handle, shader, true, true);
+			glBindVertexArray(mesh_instance->vao);
+			glDrawElementsInstanced(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0, (GLsizei)instance_count);
+		}
+	}
+	se_framebuffer_unbind(scene->output);
+}
+
+void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
+	if (render_handle == NULL) {
+		return;
+	}
+	if (!scene->is_valid) {
+		return;
+	}
+
+	se_unbind_framebuffer();
+	se_render_clear();
+	se_enable_blending();
+	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
+	se_window_render_quad(window);
+	se_disable_blending();
+}
+
+void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
+	se_scene_3d_render_to_buffer(scene, render_handle);
+	se_scene_3d_render_to_screen(scene, render_handle, window);
+	se_window_render_screen(window);
+}
+
+void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object) {
+	s_assertf(scene, "se_scene_3d_add_object :: scene is null");
+	s_assertf(object, "se_scene_3d_add_object :: object is null");
+	printf("se_scene_3d_add_object :: scene: %p, object: %p\n", scene, object);
+	s_array_add(&scene->objects, object);
+}
+
+void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object) {
+	s_assertf(scene, "se_scene_3d_remove_object :: scene is null");
+	s_assertf(object, "se_scene_3d_remove_object :: object is null");
+	printf("se_scene_3d_remove_object :: scene: %p, object: %p\n", scene, object);
+	s_array_remove(&scene->objects, &object);
+}
+
+void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera) {
+	scene->camera = camera;
+}
+
+void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled) {
+	s_assertf(scene, "se_scene_3d_set_culling :: scene is null");
+	scene->enable_culling = enabled;
+}
+
+void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
+	s_array_add(&scene->post_process, buffer);
+}
+
+void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
+	s_array_remove(&scene->post_process, &buffer);
+}
+
 se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model, const s_mat4 *transform, const sz max_instances_count) {
 	s_assertf(scene_handle, "se_object_3d_create :: scene_handle is null");
 	s_assertf(model, "se_object_3d_create :: model is null");
@@ -644,323 +963,4 @@ b8 se_object_3d_are_instances_dirty(se_object_3d *object) {
 sz se_object_3d_get_instance_count(se_object_3d *object) {
 	s_assertf(object, "se_object_3d_get_instance_count :: object is null");
 	return s_array_get_size(&object->instances.ids);
-}
-
-se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
-							const s_vec2 *size, const u16 object_count) {
-	s_assertf(scene_handle->render_handle,
-				"se_scene_2d_create :: scene_handle->render_handle is null");
-	s_assertf(scene_handle, "se_scene_2d_create :: scene_handle is null");
-	s_assertf(size, "se_scene_2d_create :: size is null");
-	s_assertf(object_count > 0, "se_scene_2d_create :: object_count is 0");
-	se_scene_2d *new_scene = NULL;
-	s_foreach(&scene_handle->scenes_2d, i) {
-		se_scene_2d *slot = s_array_get(&scene_handle->scenes_2d, i);
-		if (!slot->is_valid) {
-			new_scene = slot;
-			break;
-		}
-	}
-	if (!new_scene) {
-		if (s_array_get_capacity(&scene_handle->scenes_2d) == s_array_get_size(&scene_handle->scenes_2d)) {
-			printf("se_scene_2d_create :: scene_handle->scenes_2d is full\n");
-			return NULL;
-		}
-		new_scene = s_array_increment(&scene_handle->scenes_2d);
-	}
-	memset(new_scene, 0, sizeof(*new_scene));
-	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
-	s_array_init(&new_scene->objects, object_count);
-	new_scene->is_valid = true;
-	printf("se_scene_2d_create :: created scene 2D %p\n", new_scene);
-	return new_scene;
-}
-
-void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d *scene) {
-	s_assertf(scene_handle, "se_scene_handle_destroy_scene_2d :: scene_handle is null");
-	s_assertf(scene, "se_scene_handle_destroy_scene_2d :: scene is null");
-	if (!scene->is_valid) {
-		return;
-	}
-	se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
-	scene->output = NULL;
-	s_array_clear(&scene->objects);
-	scene->is_valid = false;
-}
-
-void se_scene_2d_bind(se_scene_2d *scene) {
-	s_assertf(scene, "se_scene_2d_bind :: scene is null");
-	se_framebuffer_bind(scene->output);
-	se_enable_blending();
-}
-
-void se_scene_2d_unbind(se_scene_2d *scene) {
-	s_assertf(scene, "se_scene_2d_unbind :: scene is null");
-	se_framebuffer_unbind(scene->output);
-	se_disable_blending();
-}
-
-void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle) {
-	s_assertf(scene, "se_scene_2d_render_raw :: scene is null");
-	s_assertf(render_handle, "se_scene_2d_render_raw :: render_handle is null");
-	if (!scene->is_valid) {
-		return;
-	}
-
-	se_render_clear();
-		s_foreach(&scene->objects, i) {
-			se_object_2d_ptr *current_object_2d_ptr = s_array_get(&scene->objects, i);
-			if (current_object_2d_ptr == NULL) {
-			    printf("se_scene_2d_render_to_buffer :: current_object_2d_ptr is null\n");
-			    continue;
-			}
-			se_object_2d *current_object_2d = *current_object_2d_ptr;
-			if (!current_object_2d || !current_object_2d->is_valid || !current_object_2d->is_visible) {
-				continue;
-			}
-			if (current_object_2d->is_custom) {
-				if (current_object_2d->custom.render) {
-					current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
-				}
-			} else {
-				se_shader_use(render_handle, current_object_2d->shader, true, true);
-				const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
-				se_quad_render(&current_object_2d->quad, instance_count);
-			}
-		}
-}
-
-void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle) {
-	s_assertf(scene, "se_scene_2d_render_to_buffer :: scene is null");
-	s_assertf(render_handle, "se_scene_2d_render_to_buffer :: render_handle is null");
-	if (!scene->is_valid) {
-		return;
-	}
-
-	se_scene_2d_bind(scene);
-	se_scene_2d_render_raw(scene, render_handle);
-	se_scene_2d_unbind(scene);
-}
-
-void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
-	if (render_handle == NULL) {
-		return;
-	}
-	if (!scene->is_valid) {
-		return;
-	}
-
-	se_unbind_framebuffer();
-	se_enable_blending();
-	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
-	se_window_render_quad(window);
-	se_disable_blending();
-}
-
-void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
-	se_scene_2d_render_to_buffer(scene, render_handle);
-	se_render_clear();
-	se_scene_2d_render_to_screen(scene, render_handle, window);
-	se_window_render_screen(window);
-}
-
-void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object) {
-	s_assertf(scene, "se_scene_2d_add_object :: scene is null");
-	s_assertf(object, "se_scene_2d_add_object :: object is null");
-	printf("se_scene_2d_add_object :: scene: %p, object: %p\n", scene, object);
-	s_array_add(&scene->objects, object);
-}
-
-void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object) {
-	s_assertf(scene, "se_scene_2d_remove_object :: scene is null");
-	s_assertf(object, "se_scene_2d_remove_object :: object is null");
-	printf("se_scene_2d_remove_object :: scene: %p, object: %p\n", scene, object);
-	s_array_remove(&scene->objects, &object);
-}
-
-se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count) {
-	s_assertf(scene_handle, "se_scene_3d_create :: scene_handle is null");
-	s_assertf(scene_handle->render_handle,
-			"se_scene_3d_create :: scene_handle->render_handle is null");
-	s_assertf(size, "se_scene_3d_create :: size is null");
-	s_assertf(object_count > 0, "se_scene_3d_create :: object_count is 0");
-	se_scene_3d *new_scene = NULL;
-	s_foreach(&scene_handle->scenes_3d, i) {
-		se_scene_3d *slot = s_array_get(&scene_handle->scenes_3d, i);
-		if (!slot->is_valid) {
-			new_scene = slot;
-			break;
-		}
-	}
-	if (!new_scene) {
-		if (s_array_get_capacity(&scene_handle->scenes_3d) == s_array_get_size(&scene_handle->scenes_3d)) {
-			printf("se_scene_3d_create :: scene_handle->scenes_3d is full\n");
-			return NULL;
-		}
-		new_scene = s_array_increment(&scene_handle->scenes_3d);
-	}
-	memset(new_scene, 0, sizeof(*new_scene));
-	new_scene->output = se_framebuffer_create(scene_handle->render_handle, size);
-	s_array_init(&new_scene->objects, object_count);
-	s_array_init(&new_scene->post_process, object_count);
-	new_scene->output_shader = NULL;
-	new_scene->camera = se_render_handle_create_camera(scene_handle->render_handle);
-	new_scene->enable_culling = true;
-	new_scene->is_valid = true;
-	if (new_scene->camera) {
-		se_camera_set_aspect(new_scene->camera, size->x, size->y);
-	}
-	printf("se_scene_3d_create :: created scene 3D %p\n", new_scene);
-	return new_scene;
-}
-
-void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene) {
-	printf("se_scene_handle_destroy_scene_3d :: scene: %p\n", scene);
-	if (!scene->is_valid) {
-		return;
-	}
-	if (scene->camera && scene_handle->render_handle) {
-		se_render_handle_destroy_camera(scene_handle->render_handle, scene->camera);
-		scene->camera = NULL;
-	}
-	if (scene->output) {
-		se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
-		scene->output = NULL;
-	}
-	s_array_clear(&scene->post_process);
-	s_array_clear(&scene->objects);
-	scene->is_valid = false;
-}
-
-void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle) {
-	if (render_handle == NULL) {
-		return;
-	}
-	s_assertf(scene, "se_scene_3d_render_to_buffer :: scene is null");
-	if (!scene->is_valid) {
-		return;
-	}
-	s_assertf(scene->output, "se_scene_3d_render_to_buffer :: scene output is null");
-
-	se_framebuffer_bind(scene->output);
-	se_render_clear();
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LESS);
-	if (scene->enable_culling) {
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CCW);
-	} else {
-		glDisable(GL_CULL_FACE);
-	}
-
-	s_mat4 view = s_mat4_identity;
-	s_mat4 proj = s_mat4_identity;
-	if (scene->camera) {
-		view = se_camera_get_view_matrix(scene->camera);
-		proj = se_camera_get_projection_matrix(scene->camera);
-	}
-	s_mat4 vp = s_mat4_mul(&proj, &view);
-
-	s_foreach(&scene->objects, i) {
-		se_object_3d_ptr *object_ptr = s_array_get(&scene->objects, i);
-		if (object_ptr == NULL || *object_ptr == NULL) {
-			continue;
-		}
-		se_object_3d *object = *object_ptr;
-		if (!object->is_valid || !object->is_visible || object->model == NULL) {
-			continue;
-		}
-
-		const sz instance_count = se_object_3d_get_instance_count(object);
-		const sz mesh_count = s_array_get_size(&object->mesh_instances);
-		sz mesh_index = 0;
-		s_foreach(&object->model->meshes, m) {
-			se_mesh *mesh = s_array_get(&object->model->meshes, m);
-			if (mesh_index >= mesh_count) {
-				break;
-			}
-			se_mesh_instance *mesh_instance = s_array_get(&object->mesh_instances, mesh_index);
-			mesh_index++;
-			if (mesh_instance == NULL) {
-				continue;
-			}
-
-			s_foreach(&object->instances.transforms, j) {
-				s_mat4 *instance_transform = s_array_get(&object->instances.transforms, j);
-				s_mat4 *out_buffer = s_array_get(&object->render_transforms, j);
-				s_mat4 model = s_mat4_mul(&object->transform, instance_transform);
-				model = s_mat4_mul(&model, &mesh->matrix);
-				*out_buffer = s_mat4_mul(&vp, &model);
-			}
-			mesh_instance->instance_buffers_dirty = true;
-			se_mesh_instance_update(mesh_instance);
-
-			se_shader *shader = mesh->shader;
-			if (!shader) {
-				continue;
-			}
-			if (mesh->texture_id != 0) {
-				se_shader_set_texture(shader, "u_texture", mesh->texture_id);
-			}
-
-			se_shader_use(render_handle, shader, true, true);
-			glBindVertexArray(mesh_instance->vao);
-			glDrawElementsInstanced(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0, (GLsizei)instance_count);
-		}
-	}
-	se_framebuffer_unbind(scene->output);
-}
-
-void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
-	if (render_handle == NULL) {
-		return;
-	}
-	if (!scene->is_valid) {
-		return;
-	}
-
-	se_unbind_framebuffer();
-	se_render_clear();
-	se_enable_blending();
-	se_shader_set_texture(window->shader, "u_texture", scene->output->texture);
-	se_window_render_quad(window);
-	se_disable_blending();
-}
-
-void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
-	se_scene_3d_render_to_buffer(scene, render_handle);
-	se_scene_3d_render_to_screen(scene, render_handle, window);
-	se_window_render_screen(window);
-}
-
-void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object) {
-	s_assertf(scene, "se_scene_3d_add_object :: scene is null");
-	s_assertf(object, "se_scene_3d_add_object :: object is null");
-	printf("se_scene_3d_add_object :: scene: %p, object: %p\n", scene, object);
-	s_array_add(&scene->objects, object);
-}
-
-void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object) {
-	s_assertf(scene, "se_scene_3d_remove_object :: scene is null");
-	s_assertf(object, "se_scene_3d_remove_object :: object is null");
-	printf("se_scene_3d_remove_object :: scene: %p, object: %p\n", scene, object);
-	s_array_remove(&scene->objects, &object);
-}
-
-void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera) {
-	scene->camera = camera;
-}
-
-void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled) {
-	s_assertf(scene, "se_scene_3d_set_culling :: scene is null");
-	scene->enable_culling = enabled;
-}
-
-void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
-	s_array_add(&scene->post_process, buffer);
-}
-
-void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
-	s_array_remove(&scene->post_process, &buffer);
 }

@@ -206,22 +206,6 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
     se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->render_handle, ui_handle->window);
 }
 
-void se_ui_element_detach_child(se_ui_element *parent_ui, se_ui_element *child) {
-	s_assertf(parent_ui, "se_ui_element_detach_child :: parent_ui is null");
-	s_assertf(child, "se_ui_element_detach_child :: child is null");
-	s_foreach(&parent_ui->children, i) {
-		se_ui_element_ptr *current_child_ptr = s_array_get(&parent_ui->children, i);
-		if (!current_child_ptr) {
-			continue;
-		}
-		if (*current_child_ptr == child) {
-			s_array_remove_at(&parent_ui->children, i);
-			break;
-		}
-	}
-	child->parent = NULL;
-}
-
 void se_ui_element_set_position(se_ui_element *ui, const s_vec2 *position) {
 	s_assertf(ui, "se_ui_element_set_position :: ui is null");
 	s_assertf(position, "se_ui_element_set_position :: position is null");
@@ -472,4 +456,20 @@ se_ui_element *se_ui_element_add_child(se_ui_element *parent_ui, const se_ui_ele
 	s_array_add(&parent_ui->children, new_ui);
 	se_ui_element_update_children(parent_ui);
 	return new_ui;
+}
+
+void se_ui_element_detach_child(se_ui_element *parent_ui, se_ui_element *child) {
+	s_assertf(parent_ui, "se_ui_element_detach_child :: parent_ui is null");
+	s_assertf(child, "se_ui_element_detach_child :: child is null");
+	s_foreach(&parent_ui->children, i) {
+		se_ui_element_ptr *current_child_ptr = s_array_get(&parent_ui->children, i);
+		if (!current_child_ptr) {
+			continue;
+		}
+		if (*current_child_ptr == child) {
+			s_array_remove_at(&parent_ui->children, i);
+			break;
+		}
+	}
+	child->parent = NULL;
 }

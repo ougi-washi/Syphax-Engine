@@ -366,6 +366,16 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 	return NULL;
 }
 
+void se_render_handle_destroy_shader(se_render_handle *render_handle, se_shader *shader) {
+	s_assertf(render_handle, "se_render_handle_destroy_shader :: render_handle is null");
+	s_assertf(shader, "se_render_handle_destroy_shader :: shader is null");
+	if (!shader->is_valid) {
+		return;
+	}
+	se_shader_cleanup(shader);
+	memset(shader, 0, sizeof(*shader));
+}
+
 b8 se_shader_reload_if_changed(se_shader *shader) {
 	if (!shader->is_valid) {
 		return false;
@@ -402,16 +412,6 @@ static void se_shader_cleanup(se_shader *shader) {
 	glDeleteProgram(shader->program);
 	shader->program = 0;
 	}
-}
-
-void se_render_handle_destroy_shader(se_render_handle *render_handle, se_shader *shader) {
-	s_assertf(render_handle, "se_render_handle_destroy_shader :: render_handle is null");
-	s_assertf(shader, "se_render_handle_destroy_shader :: shader is null");
-	if (!shader->is_valid) {
-		return;
-	}
-	se_shader_cleanup(shader);
-	memset(shader, 0, sizeof(*shader));
 }
 
 GLuint se_shader_get_uniform_location(se_shader *shader, const char *name) {
@@ -768,6 +768,16 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	return model;
 }
 
+void se_render_handle_destroy_model(se_render_handle *render_handle, se_model *model) {
+	s_assertf(render_handle, "se_render_handle_destroy_model :: render_handle is null");
+	s_assertf(model, "se_render_handle_destroy_model :: model is null");
+	if (!model->is_valid) {
+		return;
+	}
+	se_model_cleanup(model);
+	memset(model, 0, sizeof(*model));
+}
+
 void se_model_render(se_render_handle *render_handle, se_model *model, se_camera *camera) {
 	// set up global view/proj once per frame
 	const s_mat4 proj = se_camera_get_projection_matrix(camera);
@@ -817,16 +827,6 @@ static void se_model_cleanup(se_model *model) {
 	free(mesh->indices);
 	}
 	s_array_clear(&model->meshes);
-}
-
-void se_render_handle_destroy_model(se_render_handle *render_handle, se_model *model) {
-	s_assertf(render_handle, "se_render_handle_destroy_model :: render_handle is null");
-	s_assertf(model, "se_render_handle_destroy_model :: model is null");
-	if (!model->is_valid) {
-		return;
-	}
-	se_model_cleanup(model);
-	memset(model, 0, sizeof(*model));
 }
 
 void se_model_translate(se_model *model, const s_vec3 *v) {
@@ -881,6 +881,16 @@ se_camera *se_render_handle_create_camera(se_render_handle *render_handle) {
 	return camera;
 }
 
+void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera *camera) {
+	printf("se_render_handle_destroy_camera :: camera: %p\n", camera);
+	s_assertf(render_handle, "se_render_handle_destroy_camera :: render_handle is null");
+	s_assertf(camera, "se_render_handle_destroy_camera :: camera is null");
+	if (!camera->is_valid) {
+		return;
+	}
+	memset(camera, 0, sizeof(*camera));
+}
+
 s_mat4 se_camera_get_view_matrix(const se_camera *camera) {
 	return s_mat4_look_at(&camera->position, &camera->target, &camera->up);
 }
@@ -891,16 +901,6 @@ s_mat4 se_camera_get_projection_matrix(const se_camera *camera) {
 
 void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height) {
 	camera->aspect = width / height;
-}
-
-void se_render_handle_destroy_camera(se_render_handle *render_handle, se_camera *camera) {
-	printf("se_render_handle_destroy_camera :: camera: %p\n", camera);
-	s_assertf(render_handle, "se_render_handle_destroy_camera :: render_handle is null");
-	s_assertf(camera, "se_render_handle_destroy_camera :: camera is null");
-	if (!camera->is_valid) {
-		return;
-	}
-	memset(camera, 0, sizeof(*camera));
 }
 
 // Framebuffer functions
@@ -960,6 +960,16 @@ se_framebuffer *se_framebuffer_create(se_render_handle *render_handle, const s_v
 	return framebuffer;
 }
 
+void se_render_handle_destroy_framebuffer(se_render_handle *render_handle, se_framebuffer *framebuffer) {
+	s_assertf(render_handle, "se_render_handle_destroy_framebuffer :: render_handle is null");
+	s_assertf(framebuffer, "se_render_handle_destroy_framebuffer :: framebuffer is null");
+	if (!framebuffer->is_valid) {
+		return;
+	}
+	se_framebuffer_cleanup(framebuffer);
+	memset(framebuffer, 0, sizeof(*framebuffer));
+}
+
 void se_framebuffer_set_size(se_framebuffer *framebuffer, const s_vec2 *size) {
 	s_assertf(framebuffer, "se_framebuffer_set_size :: framebuffer is null");
 	s_assertf(size, "se_framebuffer_set_size :: size is null");
@@ -1009,16 +1019,6 @@ static void se_framebuffer_cleanup(se_framebuffer *framebuffer) {
 	glDeleteRenderbuffers(1, &framebuffer->depth_buffer);
 	framebuffer->depth_buffer = 0;
 	}
-}
-
-void se_render_handle_destroy_framebuffer(se_render_handle *render_handle, se_framebuffer *framebuffer) {
-	s_assertf(render_handle, "se_render_handle_destroy_framebuffer :: render_handle is null");
-	s_assertf(framebuffer, "se_render_handle_destroy_framebuffer :: framebuffer is null");
-	if (!framebuffer->is_valid) {
-		return;
-	}
-	se_framebuffer_cleanup(framebuffer);
-	memset(framebuffer, 0, sizeof(*framebuffer));
 }
 
 // Render buffer functions
@@ -1094,6 +1094,16 @@ se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const
 	return buffer;
 }
 
+void se_render_handle_destroy_render_buffer(se_render_handle *render_handle, se_render_buffer *buffer) {
+	s_assertf(render_handle, "se_render_handle_destroy_render_buffer :: render_handle is null");
+	s_assertf(buffer, "se_render_handle_destroy_render_buffer :: buffer is null");
+	if (!buffer->is_valid) {
+		return;
+	}
+	se_render_buffer_cleanup(buffer);
+	memset(buffer, 0, sizeof(*buffer));
+}
+
 void se_render_buffer_copy_to_previous(se_render_buffer *buffer) {
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, buffer->framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, buffer->prev_framebuffer);
@@ -1164,16 +1174,6 @@ static void se_render_buffer_cleanup(se_render_buffer *buffer) {
 	glDeleteRenderbuffers(1, &buffer->depth_buffer);
 	buffer->depth_buffer = 0;
 	}
-}
-
-void se_render_handle_destroy_render_buffer(se_render_handle *render_handle, se_render_buffer *buffer) {
-	s_assertf(render_handle, "se_render_handle_destroy_render_buffer :: render_handle is null");
-	s_assertf(buffer, "se_render_handle_destroy_render_buffer :: buffer is null");
-	if (!buffer->is_valid) {
-		return;
-	}
-	se_render_buffer_cleanup(buffer);
-	memset(buffer, 0, sizeof(*buffer));
 }
 
 f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
