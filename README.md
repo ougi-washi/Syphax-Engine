@@ -34,6 +34,8 @@ make -j
 ./bin/window_example
 ```
 
+Examples are intentionally concise and focus on API flow over defensive setup checks.
+
 ### Minimal usage
 ```c
 #include "se_window.h"
@@ -41,35 +43,13 @@ make -j
 #include "se_text.h"
 
 int main() {
-	se_render_handle *render = NULL;
-	se_window *window = NULL;
-	se_text_handle* text_handle = NULL;
-	se_font* font = NULL;
-	render = se_render_handle_create(NULL);
-	if (!render) {
-		return 1;
-	}
-	window = se_window_create(render, "Syphax Hello", 1280, 720);
-	if (!window) {
-		se_render_handle_destroy(render);
-		return 1;
-	}
+	se_render_handle *render = se_render_handle_create(NULL);
+	se_window *window = se_window_create(render, "Syphax Hello", 1280, 720);
+	se_text_handle *text_handle = se_text_handle_create(render, 0);
+	se_font *font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.0f);
+
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.08f, 0.08f, 0.1f, 1.0f));
-
-	text_handle = se_text_handle_create(render, 0);
-	if (!text_handle) {
-		se_window_destroy(window);
-		se_render_handle_destroy(render);
-		return 1;
-	}
-	font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.0f);
-	if (!font) {
-		se_text_handle_destroy(text_handle);
-		se_window_destroy(window);
-		se_render_handle_destroy(render);
-		return 1;
-	}
 
 	se_window_loop(window,
 		se_render_clear();

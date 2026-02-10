@@ -46,9 +46,6 @@ static void audio_demo_print_devices(const audio_demo_state* state) {
 }
 
 static void audio_demo_build_bar(f32 value, char* out, u32 length) {
-	if (!out || length == 0) {
-		return;
-	}
 	if (value < 0.0f) {
 		value = 0.0f;
 	}
@@ -98,21 +95,12 @@ int main(void) {
 	audio_demo_state state = {0};
 	printf("Audio example :: initializing engine\n");
 	state.engine = se_audio_init(NULL);
-	if (!state.engine) {
-		fprintf(stderr, "Audio example :: failed to initialize engine\n");
-		return 1;
-	}
 
 	state.device_count = se_audio_capture_list_devices(state.engine, state.devices, 16);
 	state.default_device = audio_demo_find_default_device(&state);
 	audio_demo_print_devices(&state);
 
 	state.clip = se_audio_clip_load(state.engine, "audio/chime.wav");
-	if (!state.clip) {
-		fprintf(stderr, "Audio example :: failed to load clip\n");
-		se_audio_shutdown(state.engine);
-		return 1;
-	}
 	se_audio_play_params clip_params = {
 		.volume = 0.85f,
 		.pan = 0.0f,
@@ -158,12 +146,8 @@ int main(void) {
 	printf("\n");
 
 	printf("Audio example :: shutting down\n");
-	if (state.capture) {
-		se_audio_capture_stop(state.capture);
-	}
-	if (state.stream) {
-		se_audio_stream_close(state.stream);
-	}
+	se_audio_capture_stop(state.capture);
+	se_audio_stream_close(state.stream);
 	se_audio_clip_unload(state.engine, state.clip);
 	se_audio_shutdown(state.engine);
 	return 0;

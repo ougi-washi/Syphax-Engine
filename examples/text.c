@@ -7,35 +7,12 @@
 #define HEIGHT 1080
 
 i32 main() {
-	se_render_handle* render_handle = NULL;
-	se_window* window = NULL;
-	se_text_handle* text_handle = NULL;
-	se_font* font = NULL;
-	render_handle = se_render_handle_create(NULL);
-	if (!render_handle) {
-		return 1;
-	}
-	
-	window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
-	if (!window) {
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
+	se_render_handle *render_handle = se_render_handle_create(NULL);
+	se_window *window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
+	se_text_handle *text_handle = se_text_handle_create(render_handle, 0);
+	se_font *font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.f);
+
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-	
-	text_handle = se_text_handle_create(render_handle, 0);
-	if (!text_handle) {
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
-	font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.f);
-	if (!font) {
-		se_text_handle_destroy(text_handle);
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
@@ -45,7 +22,7 @@ i32 main() {
 	}
 
 	se_text_handle_destroy(text_handle);
-	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
+	se_render_handle_destroy(render_handle);
 	return 0;
 }

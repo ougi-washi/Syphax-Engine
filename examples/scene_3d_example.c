@@ -14,71 +14,26 @@ typedef struct {
 } se_instance_slot;
 
 int main() {
-	se_render_handle *render_handle = NULL;
-	se_window *window = NULL;
-	se_scene_handle *scene_handle = NULL;
-	se_scene_3d *scene = NULL;
+	se_render_handle *render_handle = se_render_handle_create(NULL);
+	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
+	se_scene_3d *scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), INSTANCE_TOTAL + 4);
 	se_shader *mesh_shader = NULL;
 	se_model *cube_model = NULL;
 	se_object_3d *cube_field = NULL;
-	render_handle = se_render_handle_create(NULL);
-	if (!render_handle) {
-		return 1;
-	}
 
-	window = se_window_create(render_handle, "Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
-	if (!window) {
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-
-	scene_handle = se_scene_handle_create(render_handle, NULL);
-	if (!scene_handle) {
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
-
-	scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), INSTANCE_TOTAL + 4);
-	if (!scene) {
-		se_scene_handle_destroy(scene_handle);
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
 	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
 
 	se_shaders_ptr shader_list = {0};
 	s_array_init(&shader_list, 4);
 	mesh_shader = se_shader_load(render_handle, "shaders/scene_3d_vertex.glsl", "shaders/scene_3d_fragment.glsl");
-	if (!mesh_shader) {
-		s_array_clear(&shader_list);
-		se_scene_handle_destroy(scene_handle);
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
 	*s_array_increment(&shader_list) = mesh_shader;
 
 	cube_model = se_model_load_obj(render_handle, "cube.obj", &shader_list);
-	if (!cube_model) {
-		s_array_clear(&shader_list);
-		se_scene_handle_destroy(scene_handle);
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
 
 	s_mat4 identity = s_mat4_identity;
 	cube_field = se_object_3d_create(scene_handle, cube_model, &identity, INSTANCE_TOTAL);
-	if (!cube_field) {
-		s_array_clear(&shader_list);
-		se_scene_handle_destroy(scene_handle);
-		se_window_destroy(window);
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
 	se_scene_3d_add_object(scene, cube_field);
 
 	se_instance_slot slots[INSTANCE_TOTAL] = {0};
@@ -101,11 +56,9 @@ int main() {
 		}
 	}
 
-	if (scene->camera) {
-		scene->camera->position = s_vec3(6.0f, 5.0f, 10.0f);
-		scene->camera->target = s_vec3(0.0f, 0.0f, 0.0f);
-		scene->camera->up = s_vec3(0.0f, 1.0f, 0.0f);
-	}
+	scene->camera->position = s_vec3(6.0f, 5.0f, 10.0f);
+	scene->camera->target = s_vec3(0.0f, 0.0f, 0.0f);
+	scene->camera->up = s_vec3(0.0f, 1.0f, 0.0f);
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);

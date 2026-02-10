@@ -7,17 +7,8 @@
 #define HEIGHT 1080
 
 i32 main() {
-	se_render_handle* render_handle = NULL;
-	se_window* window = NULL;
-	render_handle = se_render_handle_create(NULL);
-	if (!render_handle) {
-		return 1;
-	}
-	window = se_window_create(render_handle, "Syphax-Engine - Window Example", WIDTH, HEIGHT);
-	if (!window) {
-		se_render_handle_destroy(render_handle);
-		return 1;
-	}
+	se_render_handle *render_handle = se_render_handle_create(NULL);
+	se_window *window = se_window_create(render_handle, "Syphax-Engine - Window Example", WIDTH, HEIGHT);
 	se_render_set_background_color(s_vec4(0.5f, 0.5f, 0.5f, 1.0f));
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
@@ -28,5 +19,6 @@ i32 main() {
 		se_window_present_frame(window, &clear_color);
 	}
 	se_window_destroy(window);
+	se_render_handle_destroy(render_handle);
 	return 0;
 }
