@@ -34,8 +34,6 @@ make -j
 ./bin/window_example
 ```
 
-Examples are intentionally concise and focus on API flow over defensive setup checks.
-
 ### Minimal usage
 ```c
 #include "se_window.h"
