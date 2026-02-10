@@ -7,7 +7,7 @@
 
 // Scene handle owns its arrays; only the handle should remove/free entries.
 
-#define SE_OBJECT_2D_VERTEX_SHADER_PATH "shaders/object_2d_vertex.glsl"
+#define SE_OBJECT_2D_VERTEX_SHADER_PATH SE_RESOURCE_INTERNAL("shaders/object_2d_vertex.glsl")
 
 se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const se_scene_handle_params *params) {
 	se_scene_handle_params resolved = SE_SCENE_HANDLE_PARAMS_DEFAULTS;

@@ -33,10 +33,10 @@ i32 main() {
 
 	s_mat3 transform = s_mat3_identity;
 
-	borders = se_object_2d_create(scene_handle, "examples/scene_example/borders.glsl", &transform, 0);
-	panel = se_object_2d_create(scene_handle, "examples/scene_example/panel.glsl", &transform, 0);
-	button_yes = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
-	button_no = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 0);
+	borders = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene_2d/borders.glsl"), &transform, 0);
+	panel = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene_2d/panel.glsl"), &transform, 0);
+	button_yes = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene_2d/button.glsl"), &transform, 0);
+	button_no = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene_2d/button.glsl"), &transform, 0);
 	se_object_2d_set_scale(borders, &s_vec2(0.95, 0.95));
 	se_object_2d_set_scale(panel, &s_vec2(0.5, 0.5));
 	se_object_2d_set_position(button_yes, &s_vec2(0.15, 0.));

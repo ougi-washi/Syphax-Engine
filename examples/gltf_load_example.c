@@ -6,7 +6,7 @@
 
 int main(void) {
 	char gltf_path[SE_MAX_PATH_LENGTH] = {0};
-	se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, "examples/gltf/triangle.gltf");
+	se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, SE_RESOURCE_EXAMPLE("gltf/triangle.gltf"));
 
 	se_gltf_asset *asset = se_gltf_load(gltf_path, NULL);
 

@@ -10,7 +10,7 @@ i32 main() {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
 	se_text_handle *text_handle = se_text_handle_create(render_handle, 0);
-	se_font *font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.f);
+	se_font *font = se_font_load(text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.f);
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 

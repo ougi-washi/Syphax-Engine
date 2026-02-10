@@ -17,7 +17,7 @@ i32 main() {
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	s_mat3 transform = s_mat3_identity;
-	button = se_object_2d_create(scene_handle, "examples/scene_example/button.glsl", &transform, 16);
+	button = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene_2d/button.glsl"), &transform, 16);
 	se_object_2d_set_position(button, &s_vec2(0.15, 0.));
 	se_object_2d_set_scale(button, &s_vec2(0.1, 0.1));
 	s_mat3 instance_transform = s_mat3_identity;

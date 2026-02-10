@@ -29,7 +29,7 @@ static se_result se_window_init_render(se_window* window, se_render_handle* rend
 		se_quad_2d_create(&window->quad, 0);
 	}
 	if (!window->shader) {
-		se_shader *shader = se_shader_load(render_handle, "shaders/render_quad_vert.glsl", "shaders/render_quad_frag.glsl");
+		se_shader *shader = se_shader_load(render_handle, SE_RESOURCE_INTERNAL("shaders/render_quad_vert.glsl"), SE_RESOURCE_INTERNAL("shaders/render_quad_frag.glsl"));
 		if (!shader) {
 			return se_get_last_error();
 		}

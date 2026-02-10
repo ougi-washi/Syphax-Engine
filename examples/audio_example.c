@@ -100,7 +100,7 @@ int main(void) {
 	state.default_device = audio_demo_find_default_device(&state);
 	audio_demo_print_devices(&state);
 
-	state.clip = se_audio_clip_load(state.engine, "audio/chime.wav");
+	state.clip = se_audio_clip_load(state.engine, SE_RESOURCE_PUBLIC("audio/chime.wav"));
 	se_audio_play_params clip_params = {
 		.volume = 0.85f,
 		.pan = 0.0f,
@@ -117,7 +117,7 @@ int main(void) {
 		.looping = true,
 		.bus = SE_AUDIO_BUS_MUSIC
 	};
-	state.stream = se_audio_stream_open(state.engine, "audio/loop.wav", &stream_params);
+	state.stream = se_audio_stream_open(state.engine, SE_RESOURCE_PUBLIC("audio/loop.wav"), &stream_params);
 
 	if (state.device_count > 0) {
 		se_audio_capture_config capture_config = {

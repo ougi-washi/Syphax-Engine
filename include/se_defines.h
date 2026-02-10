@@ -10,6 +10,10 @@
 #	define RESOURCES_DIR "resources/"
 #endif
 
+#define SE_RESOURCE_INTERNAL(path) "internal/" path
+#define SE_RESOURCE_PUBLIC(path) "public/" path
+#define SE_RESOURCE_EXAMPLE(path) "examples/" path
+
 typedef enum {
 	SE_RESULT_OK = 0,
 	SE_RESULT_INVALID_ARGUMENT,

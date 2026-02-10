@@ -10,7 +10,7 @@
 
 int main(void) {
 	char gltf_path[SE_MAX_PATH_LENGTH] = {0};
-	se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, "examples/gltf/Sponza/Sponza.gltf");
+	se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, SE_RESOURCE_EXAMPLE("gltf/Sponza/Sponza.gltf"));
 
 	se_render_handle_params render_params = SE_RENDER_HANDLE_PARAMS_DEFAULTS;
 	render_params.framebuffers_count = 4;
@@ -38,9 +38,9 @@ int main(void) {
 	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
 	se_scene_3d_set_culling(scene, false);
 
-	se_shader *mesh_shader = se_shader_load(render_handle, "shaders/gltf_3d_vertex.glsl", "shaders/gltf_3d_fragment.glsl");
+	se_shader *mesh_shader = se_shader_load(render_handle, SE_RESOURCE_PUBLIC("shaders/gltf_3d_vertex.glsl"), SE_RESOURCE_PUBLIC("shaders/gltf_3d_fragment.glsl"));
 
-	se_texture *default_texture = se_texture_load(render_handle, "examples/gltf/Sponza/white.png", SE_REPEAT);
+	se_texture *default_texture = se_texture_load(render_handle, SE_RESOURCE_EXAMPLE("gltf/Sponza/white.png"), SE_REPEAT);
 
 	sz objects_added = 0;
 	se_gltf_asset *asset = se_gltf_scene_load(render_handle, scene_handle, scene, gltf_path, NULL, mesh_shader, default_texture, SE_REPEAT, &objects_added);

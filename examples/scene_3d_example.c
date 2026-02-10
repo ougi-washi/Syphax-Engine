@@ -27,10 +27,10 @@ int main() {
 
 	se_shaders_ptr shader_list = {0};
 	s_array_init(&shader_list, 4);
-	mesh_shader = se_shader_load(render_handle, "shaders/scene_3d_vertex.glsl", "shaders/scene_3d_fragment.glsl");
+	mesh_shader = se_shader_load(render_handle, SE_RESOURCE_PUBLIC("shaders/scene_3d_vertex.glsl"), SE_RESOURCE_PUBLIC("shaders/scene_3d_fragment.glsl"));
 	*s_array_increment(&shader_list) = mesh_shader;
 
-	cube_model = se_model_load_obj(render_handle, "cube.obj", &shader_list);
+	cube_model = se_model_load_obj(render_handle, SE_RESOURCE_PUBLIC("models/cube.obj"), &shader_list);
 
 	s_mat4 identity = s_mat4_identity;
 	cube_field = se_object_3d_create(scene_handle, cube_model, &identity, INSTANCE_TOTAL);

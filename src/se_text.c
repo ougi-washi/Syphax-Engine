@@ -23,7 +23,7 @@ se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32
 	s_array_init(&text_handle->fonts, resolved_fonts);
 	se_quad_2d_create(&text_handle->quad, SE_TEXT_CHAR_COUNT);
 	se_quad_2d_add_instance_buffer(&text_handle->quad, text_handle->buffer, SE_TEXT_CHAR_COUNT);
-	se_shader* shader = se_shader_load(render_handle, "shaders/text_vert.glsl", "shaders/text_frag.glsl");
+	se_shader* shader = se_shader_load(render_handle, SE_RESOURCE_INTERNAL("shaders/text_vert.glsl"), SE_RESOURCE_INTERNAL("shaders/text_frag.glsl"));
 	if (!shader) {
 		se_quad_destroy(&text_handle->quad);
 		s_array_clear(&text_handle->fonts);

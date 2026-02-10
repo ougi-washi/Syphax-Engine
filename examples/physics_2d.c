@@ -52,7 +52,7 @@ int main(void) {
 	floor_params.position = s_vec2(0.0f, -0.9f);
 	se_physics_body_2d *floor_body = se_physics_body_2d_create(world, &floor_params);
 	se_physics_body_2d_add_aabb(floor_body, &s_vec2(0.0f, 0.0f), &s_vec2(0.95f, 0.06f), false);
-	se_object_2d *floor_object = se_object_2d_create(scene_handle, "examples/ui/button.glsl", &s_mat3_identity, 0);
+	se_object_2d *floor_object = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("ui/button.glsl"), &s_mat3_identity, 0);
 	se_shader_set_vec3(floor_object->shader, "u_color", &s_vec3(0.2f, 0.25f, 0.32f));
 	se_object_2d_set_position(floor_object, &floor_body->position);
 	se_object_2d_set_scale(floor_object, &s_vec2(0.95f, 0.06f));
@@ -70,7 +70,7 @@ int main(void) {
 		} else {
 			se_physics_body_2d_add_box(body, &s_vec2(0.0f, 0.0f), &s_vec2(size, size), 0.0f, false);
 		}
-		se_object_2d *object = se_object_2d_create(scene_handle, "examples/ui/button.glsl", &s_mat3_identity, 0);
+		se_object_2d *object = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("ui/button.glsl"), &s_mat3_identity, 0);
 		se_shader_set_vec3(object->shader, "u_color", is_circle ? &s_vec3(0.45f, 0.75f, 0.9f) : &s_vec3(0.9f, 0.6f, 0.35f));
 		se_object_2d_set_position(object, &body->position);
 		se_object_2d_set_scale(object, &s_vec2(size, size));

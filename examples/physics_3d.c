@@ -35,13 +35,13 @@ int main(void) {
 	se_scene_3d *scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), BODY_COUNT + 1);
 	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
 
-	se_shader *mesh_shader = se_shader_load(render_handle, "shaders/scene_3d_vertex.glsl", "shaders/scene_3d_fragment.glsl");
+	se_shader *mesh_shader = se_shader_load(render_handle, SE_RESOURCE_PUBLIC("shaders/scene_3d_vertex.glsl"), SE_RESOURCE_PUBLIC("shaders/scene_3d_fragment.glsl"));
 
 	se_shaders_ptr shader_list = {0};
 	s_array_init(&shader_list, 1);
 	*s_array_increment(&shader_list) = mesh_shader;
 
-	se_model *cube_model = se_model_load_obj(render_handle, "cube.obj", &shader_list);
+	se_model *cube_model = se_model_load_obj(render_handle, SE_RESOURCE_PUBLIC("models/cube.obj"), &shader_list);
 
 	se_object_3d *cubes = se_object_3d_create(scene_handle, cube_model, &s_mat4_identity, BODY_COUNT + 1);
 	se_scene_3d_add_object(scene, cubes);

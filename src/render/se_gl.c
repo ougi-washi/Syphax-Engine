@@ -1407,7 +1407,7 @@ se_render_buffer *se_render_buffer_create(se_render_handle *render_handle, const
 	glBindFramebuffer(GL_FRAMEBUFFER, buffer->prev_framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, buffer->prev_texture, 0);
 
-	se_shader *shader = se_shader_load(render_handle, "shaders/render_buffer_vert.glsl", fragment_shader_path);
+	se_shader *shader = se_shader_load(render_handle, SE_RESOURCE_INTERNAL("shaders/render_buffer_vert.glsl"), fragment_shader_path);
 	if (!shader) {
 		se_render_buffer_cleanup(buffer);
 		memset(buffer, 0, sizeof(*buffer));

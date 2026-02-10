@@ -44,7 +44,7 @@ int main() {
 	se_render_handle *render = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render, "Syphax Hello", 1280, 720);
 	se_text_handle *text_handle = se_text_handle_create(render, 0);
-	se_font *font = se_font_load(text_handle, "fonts/ithaca.ttf", 32.0f);
+	se_font *font = se_font_load(text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.08f, 0.08f, 0.1f, 1.0f));
@@ -61,12 +61,20 @@ int main() {
 }
 ```
 
+### Resource scopes
+- `SE_RESOURCE_INTERNAL("...")`: engine-only implementation assets.
+- `SE_RESOURCE_PUBLIC("...")`: reusable assets intended for library users.
+- `SE_RESOURCE_EXAMPLE("...")`: sample/demo-only assets.
+- Scope roots live under `resources/internal`, `resources/public`, and `resources/examples`.
+
 ### Project layout
 - `src/` engine modules (`se_*.c` / `se_*.h`)
 - `examples/` runnable samples (build to `bin/<name>`)
+- `resources/` split by ownership (`internal/`, `public/`, `examples/`)
 - `lib/` vendored dependencies
 
 ### Submodules
+- [Syphax](https://github.com/ougi-washi/syphax)
 - [GLFW](https://github.com/glfw/glfw)
 - [STB](https://github.com/nothings/stb)
 - [miniaudio](https://github.com/mackron/miniaudio)

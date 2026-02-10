@@ -59,10 +59,10 @@ i32 main() {
 	ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
 	toolbar = se_ui_element_add_child(root, &ui_element_params);
 	
-	button_minimize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	button_maximize = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	button_exit = se_ui_element_add_object(toolbar, "examples/ui/button.glsl");
-	se_ui_element_add_text(toolbar, "Hello World!", "fonts/ithaca.ttf", 32.f);
+	button_minimize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	button_maximize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	button_exit = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_ui_element_add_text(toolbar, "Hello World!", SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.f);
 
 	se_shader_set_vec3(button_minimize->shader, "u_color", &s_vec3(0, 0, .3));
 	se_shader_set_vec3(button_maximize->shader, "u_color", &s_vec3(0, .3, 0));
@@ -70,9 +70,9 @@ i32 main() {
 
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
 	content = se_ui_element_add_child(root, &ui_element_params);
-	item_1 = se_ui_element_add_object(content, "examples/ui/button.glsl");
-	item_2 = se_ui_element_add_object(content, "examples/ui/button.glsl");
-	item_3 = se_ui_element_add_object(content, "examples/ui/button.glsl");
+	item_1 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	item_2 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	item_3 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
 	se_shader_set_vec3(item_1->shader, "u_color", &s_vec3(.5, .5, 0));
 	se_shader_set_vec3(item_2->shader, "u_color", &s_vec3(0, .5, .5));
 	se_shader_set_vec3(item_3->shader, "u_color", &s_vec3(.5, 0, .5));
@@ -100,7 +100,7 @@ i32 main() {
 	    		se_window_get_mouse_position_x(window),
 	    		se_window_get_mouse_position_y(window), normalized_mouse_position.x,
 	    		normalized_mouse_position.y);
-	    se_ui_element_set_text(toolbar, fps_text, "fonts/ithaca.ttf", 32.f);
+	    se_ui_element_set_text(toolbar, fps_text, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.f);
 	    se_render_clear();
 	    se_ui_element_render(root);
 	    se_ui_element_render_to_screen(root);
