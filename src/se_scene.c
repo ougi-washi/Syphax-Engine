@@ -771,9 +771,6 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 			if (!shader) {
 				continue;
 			}
-			if (mesh->texture_id != 0) {
-				se_shader_set_texture(shader, "u_texture", mesh->texture_id);
-			}
 
 			se_shader_use(render_handle, shader, true, true);
 			glBindVertexArray(mesh_instance->vao);

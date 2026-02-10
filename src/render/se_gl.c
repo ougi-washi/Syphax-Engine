@@ -818,7 +818,6 @@ static void se_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices
 	mesh->vertex_count = vertex_count;
 	mesh->index_count = index_count;
 	mesh->matrix = s_mat4_identity;
-	mesh->texture_id = 0;
 
 	// Assign shader (cycle through available shaders)
 	if (s_array_get_size(shaders) > 0) {

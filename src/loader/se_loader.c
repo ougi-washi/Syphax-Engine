@@ -133,7 +133,6 @@ static b8 se_gltf_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indi
 	mesh->index_count = index_count;
 	mesh->matrix = s_mat4_identity;
 	mesh->shader = NULL;
-	mesh->texture_id = 0;
 
 	glGenVertexArrays(1, &mesh->vao);
 	glGenBuffers(1, &mesh->vbo);
@@ -311,6 +310,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 		i32 has_occlusion_texture = 0;
 		i32 has_emissive_texture = 0;
 
+		u32 base_color_texture_id = default_texture ? default_texture->id : 0;
 		u32 metallic_roughness_texture_id = default_texture ? default_texture->id : 0;
 		u32 occlusion_texture_id = default_texture ? default_texture->id : 0;
 		u32 emissive_texture_id = default_texture ? default_texture->id : 0;
@@ -329,6 +329,17 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 			}
 			if (pbr->has_roughness_factor) {
 				roughness_factor = pbr->roughness_factor;
+			}
+			if (pbr->has_base_color_texture) {
+				se_texture *tex = se_gltf_texture_from_cache(
+					render_handle,
+					asset,
+					texture_cache,
+					pbr->base_color_texture.index,
+					wrap);
+				if (tex != NULL) {
+					base_color_texture_id = tex->id;
+				}
 			}
 
 			if (pbr->has_metallic_roughness_texture) {
@@ -401,6 +412,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 		se_shader_set_float(material_shader, "u_ao_factor", ao_factor);
 		se_shader_set_vec3(material_shader, "u_emissive_factor", &emissive_factor);
 
+		se_shader_set_texture(material_shader, "u_texture", base_color_texture_id);
 		se_shader_set_texture(material_shader, "u_metallic_roughness_texture", metallic_roughness_texture_id);
 		se_shader_set_texture(material_shader, "u_occlusion_texture", occlusion_texture_id);
 		se_shader_set_texture(material_shader, "u_emissive_texture", emissive_texture_id);
@@ -429,25 +441,11 @@ static void se_gltf_apply_model_materials(se_render_handle *render_handle, const
 			continue;
 		}
 
-		se_texture *mesh_texture = default_texture;
 		se_shader *mesh_material_shader = mesh_shader;
 
 		if (prim_index < gltf_mesh->primitives.size) {
 			se_gltf_primitive *prim = s_array_get(&gltf_mesh->primitives, prim_index);
 			if (prim != NULL && prim->has_material && prim->material >= 0 && (sz)prim->material < asset->materials.size) {
-				se_gltf_material *material = s_array_get(&asset->materials, prim->material);
-				if (material != NULL && material->has_pbr_metallic_roughness && material->pbr_metallic_roughness.has_base_color_texture) {
-					se_texture *base_color_texture = se_gltf_texture_from_cache(
-						render_handle,
-						asset,
-						texture_cache,
-						material->pbr_metallic_roughness.base_color_texture.index,
-						wrap);
-					if (base_color_texture != NULL) {
-						mesh_texture = base_color_texture;
-					}
-				}
-
 				mesh_material_shader = se_gltf_get_material_shader(
 					render_handle,
 					asset,
@@ -463,7 +461,6 @@ static void se_gltf_apply_model_materials(se_render_handle *render_handle, const
 		if (mesh_material_shader != NULL) {
 			mesh->shader = mesh_material_shader;
 		}
-		mesh->texture_id = mesh_texture ? mesh_texture->id : 0;
 	}
 }
 

@@ -102,7 +102,6 @@ typedef struct {
 	u32 vbo;
 	u32 ebo;
 	se_shader *shader;
-	u32 texture_id;
 	s_mat4 matrix;
 } se_mesh;
 typedef s_array(se_mesh, se_meshes);
