@@ -93,8 +93,7 @@ typedef se_texture *se_texture_ptr;
 typedef s_array(se_texture_ptr, se_textures_ptr);
 
 typedef struct {
-	se_vertex_3d
-		*vertices; // TODO: no need for this, we can just use the buffer directly
+	se_vertex_3d *vertices; // TODO: no need for this, we can just use the buffer directly
 	u32 *indices;
 	u32 vertex_count;
 	u32 index_count;

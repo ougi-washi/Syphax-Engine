@@ -28,11 +28,14 @@ typedef enum {
 
 typedef struct se_sdf_object {
 	s_mat4 transform;
+	se_sdf_object_type type;
 	union {
 		struct { f32 radius; } sphere;
 		struct { s_vec3 size; } box;
 		struct { s_vec3 size; f32 roundness; } round_box;
 	};			
+	se_sdf_operation operation;
+	se_sdf_noise noise;
 	s_array(struct se_sdf_object, children);
 } se_sdf_object;
 
