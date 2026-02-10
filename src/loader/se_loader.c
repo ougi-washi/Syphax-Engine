@@ -26,6 +26,7 @@ typedef struct {
 	se_texture_wrap wrap;
 	se_models_ptr *model_cache;
 	se_textures_ptr *texture_cache;
+	se_shaders_ptr *material_shader_cache;
 	sz added_objects;
 } se_gltf_scene_build_context;
 
@@ -212,34 +213,255 @@ static b8 se_gltf_get_accessor_view(const se_gltf_asset *asset, const se_gltf_ac
 	return true;
 }
 
-static void se_gltf_apply_model_materials(se_render_handle *render_handle, const se_gltf_asset *asset, const se_gltf_mesh *gltf_mesh, se_model *model, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap, se_textures_ptr *texture_cache) {
-	if (render_handle == NULL || asset == NULL || gltf_mesh == NULL || model == NULL || texture_cache == NULL) return;
+static se_texture *se_gltf_texture_from_cache(se_render_handle *render_handle,
+									 const se_gltf_asset *asset,
+									 se_textures_ptr *texture_cache,
+									 const i32 texture_index,
+									 const se_texture_wrap wrap) {
+	if (render_handle == NULL || asset == NULL || texture_cache == NULL) return NULL;
+	if (texture_index < 0 || (sz)texture_index >= asset->textures.size || (sz)texture_index >= texture_cache->size) {
+		return NULL;
+	}
 
-	s_foreach(&model->meshes, prim_index) {
-		se_mesh *mesh = s_array_get(&model->meshes, prim_index);
-		se_texture *mesh_texture = default_texture;
+	se_texture **cached = s_array_get(texture_cache, texture_index);
+	if (cached == NULL) return NULL;
+	if (*cached == NULL) {
+		*cached = se_gltf_texture_load(render_handle, asset, texture_index, wrap);
+	}
+	return *cached;
+}
 
-		if (prim_index < gltf_mesh->primitives.size) {
-			se_gltf_primitive *prim = s_array_get(&gltf_mesh->primitives, prim_index);
-			if (prim->has_material && prim->material >= 0 && (sz)prim->material < asset->materials.size) {
-				se_gltf_material *material = s_array_get(&asset->materials, prim->material);
-				if (material->has_pbr_metallic_roughness && material->pbr_metallic_roughness.has_base_color_texture) {
-					i32 tex_index = material->pbr_metallic_roughness.base_color_texture.index;
-					if (tex_index >= 0 && (sz)tex_index < texture_cache->size) {
-						se_texture **cached = s_array_get(texture_cache, tex_index);
-						if (*cached == NULL) {
-							*cached = se_gltf_texture_load(render_handle, asset, tex_index, wrap);
-						}
-						if (*cached != NULL) {
-							mesh_texture = *cached;
-						}
-					}
+static f32 se_gltf_clamp(const f32 value, const f32 min_value, const f32 max_value) {
+	if (value < min_value) return min_value;
+	if (value > max_value) return max_value;
+	return value;
+}
+
+static i32 se_gltf_alpha_mode_to_uniform(const se_gltf_material *material) {
+	if (material == NULL || !material->has_alpha_mode || material->alpha_mode == NULL) {
+		return 0;
+	}
+	if (strcmp(material->alpha_mode, "MASK") == 0) {
+		return 1;
+	}
+	if (strcmp(material->alpha_mode, "BLEND") == 0) {
+		return 2;
+	}
+	return 0;
+}
+
+static void se_gltf_set_default_material_uniforms(se_shader *shader, se_texture *default_texture) {
+	if (shader == NULL) return;
+
+	const u32 default_texture_id = default_texture ? default_texture->id : 0;
+	const s_vec4 base_color_factor = s_vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	const s_vec3 emissive_factor = s_vec3(0.0f, 0.0f, 0.0f);
+
+	se_shader_set_texture(shader, "u_texture", default_texture_id);
+	se_shader_set_texture(shader, "u_metallic_roughness_texture", default_texture_id);
+	se_shader_set_texture(shader, "u_occlusion_texture", default_texture_id);
+	se_shader_set_texture(shader, "u_emissive_texture", default_texture_id);
+	se_shader_set_vec4(shader, "u_base_color_factor", &base_color_factor);
+	se_shader_set_float(shader, "u_metallic_factor", 1.0f);
+	se_shader_set_float(shader, "u_roughness_factor", 1.0f);
+	se_shader_set_float(shader, "u_ao_factor", 1.0f);
+	se_shader_set_vec3(shader, "u_emissive_factor", &emissive_factor);
+	se_shader_set_int(shader, "u_has_metallic_roughness_texture", 0);
+	se_shader_set_int(shader, "u_has_occlusion_texture", 0);
+	se_shader_set_int(shader, "u_has_emissive_texture", 0);
+	se_shader_set_int(shader, "u_alpha_mode", 0);
+	se_shader_set_float(shader, "u_alpha_cutoff", 0.5f);
+}
+
+static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
+									   const se_gltf_asset *asset,
+									   const i32 material_index,
+									   se_shader *mesh_shader,
+									   se_texture *default_texture,
+									   const se_texture_wrap wrap,
+									   se_textures_ptr *texture_cache,
+									   se_shaders_ptr *material_shader_cache) {
+	if (render_handle == NULL || asset == NULL || mesh_shader == NULL || texture_cache == NULL || material_shader_cache == NULL) {
+		return mesh_shader;
+	}
+	if (material_index < 0 || (sz)material_index >= asset->materials.size || (sz)material_index >= material_shader_cache->size) {
+		return mesh_shader;
+	}
+
+	se_shader **cached_shader = s_array_get(material_shader_cache, material_index);
+	if (cached_shader == NULL) return mesh_shader;
+	if (*cached_shader != NULL) return *cached_shader;
+
+	se_shader *material_shader = se_shader_load(render_handle, mesh_shader->vertex_path, mesh_shader->fragment_path);
+	if (material_shader == NULL) {
+		return mesh_shader;
+	}
+
+	se_gltf_set_default_material_uniforms(material_shader, default_texture);
+
+	se_gltf_material *material = s_array_get(&asset->materials, material_index);
+	if (material != NULL) {
+		s_vec4 base_color_factor = s_vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		f32 metallic_factor = 1.0f;
+		f32 roughness_factor = 1.0f;
+		f32 ao_factor = 1.0f;
+		s_vec3 emissive_factor = s_vec3(0.0f, 0.0f, 0.0f);
+
+		i32 has_metallic_roughness_texture = 0;
+		i32 has_occlusion_texture = 0;
+		i32 has_emissive_texture = 0;
+
+		u32 metallic_roughness_texture_id = default_texture ? default_texture->id : 0;
+		u32 occlusion_texture_id = default_texture ? default_texture->id : 0;
+		u32 emissive_texture_id = default_texture ? default_texture->id : 0;
+
+		if (material->has_pbr_metallic_roughness) {
+			se_gltf_pbr_metallic_roughness *pbr = &material->pbr_metallic_roughness;
+			if (pbr->has_base_color_factor) {
+				base_color_factor = s_vec4(
+					pbr->base_color_factor[0],
+					pbr->base_color_factor[1],
+					pbr->base_color_factor[2],
+					pbr->base_color_factor[3]);
+			}
+			if (pbr->has_metallic_factor) {
+				metallic_factor = pbr->metallic_factor;
+			}
+			if (pbr->has_roughness_factor) {
+				roughness_factor = pbr->roughness_factor;
+			}
+
+			if (pbr->has_metallic_roughness_texture) {
+				se_texture *tex = se_gltf_texture_from_cache(
+					render_handle,
+					asset,
+					texture_cache,
+					pbr->metallic_roughness_texture.index,
+					wrap);
+				if (tex != NULL) {
+					metallic_roughness_texture_id = tex->id;
+					has_metallic_roughness_texture = 1;
 				}
 			}
 		}
 
-		if (mesh_shader != NULL) {
-			mesh->shader = mesh_shader;
+		if (material->has_occlusion_texture) {
+			if (material->occlusion_texture.has_strength) {
+				ao_factor = material->occlusion_texture.strength;
+			}
+			se_texture *tex = se_gltf_texture_from_cache(
+				render_handle,
+				asset,
+				texture_cache,
+				material->occlusion_texture.info.index,
+				wrap);
+			if (tex != NULL) {
+				occlusion_texture_id = tex->id;
+				has_occlusion_texture = 1;
+			}
+		}
+
+		if (material->has_emissive_factor) {
+			emissive_factor = s_vec3(
+				material->emissive_factor[0],
+				material->emissive_factor[1],
+				material->emissive_factor[2]);
+		}
+
+		if (material->has_emissive_texture) {
+			se_texture *tex = se_gltf_texture_from_cache(
+				render_handle,
+				asset,
+				texture_cache,
+				material->emissive_texture.index,
+				wrap);
+			if (tex != NULL) {
+				emissive_texture_id = tex->id;
+				has_emissive_texture = 1;
+			}
+		}
+
+		metallic_factor = se_gltf_clamp(metallic_factor, 0.0f, 1.0f);
+		roughness_factor = se_gltf_clamp(roughness_factor, 0.04f, 1.0f);
+		ao_factor = se_gltf_clamp(ao_factor, 0.0f, 1.0f);
+		base_color_factor.x = se_gltf_clamp(base_color_factor.x, 0.0f, 1.0f);
+		base_color_factor.y = se_gltf_clamp(base_color_factor.y, 0.0f, 1.0f);
+		base_color_factor.z = se_gltf_clamp(base_color_factor.z, 0.0f, 1.0f);
+		base_color_factor.w = se_gltf_clamp(base_color_factor.w, 0.0f, 1.0f);
+		emissive_factor.x = se_gltf_clamp(emissive_factor.x, 0.0f, 32.0f);
+		emissive_factor.y = se_gltf_clamp(emissive_factor.y, 0.0f, 32.0f);
+		emissive_factor.z = se_gltf_clamp(emissive_factor.z, 0.0f, 32.0f);
+
+		f32 alpha_cutoff = material->has_alpha_cutoff ? material->alpha_cutoff : 0.5f;
+		alpha_cutoff = se_gltf_clamp(alpha_cutoff, 0.0f, 1.0f);
+
+		se_shader_set_vec4(material_shader, "u_base_color_factor", &base_color_factor);
+		se_shader_set_float(material_shader, "u_metallic_factor", metallic_factor);
+		se_shader_set_float(material_shader, "u_roughness_factor", roughness_factor);
+		se_shader_set_float(material_shader, "u_ao_factor", ao_factor);
+		se_shader_set_vec3(material_shader, "u_emissive_factor", &emissive_factor);
+
+		se_shader_set_texture(material_shader, "u_metallic_roughness_texture", metallic_roughness_texture_id);
+		se_shader_set_texture(material_shader, "u_occlusion_texture", occlusion_texture_id);
+		se_shader_set_texture(material_shader, "u_emissive_texture", emissive_texture_id);
+
+		se_shader_set_int(material_shader, "u_has_metallic_roughness_texture", has_metallic_roughness_texture);
+		se_shader_set_int(material_shader, "u_has_occlusion_texture", has_occlusion_texture);
+		se_shader_set_int(material_shader, "u_has_emissive_texture", has_emissive_texture);
+		se_shader_set_int(material_shader, "u_alpha_mode", se_gltf_alpha_mode_to_uniform(material));
+		se_shader_set_float(material_shader, "u_alpha_cutoff", alpha_cutoff);
+	}
+
+	*cached_shader = material_shader;
+	return material_shader;
+}
+
+static void se_gltf_apply_model_materials(se_render_handle *render_handle, const se_gltf_asset *asset, const se_gltf_mesh *gltf_mesh, se_model *model, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap, se_textures_ptr *texture_cache, se_shaders_ptr *material_shader_cache) {
+	if (render_handle == NULL || asset == NULL || gltf_mesh == NULL || model == NULL || texture_cache == NULL) return;
+
+	if (mesh_shader != NULL) {
+		se_gltf_set_default_material_uniforms(mesh_shader, default_texture);
+	}
+
+	s_foreach(&model->meshes, prim_index) {
+		se_mesh *mesh = s_array_get(&model->meshes, prim_index);
+		if (mesh == NULL) {
+			continue;
+		}
+
+		se_texture *mesh_texture = default_texture;
+		se_shader *mesh_material_shader = mesh_shader;
+
+		if (prim_index < gltf_mesh->primitives.size) {
+			se_gltf_primitive *prim = s_array_get(&gltf_mesh->primitives, prim_index);
+			if (prim != NULL && prim->has_material && prim->material >= 0 && (sz)prim->material < asset->materials.size) {
+				se_gltf_material *material = s_array_get(&asset->materials, prim->material);
+				if (material != NULL && material->has_pbr_metallic_roughness && material->pbr_metallic_roughness.has_base_color_texture) {
+					se_texture *base_color_texture = se_gltf_texture_from_cache(
+						render_handle,
+						asset,
+						texture_cache,
+						material->pbr_metallic_roughness.base_color_texture.index,
+						wrap);
+					if (base_color_texture != NULL) {
+						mesh_texture = base_color_texture;
+					}
+				}
+
+				mesh_material_shader = se_gltf_get_material_shader(
+					render_handle,
+					asset,
+					prim->material,
+					mesh_shader,
+					default_texture,
+					wrap,
+					texture_cache,
+					material_shader_cache);
+			}
+		}
+
+		if (mesh_material_shader != NULL) {
+			mesh->shader = mesh_material_shader;
 		}
 		mesh->texture_id = mesh_texture ? mesh_texture->id : 0;
 	}
@@ -441,7 +663,7 @@ static b8 se_gltf_add_node_objects_recursive(se_gltf_scene_build_context *ctx, c
 			*cached_model = se_gltf_model_load(ctx->render_handle, ctx->asset, node->mesh);
 			if (*cached_model == NULL) return false;
 			se_gltf_mesh *gltf_mesh = s_array_get(&ctx->asset->meshes, node->mesh);
-			se_gltf_apply_model_materials(ctx->render_handle, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache);
+			se_gltf_apply_model_materials(ctx->render_handle, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache, ctx->material_shader_cache);
 		}
 
 		se_object_3d *object = se_object_3d_create(ctx->scene_handle, *cached_model, &world, 1);
@@ -472,7 +694,7 @@ static b8 se_gltf_add_mesh_objects_fallback(se_gltf_scene_build_context *ctx) {
 			*cached_model = se_gltf_model_load(ctx->render_handle, ctx->asset, (i32)mesh_index);
 			if (*cached_model == NULL) return false;
 			se_gltf_mesh *gltf_mesh = s_array_get(&ctx->asset->meshes, mesh_index);
-			se_gltf_apply_model_materials(ctx->render_handle, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache);
+			se_gltf_apply_model_materials(ctx->render_handle, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache, ctx->material_shader_cache);
 		}
 
 		se_object_3d *object = se_object_3d_create(ctx->scene_handle, *cached_model, &identity, 1);
@@ -821,6 +1043,13 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 		*slot = NULL;
 	}
 
+	se_shaders_ptr material_shader_cache = {0};
+	s_array_init(&material_shader_cache, asset->materials.size);
+	for (sz i = 0; i < asset->materials.size; i++) {
+		se_shader **slot = s_array_increment(&material_shader_cache);
+		*slot = NULL;
+	}
+
 	se_gltf_scene_build_context ctx = {0};
 	ctx.render_handle = render_handle;
 	ctx.scene_handle = scene_handle;
@@ -831,6 +1060,7 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 	ctx.wrap = wrap;
 	ctx.model_cache = &model_cache;
 	ctx.texture_cache = &texture_cache;
+	ctx.material_shader_cache = &material_shader_cache;
 
 	b8 ok = true;
 	if (asset->scenes.size > 0) {
@@ -863,6 +1093,7 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 	}
 
 	s_array_clear(&texture_cache);
+	s_array_clear(&material_shader_cache);
 	s_array_clear(&model_cache);
 
 	if (!ok || ctx.added_objects == 0) {

@@ -16,7 +16,7 @@ int main(void) {
 	render_params.framebuffers_count = 4;
 	render_params.render_buffers_count = 2;
 	render_params.textures_count = 512;
-	render_params.shaders_count = 16;
+	render_params.shaders_count = 96;
 	render_params.models_count = 512;
 	render_params.cameras_count = 2;
 
@@ -40,6 +40,26 @@ int main(void) {
 
 	se_texture* default_texture = se_texture_load(render_handle, SE_RESOURCE_EXAMPLE("gltf/Sponza/white.png"), SE_REPEAT);
 
+	se_uniforms *global_uniforms = se_render_handle_get_global_uniforms(render_handle);
+	const s_vec3 light_direction_0 = s_vec3(-0.25f, 0.90f, 0.34f);
+	const s_vec3 light_direction_1 = s_vec3(0.74f, 0.48f, -0.31f);
+	const s_vec3 light_direction_2 = s_vec3(-0.08f, -0.62f, -0.78f);
+	const s_vec3 light_color_0 = s_vec3(8.5f, 8.0f, 7.3f);
+	const s_vec3 light_color_1 = s_vec3(2.2f, 2.8f, 3.4f);
+	const s_vec3 light_color_2 = s_vec3(0.55f, 0.65f, 0.78f);
+	const s_vec3 ambient_sky = s_vec3(0.18f, 0.22f, 0.27f);
+	const s_vec3 ambient_ground = s_vec3(0.02f, 0.017f, 0.014f);
+	se_uniform_set_vec3(global_uniforms, "u_light_directions[0]", &light_direction_0);
+	se_uniform_set_vec3(global_uniforms, "u_light_directions[1]", &light_direction_1);
+	se_uniform_set_vec3(global_uniforms, "u_light_directions[2]", &light_direction_2);
+	se_uniform_set_vec3(global_uniforms, "u_light_colors[0]", &light_color_0);
+	se_uniform_set_vec3(global_uniforms, "u_light_colors[1]", &light_color_1);
+	se_uniform_set_vec3(global_uniforms, "u_light_colors[2]", &light_color_2);
+	se_uniform_set_vec3(global_uniforms, "u_ambient_sky", &ambient_sky);
+	se_uniform_set_vec3(global_uniforms, "u_ambient_ground", &ambient_ground);
+	se_uniform_set_float(global_uniforms, "u_ambient_strength", 1.1f);
+	se_uniform_set_float(global_uniforms, "u_exposure", 1.08f);
+
 	sz objects_added = 0;
 	se_gltf_asset* asset = se_gltf_scene_load(render_handle, scene_handle, scene, gltf_path, NULL, mesh_shader, default_texture, SE_REPEAT, &objects_added);
 
@@ -52,10 +72,15 @@ int main(void) {
 	printf("15_gltf_viewer :: added %zu objects\n", objects_added);
 	se_gltf_scene_fit_camera(scene, asset);
 
+	f32 base_speed = 180.0f;
+	f32 fast_speed = 420.0f;
+	se_gltf_scene_get_navigation_speeds(asset, &base_speed, &fast_speed);
+	(void)fast_speed;
+
 	se_camera_controller_params camera_controller_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
 	camera_controller_params.window = window;
 	camera_controller_params.camera = scene->camera;
-	camera_controller_params.movement_speed = 20.f;
+	camera_controller_params.movement_speed = base_speed;
 	camera_controller_params.mouse_x_speed = 0.01f;
 	camera_controller_params.mouse_y_speed = 0.01f;
 	camera_controller_params.preset = SE_CAMERA_CONTROLLER_PRESET_UE;
