@@ -32,7 +32,7 @@ static i32 audio_demo_find_default_device(const audio_demo_state* state) {
 }
 
 static void audio_demo_print_devices(const audio_demo_state* state) {
-	printf("Audio example :: detected %u capture devices\n", state->device_count);
+	printf("5_audio :: detected %u capture devices\n", state->device_count);
 	if (state->device_count == 0) {
 		printf("  (none)\n");
 		return;
@@ -93,7 +93,7 @@ static void audio_demo_render_status(const se_audio_band_levels* output_levels, 
 
 int main(void) {
 	audio_demo_state state = {0};
-	printf("Audio example :: initializing engine\n");
+	printf("5_audio :: initializing engine\n");
 	state.engine = se_audio_init(NULL);
 
 	state.device_count = se_audio_capture_list_devices(state.engine, state.devices, 16);
@@ -126,10 +126,10 @@ int main(void) {
 			.channels = 1,
 			.frames_per_buffer = 256
 		};
-		printf("Audio example :: using capture device [%u]\n", capture_config.device_index);
+		printf("5_audio :: using capture device [%u]\n", capture_config.device_index);
 		state.capture = se_audio_capture_start(state.engine, &capture_config);
 	} else {
-		printf("Audio example :: microphone capture unavailable.\n");
+		printf("5_audio :: microphone capture unavailable.\n");
 	}
 
 	printf("\nMonitoring low/mid/high bands for playback (output) and microphone (input).\n");
@@ -145,7 +145,7 @@ int main(void) {
 	}
 	printf("\n");
 
-	printf("Audio example :: shutting down\n");
+	printf("5_audio :: shutting down\n");
 	se_audio_capture_stop(state.capture);
 	se_audio_stream_close(state.stream);
 	se_audio_clip_unload(state.engine, state.clip);

@@ -6,7 +6,7 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
-i32 main() {
+i32 main(void) {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 	se_window *window_main = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
 	se_window *window_1 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);

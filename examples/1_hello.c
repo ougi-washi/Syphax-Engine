@@ -4,7 +4,7 @@
 #include "se_render.h"
 #include "se_text.h"
 
-int main() {
+i32 main(void) {
 	se_render_handle *render = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render, "Syphax Hello", 1280, 720);
 	se_text_handle *text_handle = se_text_handle_create(render, 0);

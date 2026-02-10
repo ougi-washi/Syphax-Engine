@@ -14,7 +14,7 @@ void display_array(ints* array) {
 	printf("\n");
 }
 
-i32 main() {
+i32 main(void) {
 	ints my_ints = {0};
 	s_array_init(&my_ints, ARRAY_SIZE);
 

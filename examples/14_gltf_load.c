@@ -10,8 +10,8 @@ int main(void) {
 
 	se_gltf_asset *asset = se_gltf_load(gltf_path, NULL);
 
-	printf("gltf_load_example :: loaded '%s'\n", gltf_path);
-	printf("gltf_load_example :: meshes=%zu materials=%zu textures=%zu images=%zu nodes=%zu scenes=%zu\n",
+	printf("14_gltf_load :: loaded '%s'\n", gltf_path);
+	printf("14_gltf_load :: meshes=%zu materials=%zu textures=%zu images=%zu nodes=%zu scenes=%zu\n",
 		asset->meshes.size,
 		asset->materials.size,
 		asset->textures.size,

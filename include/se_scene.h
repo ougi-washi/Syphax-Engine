@@ -157,6 +157,7 @@ extern void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object);
 
 // 3D scene functions
 extern se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
+extern se_scene_3d *se_scene_3d_create_for_window(se_scene_handle *scene_handle, se_window *window, const u16 object_count);
 extern void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio);
 extern void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene);
 #define se_scene_3d_destroy(scene_handle, scene) se_scene_handle_destroy_scene_3d((scene_handle), (scene))
@@ -164,6 +165,7 @@ extern void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *r
 extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
 extern void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object);
+extern se_object_3d *se_scene_3d_add_model(se_scene_handle *scene_handle, se_scene_3d *scene, se_model *model, const s_mat4 *transform);
 extern void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object);
 extern void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera);
 extern void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled);

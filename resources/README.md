@@ -17,4 +17,4 @@ Guidelines:
 - Engine modules should only reference `internal/` assets.
 - Example binaries can reference `public/` and `examples/` assets.
 - Library users should treat `internal/` as unstable implementation detail.
-
+- Shader-based examples should keep shaders in their own `resources/examples/<example_name>/` folder.

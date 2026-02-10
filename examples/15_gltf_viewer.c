@@ -2,7 +2,6 @@
 
 #include "loader/se_loader.h"
 #include "se_camera_controller.h"
-#include "se_input.h"
 
 #include <stdio.h>
 
@@ -34,33 +33,26 @@ int main(void) {
 
 	se_scene_handle* scene_handle = se_scene_handle_create(render_handle, &scene_params);
 	
-	se_scene_3d* scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), scene_params.objects_3d_count);
-
-	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_3d* scene = se_scene_3d_create_for_window(scene_handle, window, scene_params.objects_3d_count);
 	se_scene_3d_set_culling(scene, false);
 
-	se_shader* mesh_shader = se_shader_load(render_handle, SE_RESOURCE_PUBLIC("shaders/gltf_3d_vertex.glsl"), SE_RESOURCE_PUBLIC("shaders/gltf_3d_fragment.glsl"));
+	se_shader* mesh_shader = se_shader_load(render_handle, SE_RESOURCE_EXAMPLE("gltf_viewer/gltf_vertex.glsl"), SE_RESOURCE_EXAMPLE("gltf_viewer/gltf_fragment.glsl"));
 
 	se_texture* default_texture = se_texture_load(render_handle, SE_RESOURCE_EXAMPLE("gltf/Sponza/white.png"), SE_REPEAT);
 
 	sz objects_added = 0;
 	se_gltf_asset* asset = se_gltf_scene_load(render_handle, scene_handle, scene, gltf_path, NULL, mesh_shader, default_texture, SE_REPEAT, &objects_added);
 
-	printf("gltf_viewer_example :: loaded gltf asset, meshes=%zu materials=%zu textures=%zu images=%zu objects=%zu\n",
+	printf("15_gltf_viewer :: loaded gltf asset, meshes=%zu materials=%zu textures=%zu images=%zu objects=%zu\n",
 		asset->meshes.size,
 		asset->materials.size,
 		asset->textures.size,
 		asset->images.size,
 		objects_added);
-	printf("gltf_viewer_example :: added %zu objects\n", objects_added);
+	printf("15_gltf_viewer :: added %zu objects\n", objects_added);
 	se_gltf_scene_fit_camera(scene, asset);
 
-	se_input_params input_params = SE_INPUT_PARAMS_DEFAULTS;
-	input_params.actions_count = 64;
-	se_input* input = se_input_create(&input_params);
-
 	se_camera_controller_params camera_controller_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
-	camera_controller_params.input = input;
 	camera_controller_params.window = window;
 	camera_controller_params.camera = scene->camera;
 	camera_controller_params.movement_speed = 20.f;
@@ -83,13 +75,11 @@ int main(void) {
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
 		se_render_handle_reload_changed_shaders(render_handle);
-		se_input_tick(input, window);
 		se_camera_controller_tick(camera_controller, (f32)se_window_get_delta_time(window));
 		se_scene_3d_draw(scene, render_handle, window);
 	}
 
 	se_camera_controller_destroy(camera_controller);
-	se_input_destroy(input);
 	se_gltf_free(asset);
 	se_scene_handle_destroy(scene_handle);
 	se_render_handle_destroy(render_handle);

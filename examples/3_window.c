@@ -6,7 +6,7 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
-i32 main() {
+i32 main(void) {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Window Example", WIDTH, HEIGHT);
 	se_render_set_background_color(s_vec4(0.5f, 0.5f, 0.5f, 1.0f));

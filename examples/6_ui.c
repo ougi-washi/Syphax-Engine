@@ -33,7 +33,7 @@ void on_button_stop_hovered(void *window, void *data) {
 	color->z = s_max(color->z / 2., 0);
 }
 
-i32 main() {
+i32 main(void) {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
 	se_ui_handle *ui_handle = NULL;

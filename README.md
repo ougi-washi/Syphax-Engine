@@ -30,8 +30,8 @@ make -j
 
 ### Run examples
 ```bash
-./build.sh window_example
-./bin/window_example
+./build.sh 1_hello
+./bin/1_hello
 ```
 
 ### Minimal usage

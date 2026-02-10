@@ -13,24 +13,21 @@ typedef struct {
 	s_vec3 base_position;
 } se_instance_slot;
 
-int main() {
+i32 main(void) {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
-	se_scene_3d *scene = se_scene_3d_create(scene_handle, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), INSTANCE_TOTAL + 4);
-	se_shader *mesh_shader = NULL;
+	se_scene_3d *scene = se_scene_3d_create_for_window(scene_handle, window, INSTANCE_TOTAL + 4);
 	se_model *cube_model = NULL;
 	se_object_3d *cube_field = NULL;
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-	se_scene_3d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
 
-	se_shaders_ptr shader_list = {0};
-	s_array_init(&shader_list, 4);
-	mesh_shader = se_shader_load(render_handle, SE_RESOURCE_PUBLIC("shaders/scene_3d_vertex.glsl"), SE_RESOURCE_PUBLIC("shaders/scene_3d_fragment.glsl"));
-	*s_array_increment(&shader_list) = mesh_shader;
-
-	cube_model = se_model_load_obj(render_handle, SE_RESOURCE_PUBLIC("models/cube.obj"), &shader_list);
+	cube_model = se_model_load_obj_simple(
+		render_handle,
+		SE_RESOURCE_PUBLIC("models/cube.obj"),
+		SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
+		SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"));
 
 	s_mat4 identity = s_mat4_identity;
 	cube_field = se_object_3d_create(scene_handle, cube_model, &identity, INSTANCE_TOTAL);
@@ -76,7 +73,6 @@ int main() {
 		se_scene_3d_draw(scene, render_handle, window);
 	}
 
-	s_array_clear(&shader_list);
 	se_scene_handle_destroy(scene_handle);
 	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);

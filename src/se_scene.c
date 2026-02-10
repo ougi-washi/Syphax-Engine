@@ -629,6 +629,24 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	return new_scene;
 }
 
+se_scene_3d *se_scene_3d_create_for_window(se_scene_handle *scene_handle, se_window *window, const u16 object_count) {
+	if (!scene_handle || !window || object_count == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+
+	const s_vec2 size = s_vec2((f32)window->width, (f32)window->height);
+	se_scene_3d *scene = se_scene_3d_create(scene_handle, &size, object_count);
+	if (!scene) {
+		return NULL;
+	}
+
+	const s_vec2 ratio = s_vec2(1.0f, 1.0f);
+	se_scene_3d_set_auto_resize(scene, window, &ratio);
+	se_set_last_error(SE_RESULT_OK);
+	return scene;
+}
+
 void se_scene_3d_resize_callback(void *window, void *scene) {
 	s_assertf(window, "se_scene_3d_resize_callback :: window is null");
 	s_assertf(scene, "se_scene_3d_resize_callback :: scene is null");
@@ -792,6 +810,29 @@ void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object) {
 	s_assertf(object, "se_scene_3d_add_object :: object is null");
 	printf("se_scene_3d_add_object :: scene: %p, object: %p\n", scene, object);
 	s_array_add(&scene->objects, object);
+}
+
+se_object_3d *se_scene_3d_add_model(se_scene_handle *scene_handle, se_scene_3d *scene, se_model *model, const s_mat4 *transform) {
+	if (!scene_handle || !scene || !model || !transform) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	if (!scene->is_valid) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	if (s_array_get_size(&scene->objects) >= s_array_get_capacity(&scene->objects)) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return NULL;
+	}
+
+	se_object_3d *object = se_object_3d_create(scene_handle, model, transform, 0);
+	if (!object) {
+		return NULL;
+	}
+	se_scene_3d_add_object(scene, object);
+	se_set_last_error(SE_RESULT_OK);
+	return object;
 }
 
 void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object) {

@@ -1084,6 +1084,32 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	return model;
 }
 
+se_model *se_model_load_obj_simple(se_render_handle *render_handle, const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path) {
+	if (!render_handle || !obj_path || !vertex_shader_path || !fragment_shader_path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+
+	se_shader *shader = se_shader_load(render_handle, vertex_shader_path, fragment_shader_path);
+	if (!shader) {
+		return NULL;
+	}
+
+	se_shaders_ptr shaders = {0};
+	s_array_init(&shaders, 1);
+	*s_array_increment(&shaders) = shader;
+
+	se_model *model = se_model_load_obj(render_handle, obj_path, &shaders);
+	s_array_clear(&shaders);
+	if (!model) {
+		se_render_handle_destroy_shader(render_handle, shader);
+		return NULL;
+	}
+
+	se_set_last_error(SE_RESULT_OK);
+	return model;
+}
+
 void se_render_handle_destroy_model(se_render_handle *render_handle, se_model *model) {
 	s_assertf(render_handle, "se_render_handle_destroy_model :: render_handle is null");
 	s_assertf(model, "se_render_handle_destroy_model :: model is null");

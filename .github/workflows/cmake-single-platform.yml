@@ -36,4 +36,4 @@ jobs:
       run: ${{github.workspace}}/build.sh
 
     - name: Test
-      run: ${{github.workspace}}/bin/array_example
+      run: ${{github.workspace}}/bin/2_array

@@ -5,94 +5,60 @@
 
 #include "se_window.h"
 
-#define SE_INPUT_CONTEXT_NAME_LENGTH 32
-#define SE_INPUT_CONTEXT_INVALID (-1)
-
-typedef i32 se_input_context_id;
+#include "syphax/s_array.h"
 
 typedef enum {
-	SE_INPUT_DEVICE_KEY = 0,
-	SE_INPUT_DEVICE_MOUSE_BUTTON,
-	SE_INPUT_DEVICE_MOUSE_DELTA_X,
-	SE_INPUT_DEVICE_MOUSE_DELTA_Y,
-	SE_INPUT_DEVICE_MOUSE_SCROLL_X,
-	SE_INPUT_DEVICE_MOUSE_SCROLL_Y
-} se_input_device;
+	SE_INPUT_DOWN = 0,
+	SE_INPUT_PRESS,
+	SE_INPUT_RELEASE,
+	SE_INPUT_AXIS
+} se_input_state;
 
 typedef enum {
-	SE_INPUT_TRIGGER_DOWN = 0,
-	SE_INPUT_TRIGGER_PRESSED,
-	SE_INPUT_TRIGGER_RELEASED,
-	SE_INPUT_TRIGGER_AXIS
-} se_input_trigger;
+	SE_INPUT_ID_MOUSE_BUTTON_BASE = 1000,
+	SE_INPUT_MOUSE_LEFT = 1000,
+	SE_INPUT_MOUSE_RIGHT,
+	SE_INPUT_MOUSE_MIDDLE,
+	SE_INPUT_MOUSE_BUTTON_4,
+	SE_INPUT_MOUSE_BUTTON_5,
+	SE_INPUT_MOUSE_BUTTON_6,
+	SE_INPUT_MOUSE_BUTTON_7,
+	SE_INPUT_MOUSE_BUTTON_8,
 
-typedef enum {
-	SE_INPUT_AXIS_X = 0,
-	SE_INPUT_AXIS_Y
-} se_input_axis;
+	SE_INPUT_ID_MOUSE_AXIS_BASE = 2000,
+	SE_INPUT_MOUSE_DELTA_X = 2000,
+	SE_INPUT_MOUSE_DELTA_Y,
+	SE_INPUT_MOUSE_SCROLL_X,
+	SE_INPUT_MOUSE_SCROLL_Y
+} se_input_id;
 
-typedef struct {
-	b8 shift : 1;
-	b8 ctrl : 1;
-	b8 alt : 1;
-	b8 super : 1;
-} se_input_modifiers;
+typedef struct se_input_handle se_input_handle;
+typedef void (*se_input_callback)(void* user_data);
 
-#define SE_INPUT_MODIFIERS_NONE ((se_input_modifiers){0})
-#define SE_INPUT_MODIFIERS_SHIFT ((se_input_modifiers){ .shift = true })
-#define SE_INPUT_MODIFIERS_CTRL ((se_input_modifiers){ .ctrl = true })
-#define SE_INPUT_MODIFIERS_ALT ((se_input_modifiers){ .alt = true })
-#define SE_INPUT_MODIFIERS_SUPER ((se_input_modifiers){ .super = true })
+typedef struct se_input_binding {
+	i32 id;
+	se_input_state state;
+	f32 value;
+	se_input_callback callback;
+	void* user_data;
+	b8 is_valid : 1;
+} se_input_binding;
 
-typedef struct {
-	se_input_device device;
-	se_input_trigger trigger;
-	se_input_modifiers modifiers;
-	f32 scale;
-	union {
-		se_key key;
-		se_mouse_button mouse_button;
-	};
-	b8 invert : 1;
-	b8 exact_modifiers : 1;
-} se_input_binding_desc;
+typedef s_array(se_input_binding, se_input_bindings);
 
-#define SE_INPUT_BINDING_DESC_DEFAULTS ((se_input_binding_desc){ .device = SE_INPUT_DEVICE_KEY, .trigger = SE_INPUT_TRIGGER_DOWN, .modifiers = SE_INPUT_MODIFIERS_NONE, .scale = 1.0f, .key = SE_KEY_UNKNOWN, .invert = false, .exact_modifiers = false })
+typedef struct se_input_handle {
+	se_window* window;
+	se_input_bindings bindings;
+	b8 enabled : 1;
+} se_input_handle;
 
-typedef struct {
-	u16 actions_count;
-	u16 contexts_count;
-	u16 bindings_per_action;
-} se_input_params;
-
-#define SE_INPUT_PARAMS_DEFAULTS ((se_input_params){ .actions_count = 64, .contexts_count = 8, .bindings_per_action = 8 })
-
-typedef struct se_input se_input;
-
-extern se_input* se_input_create(const se_input_params* params);
-extern void se_input_destroy(se_input* input);
-extern void se_input_tick(se_input* input, se_window* window);
-
-extern se_input_context_id se_input_context_create(se_input* input, const c8* name, const i32 priority);
-extern b8 se_input_context_destroy(se_input* input, const se_input_context_id context_id);
-extern b8 se_input_set_context_active(se_input* input, const se_input_context_id context_id, const b8 active);
-extern b8 se_input_is_context_active(const se_input* input, const se_input_context_id context_id);
-extern b8 se_input_set_context_priority(se_input* input, const se_input_context_id context_id, const i32 priority);
-extern b8 se_input_context_clear_bindings(se_input* input, const se_input_context_id context_id);
-extern b8 se_input_action_clear_bindings(se_input* input, const se_input_context_id context_id, const u16 action);
-
-extern b8 se_input_bind(se_input* input, const se_input_context_id context_id, const u16 action, const se_input_binding_desc* binding);
-extern b8 se_input_bind_key(se_input* input, const se_input_context_id context_id, const u16 action, const se_key key, const se_input_trigger trigger, const f32 scale, const se_input_modifiers modifiers, const b8 exact_modifiers);
-extern b8 se_input_bind_mouse_button(se_input* input, const se_input_context_id context_id, const u16 action, const se_mouse_button button, const se_input_trigger trigger, const f32 scale, const se_input_modifiers modifiers, const b8 exact_modifiers);
-extern b8 se_input_bind_mouse_delta(se_input* input, const se_input_context_id context_id, const u16 action, const se_input_axis axis, const f32 scale, const se_input_modifiers modifiers, const b8 invert, const b8 exact_modifiers);
-extern b8 se_input_bind_mouse_scroll(se_input* input, const se_input_context_id context_id, const u16 action, const se_input_axis axis, const f32 scale, const se_input_modifiers modifiers, const b8 invert, const b8 exact_modifiers);
-
-extern f32 se_input_get_action_value(const se_input* input, const u16 action);
-extern b8 se_input_is_action_down(const se_input* input, const u16 action);
-extern b8 se_input_is_action_pressed(const se_input* input, const u16 action);
-extern b8 se_input_is_action_released(const se_input* input, const u16 action);
-
-extern u16 se_input_get_actions_count(const se_input* input);
-extern u16 se_input_get_contexts_count(const se_input* input);
+extern se_input_handle* se_input_create(se_window* window, const u16 bindings_capacity);
+extern void se_input_destroy(se_input_handle* input_handle);
+extern b8 se_input_bind(se_input_handle* input_handle, const i32 id, const se_input_state state, se_input_callback callback, void* user_data);
+extern void se_input_unbind_all(se_input_handle* input_handle);
+extern void se_input_set_enabled(se_input_handle* input_handle, const b8 enabled);
+extern b8 se_input_is_enabled(const se_input_handle* input_handle);
+extern void se_input_tick(se_input_handle* input_handle);
+extern f32 se_input_get_value(const se_input_handle* input_handle, const i32 id, const se_input_state state);
 
 #endif // SE_INPUT_H

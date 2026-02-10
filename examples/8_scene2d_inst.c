@@ -7,7 +7,7 @@
 
 #define INSTANCE_COUNT 16
 
-i32 main() {
+i32 main(void) {
 	se_render_handle *render_handle = se_render_handle_create(NULL);
 	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
 	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
@@ -17,7 +17,7 @@ i32 main() {
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	s_mat3 transform = s_mat3_identity;
-	button = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene_2d/button.glsl"), &transform, 16);
+	button = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene2d_inst/instance.glsl"), &transform, 16);
 	se_object_2d_set_position(button, &s_vec2(0.15, 0.));
 	se_object_2d_set_scale(button, &s_vec2(0.1, 0.1));
 	s_mat3 instance_transform = s_mat3_identity;
