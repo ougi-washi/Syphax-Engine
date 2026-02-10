@@ -23,6 +23,10 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->width = width;
 	new_window->height = height;
 	new_window->handle = NULL;
+	new_window->cursor_mode = SE_WINDOW_CURSOR_NORMAL;
+	new_window->raw_mouse_motion_supported = false;
+	new_window->raw_mouse_motion_enabled = false;
+	new_window->should_close = false;
 	new_window->target_fps = 30;
 	new_window->time.current = 0.0;
 	printf("[terminal] window: %s (%u x %u)\n", title, width, height);
@@ -41,6 +45,8 @@ void se_window_update(se_window* window) {
 	memcpy(window->mouse_buttons_prev, window->mouse_buttons, sizeof(window->mouse_buttons));
 	window->mouse_dx = 0.0;
 	window->mouse_dy = 0.0;
+	window->scroll_dx = 0.0;
+	window->scroll_dy = 0.0;
 	window->time.last_frame = window->time.current;
 	window->time.current += 1.0 / (f64)window->target_fps;
 	window->time.delta = window->time.current - window->time.last_frame;
@@ -51,6 +57,10 @@ void se_window_update(se_window* window) {
 void se_window_tick(se_window* window) {
 	se_window_update(window);
 	se_window_poll_events();
+}
+
+void se_window_set_current_context(se_window* window) {
+	(void)window;
 }
 
 void se_window_render_quad(se_window* window) {
@@ -142,6 +152,52 @@ void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_mouse_d
 		return;
 	}
 	*out_mouse_delta = s_vec2((window->mouse_dx / window->width), (window->mouse_dy / window->height));
+}
+
+void se_window_get_scroll_delta(se_window* window, s_vec2* out_scroll_delta) {
+	if (!window || !out_scroll_delta) {
+		return;
+	}
+	*out_scroll_delta = s_vec2(window->scroll_dx, window->scroll_dy);
+}
+
+void se_window_set_cursor_mode(se_window* window, const se_window_cursor_mode mode) {
+	if (!window) {
+		return;
+	}
+	window->cursor_mode = mode;
+}
+
+se_window_cursor_mode se_window_get_cursor_mode(se_window* window) {
+	if (!window) {
+		return SE_WINDOW_CURSOR_NORMAL;
+	}
+	return window->cursor_mode;
+}
+
+b8 se_window_is_raw_mouse_motion_supported(se_window* window) {
+	if (!window) {
+		return false;
+	}
+	return window->raw_mouse_motion_supported;
+}
+
+void se_window_set_raw_mouse_motion(se_window* window, const b8 enabled) {
+	if (!window) {
+		return;
+	}
+	if (!window->raw_mouse_motion_supported) {
+		window->raw_mouse_motion_enabled = false;
+		return;
+	}
+	window->raw_mouse_motion_enabled = enabled;
+}
+
+b8 se_window_is_raw_mouse_motion_enabled(se_window* window) {
+	if (!window) {
+		return false;
+	}
+	return window->raw_mouse_motion_enabled;
 }
 
 b8 se_window_should_close(se_window* window) {

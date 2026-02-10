@@ -76,6 +76,12 @@ static void mouse_button_callback(GLFWwindow* glfw_handle, i32 button, i32 actio
 	}
 }
 
+static void scroll_callback(GLFWwindow* glfw_handle, double xoffset, double yoffset) {
+	se_window* window = (se_window*)glfwGetWindowUserPointer(glfw_handle);
+	window->scroll_dx += xoffset;
+	window->scroll_dy += yoffset;
+}
+
 static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 height) {
 	se_window* window = (se_window*)glfwGetWindowUserPointer(glfw_handle);
 	window->width = width;
@@ -139,6 +145,10 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	
 	new_window->width = width;
 	new_window->height = height;
+	new_window->cursor_mode = SE_WINDOW_CURSOR_NORMAL;
+	new_window->raw_mouse_motion_supported = glfwRawMouseMotionSupported();
+	new_window->raw_mouse_motion_enabled = false;
+	new_window->should_close = false;
 	
 	se_window_set_current_context(new_window);
 	glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, new_window);
@@ -148,6 +158,7 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	glfwSetKeyCallback((GLFWwindow*)new_window->handle, key_callback);
 	glfwSetCursorPosCallback((GLFWwindow*)new_window->handle, mouse_callback);
 	glfwSetMouseButtonCallback((GLFWwindow*)new_window->handle, mouse_button_callback);
+	glfwSetScrollCallback((GLFWwindow*)new_window->handle, scroll_callback);
 	glfwSetFramebufferSizeCallback((GLFWwindow*)new_window->handle, framebuffer_size_callback);
 	
 	se_render_init();
@@ -181,6 +192,8 @@ extern void se_window_update(se_window* window) {
 	memcpy(window->mouse_buttons_prev, window->mouse_buttons, sizeof(window->mouse_buttons));
 	window->mouse_dx = 0.0;
 	window->mouse_dy = 0.0;
+	window->scroll_dx = 0.0;
+	window->scroll_dy = 0.0;
 	window->time.last_frame = window->time.current;
 	window->time.current = glfwGetTime();
 	window->time.delta = window->time.current - window->time.last_frame;
@@ -351,6 +364,51 @@ void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_mouse_d
 	s_assertf(window, "se_window_get_mouse_delta_normalized :: window is null");
 	s_assertf(out_mouse_delta, "se_window_get_mouse_delta_normalized :: out_mouse_delta is null");
 	*out_mouse_delta = s_vec2((window->mouse_dx / window->width), (window->mouse_dy / window->height));
+}
+
+void se_window_get_scroll_delta(se_window* window, s_vec2* out_scroll_delta) {
+	s_assertf(window, "se_window_get_scroll_delta :: window is null");
+	s_assertf(out_scroll_delta, "se_window_get_scroll_delta :: out_scroll_delta is null");
+	*out_scroll_delta = s_vec2(window->scroll_dx, window->scroll_dy);
+}
+
+void se_window_set_cursor_mode(se_window* window, const se_window_cursor_mode mode) {
+	s_assertf(window, "se_window_set_cursor_mode :: window is null");
+	i32 glfw_mode = GLFW_CURSOR_NORMAL;
+	switch (mode) {
+		case SE_WINDOW_CURSOR_NORMAL: glfw_mode = GLFW_CURSOR_NORMAL; break;
+		case SE_WINDOW_CURSOR_HIDDEN: glfw_mode = GLFW_CURSOR_HIDDEN; break;
+		case SE_WINDOW_CURSOR_DISABLED: glfw_mode = GLFW_CURSOR_DISABLED; break;
+		default: glfw_mode = GLFW_CURSOR_NORMAL; break;
+	}
+	glfwSetInputMode((GLFWwindow*)window->handle, GLFW_CURSOR, glfw_mode);
+	window->cursor_mode = mode;
+}
+
+se_window_cursor_mode se_window_get_cursor_mode(se_window* window) {
+	s_assertf(window, "se_window_get_cursor_mode :: window is null");
+	return window->cursor_mode;
+}
+
+b8 se_window_is_raw_mouse_motion_supported(se_window* window) {
+	s_assertf(window, "se_window_is_raw_mouse_motion_supported :: window is null");
+	return window->raw_mouse_motion_supported;
+}
+
+void se_window_set_raw_mouse_motion(se_window* window, const b8 enabled) {
+	s_assertf(window, "se_window_set_raw_mouse_motion :: window is null");
+	if (!window->raw_mouse_motion_supported) {
+		window->raw_mouse_motion_enabled = false;
+		return;
+	}
+	const i32 glfw_enabled = enabled ? GLFW_TRUE : GLFW_FALSE;
+	glfwSetInputMode((GLFWwindow*)window->handle, GLFW_RAW_MOUSE_MOTION, glfw_enabled);
+	window->raw_mouse_motion_enabled = enabled;
+}
+
+b8 se_window_is_raw_mouse_motion_enabled(se_window* window) {
+	s_assertf(window, "se_window_is_raw_mouse_motion_enabled :: window is null");
+	return window->raw_mouse_motion_enabled;
 }
 
 b8 se_window_should_close(se_window* window) {

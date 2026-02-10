@@ -156,6 +156,12 @@ typedef enum {
 	SE_MOUSE_BUTTON_COUNT = 8
 } se_mouse_button;
 
+typedef enum {
+	SE_WINDOW_CURSOR_NORMAL = 0,
+	SE_WINDOW_CURSOR_HIDDEN,
+	SE_WINDOW_CURSOR_DISABLED
+} se_window_cursor_mode;
+
 typedef void (*se_input_event_callback)(void* window, void* data); // Data is a ptr for the user to store/pass data. Handle it carefully.
 typedef struct {
 	i32 id;
@@ -186,8 +192,13 @@ typedef struct {
 	b8 keys_prev[SE_KEY_COUNT];
 	f64 mouse_x, mouse_y;
 	f64 mouse_dx, mouse_dy;
+	f64 scroll_dx, scroll_dy;
 	b8 mouse_buttons[8];
 	b8 mouse_buttons_prev[8];
+	se_window_cursor_mode cursor_mode;
+	b8 raw_mouse_motion_supported : 1;
+	b8 raw_mouse_motion_enabled : 1;
+	b8 should_close : 1;
 
 	se_quad quad;
 	se_shader* shader;
@@ -226,6 +237,12 @@ extern f32 se_window_get_mouse_position_y(se_window* window);
 extern void se_window_get_mouse_position_normalized(se_window* window, s_vec2* out_mouse_position);
 extern void se_window_get_mouse_delta(se_window* window, s_vec2* out_mouse_delta);
 extern void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_mouse_delta);
+extern void se_window_get_scroll_delta(se_window* window, s_vec2* out_scroll_delta);
+extern void se_window_set_cursor_mode(se_window* window, const se_window_cursor_mode mode);
+extern se_window_cursor_mode se_window_get_cursor_mode(se_window* window);
+extern b8 se_window_is_raw_mouse_motion_supported(se_window* window);
+extern void se_window_set_raw_mouse_motion(se_window* window, const b8 enabled);
+extern b8 se_window_is_raw_mouse_motion_enabled(se_window* window);
 extern b8 se_window_should_close(se_window* window);
 extern void se_window_set_should_close(se_window* window, const b8 should_close);
 extern void se_window_set_exit_keys(se_window* window, se_key_combo* keys);
