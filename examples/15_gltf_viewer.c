@@ -13,12 +13,9 @@ int main(void) {
 	se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, SE_RESOURCE_EXAMPLE("gltf/Sponza/Sponza.gltf"));
 
 	se_render_handle_params render_params = SE_RENDER_HANDLE_PARAMS_DEFAULTS;
-	render_params.framebuffers_count = 4;
-	render_params.render_buffers_count = 2;
-	render_params.textures_count = 512;
+	render_params.textures_count = 128;
 	render_params.shaders_count = 96;
-	render_params.models_count = 512;
-	render_params.cameras_count = 2;
+	render_params.models_count = 128;
 
 	se_render_handle* render_handle = se_render_handle_create(&render_params);
 
@@ -72,15 +69,10 @@ int main(void) {
 	printf("15_gltf_viewer :: added %zu objects\n", objects_added);
 	se_gltf_scene_fit_camera(scene, asset);
 
-	f32 base_speed = 180.0f;
-	f32 fast_speed = 420.0f;
-	se_gltf_scene_get_navigation_speeds(asset, &base_speed, &fast_speed);
-	(void)fast_speed;
-
 	se_camera_controller_params camera_controller_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
 	camera_controller_params.window = window;
 	camera_controller_params.camera = scene->camera;
-	camera_controller_params.movement_speed = base_speed;
+	camera_controller_params.movement_speed = 10.;
 	camera_controller_params.mouse_x_speed = 0.01f;
 	camera_controller_params.mouse_y_speed = 0.01f;
 	camera_controller_params.preset = SE_CAMERA_CONTROLLER_PRESET_UE;
