@@ -6,7 +6,7 @@ Simple, fast, and lightweight 2D/3D engine in C.
 - Render-to-texture and post-processing
 - Window + input helpers
 - Text and UI
-- glTF loading and audio playback/capture
+- Audio playback/capture
 
 ### Requirements
 - CMake 3.22+
