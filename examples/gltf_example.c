@@ -12,7 +12,7 @@
 
 int main() {
 	char gltf_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!s_path_join(gltf_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, "examples/gltf/Sponza/Sponza.gltf")) {
+	if (!se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, "examples/gltf/Sponza/Sponza.gltf")) {
 		printf("gltf_example :: failed to build gltf path\n");
 		return 1;
 	}

@@ -745,7 +745,7 @@ static char* se_audio_resolve_resource_path(const char* relative_path, char* out
 	if (!relative_path || !out_path || path_size == 0) {
 		return NULL;
 	}
-	if (!s_path_join(out_path, path_size, RESOURCES_DIR, relative_path)) {
+	if (!se_paths_resolve_resource_path(out_path, path_size, relative_path)) {
 		fprintf(stderr, "se_audio :: path too long for %s\n", relative_path);
 		return NULL;
 	}

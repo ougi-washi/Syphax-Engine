@@ -72,7 +72,7 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	strcpy(new_font->path, path);
 
 	c8 new_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!s_path_join(new_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, path)) {
+	if (!se_paths_resolve_resource_path(new_path, SE_MAX_PATH_LENGTH, path)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}

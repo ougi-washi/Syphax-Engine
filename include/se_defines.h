@@ -3,9 +3,11 @@
 #ifndef SE_DEFINES_H
 #define SE_DEFINES_H
 
+#include "syphax/s_types.h"
+
 #define SE_MAX_PATH_LENGTH 256
 #ifndef RESOURCES_DIR
-#	error "RESOURCES_DIR not defined!"
+#	define RESOURCES_DIR "resources/"
 #endif
 
 typedef enum {
@@ -22,5 +24,9 @@ typedef enum {
 extern const char* se_result_str(se_result result);
 extern se_result se_get_last_error(void);
 extern void se_set_last_error(se_result result);
+
+extern void se_paths_set_resource_root(const char* path);
+extern const char* se_paths_get_resource_root(void);
+extern b8 se_paths_resolve_resource_path(char* out_path, sz out_path_size, const char* path);
 
 #endif // SE_DEFINES_H

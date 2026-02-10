@@ -45,7 +45,7 @@ add_subdirectory(${LIB_DIR}/miniaudio)
 # setup library macro
 macro(setup_library arg_lib_name arg_source_path arg_include_path)
 	message(STATUS "Adding ${arg_lib_name}")
-	file(GLOB CURRENT_SRC_FILES	"${arg_source_path}/*.c" 
+	file(GLOB CURRENT_SRC_FILES CONFIGURE_DEPENDS	"${arg_source_path}/*.c" 
 					"${arg_source_path}/*.cpp"
 					"${arg_source_path}/**/*.c" 
 					"${arg_source_path}/**/*.cpp")
@@ -75,7 +75,7 @@ macro(setup_executable arg_exec_dir arg_exec_name modules)
     set_target_properties(${arg_exec_name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR})
 endmacro()
 
-file(GLOB EXAMPLES 	"${EXAMPLES_DIR}/*.c" 
+file(GLOB EXAMPLES CONFIGURE_DEPENDS 	"${EXAMPLES_DIR}/*.c" 
 			"${EXAMPLES_DIR}/*.cpp"
 			"${EXAMPLES_DIR}/**/*.c" 
 			"${EXAMPLES_DIR}/**/*.cpp")

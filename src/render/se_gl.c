@@ -406,7 +406,7 @@ se_texture *se_texture_load(se_render_handle *render_handle, const char *file_pa
 	memset(texture, 0, sizeof(*texture));
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, file_path)) {
+	if (!se_paths_resolve_resource_path(full_path, SE_MAX_PATH_LENGTH, file_path)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -580,7 +580,7 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 
 	// make path absolute
 	if (strlen(vertex_file_path) > 0) {
-		if (!s_path_join(new_shader->vertex_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, vertex_file_path)) {
+		if (!se_paths_resolve_resource_path(new_shader->vertex_path, SE_MAX_PATH_LENGTH, vertex_file_path)) {
 			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 			return NULL;
 		}
@@ -589,7 +589,7 @@ se_shader *se_shader_load(se_render_handle *render_handle, const char *vertex_fi
 	}
 
 	if (strlen(fragment_file_path) > 0) {
-		if (!s_path_join(new_shader->fragment_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, fragment_file_path)) {
+		if (!se_paths_resolve_resource_path(new_shader->fragment_path, SE_MAX_PATH_LENGTH, fragment_file_path)) {
 			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 			return NULL;
 		}
@@ -880,7 +880,7 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	s_array_init(&model->meshes, 64);
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, RESOURCES_DIR, path)) {
+	if (!se_paths_resolve_resource_path(full_path, SE_MAX_PATH_LENGTH, path)) {
 		se_model_cleanup(model);
 		memset(model, 0, sizeof(*model));
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
