@@ -112,36 +112,64 @@ static b8 se_loader_path_is_absolute(const char *path) {
 	return false;
 }
 
-static b8 se_gltf_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices, u32 vertex_count, u32 index_count) {
-	if (mesh == NULL || vertices == NULL || indices == NULL || vertex_count == 0 || index_count == 0) {
+static b8 se_loader_mesh_data_flags_are_valid(const se_mesh_data_flags mesh_data_flags) {
+	const se_mesh_data_flags supported_flags = (se_mesh_data_flags)(SE_MESH_DATA_CPU | SE_MESH_DATA_GPU);
+	if ((mesh_data_flags & supported_flags) == 0) {
+		return false;
+	}
+	if ((mesh_data_flags & ~supported_flags) != 0) {
+		return false;
+	}
+	return true;
+}
+
+static b8 se_gltf_mesh_set_source_path(se_mesh *mesh, const char *source_path) {
+	if (mesh == NULL) {
 		return false;
 	}
 
-	mesh->vertices = malloc(vertex_count * sizeof(se_vertex_3d));
-	mesh->indices = malloc(index_count * sizeof(u32));
-	if (mesh->vertices == NULL || mesh->indices == NULL) {
-		free(mesh->vertices);
-		free(mesh->indices);
-		mesh->vertices = NULL;
-		mesh->indices = NULL;
+	s_array_clear(&mesh->cpu.file_path);
+	if (source_path == NULL || source_path[0] == '\0') {
+		return true;
+	}
+
+	const sz source_path_size = strlen(source_path) + 1;
+	s_array_init(&mesh->cpu.file_path, source_path_size);
+	for (sz i = 0; i < source_path_size; i++) {
+		*s_array_increment(&mesh->cpu.file_path) = source_path[i];
+	}
+
+	return true;
+}
+
+static b8 se_gltf_mesh_create_gpu_data(se_mesh *mesh) {
+	if (mesh == NULL || s_array_get_size(&mesh->cpu.vertices) == 0 || s_array_get_size(&mesh->cpu.indices) == 0) {
 		return false;
 	}
 
-	memcpy(mesh->vertices, vertices, vertex_count * sizeof(se_vertex_3d));
-	memcpy(mesh->indices, indices, index_count * sizeof(u32));
-	mesh->vertex_count = vertex_count;
-	mesh->index_count = index_count;
-	mesh->matrix = s_mat4_identity;
-	mesh->shader = NULL;
+	const se_vertex_3d *vertices = s_array_get(&mesh->cpu.vertices, 0);
+	const u32 *indices = s_array_get(&mesh->cpu.indices, 0);
+	const u32 vertex_count = (u32)s_array_get_size(&mesh->cpu.vertices);
+	const u32 index_count = (u32)s_array_get_size(&mesh->cpu.indices);
 
-	glGenVertexArrays(1, &mesh->vao);
-	glGenBuffers(1, &mesh->vbo);
-	glGenBuffers(1, &mesh->ebo);
-	glBindVertexArray(mesh->vao);
-	glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
-	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(se_vertex_3d), mesh->vertices, GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), mesh->indices, GL_STATIC_DRAW);
+	glGenVertexArrays(1, &mesh->gpu.vao);
+	glGenBuffers(1, &mesh->gpu.vbo);
+	glGenBuffers(1, &mesh->gpu.ebo);
+	if (mesh->gpu.vao == 0 || mesh->gpu.vbo == 0 || mesh->gpu.ebo == 0) {
+		if (mesh->gpu.vao != 0) glDeleteVertexArrays(1, &mesh->gpu.vao);
+		if (mesh->gpu.vbo != 0) glDeleteBuffers(1, &mesh->gpu.vbo);
+		if (mesh->gpu.ebo != 0) glDeleteBuffers(1, &mesh->gpu.ebo);
+		mesh->gpu.vao = 0;
+		mesh->gpu.vbo = 0;
+		mesh->gpu.ebo = 0;
+		return false;
+	}
+
+	glBindVertexArray(mesh->gpu.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->gpu.vbo);
+	glBufferData(GL_ARRAY_BUFFER, (sz)vertex_count * sizeof(se_vertex_3d), vertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->gpu.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sz)index_count * sizeof(u32), indices, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)0);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)offsetof(se_vertex_3d, normal));
@@ -150,16 +178,56 @@ static b8 se_gltf_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indi
 	glEnableVertexAttribArray(2);
 	glBindVertexArray(0);
 
+	mesh->gpu.vertex_count = vertex_count;
+	mesh->gpu.index_count = index_count;
+	mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags | SE_MESH_DATA_GPU);
+	return true;
+}
+
+static b8 se_gltf_mesh_finalize(se_mesh *mesh, const char *source_path, const se_mesh_data_flags mesh_data_flags) {
+	if (mesh == NULL || !se_loader_mesh_data_flags_are_valid(mesh_data_flags)) {
+		return false;
+	}
+	if (s_array_get_size(&mesh->cpu.vertices) == 0 || s_array_get_size(&mesh->cpu.indices) == 0) {
+		return false;
+	}
+
+	mesh->matrix = s_mat4_identity;
+	mesh->shader = NULL;
+	mesh->gpu.vertex_count = (u32)s_array_get_size(&mesh->cpu.vertices);
+	mesh->gpu.index_count = (u32)s_array_get_size(&mesh->cpu.indices);
+
+	if ((mesh_data_flags & SE_MESH_DATA_GPU) != 0 && !se_gltf_mesh_create_gpu_data(mesh)) {
+		se_mesh_discard_cpu_data(mesh);
+		return false;
+	}
+
+	if ((mesh_data_flags & SE_MESH_DATA_CPU) != 0) {
+		if (!se_gltf_mesh_set_source_path(mesh, source_path)) {
+			if (mesh->gpu.vao != 0) glDeleteVertexArrays(1, &mesh->gpu.vao);
+			if (mesh->gpu.vbo != 0) glDeleteBuffers(1, &mesh->gpu.vbo);
+			if (mesh->gpu.ebo != 0) glDeleteBuffers(1, &mesh->gpu.ebo);
+			mesh->gpu = (se_mesh_gpu_data){0};
+			mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags & ~SE_MESH_DATA_GPU);
+			se_mesh_discard_cpu_data(mesh);
+			return false;
+		}
+		mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags | SE_MESH_DATA_CPU);
+	} else {
+		se_mesh_discard_cpu_data(mesh);
+	}
+
 	return true;
 }
 
 static void se_gltf_mesh_release(se_mesh *mesh) {
 	if (mesh == NULL) return;
-	if (mesh->vao != 0) glDeleteVertexArrays(1, &mesh->vao);
-	if (mesh->vbo != 0) glDeleteBuffers(1, &mesh->vbo);
-	if (mesh->ebo != 0) glDeleteBuffers(1, &mesh->ebo);
-	free(mesh->vertices);
-	free(mesh->indices);
+	if (mesh->gpu.vao != 0) glDeleteVertexArrays(1, &mesh->gpu.vao);
+	if (mesh->gpu.vbo != 0) glDeleteBuffers(1, &mesh->gpu.vbo);
+	if (mesh->gpu.ebo != 0) glDeleteBuffers(1, &mesh->gpu.ebo);
+	se_mesh_discard_cpu_data(mesh);
+	mesh->gpu = (se_mesh_gpu_data){0};
+	mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags & ~SE_MESH_DATA_GPU);
 	memset(mesh, 0, sizeof(*mesh));
 }
 
@@ -704,8 +772,8 @@ static b8 se_gltf_add_mesh_objects_fallback(se_gltf_scene_build_context *ctx) {
 	return true;
 }
 
-se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index) {
-	if (render_handle == NULL || asset == NULL) {
+se_model *se_gltf_model_load_ex(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags) {
+	if (render_handle == NULL || asset == NULL || !se_loader_mesh_data_flags_are_valid(mesh_data_flags)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -729,8 +797,6 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 	s_array_init(&model->meshes, mesh->primitives.size);
 
 	se_result error = SE_RESULT_IO;
-	se_vertex_3d *tmp_vertices = NULL;
-	u32 *tmp_indices = NULL;
 
 	for (sz i = 0; i < mesh->primitives.size; i++) {
 		se_gltf_primitive *prim = s_array_get(&mesh->primitives, i);
@@ -767,18 +833,17 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 			goto fail;
 		}
 
-		tmp_vertices = (se_vertex_3d *)malloc(sizeof(se_vertex_3d) * vertex_count);
-		if (tmp_vertices == NULL) {
-			error = SE_RESULT_OUT_OF_MEMORY;
-			goto fail;
-		}
+		se_mesh *out_mesh = s_array_increment(&model->meshes);
+		memset(out_mesh, 0, sizeof(*out_mesh));
+		s_array_init(&out_mesh->cpu.vertices, vertex_count);
 
 		for (u32 v = 0; v < vertex_count; v++) {
 			const u8 *ptr = pos_view.data + ((sz)v * pos_view.stride);
 			const f32 *fptr = (const f32 *)ptr;
-			tmp_vertices[v].position = s_vec3(fptr[0], fptr[1], fptr[2]);
-			tmp_vertices[v].normal = s_vec3(0.0f, 0.0f, 1.0f);
-			tmp_vertices[v].uv = s_vec2(0.0f, 0.0f);
+			se_vertex_3d *new_vertex = s_array_increment(&out_mesh->cpu.vertices);
+			new_vertex->position = s_vec3(fptr[0], fptr[1], fptr[2]);
+			new_vertex->normal = s_vec3(0.0f, 0.0f, 1.0f);
+			new_vertex->uv = s_vec2(0.0f, 0.0f);
 		}
 
 		if (norm_attr != NULL) {
@@ -805,7 +870,8 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 			for (u32 v = 0; v < vertex_count; v++) {
 				const u8 *ptr = normal_view.data + ((sz)v * normal_view.stride);
 				const f32 *fptr = (const f32 *)ptr;
-				tmp_vertices[v].normal = s_vec3(fptr[0], fptr[1], fptr[2]);
+				se_vertex_3d *current_vertex = s_array_get(&out_mesh->cpu.vertices, v);
+				current_vertex->normal = s_vec3(fptr[0], fptr[1], fptr[2]);
 			}
 		}
 
@@ -833,7 +899,8 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 			for (u32 v = 0; v < vertex_count; v++) {
 				const u8 *ptr = uv_view.data + ((sz)v * uv_view.stride);
 				const f32 *fptr = (const f32 *)ptr;
-				tmp_vertices[v].uv = s_vec2(fptr[0], fptr[1]);
+				se_vertex_3d *current_vertex = s_array_get(&out_mesh->cpu.vertices, v);
+				current_vertex->uv = s_vec2(fptr[0], fptr[1]);
 			}
 		}
 
@@ -866,11 +933,7 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 				goto fail;
 			}
 
-			tmp_indices = (u32 *)malloc(sizeof(u32) * index_count);
-			if (tmp_indices == NULL) {
-				error = SE_RESULT_OUT_OF_MEMORY;
-				goto fail;
-			}
+			s_array_init(&out_mesh->cpu.indices, index_count);
 
 			for (u32 idx = 0; idx < index_count; idx++) {
 				const u8 *ptr = idx_view.data + ((sz)idx * idx_view.stride);
@@ -882,30 +945,19 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 					error = SE_RESULT_IO;
 					goto fail;
 				}
-				tmp_indices[idx] = value;
+				*s_array_increment(&out_mesh->cpu.indices) = value;
 			}
 		} else {
-			tmp_indices = (u32 *)malloc(sizeof(u32) * index_count);
-			if (tmp_indices == NULL) {
-				error = SE_RESULT_OUT_OF_MEMORY;
-				goto fail;
-			}
+			s_array_init(&out_mesh->cpu.indices, index_count);
 			for (u32 idx = 0; idx < index_count; idx++) {
-				tmp_indices[idx] = idx;
+				*s_array_increment(&out_mesh->cpu.indices) = idx;
 			}
 		}
 
-		se_mesh *out_mesh = s_array_increment(&model->meshes);
-		memset(out_mesh, 0, sizeof(*out_mesh));
-		if (!se_gltf_mesh_finalize(out_mesh, tmp_vertices, tmp_indices, vertex_count, index_count)) {
+		if (!se_gltf_mesh_finalize(out_mesh, asset->source_path, mesh_data_flags)) {
 			error = SE_RESULT_OUT_OF_MEMORY;
 			goto fail;
 		}
-
-		free(tmp_vertices);
-		tmp_vertices = NULL;
-		free(tmp_indices);
-		tmp_indices = NULL;
 	}
 
 	model->is_valid = true;
@@ -913,11 +965,13 @@ se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asse
 	return model;
 
 fail:
-	free(tmp_vertices);
-	free(tmp_indices);
 	se_gltf_model_rollback(render_handle, model);
 	se_set_last_error(error);
 	return NULL;
+}
+
+se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index) {
+	return se_gltf_model_load_ex(render_handle, asset, mesh_index, SE_MESH_DATA_GPU);
 }
 
 se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap) {

@@ -782,6 +782,199 @@ void se_mesh_scale(se_mesh *mesh, const s_vec3 *v) {
     s_mat4_scale(&mesh->matrix, v);
 }
 
+static b8 se_mesh_data_flags_are_valid(const se_mesh_data_flags mesh_data_flags) {
+	const se_mesh_data_flags supported_flags = (se_mesh_data_flags)(SE_MESH_DATA_CPU | SE_MESH_DATA_GPU);
+	if ((mesh_data_flags & supported_flags) == 0) {
+		return false;
+	}
+	if ((mesh_data_flags & ~supported_flags) != 0) {
+		return false;
+	}
+	return true;
+}
+
+b8 se_mesh_has_cpu_data(const se_mesh *mesh) {
+	if (mesh == NULL) {
+		return false;
+	}
+	return (mesh->data_flags & SE_MESH_DATA_CPU) != 0;
+}
+
+b8 se_mesh_has_gpu_data(const se_mesh *mesh) {
+	if (mesh == NULL) {
+		return false;
+	}
+	if ((mesh->data_flags & SE_MESH_DATA_GPU) == 0) {
+		return false;
+	}
+	return mesh->gpu.vao != 0 && mesh->gpu.vbo != 0 && mesh->gpu.ebo != 0;
+}
+
+void se_mesh_discard_cpu_data(se_mesh *mesh) {
+	s_assertf(mesh, "se_mesh_discard_cpu_data :: mesh is null");
+	s_array_clear(&mesh->cpu.file_path);
+	s_array_clear(&mesh->cpu.vertices);
+	s_array_clear(&mesh->cpu.indices);
+	mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags & ~SE_MESH_DATA_CPU);
+}
+
+void se_model_discard_cpu_data(se_model *model) {
+	s_assertf(model, "se_model_discard_cpu_data :: model is null");
+	s_foreach(&model->meshes, i) {
+		se_mesh *mesh = s_array_get(&model->meshes, i);
+		se_mesh_discard_cpu_data(mesh);
+	}
+}
+
+static void se_mesh_release_gpu_data(se_mesh *mesh) {
+	if (mesh == NULL) {
+		return;
+	}
+	if (mesh->gpu.vao != 0) {
+		glDeleteVertexArrays(1, &mesh->gpu.vao);
+		mesh->gpu.vao = 0;
+	}
+	if (mesh->gpu.vbo != 0) {
+		glDeleteBuffers(1, &mesh->gpu.vbo);
+		mesh->gpu.vbo = 0;
+	}
+	if (mesh->gpu.ebo != 0) {
+		glDeleteBuffers(1, &mesh->gpu.ebo);
+		mesh->gpu.ebo = 0;
+	}
+	mesh->gpu.vertex_count = 0;
+	mesh->gpu.index_count = 0;
+	mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags & ~SE_MESH_DATA_GPU);
+}
+
+static b8 se_mesh_cpu_reserve_vertices(se_mesh_cpu_data *cpu, const u32 needed) {
+	if (cpu == NULL) {
+		return false;
+	}
+	if ((sz)needed <= s_array_get_capacity(&cpu->vertices)) {
+		return true;
+	}
+
+	u32 new_capacity = s_array_get_capacity(&cpu->vertices) > 0 ? (u32)s_array_get_capacity(&cpu->vertices) : 64;
+	while (new_capacity < needed) {
+		u32 next_capacity = new_capacity * 2;
+		if (next_capacity < new_capacity) {
+			new_capacity = needed;
+			break;
+		}
+		new_capacity = next_capacity;
+	}
+
+	s_array(se_vertex_3d, grown_vertices) = {0};
+	s_array_init(&grown_vertices, new_capacity);
+	s_foreach(&cpu->vertices, i) {
+		*s_array_increment(&grown_vertices) = *s_array_get(&cpu->vertices, i);
+	}
+	s_array_clear(&cpu->vertices);
+	s_array_init(&cpu->vertices, new_capacity);
+	s_foreach(&grown_vertices, i) {
+		*s_array_increment(&cpu->vertices) = *s_array_get(&grown_vertices, i);
+	}
+	s_array_clear(&grown_vertices);
+	return true;
+}
+
+static b8 se_mesh_cpu_reserve_indices(se_mesh_cpu_data *cpu, const u32 needed) {
+	if (cpu == NULL) {
+		return false;
+	}
+	if ((sz)needed <= s_array_get_capacity(&cpu->indices)) {
+		return true;
+	}
+
+	u32 new_capacity = s_array_get_capacity(&cpu->indices) > 0 ? (u32)s_array_get_capacity(&cpu->indices) : 64;
+	while (new_capacity < needed) {
+		u32 next_capacity = new_capacity * 2;
+		if (next_capacity < new_capacity) {
+			new_capacity = needed;
+			break;
+		}
+		new_capacity = next_capacity;
+	}
+
+	s_array(u32, grown_indices) = {0};
+	s_array_init(&grown_indices, new_capacity);
+	s_foreach(&cpu->indices, i) {
+		*s_array_increment(&grown_indices) = *s_array_get(&cpu->indices, i);
+	}
+	s_array_clear(&cpu->indices);
+	s_array_init(&cpu->indices, new_capacity);
+	s_foreach(&grown_indices, i) {
+		*s_array_increment(&cpu->indices) = *s_array_get(&grown_indices, i);
+	}
+	s_array_clear(&grown_indices);
+	return true;
+}
+
+static b8 se_mesh_cpu_set_file_path(se_mesh_cpu_data *cpu, const char *source_path) {
+	if (cpu == NULL) {
+		return false;
+	}
+
+	s_array_clear(&cpu->file_path);
+	if (source_path == NULL || source_path[0] == '\0') {
+		return true;
+	}
+
+	const sz source_path_size = strlen(source_path) + 1;
+	s_array_init(&cpu->file_path, source_path_size);
+	for (sz i = 0; i < source_path_size; i++) {
+		*s_array_increment(&cpu->file_path) = source_path[i];
+	}
+
+	return true;
+}
+
+static b8 se_mesh_create_gpu_data(se_mesh *mesh,
+							const se_vertex_3d *vertices,
+							const u32 *indices,
+							const u32 vertex_count,
+							const u32 index_count) {
+	s_assertf(mesh, "se_mesh_create_gpu_data :: mesh is null");
+
+	if (vertex_count == 0 || index_count == 0 || vertices == NULL || indices == NULL) {
+		return false;
+	}
+
+	glGenVertexArrays(1, &mesh->gpu.vao);
+	glGenBuffers(1, &mesh->gpu.vbo);
+	glGenBuffers(1, &mesh->gpu.ebo);
+
+	if (mesh->gpu.vao == 0 || mesh->gpu.vbo == 0 || mesh->gpu.ebo == 0) {
+		se_mesh_release_gpu_data(mesh);
+		return false;
+	}
+
+	glBindVertexArray(mesh->gpu.vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->gpu.vbo);
+	glBufferData(GL_ARRAY_BUFFER, (sz)vertex_count * sizeof(se_vertex_3d), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->gpu.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sz)index_count * sizeof(u32), indices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)0);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)offsetof(se_vertex_3d, normal));
+	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)offsetof(se_vertex_3d, uv));
+	glEnableVertexAttribArray(2);
+
+	glBindVertexArray(0);
+
+	mesh->gpu.vertex_count = vertex_count;
+	mesh->gpu.index_count = index_count;
+	mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags | SE_MESH_DATA_GPU);
+	return true;
+}
+
 static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_size, const char *label) {
 	if (needed <= *capacity) {
 		return true;
@@ -809,54 +1002,56 @@ static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_siz
 }
 
 // Helper function to finalize a mesh
-static void se_mesh_finalize(se_mesh *mesh, se_vertex_3d *vertices, u32 *indices, u32 vertex_count, u32 index_count, se_shaders_ptr *shaders, u32 se_mesh_index) {
-	// Allocate mesh data
-	mesh->vertices = malloc(vertex_count * sizeof(se_vertex_3d));
-	mesh->indices = malloc(index_count * sizeof(u32));
-	memcpy(mesh->vertices, vertices, vertex_count * sizeof(se_vertex_3d));
-	memcpy(mesh->indices, indices, index_count * sizeof(u32));
-	mesh->vertex_count = vertex_count;
-	mesh->index_count = index_count;
-	mesh->matrix = s_mat4_identity;
-
-	// Assign shader (cycle through available shaders)
-	if (s_array_get_size(shaders) > 0) {
-	mesh->shader = *s_array_get(shaders, se_mesh_index % s_array_get_size(shaders));
-	} else {
-	mesh->shader = NULL;
-	fprintf(stderr, "No shaders provided for mesh %u\n", se_mesh_index);
+static b8 se_mesh_finalize(se_mesh *mesh,
+						   const char *source_path,
+						   se_shaders_ptr *shaders,
+						   const u32 se_mesh_index,
+						   const se_mesh_data_flags mesh_data_flags) {
+	if (mesh == NULL) {
+		return false;
+	}
+	if (!se_mesh_data_flags_are_valid(mesh_data_flags)) {
+		return false;
 	}
 
-	// Create OpenGL objects
-	glGenVertexArrays(1, &mesh->vao);
-	glGenBuffers(1, &mesh->vbo);
-	glGenBuffers(1, &mesh->ebo);
+	if (s_array_get_size(&mesh->cpu.vertices) == 0 || s_array_get_size(&mesh->cpu.indices) == 0) {
+		return false;
+	}
 
-	glBindVertexArray(mesh->vao);
+	mesh->matrix = s_mat4_identity;
+	mesh->gpu.vertex_count = (u32)s_array_get_size(&mesh->cpu.vertices);
+	mesh->gpu.index_count = (u32)s_array_get_size(&mesh->cpu.indices);
 
-	glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
-	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(se_vertex_3d), mesh->vertices, GL_STATIC_DRAW);
+	if (shaders != NULL && s_array_get_size(shaders) > 0) {
+		mesh->shader = *s_array_get(shaders, se_mesh_index % s_array_get_size(shaders));
+	} else {
+		mesh->shader = NULL;
+	}
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), mesh->indices, GL_STATIC_DRAW);
+	const se_vertex_3d *vertices = s_array_get(&mesh->cpu.vertices, 0);
+	const u32 *indices = s_array_get(&mesh->cpu.indices, 0);
+	if ((mesh_data_flags & SE_MESH_DATA_GPU) != 0 && !se_mesh_create_gpu_data(mesh, vertices, indices, mesh->gpu.vertex_count, mesh->gpu.index_count)) {
+		se_mesh_release_gpu_data(mesh);
+		se_mesh_discard_cpu_data(mesh);
+		return false;
+	}
 
-	// Position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)0);
-	glEnableVertexAttribArray(0);
+	if ((mesh_data_flags & SE_MESH_DATA_CPU) != 0) {
+		if (!se_mesh_cpu_set_file_path(&mesh->cpu, source_path)) {
+			se_mesh_release_gpu_data(mesh);
+			se_mesh_discard_cpu_data(mesh);
+			return false;
+		}
+		mesh->data_flags = (se_mesh_data_flags)(mesh->data_flags | SE_MESH_DATA_CPU);
+	} else {
+		se_mesh_discard_cpu_data(mesh);
+	}
 
-	// Normal attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)offsetof(se_vertex_3d, normal));
-	glEnableVertexAttribArray(1);
-
-	// UV attribute
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (void *)offsetof(se_vertex_3d, uv));
-	glEnableVertexAttribArray(2);
-
-	glBindVertexArray(0);
+	return true;
 }
 
-se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders) {
-	if (!render_handle || !path) {
+se_model *se_model_load_obj_ex(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags) {
+	if (!render_handle || !path || !se_mesh_data_flags_are_valid(mesh_data_flags)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -909,12 +1104,8 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	// Dynamic array for meshes
 
 	// Current mesh data
-	se_vertex_3d *current_vertices = NULL;
-	u32 *current_indices = NULL;
-	u32 current_vertices_capacity = 0;
-	u32 current_indices_capacity = 0;
-	u32 current_vertex_count = 0;
-	u32 current_index_count = 0;
+	se_mesh *current_mesh = NULL;
+	u32 current_mesh_index = 0;
 
 	char line[256];
 	char current_object[256] = "default";
@@ -968,16 +1159,13 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 		uv_count++;
 	} else if (strncmp(line, "o ", 2) == 0 || strncmp(line, "g ", 2) == 0) {
 		// New object/group - finalize current mesh if it has faces
-		if (hse_faces && current_vertex_count > 0) {
-		se_mesh *new_mesh = s_array_increment(&model->meshes);
-		const sz mesh_count = s_array_get_size(&model->meshes);
-		if (mesh_count > 0) {
-			se_mesh_finalize(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
-		}
-		// Reset for next mesh
-		current_vertex_count = 0;
-		current_index_count = 0;
-		hse_faces = false;
+		if (hse_faces && current_mesh != NULL && s_array_get_size(&current_mesh->cpu.vertices) > 0) {
+			if (!se_mesh_finalize(current_mesh, full_path, shaders, current_mesh_index, mesh_data_flags)) {
+				ok = false;
+				break;
+			}
+			current_mesh = NULL;
+			hse_faces = false;
 		}
 
 		// Get new object name
@@ -985,72 +1173,80 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	} else if (strncmp(line, "f ", 2) == 0) {
 		// Face
 		hse_faces = true;
+		if (current_mesh == NULL) {
+			current_mesh = s_array_increment(&model->meshes);
+			memset(current_mesh, 0, sizeof(*current_mesh));
+			current_mesh_index = (u32)(s_array_get_size(&model->meshes) - 1);
+		}
+
 		u32 v1, v2, v3, n1, n2, n3, t1, t2, t3;
 		i32 matches = sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d", &v1, &t1, &n1,
 					 &v2, &t2, &n2, &v3, &t3, &n3);
 
 		if (matches == 9) {
-			if (!se_ensure_capacity((void **)&current_vertices, &current_vertices_capacity, current_vertex_count + 3, sizeof(se_vertex_3d), "mesh vertices") ||
-				!se_ensure_capacity((void **)&current_indices, &current_indices_capacity, current_index_count + 3, sizeof(u32), "mesh indices")) {
-				ok = false;
-				break;
-			}
-		// Create vertices for this face
-		for (i32 i = 0; i < 3; i++) {
-			u32 vi = (i == 0) ? v1 - 1 : (i == 1) ? v2 - 1 : v3 - 1;
-			u32 ni = (i == 0) ? n1 - 1 : (i == 1) ? n2 - 1 : n3 - 1;
-			u32 ti = (i == 0) ? t1 - 1 : (i == 1) ? t2 - 1 : t3 - 1;
-
-			// Check bounds
-			if (vi >= vertex_count || ni >= normal_count || ti >= uv_count) {
-			fprintf(stderr, "OBJ file contains invalid face indices\n");
-			continue;
-			}
-
-			current_vertices[current_vertex_count].position = temp_vertices[vi];
-			current_vertices[current_vertex_count].normal = temp_normals[ni];
-			current_vertices[current_vertex_count].uv = temp_uvs[ti];
-
-			current_indices[current_index_count] = current_vertex_count;
-			current_vertex_count++;
-			current_index_count++;
-		}
-		} else {
-		// Try to parse face without texture coordinates (v//n format)
-		matches = sscanf(line, "f %d//%d %d//%d %d//%d", &v1, &n1, &v2, &n2, &v3, &n3);
-		if (matches == 6) {
-			if (!se_ensure_capacity((void **)&current_vertices, &current_vertices_capacity, current_vertex_count + 3, sizeof(se_vertex_3d), "mesh vertices") ||
-				!se_ensure_capacity((void **)&current_indices, &current_indices_capacity, current_index_count + 3, sizeof(u32), "mesh indices")) {
+			const u32 needed_vertices = (u32)s_array_get_size(&current_mesh->cpu.vertices) + 3;
+			const u32 needed_indices = (u32)s_array_get_size(&current_mesh->cpu.indices) + 3;
+			if (!se_mesh_cpu_reserve_vertices(&current_mesh->cpu, needed_vertices) ||
+				!se_mesh_cpu_reserve_indices(&current_mesh->cpu, needed_indices)) {
 				ok = false;
 				break;
 			}
 			for (i32 i = 0; i < 3; i++) {
 				u32 vi = (i == 0) ? v1 - 1 : (i == 1) ? v2 - 1 : v3 - 1;
 				u32 ni = (i == 0) ? n1 - 1 : (i == 1) ? n2 - 1 : n3 - 1;
+				u32 ti = (i == 0) ? t1 - 1 : (i == 1) ? t2 - 1 : t3 - 1;
 
-			if (vi >= vertex_count || ni >= normal_count) {
-				fprintf(stderr, "OBJ file contains invalid face indices\n");
-				continue;
+				if (vi >= vertex_count || ni >= normal_count || ti >= uv_count) {
+					fprintf(stderr, "OBJ file contains invalid face indices\n");
+					continue;
+				}
+
+				const u32 next_index = (u32)s_array_get_size(&current_mesh->cpu.vertices);
+				se_vertex_3d *new_vertex = s_array_increment(&current_mesh->cpu.vertices);
+				new_vertex->position = temp_vertices[vi];
+				new_vertex->normal = temp_normals[ni];
+				new_vertex->uv = temp_uvs[ti];
+
+				*s_array_increment(&current_mesh->cpu.indices) = next_index;
 			}
+		} else {
+			matches = sscanf(line, "f %d//%d %d//%d %d//%d", &v1, &n1, &v2, &n2, &v3, &n3);
+			if (matches == 6) {
+				const u32 needed_vertices = (u32)s_array_get_size(&current_mesh->cpu.vertices) + 3;
+				const u32 needed_indices = (u32)s_array_get_size(&current_mesh->cpu.indices) + 3;
+				if (!se_mesh_cpu_reserve_vertices(&current_mesh->cpu, needed_vertices) ||
+					!se_mesh_cpu_reserve_indices(&current_mesh->cpu, needed_indices)) {
+					ok = false;
+					break;
+				}
+				for (i32 i = 0; i < 3; i++) {
+					u32 vi = (i == 0) ? v1 - 1 : (i == 1) ? v2 - 1 : v3 - 1;
+					u32 ni = (i == 0) ? n1 - 1 : (i == 1) ? n2 - 1 : n3 - 1;
 
-			current_vertices[current_vertex_count].position = temp_vertices[vi];
-			current_vertices[current_vertex_count].normal = temp_normals[ni];
-			current_vertices[current_vertex_count].uv = (s_vec2){0.0f, 0.0f}; // Default UV
+					if (vi >= vertex_count || ni >= normal_count) {
+						fprintf(stderr, "OBJ file contains invalid face indices\n");
+						continue;
+					}
 
-			current_indices[current_index_count] = current_vertex_count;
-			current_vertex_count++;
-			current_index_count++;
+					const u32 next_index = (u32)s_array_get_size(&current_mesh->cpu.vertices);
+					se_vertex_3d *new_vertex = s_array_increment(&current_mesh->cpu.vertices);
+					new_vertex->position = temp_vertices[vi];
+					new_vertex->normal = temp_normals[ni];
+					new_vertex->uv = (s_vec2){0.0f, 0.0f};
+
+					*s_array_increment(&current_mesh->cpu.indices) = next_index;
+				}
 			}
-		}
 		}
 	}
 	}
 
 	// Finalize the last mesh
-	if (ok && hse_faces && current_vertex_count > 0) {
-	const sz mesh_count = s_array_get_size(&model->meshes);
-	se_mesh *new_mesh = s_array_increment(&model->meshes);
-	se_mesh_finalize(new_mesh, current_vertices, current_indices, current_vertex_count, current_index_count, shaders, mesh_count - 1);
+	if (ok && hse_faces && current_mesh != NULL && s_array_get_size(&current_mesh->cpu.vertices) > 0) {
+		if (!se_mesh_finalize(current_mesh, full_path, shaders, current_mesh_index, mesh_data_flags)) {
+			ok = false;
+		}
+		current_mesh = NULL;
 	}
 
 	free(file_data);
@@ -1059,8 +1255,6 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	free(temp_vertices);
 	free(temp_normals);
 	free(temp_uvs);
-	free(current_vertices);
-	free(current_indices);
 
 	if (!ok) {
 		se_model_cleanup(model);
@@ -1083,7 +1277,11 @@ se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, s
 	return model;
 }
 
-se_model *se_model_load_obj_simple(se_render_handle *render_handle, const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path) {
+se_model *se_model_load_obj(se_render_handle *render_handle, const char *path, se_shaders_ptr *shaders) {
+	return se_model_load_obj_ex(render_handle, path, shaders, SE_MESH_DATA_GPU);
+}
+
+se_model *se_model_load_obj_simple_ex(se_render_handle *render_handle, const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags) {
 	if (!render_handle || !obj_path || !vertex_shader_path || !fragment_shader_path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
@@ -1098,7 +1296,7 @@ se_model *se_model_load_obj_simple(se_render_handle *render_handle, const char *
 	s_array_init(&shaders, 1);
 	*s_array_increment(&shaders) = shader;
 
-	se_model *model = se_model_load_obj(render_handle, obj_path, &shaders);
+	se_model *model = se_model_load_obj_ex(render_handle, obj_path, &shaders, mesh_data_flags);
 	s_array_clear(&shaders);
 	if (!model) {
 		se_render_handle_destroy_shader(render_handle, shader);
@@ -1107,6 +1305,10 @@ se_model *se_model_load_obj_simple(se_render_handle *render_handle, const char *
 
 	se_set_last_error(SE_RESULT_OK);
 	return model;
+}
+
+se_model *se_model_load_obj_simple(se_render_handle *render_handle, const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path) {
+	return se_model_load_obj_simple_ex(render_handle, obj_path, vertex_shader_path, fragment_shader_path, SE_MESH_DATA_GPU);
 }
 
 void se_render_handle_destroy_model(se_render_handle *render_handle, se_model *model) {
@@ -1124,34 +1326,37 @@ void se_model_render(se_render_handle *render_handle, se_model *model, se_camera
 	const s_mat4 proj = se_camera_get_projection_matrix(camera);
 	const s_mat4 view = se_camera_get_view_matrix(camera);
 	s_foreach(&model->meshes, i) {
-	se_mesh *mesh = s_array_get(&model->meshes, i);
-	se_shader *sh = mesh->shader;
+		se_mesh *mesh = s_array_get(&model->meshes, i);
+		if (!se_mesh_has_gpu_data(mesh) || mesh->gpu.index_count == 0 || mesh->shader == NULL) {
+			continue;
+		}
+		se_shader *sh = mesh->shader;
 
-	se_shader_use(render_handle, sh, true, true);
+		se_shader_use(render_handle, sh, true, true);
 
-	s_mat4 vp = s_mat4_mul(&proj, &view);
-	s_mat4 mvp = s_mat4_mul(&vp, &mesh->matrix);
+		s_mat4 vp = s_mat4_mul(&proj, &view);
+		s_mat4 mvp = s_mat4_mul(&vp, &mesh->matrix);
 
-	GLint loc_mvp = glGetUniformLocation(sh->program, "u_mvp");
-	if (loc_mvp >= 0) {
-		glUniformMatrix4fv(loc_mvp, 1, GL_FALSE, mvp.m[0]);
-	}
+		GLint loc_mvp = glGetUniformLocation(sh->program, "u_mvp");
+		if (loc_mvp >= 0) {
+			glUniformMatrix4fv(loc_mvp, 1, GL_FALSE, mvp.m[0]);
+		}
 
-	GLint loc_model = glGetUniformLocation(sh->program, "u_model");
-	if (loc_model >= 0) {
-		glUniformMatrix4fv(loc_model, 1, GL_FALSE, mesh->matrix.m[0]);
-	}
+		GLint loc_model = glGetUniformLocation(sh->program, "u_model");
+		if (loc_model >= 0) {
+			glUniformMatrix4fv(loc_model, 1, GL_FALSE, mesh->matrix.m[0]);
+		}
 
-	// send to the GPU other uniforms (lights if forward rendering, etc)
+		// send to the GPU other uniforms (lights if forward rendering, etc)
 
-	// draw
-	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LESS);
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_BACK);
-	glFrontFace(GL_CCW);
-	glBindVertexArray(mesh->vao);
-	glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
+		// draw
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LESS);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+		glFrontFace(GL_CCW);
+		glBindVertexArray(mesh->gpu.vao);
+		glDrawElements(GL_TRIANGLES, mesh->gpu.index_count, GL_UNSIGNED_INT, 0);
 	}
 	// unbind
 	glBindVertexArray(0);
@@ -1160,12 +1365,9 @@ void se_model_render(se_render_handle *render_handle, se_model *model, se_camera
 
 static void se_model_cleanup(se_model *model) {
 	s_foreach(&model->meshes, i) {
-	se_mesh *mesh = s_array_get(&model->meshes, i);
-	glDeleteVertexArrays(1, &mesh->vao);
-	glDeleteBuffers(1, &mesh->vbo);
-	glDeleteBuffers(1, &mesh->ebo);
-	free(mesh->vertices);
-	free(mesh->indices);
+		se_mesh *mesh = s_array_get(&model->meshes, i);
+		se_mesh_release_gpu_data(mesh);
+		se_mesh_discard_cpu_data(mesh);
 	}
 	s_array_clear(&model->meshes);
 }
@@ -1804,11 +2006,15 @@ void se_mesh_instance_create(se_mesh_instance *out_instance, const se_mesh *mesh
 	s_assertf(mesh, "se_mesh_instance_create :: mesh is null");
 
 	memset(out_instance, 0, sizeof(se_mesh_instance));
+	if (!se_mesh_has_gpu_data(mesh)) {
+		return;
+	}
+
 	glGenVertexArrays(1, &out_instance->vao);
 	glBindVertexArray(out_instance->vao);
 
-	glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->ebo);
+	glBindBuffer(GL_ARRAY_BUFFER, mesh->gpu.vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->gpu.ebo);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(se_vertex_3d), (const void *)offsetof(se_vertex_3d, position));
@@ -1830,6 +2036,9 @@ void se_mesh_instance_create(se_mesh_instance *out_instance, const se_mesh *mesh
 void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffer, const sz instance_count) {
 	s_assertf(instance, "se_mesh_instance_add_buffer :: instance is null");
 	s_assertf(buffer, "se_mesh_instance_add_buffer :: buffer is null");
+	if (instance->vao == 0) {
+		return;
+	}
 
 	glBindVertexArray(instance->vao);
 
@@ -1855,6 +2064,9 @@ void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffe
 
 void se_mesh_instance_update(se_mesh_instance *instance) {
 	s_assertf(instance, "se_mesh_instance_update :: instance is null");
+	if (instance->vao == 0) {
+		return;
+	}
 	if (!instance->instance_buffers_dirty) {
 		return;
 	}

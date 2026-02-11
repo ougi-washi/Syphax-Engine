@@ -753,7 +753,10 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 			}
 			se_mesh_instance *mesh_instance = s_array_get(&object->mesh_instances, mesh_index);
 			mesh_index++;
-			if (mesh_instance == NULL) {
+			if (mesh == NULL || !se_mesh_has_gpu_data(mesh) || mesh->gpu.index_count == 0) {
+				continue;
+			}
+			if (mesh_instance == NULL || mesh_instance->vao == 0) {
 				continue;
 			}
 
@@ -774,7 +777,7 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 
 			se_shader_use(render_handle, shader, true, true);
 			glBindVertexArray(mesh_instance->vao);
-			glDrawElementsInstanced(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0, (GLsizei)instance_count);
+			glDrawElementsInstanced(GL_TRIANGLES, mesh->gpu.index_count, GL_UNSIGNED_INT, 0, (GLsizei)instance_count);
 		}
 	}
 	se_framebuffer_unbind(scene->output);
@@ -893,6 +896,10 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 		s_foreach(&model->meshes, i) {
 			se_mesh *mesh = s_array_get(&model->meshes, i);
 			se_mesh_instance *mesh_instance = s_array_increment(&new_object->mesh_instances);
+			memset(mesh_instance, 0, sizeof(*mesh_instance));
+			if (!se_mesh_has_gpu_data(mesh)) {
+				continue;
+			}
 			se_mesh_instance_create(mesh_instance, mesh, (u32)instance_capacity);
 			se_mesh_instance_add_buffer(mesh_instance, new_object->render_transforms.data, instance_capacity);
 		}
