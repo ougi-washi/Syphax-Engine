@@ -284,6 +284,8 @@ void se_quad_3d_create(se_quad *out_quad) {
 	out_quad->vbo = 0;
 	out_quad->ebo = 0;
 	out_quad->last_attribute = 0;
+	s_array_init(&out_quad->instance_buffers);
+	out_quad->instance_buffers_dirty = false;
 
 	glGenVertexArrays(1, &out_quad->vao);
 	glGenBuffers(1, &out_quad->vbo);
@@ -315,6 +317,8 @@ void se_quad_2d_create(se_quad *out_quad, const u32 instance_count) {
 	out_quad->vbo = 0;
 	out_quad->ebo = 0;
 	out_quad->last_attribute = 0;
+	s_array_init(&out_quad->instance_buffers);
+	out_quad->instance_buffers_dirty = false;
 
 	glGenVertexArrays(1, &out_quad->vao);
 	glGenBuffers(1, &out_quad->vbo);
@@ -334,8 +338,8 @@ void se_quad_2d_create(se_quad *out_quad, const u32 instance_count) {
 	glBindVertexArray(0);
 
 	if (instance_count > 0) {
-	s_array_init(&out_quad->instance_buffers, instance_count);
-	out_quad->instance_buffers_dirty = true;
+		s_array_reserve(&out_quad->instance_buffers, instance_count);
+		out_quad->instance_buffers_dirty = true;
 	}
 }
 
@@ -345,7 +349,9 @@ void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const s
 
 	glBindVertexArray(quad->vao);
 
-	se_instance_buffer *new_buffer = s_array_increment(&quad->instance_buffers);
+	s_handle new_buffer_handle = s_array_increment(&quad->instance_buffers);
+	se_instance_buffer *new_buffer = s_array_get(&quad->instance_buffers, new_buffer_handle);
+	s_assertf(new_buffer, "se_quad_2d_add_instance_buffer :: out of memory");
 	new_buffer->vbo = 0;
 	new_buffer->buffer_ptr = buffer;
 	new_buffer->buffer_size = sizeof(s_mat4) * instance_count;
@@ -361,6 +367,8 @@ void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const s
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
+	quad->instance_buffers_dirty = true;
+
 	printf("se_quad_2d_add_instance_buffer :: buffer: %p\n", buffer);
 }
 
@@ -370,7 +378,9 @@ void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, co
 
 	glBindVertexArray(quad->vao);
 
-	se_instance_buffer *new_buffer = s_array_increment(&quad->instance_buffers);
+	s_handle new_buffer_handle = s_array_increment(&quad->instance_buffers);
+	se_instance_buffer *new_buffer = s_array_get(&quad->instance_buffers, new_buffer_handle);
+	s_assertf(new_buffer, "se_quad_2d_add_instance_buffer_mat3 :: out of memory");
 	new_buffer->vbo = 0;
 	new_buffer->buffer_ptr = buffer;
 	new_buffer->buffer_size = sizeof(s_mat3) * instance_count;
@@ -385,6 +395,8 @@ void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, co
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
+	quad->instance_buffers_dirty = true;
+
 	printf("se_quad_2d_add_instance_buffer_mat3 :: buffer: %p\n", buffer);
 }
 
@@ -392,11 +404,11 @@ void se_quad_render(se_quad *quad, const sz instance_count) {
 	glBindVertexArray(quad->vao);
 	if (instance_count > 0) {
 		if (quad->instance_buffers_dirty) {
-			s_foreach(&quad->instance_buffers, i) {
-			se_instance_buffer *current_buffer = s_array_get(&quad->instance_buffers, i);
-			glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
-			glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			se_instance_buffer *current_buffer = NULL;
+			s_foreach(&quad->instance_buffers, current_buffer) {
+				glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
+				glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
+				glBindBuffer(GL_ARRAY_BUFFER, 0);
 			}
 			quad->instance_buffers_dirty = false;
 		}
@@ -408,9 +420,9 @@ void se_quad_render(se_quad *quad, const sz instance_count) {
 }
 
 void se_quad_destroy(se_quad *quad) {
-	s_foreach(&quad->instance_buffers, i) {
-	se_instance_buffer *current_buffer = s_array_get(&quad->instance_buffers, i);
-	glDeleteBuffers(1, &current_buffer->vbo);
+	se_instance_buffer *current_buffer = NULL;
+	s_foreach(&quad->instance_buffers, current_buffer) {
+		glDeleteBuffers(1, &current_buffer->vbo);
 	}
 	s_array_clear(&quad->instance_buffers);
 	glDeleteVertexArrays(1, &quad->vao);

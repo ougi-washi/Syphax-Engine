@@ -7,33 +7,36 @@
 #include "stb_image.h"
 
 static void se_texture_cleanup(se_texture *texture);
+static se_texture* se_texture_from_handle(se_context *ctx, const se_texture_handle texture) {
+	return s_array_get(&ctx->textures, texture);
+}
 
-se_texture *se_texture_load(se_context *ctx, const char *file_path, const se_texture_wrap wrap) {
+se_texture_handle se_texture_load(const char *file_path, const se_texture_wrap wrap) {
+	se_context *ctx = se_current_context();
 	if (!ctx || !file_path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 	stbi_set_flip_vertically_on_load(1);
-	if (s_array_get_capacity(&ctx->textures) == s_array_get_size(&ctx->textures)) {
-		const sz current_capacity = s_array_get_capacity(&ctx->textures);
-		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
-		s_array_resize(&ctx->textures, next_capacity);
+	if (s_array_get_capacity(&ctx->textures) == 0) {
+		s_array_init(&ctx->textures);
 	}
-	se_texture *texture = s_array_increment(&ctx->textures);
+	se_texture_handle texture_handle = s_array_increment(&ctx->textures);
+	se_texture *texture = s_array_get(&ctx->textures, texture_handle);
 	memset(texture, 0, sizeof(*texture));
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!se_paths_resolve_resource_path(full_path, SE_MAX_PATH_LENGTH, file_path)) {
-		s_array_remove_at(&ctx->textures, s_array_get_size(&ctx->textures) - 1);
+		s_array_remove(&ctx->textures, texture_handle);
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
 	unsigned char *pixels = stbi_load(full_path, &texture->width, &texture->height, &texture->channels, 0);
 	if (!pixels) {
-		s_array_remove_at(&ctx->textures, s_array_get_size(&ctx->textures) - 1);
+		s_array_remove(&ctx->textures, texture_handle);
 		se_set_last_error(SE_RESULT_IO);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
 	glGenTextures(1, &texture->id);
@@ -59,22 +62,21 @@ se_texture *se_texture_load(se_context *ctx, const char *file_path, const se_tex
 	stbi_image_free(pixels);
 
 	se_set_last_error(SE_RESULT_OK);
-	return texture;
+	return texture_handle;
 }
 
-se_texture *se_texture_load_from_memory(se_context *ctx, const u8 *data, const sz size, const se_texture_wrap wrap) {
+se_texture_handle se_texture_load_from_memory(const u8 *data, const sz size, const se_texture_wrap wrap) {
+	se_context *ctx = se_current_context();
 	if (!ctx || !data || size == 0) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 	stbi_set_flip_vertically_on_load(1);
-
-	if (s_array_get_capacity(&ctx->textures) == s_array_get_size(&ctx->textures)) {
-		const sz current_capacity = s_array_get_capacity(&ctx->textures);
-		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
-		s_array_resize(&ctx->textures, next_capacity);
+	if (s_array_get_capacity(&ctx->textures) == 0) {
+		s_array_init(&ctx->textures);
 	}
-	se_texture *texture = s_array_increment(&ctx->textures);
+	se_texture_handle texture_handle = s_array_increment(&ctx->textures);
+	se_texture *texture = s_array_get(&ctx->textures, texture_handle);
 	memset(texture, 0, sizeof(*texture));
 
 	int width = 0;
@@ -82,9 +84,9 @@ se_texture *se_texture_load_from_memory(se_context *ctx, const u8 *data, const s
 	int channels = 0;
 	unsigned char *pixels = stbi_load_from_memory(data, (int)size, &width, &height, &channels, 0);
 	if (!pixels) {
-		s_array_remove_at(&ctx->textures, s_array_get_size(&ctx->textures) - 1);
+		s_array_remove(&ctx->textures, texture_handle);
 		se_set_last_error(SE_RESULT_IO);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
 	texture->width = width;
@@ -112,7 +114,7 @@ se_texture *se_texture_load_from_memory(se_context *ctx, const u8 *data, const s
 
 	stbi_image_free(pixels);
 	se_set_last_error(SE_RESULT_OK);
-	return texture;
+	return texture_handle;
 }
 
 static void se_texture_cleanup(se_texture *texture) {
@@ -124,15 +126,11 @@ static void se_texture_cleanup(se_texture *texture) {
 	texture->path[0] = '\0';
 }
 
-void se_texture_destroy(se_context *ctx, se_texture *texture) {
+void se_texture_destroy(const se_texture_handle texture) {
+	se_context *ctx = se_current_context();
 	s_assertf(ctx, "se_texture_destroy :: ctx is null");
-	s_assertf(texture, "se_texture_destroy :: texture is null");
-	se_texture_cleanup(texture);
-	for (sz i = 0; i < s_array_get_size(&ctx->textures); i++) {
-		se_texture *slot = s_array_get(&ctx->textures, i);
-		if (slot == texture) {
-			s_array_remove_at(&ctx->textures, i);
-			break;
-		}
-	}
+	se_texture *texture_ptr = se_texture_from_handle(ctx, texture);
+	s_assertf(texture_ptr, "se_texture_destroy :: texture is null");
+	se_texture_cleanup(texture_ptr);
+	s_array_remove(&ctx->textures, texture);
 }

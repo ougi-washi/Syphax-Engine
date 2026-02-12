@@ -17,8 +17,8 @@ typedef struct {
 } se_camera_controller_modes;
 
 struct se_camera_controller {
-	se_window* window;
-	se_camera* camera;
+	se_window_handle window;
+	se_camera_handle camera;
 	f32 movement_speed;
 	f32 mouse_x_speed;
 	f32 mouse_y_speed;
@@ -80,12 +80,24 @@ static void se_camera_controller_clamp_focus_distance(se_camera_controller* cont
 	controller->focus_distance = se_camera_controller_clampf(controller->focus_distance, controller->min_focus_distance, controller->max_focus_distance);
 }
 
+static se_camera* se_camera_controller_get_camera(se_camera_controller* controller) {
+	if (!controller || controller->camera == S_HANDLE_NULL) {
+		return NULL;
+	}
+	se_context *ctx = se_current_context();
+	if (!ctx) {
+		return NULL;
+	}
+	return s_array_get(&ctx->cameras, controller->camera);
+}
+
 static void se_camera_controller_sync_from_camera(se_camera_controller* controller) {
-	if (!controller || !controller->camera) {
+	se_camera *camera = se_camera_controller_get_camera(controller);
+	if (!camera) {
 		return;
 	}
 
-	s_vec3 to_target = s_vec3_sub(&controller->camera->target, &controller->camera->position);
+	s_vec3 to_target = s_vec3_sub(&camera->target, &camera->position);
 	f32 distance = s_vec3_length(&to_target);
 	if (distance <= 0.0001f) {
 		to_target = s_vec3(0.0f, 0.0f, -1.0f);
@@ -96,8 +108,8 @@ static void se_camera_controller_sync_from_camera(se_camera_controller* controll
 	controller->yaw = atan2f(forward.x, forward.z);
 	controller->pitch = asinf(forward.y);
 	controller->focus_distance = distance;
-	controller->orbit_target = controller->camera->target;
-	controller->scene_center = controller->camera->target;
+	controller->orbit_target = camera->target;
+	controller->scene_center = camera->target;
 	controller->scene_radius = distance;
 	if (controller->scene_radius < SE_CAMERA_CONTROLLER_MIN_RADIUS) {
 		controller->scene_radius = SE_CAMERA_CONTROLLER_MIN_RADIUS;
@@ -108,7 +120,7 @@ static void se_camera_controller_sync_from_camera(se_camera_controller* controll
 }
 
 static void se_camera_controller_set_cursor_capture(se_camera_controller* controller, const b8 capture) {
-	if (!controller || !controller->window || !controller->lock_cursor_while_active) {
+	if (!controller || controller->window == S_HANDLE_NULL || !controller->lock_cursor_while_active) {
 		return;
 	}
 	if (capture == controller->cursor_captured) {
@@ -133,7 +145,7 @@ static void se_camera_controller_set_cursor_capture(se_camera_controller* contro
 
 static se_camera_controller_modes se_camera_controller_get_modes(se_camera_controller* controller) {
 	se_camera_controller_modes modes = {0};
-	if (!controller || !controller->window) {
+	if (!controller || controller->window == S_HANDLE_NULL) {
 		return modes;
 	}
 
@@ -170,7 +182,7 @@ static se_camera_controller_modes se_camera_controller_get_modes(se_camera_contr
 }
 
 se_camera_controller* se_camera_controller_create(const se_camera_controller_params* params) {
-	if (!params || !params->window || !params->camera) {
+	if (!params || params->window == S_HANDLE_NULL || params->camera == S_HANDLE_NULL) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -224,7 +236,8 @@ void se_camera_controller_destroy(se_camera_controller* controller) {
 }
 
 void se_camera_controller_tick(se_camera_controller* controller, const f32 dt) {
-	if (!controller || !controller->window || !controller->camera) {
+	se_camera *camera = se_camera_controller_get_camera(controller);
+	if (!controller || controller->window == S_HANDLE_NULL || !camera) {
 		return;
 	}
 
@@ -246,7 +259,7 @@ void se_camera_controller_tick(se_camera_controller* controller, const f32 dt) {
 	s_vec3 forward = se_camera_controller_forward_from_angles(controller->yaw, controller->pitch);
 	if (orbit_active && !controller->was_orbit_active) {
 		s_vec3 offset = s_vec3_muls(&forward, controller->focus_distance);
-		controller->orbit_target = s_vec3_add(&controller->camera->position, &offset);
+		controller->orbit_target = s_vec3_add(&camera->position, &offset);
 	}
 
 	if (se_window_is_key_pressed(controller->window, SE_KEY_F)) {
@@ -290,8 +303,8 @@ void se_camera_controller_tick(se_camera_controller* controller, const f32 dt) {
 
 	if (orbit_active) {
 		s_vec3 offset = s_vec3_muls(&forward, -controller->focus_distance);
-		controller->camera->position = s_vec3_add(&controller->orbit_target, &offset);
-		controller->camera->target = controller->orbit_target;
+		camera->position = s_vec3_add(&controller->orbit_target, &offset);
+		camera->target = controller->orbit_target;
 	}
 
 	if (modes.fly) {
@@ -317,17 +330,17 @@ void se_camera_controller_tick(se_camera_controller* controller, const f32 dt) {
 			const b8 fast = se_window_is_key_down(controller->window, SE_KEY_LEFT_SHIFT) || se_window_is_key_down(controller->window, SE_KEY_RIGHT_SHIFT);
 			const f32 speed = fast ? (controller->movement_speed * SE_CAMERA_CONTROLLER_FAST_MULTIPLIER) : controller->movement_speed;
 			move = s_vec3_muls(&move, speed * dt);
-			controller->camera->position = s_vec3_add(&controller->camera->position, &move);
+			camera->position = s_vec3_add(&camera->position, &move);
 		}
 
-		controller->camera->target = s_vec3_add(&controller->camera->position, &forward);
+		camera->target = s_vec3_add(&camera->position, &forward);
 		s_vec3 focus_offset = s_vec3_muls(&forward, controller->focus_distance);
-		controller->orbit_target = s_vec3_add(&controller->camera->position, &focus_offset);
+		controller->orbit_target = s_vec3_add(&camera->position, &focus_offset);
 	} else if (!orbit_active) {
-		controller->camera->target = s_vec3_add(&controller->camera->position, &forward);
+		camera->target = s_vec3_add(&camera->position, &forward);
 	}
 
-	controller->camera->up = world_up;
+	camera->up = world_up;
 	controller->was_orbit_active = orbit_active;
 }
 
@@ -418,7 +431,8 @@ void se_camera_controller_set_focus_limits(se_camera_controller* controller, con
 }
 
 void se_camera_controller_focus_bounds(se_camera_controller* controller) {
-	if (!controller || !controller->camera) {
+	se_camera *camera = se_camera_controller_get_camera(controller);
+	if (!controller || !camera) {
 		return;
 	}
 	controller->orbit_target = controller->scene_center;
@@ -426,8 +440,8 @@ void se_camera_controller_focus_bounds(se_camera_controller* controller) {
 	se_camera_controller_clamp_focus_distance(controller);
 	s_vec3 forward = se_camera_controller_forward_from_angles(controller->yaw, controller->pitch);
 	s_vec3 offset = s_vec3_muls(&forward, -controller->focus_distance);
-	controller->camera->position = s_vec3_add(&controller->orbit_target, &offset);
-	controller->camera->target = controller->orbit_target;
+	camera->position = s_vec3_add(&controller->orbit_target, &offset);
+	camera->target = controller->orbit_target;
 }
 
 b8 se_camera_controller_set_preset(se_camera_controller* controller, const se_camera_controller_preset preset) {

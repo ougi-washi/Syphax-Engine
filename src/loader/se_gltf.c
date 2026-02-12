@@ -21,6 +21,71 @@ typedef struct {
 	sz bin_size;
 } se_gltf_glb_data;
 
+static se_gltf_buffer *se_gltf_buffer_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_buffers *buffers = (se_gltf_buffers *)&asset->buffers;
+	return s_array_get(buffers, s_array_handle(buffers, (u32)index));
+}
+
+static se_gltf_buffer_view *se_gltf_buffer_view_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_buffer_views *views = (se_gltf_buffer_views *)&asset->buffer_views;
+	return s_array_get(views, s_array_handle(views, (u32)index));
+}
+
+static se_gltf_accessor *se_gltf_accessor_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_accessors *accessors = (se_gltf_accessors *)&asset->accessors;
+	return s_array_get(accessors, s_array_handle(accessors, (u32)index));
+}
+
+static se_gltf_image *se_gltf_image_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_images *images = (se_gltf_images *)&asset->images;
+	return s_array_get(images, s_array_handle(images, (u32)index));
+}
+
+static se_gltf_sampler *se_gltf_sampler_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_samplers *samplers = (se_gltf_samplers *)&asset->samplers;
+	return s_array_get(samplers, s_array_handle(samplers, (u32)index));
+}
+
+static se_gltf_texture *se_gltf_texture_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_textures *textures = (se_gltf_textures *)&asset->textures;
+	return s_array_get(textures, s_array_handle(textures, (u32)index));
+}
+
+static se_gltf_material *se_gltf_material_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_materials *materials = (se_gltf_materials *)&asset->materials;
+	return s_array_get(materials, s_array_handle(materials, (u32)index));
+}
+
+static se_gltf_mesh *se_gltf_mesh_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_meshes *meshes = (se_gltf_meshes *)&asset->meshes;
+	return s_array_get(meshes, s_array_handle(meshes, (u32)index));
+}
+
+static se_gltf_node *se_gltf_node_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_nodes *nodes = (se_gltf_nodes *)&asset->nodes;
+	return s_array_get(nodes, s_array_handle(nodes, (u32)index));
+}
+
+static se_gltf_scene *se_gltf_scene_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_scenes *scenes = (se_gltf_scenes *)&asset->scenes;
+	return s_array_get(scenes, s_array_handle(scenes, (u32)index));
+}
+
+static se_gltf_skin *se_gltf_skin_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_skins *skins = (se_gltf_skins *)&asset->skins;
+	return s_array_get(skins, s_array_handle(skins, (u32)index));
+}
+
+static se_gltf_animation *se_gltf_animation_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_animations *animations = (se_gltf_animations *)&asset->animations;
+	return s_array_get(animations, s_array_handle(animations, (u32)index));
+}
+
+static se_gltf_camera *se_gltf_camera_at(const se_gltf_asset *asset, const sz index) {
+	se_gltf_cameras *cameras = (se_gltf_cameras *)&asset->cameras;
+	return s_array_get(cameras, s_array_handle(cameras, (u32)index));
+}
+
 static void se_gltf_set_default_load_params(se_gltf_load_params *out, const se_gltf_load_params *params) {
 	if (params) {
 		*out = *params;
@@ -140,11 +205,13 @@ static b8 se_gltf_json_read_float_array(const s_json *arr, f32 *out, sz max, sz 
 
 static b8 se_gltf_json_read_i32_array(const s_json *arr, se_gltf_i32_array *out) {
 	if (arr == NULL || arr->type != S_JSON_ARRAY) return false;
-	s_array_init(out, arr->as.children.count);
+	s_array_init(out);
+	s_array_reserve(out, arr->as.children.count);
 	for (sz i = 0; i < arr->as.children.count; i++) {
 		s_json *item = arr->as.children.items[i];
 		if (item == NULL || item->type != S_JSON_NUMBER) return false;
-		i32 *dst = s_array_increment(out);
+		s_handle dst_handle = s_array_increment(out);
+		i32 *dst = s_array_get(out, dst_handle);
 		*dst = (i32)item->as.number;
 	}
 	return true;
@@ -152,11 +219,13 @@ static b8 se_gltf_json_read_i32_array(const s_json *arr, se_gltf_i32_array *out)
 
 static b8 se_gltf_json_read_string_array(const s_json *arr, se_gltf_strings *out) {
 	if (arr == NULL || arr->type != S_JSON_ARRAY) return false;
-	s_array_init(out, arr->as.children.count);
+	s_array_init(out);
+	s_array_reserve(out, arr->as.children.count);
 	for (sz i = 0; i < arr->as.children.count; i++) {
 		s_json *item = arr->as.children.items[i];
 		if (item == NULL || item->type != S_JSON_STRING) return false;
-		char **dst = s_array_increment(out);
+		s_handle dst_handle = s_array_increment(out);
+		char **dst = s_array_get(out, dst_handle);
 		*dst = s_files_strdup(item->as.string ? item->as.string : "");
 		if (*dst == NULL) return false;
 	}
@@ -345,16 +414,16 @@ static void se_gltf_glb_data_free(se_gltf_glb_data *data) {
 }
 
 static void se_gltf_strings_free(se_gltf_strings *arr) {
-	s_foreach(arr, i) {
-		char **str = s_array_get(arr, i);
+	char **str = NULL;
+	s_foreach(arr, str) {
 		free(*str);
 	}
 	s_array_clear(arr);
 }
 
 static void se_gltf_attribute_set_free(se_gltf_attribute_set *set) {
-	s_foreach(&set->attributes, i) {
-		se_gltf_attribute *attr = s_array_get(&set->attributes, i);
+	se_gltf_attribute *attr = NULL;
+	s_foreach(&set->attributes, attr) {
 		free(attr->name);
 	}
 	s_array_clear(&set->attributes);
@@ -362,8 +431,8 @@ static void se_gltf_attribute_set_free(se_gltf_attribute_set *set) {
 
 static void se_gltf_primitive_free(se_gltf_primitive *prim) {
 	se_gltf_attribute_set_free(&prim->attributes);
-	s_foreach(&prim->targets, i) {
-		se_gltf_attribute_set *target = s_array_get(&prim->targets, i);
+	se_gltf_attribute_set *target = NULL;
+	s_foreach(&prim->targets, target) {
 		se_gltf_attribute_set_free(target);
 	}
 	s_array_clear(&prim->targets);
@@ -372,8 +441,8 @@ static void se_gltf_primitive_free(se_gltf_primitive *prim) {
 }
 
 static void se_gltf_mesh_free(se_gltf_mesh *mesh) {
-	s_foreach(&mesh->primitives, i) {
-		se_gltf_primitive *prim = s_array_get(&mesh->primitives, i);
+	se_gltf_primitive *prim = NULL;
+	s_foreach(&mesh->primitives, prim) {
 		se_gltf_primitive_free(prim);
 	}
 	s_array_clear(&mesh->primitives);
@@ -385,11 +454,13 @@ static void se_gltf_mesh_free(se_gltf_mesh *mesh) {
 
 static b8 se_gltf_parse_attribute_set(const s_json *obj, se_gltf_attribute_set *out) {
 	if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-	s_array_init(&out->attributes, obj->as.children.count);
+	s_array_init(&out->attributes);
+	s_array_reserve(&out->attributes, obj->as.children.count);
 	for (sz i = 0; i < obj->as.children.count; i++) {
 		s_json *child = obj->as.children.items[i];
 		if (child == NULL || child->type != S_JSON_NUMBER || child->name == NULL) return false;
-		se_gltf_attribute *attr = s_array_increment(&out->attributes);
+		s_handle attr_handle = s_array_increment(&out->attributes);
+		se_gltf_attribute *attr = s_array_get(&out->attributes, attr_handle);
 		attr->name = s_files_strdup(child->name);
 		attr->accessor = (i32)child->as.number;
 		if (attr->name == NULL) return false;
@@ -418,11 +489,13 @@ static b8 se_gltf_parse_buffers(const s_json *root, se_gltf_asset *asset, const 
 	s_json *buffers = s_json_get(root, "buffers");
 	if (buffers == NULL) return true;
 	if (buffers->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->buffers, buffers->as.children.count);
+	s_array_init(&asset->buffers);
+	s_array_reserve(&asset->buffers, buffers->as.children.count);
 	for (sz i = 0; i < buffers->as.children.count; i++) {
 		s_json *obj = buffers->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_buffer *buf = s_array_increment(&asset->buffers);
+		s_handle buf_handle = s_array_increment(&asset->buffers);
+		se_gltf_buffer *buf = s_array_get(&asset->buffers, buf_handle);
 		memset(buf, 0, sizeof(*buf));
 		se_gltf_json_get_string_dup(obj, "uri", &buf->uri);
 		se_gltf_json_get_string_dup(obj, "name", &buf->name);
@@ -467,11 +540,13 @@ static b8 se_gltf_parse_buffer_views(const s_json *root, se_gltf_asset *asset) {
 	s_json *views = s_json_get(root, "bufferViews");
 	if (views == NULL) return true;
 	if (views->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->buffer_views, views->as.children.count);
+	s_array_init(&asset->buffer_views);
+	s_array_reserve(&asset->buffer_views, views->as.children.count);
 	for (sz i = 0; i < views->as.children.count; i++) {
 		s_json *obj = views->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_buffer_view *view = s_array_increment(&asset->buffer_views);
+		s_handle view_handle = s_array_increment(&asset->buffer_views);
+		se_gltf_buffer_view *view = s_array_get(&asset->buffer_views, view_handle);
 		memset(view, 0, sizeof(*view));
 		if (!se_gltf_json_get_i32(obj, "buffer", &view->buffer)) return false;
 		se_gltf_json_get_u32(obj, "byteOffset", &view->byte_offset);
@@ -506,11 +581,13 @@ static b8 se_gltf_parse_accessors(const s_json *root, se_gltf_asset *asset) {
 	s_json *accessors = s_json_get(root, "accessors");
 	if (accessors == NULL) return true;
 	if (accessors->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->accessors, accessors->as.children.count);
+	s_array_init(&asset->accessors);
+	s_array_reserve(&asset->accessors, accessors->as.children.count);
 	for (sz i = 0; i < accessors->as.children.count; i++) {
 		s_json *obj = accessors->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_accessor *acc = s_array_increment(&asset->accessors);
+		s_handle acc_handle = s_array_increment(&asset->accessors);
+		se_gltf_accessor *acc = s_array_get(&asset->accessors, acc_handle);
 		memset(acc, 0, sizeof(*acc));
 		acc->has_buffer_view = se_gltf_json_get_i32(obj, "bufferView", &acc->buffer_view);
 		acc->has_byte_offset = se_gltf_json_get_u32(obj, "byteOffset", &acc->byte_offset);
@@ -543,11 +620,13 @@ static b8 se_gltf_parse_images(const s_json *root, se_gltf_asset *asset, const s
 	s_json *images = s_json_get(root, "images");
 	if (images == NULL) return true;
 	if (images->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->images, images->as.children.count);
+	s_array_init(&asset->images);
+	s_array_reserve(&asset->images, images->as.children.count);
 	for (sz i = 0; i < images->as.children.count; i++) {
 		s_json *obj = images->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_image *img = s_array_increment(&asset->images);
+		s_handle img_handle = s_array_increment(&asset->images);
+		se_gltf_image *img = s_array_get(&asset->images, img_handle);
 		memset(img, 0, sizeof(*img));
 		se_gltf_json_get_string_dup(obj, "uri", &img->uri);
 		se_gltf_json_get_string_dup(obj, "mimeType", &img->mime_type);
@@ -577,10 +656,11 @@ static b8 se_gltf_parse_images(const s_json *root, se_gltf_asset *asset, const s
 				img->owns_data = true;
 			}
 		} else if (img->has_buffer_view) {
-			if (img->buffer_view < 0 || (sz)img->buffer_view >= asset->buffer_views.size) return false;
-			se_gltf_buffer_view *view = s_array_get(&asset->buffer_views, img->buffer_view);
-			if (view->buffer < 0 || (sz)view->buffer >= asset->buffers.size) return false;
-			se_gltf_buffer *buf = s_array_get(&asset->buffers, view->buffer);
+			if (img->buffer_view < 0 || (sz)img->buffer_view >= s_array_get_size(&asset->buffer_views)) return false;
+			se_gltf_buffer_view *view = se_gltf_buffer_view_at(asset, (sz)img->buffer_view);
+			if (view == NULL) return false;
+			if (view->buffer < 0 || (sz)view->buffer >= s_array_get_size(&asset->buffers)) return false;
+			se_gltf_buffer *buf = se_gltf_buffer_at(asset, (sz)view->buffer);
 			if (buf->data == NULL) continue;
 			if (view->byte_offset + view->byte_length > buf->data_size) return false;
 			img->data = (u8 *)malloc(view->byte_length);
@@ -597,11 +677,13 @@ static b8 se_gltf_parse_samplers(const s_json *root, se_gltf_asset *asset) {
 	s_json *samplers = s_json_get(root, "samplers");
 	if (samplers == NULL) return true;
 	if (samplers->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->samplers, samplers->as.children.count);
+	s_array_init(&asset->samplers);
+	s_array_reserve(&asset->samplers, samplers->as.children.count);
 	for (sz i = 0; i < samplers->as.children.count; i++) {
 		s_json *obj = samplers->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_sampler *sampler = s_array_increment(&asset->samplers);
+		s_handle sampler_handle = s_array_increment(&asset->samplers);
+		se_gltf_sampler *sampler = s_array_get(&asset->samplers, sampler_handle);
 		memset(sampler, 0, sizeof(*sampler));
 		sampler->has_mag_filter = se_gltf_json_get_i32(obj, "magFilter", &sampler->mag_filter);
 		sampler->has_min_filter = se_gltf_json_get_i32(obj, "minFilter", &sampler->min_filter);
@@ -617,11 +699,13 @@ static b8 se_gltf_parse_textures(const s_json *root, se_gltf_asset *asset) {
 	s_json *textures = s_json_get(root, "textures");
 	if (textures == NULL) return true;
 	if (textures->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->textures, textures->as.children.count);
+	s_array_init(&asset->textures);
+	s_array_reserve(&asset->textures, textures->as.children.count);
 	for (sz i = 0; i < textures->as.children.count; i++) {
 		s_json *obj = textures->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_texture *tex = s_array_increment(&asset->textures);
+		s_handle tex_handle = s_array_increment(&asset->textures);
+		se_gltf_texture *tex = s_array_get(&asset->textures, tex_handle);
 		memset(tex, 0, sizeof(*tex));
 		tex->has_sampler = se_gltf_json_get_i32(obj, "sampler", &tex->sampler);
 		tex->has_source = se_gltf_json_get_i32(obj, "source", &tex->source);
@@ -643,11 +727,13 @@ static b8 se_gltf_parse_materials(const s_json *root, se_gltf_asset *asset) {
 	s_json *materials = s_json_get(root, "materials");
 	if (materials == NULL) return true;
 	if (materials->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->materials, materials->as.children.count);
+	s_array_init(&asset->materials);
+	s_array_reserve(&asset->materials, materials->as.children.count);
 	for (sz i = 0; i < materials->as.children.count; i++) {
 		s_json *obj = materials->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_material *mat = s_array_increment(&asset->materials);
+		s_handle mat_handle = s_array_increment(&asset->materials);
+		se_gltf_material *mat = s_array_get(&asset->materials, mat_handle);
 		memset(mat, 0, sizeof(*mat));
 		se_gltf_json_get_string_dup(obj, "name", &mat->name);
 		s_json *pbr = s_json_get(obj, "pbrMetallicRoughness");
@@ -700,20 +786,24 @@ static b8 se_gltf_parse_meshes(const s_json *root, se_gltf_asset *asset) {
 	s_json *meshes = s_json_get(root, "meshes");
 	if (meshes == NULL) return true;
 	if (meshes->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->meshes, meshes->as.children.count);
+	s_array_init(&asset->meshes);
+	s_array_reserve(&asset->meshes, meshes->as.children.count);
 	for (sz i = 0; i < meshes->as.children.count; i++) {
 		s_json *obj = meshes->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_mesh *mesh = s_array_increment(&asset->meshes);
+		s_handle mesh_handle = s_array_increment(&asset->meshes);
+		se_gltf_mesh *mesh = s_array_get(&asset->meshes, mesh_handle);
 		memset(mesh, 0, sizeof(*mesh));
 		se_gltf_json_get_string_dup(obj, "name", &mesh->name);
 		s_json *prims = s_json_get(obj, "primitives");
 		if (prims == NULL || prims->type != S_JSON_ARRAY) return false;
-		s_array_init(&mesh->primitives, prims->as.children.count);
+		s_array_init(&mesh->primitives);
+		s_array_reserve(&mesh->primitives, prims->as.children.count);
 		for (sz p = 0; p < prims->as.children.count; p++) {
 			s_json *prim_obj = prims->as.children.items[p];
 			if (prim_obj == NULL || prim_obj->type != S_JSON_OBJECT) return false;
-			se_gltf_primitive *prim = s_array_increment(&mesh->primitives);
+			s_handle prim_handle = s_array_increment(&mesh->primitives);
+			se_gltf_primitive *prim = s_array_get(&mesh->primitives, prim_handle);
 			memset(prim, 0, sizeof(*prim));
 			s_json *attrs = s_json_get(prim_obj, "attributes");
 			if (!se_gltf_parse_attribute_set(attrs, &prim->attributes)) return false;
@@ -722,10 +812,12 @@ static b8 se_gltf_parse_meshes(const s_json *root, se_gltf_asset *asset) {
 			prim->has_mode = se_gltf_json_get_i32(prim_obj, "mode", &prim->mode);
 			s_json *targets = s_json_get(prim_obj, "targets");
 			if (targets && targets->type == S_JSON_ARRAY) {
-				s_array_init(&prim->targets, targets->as.children.count);
+				s_array_init(&prim->targets);
+				s_array_reserve(&prim->targets, targets->as.children.count);
 				for (sz t = 0; t < targets->as.children.count; t++) {
 					s_json *target_obj = targets->as.children.items[t];
-					se_gltf_attribute_set *target = s_array_increment(&prim->targets);
+					s_handle target_handle = s_array_increment(&prim->targets);
+					se_gltf_attribute_set *target = s_array_get(&prim->targets, target_handle);
 					if (!se_gltf_parse_attribute_set(target_obj, target)) return false;
 				}
 			}
@@ -734,11 +826,13 @@ static b8 se_gltf_parse_meshes(const s_json *root, se_gltf_asset *asset) {
 		s_json *weights = s_json_get(obj, "weights");
 		if (weights && weights->type == S_JSON_ARRAY) {
 			mesh->has_weights = true;
-			s_array_init(&mesh->weights, weights->as.children.count);
+			s_array_init(&mesh->weights);
+			s_array_reserve(&mesh->weights, weights->as.children.count);
 			for (sz w = 0; w < weights->as.children.count; w++) {
 				s_json *item = weights->as.children.items[w];
 				if (item == NULL || item->type != S_JSON_NUMBER) return false;
-				f32 *dst = s_array_increment(&mesh->weights);
+				s_handle weight_handle = s_array_increment(&mesh->weights);
+				f32 *dst = s_array_get(&mesh->weights, weight_handle);
 				*dst = (f32)item->as.number;
 			}
 		}
@@ -751,11 +845,13 @@ static b8 se_gltf_parse_nodes(const s_json *root, se_gltf_asset *asset) {
 	s_json *nodes = s_json_get(root, "nodes");
 	if (nodes == NULL) return true;
 	if (nodes->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->nodes, nodes->as.children.count);
+	s_array_init(&asset->nodes);
+	s_array_reserve(&asset->nodes, nodes->as.children.count);
 	for (sz i = 0; i < nodes->as.children.count; i++) {
 		s_json *obj = nodes->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_node *node = s_array_increment(&asset->nodes);
+		s_handle node_handle = s_array_increment(&asset->nodes);
+		se_gltf_node *node = s_array_get(&asset->nodes, node_handle);
 		memset(node, 0, sizeof(*node));
 		se_gltf_json_get_string_dup(obj, "name", &node->name);
 		s_json *children = s_json_get(obj, "children");
@@ -776,11 +872,13 @@ static b8 se_gltf_parse_nodes(const s_json *root, se_gltf_asset *asset) {
 		s_json *weights = s_json_get(obj, "weights");
 		if (weights && weights->type == S_JSON_ARRAY) {
 			node->has_weights = true;
-			s_array_init(&node->weights, weights->as.children.count);
+			s_array_init(&node->weights);
+			s_array_reserve(&node->weights, weights->as.children.count);
 			for (sz w = 0; w < weights->as.children.count; w++) {
 				s_json *item = weights->as.children.items[w];
 				if (item == NULL || item->type != S_JSON_NUMBER) return false;
-				f32 *dst = s_array_increment(&node->weights);
+				s_handle weight_handle = s_array_increment(&node->weights);
+				f32 *dst = s_array_get(&node->weights, weight_handle);
 				*dst = (f32)item->as.number;
 			}
 		}
@@ -793,11 +891,13 @@ static b8 se_gltf_parse_scenes(const s_json *root, se_gltf_asset *asset) {
 	s_json *scenes = s_json_get(root, "scenes");
 	if (scenes == NULL) return true;
 	if (scenes->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->scenes, scenes->as.children.count);
+	s_array_init(&asset->scenes);
+	s_array_reserve(&asset->scenes, scenes->as.children.count);
 	for (sz i = 0; i < scenes->as.children.count; i++) {
 		s_json *obj = scenes->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_scene *scene = s_array_increment(&asset->scenes);
+		s_handle scene_handle = s_array_increment(&asset->scenes);
+		se_gltf_scene *scene = s_array_get(&asset->scenes, scene_handle);
 		memset(scene, 0, sizeof(*scene));
 		se_gltf_json_get_string_dup(obj, "name", &scene->name);
 		s_json *nodes = s_json_get(obj, "nodes");
@@ -813,11 +913,13 @@ static b8 se_gltf_parse_skins(const s_json *root, se_gltf_asset *asset) {
 	s_json *skins = s_json_get(root, "skins");
 	if (skins == NULL) return true;
 	if (skins->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->skins, skins->as.children.count);
+	s_array_init(&asset->skins);
+	s_array_reserve(&asset->skins, skins->as.children.count);
 	for (sz i = 0; i < skins->as.children.count; i++) {
 		s_json *obj = skins->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_skin *skin = s_array_increment(&asset->skins);
+		s_handle skin_handle = s_array_increment(&asset->skins);
+		se_gltf_skin *skin = s_array_get(&asset->skins, skin_handle);
 		memset(skin, 0, sizeof(*skin));
 		se_gltf_json_get_string_dup(obj, "name", &skin->name);
 		skin->has_inverse_bind_matrices = se_gltf_json_get_i32(obj, "inverseBindMatrices", &skin->inverse_bind_matrices);
@@ -834,20 +936,24 @@ static b8 se_gltf_parse_animations(const s_json *root, se_gltf_asset *asset) {
 	s_json *animations = s_json_get(root, "animations");
 	if (animations == NULL) return true;
 	if (animations->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->animations, animations->as.children.count);
+	s_array_init(&asset->animations);
+	s_array_reserve(&asset->animations, animations->as.children.count);
 	for (sz i = 0; i < animations->as.children.count; i++) {
 		s_json *obj = animations->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_animation *anim = s_array_increment(&asset->animations);
+		s_handle anim_handle = s_array_increment(&asset->animations);
+		se_gltf_animation *anim = s_array_get(&asset->animations, anim_handle);
 		memset(anim, 0, sizeof(*anim));
 		se_gltf_json_get_string_dup(obj, "name", &anim->name);
 		s_json *samplers = s_json_get(obj, "samplers");
 		if (samplers == NULL || samplers->type != S_JSON_ARRAY) return false;
-		s_array_init(&anim->samplers, samplers->as.children.count);
+		s_array_init(&anim->samplers);
+		s_array_reserve(&anim->samplers, samplers->as.children.count);
 		for (sz s = 0; s < samplers->as.children.count; s++) {
 			s_json *sampler_obj = samplers->as.children.items[s];
 			if (sampler_obj == NULL || sampler_obj->type != S_JSON_OBJECT) return false;
-			se_gltf_animation_sampler *sampler = s_array_increment(&anim->samplers);
+			s_handle sampler_handle = s_array_increment(&anim->samplers);
+			se_gltf_animation_sampler *sampler = s_array_get(&anim->samplers, sampler_handle);
 			memset(sampler, 0, sizeof(*sampler));
 			if (!se_gltf_json_get_i32(sampler_obj, "input", &sampler->input)) return false;
 			if (!se_gltf_json_get_i32(sampler_obj, "output", &sampler->output)) return false;
@@ -856,11 +962,13 @@ static b8 se_gltf_parse_animations(const s_json *root, se_gltf_asset *asset) {
 		}
 		s_json *channels = s_json_get(obj, "channels");
 		if (channels == NULL || channels->type != S_JSON_ARRAY) return false;
-		s_array_init(&anim->channels, channels->as.children.count);
+		s_array_init(&anim->channels);
+		s_array_reserve(&anim->channels, channels->as.children.count);
 		for (sz c = 0; c < channels->as.children.count; c++) {
 			s_json *channel_obj = channels->as.children.items[c];
 			if (channel_obj == NULL || channel_obj->type != S_JSON_OBJECT) return false;
-			se_gltf_animation_channel *channel = s_array_increment(&anim->channels);
+			s_handle channel_handle = s_array_increment(&anim->channels);
+			se_gltf_animation_channel *channel = s_array_get(&anim->channels, channel_handle);
 			memset(channel, 0, sizeof(*channel));
 			if (!se_gltf_json_get_i32(channel_obj, "sampler", &channel->sampler)) return false;
 			s_json *target = s_json_get(channel_obj, "target");
@@ -879,11 +987,13 @@ static b8 se_gltf_parse_cameras(const s_json *root, se_gltf_asset *asset) {
 	s_json *cameras = s_json_get(root, "cameras");
 	if (cameras == NULL) return true;
 	if (cameras->type != S_JSON_ARRAY) return false;
-	s_array_init(&asset->cameras, cameras->as.children.count);
+	s_array_init(&asset->cameras);
+	s_array_reserve(&asset->cameras, cameras->as.children.count);
 	for (sz i = 0; i < cameras->as.children.count; i++) {
 		s_json *obj = cameras->as.children.items[i];
 		if (obj == NULL || obj->type != S_JSON_OBJECT) return false;
-		se_gltf_camera *cam = s_array_increment(&asset->cameras);
+		s_handle cam_handle = s_array_increment(&asset->cameras);
+		se_gltf_camera *cam = s_array_get(&asset->cameras, cam_handle);
 		memset(cam, 0, sizeof(*cam));
 		se_gltf_json_get_string_dup(obj, "name", &cam->name);
 		cam->has_type = se_gltf_json_get_string_dup(obj, "type", &cam->type);
@@ -935,8 +1045,8 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 	s_json_free(asset->asset.extensions);
 	se_gltf_strings_free(&asset->extensions_used);
 	se_gltf_strings_free(&asset->extensions_required);
-	s_foreach(&asset->buffers, i) {
-		se_gltf_buffer *buf = s_array_get(&asset->buffers, i);
+	se_gltf_buffer *buf = NULL;
+	s_foreach(&asset->buffers, buf) {
 		free(buf->uri);
 		free(buf->name);
 		if (buf->owns_data) free(buf->data);
@@ -944,15 +1054,15 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 		s_json_free(buf->extensions);
 	}
 	s_array_clear(&asset->buffers);
-	s_foreach(&asset->buffer_views, i) {
-		se_gltf_buffer_view *view = s_array_get(&asset->buffer_views, i);
+	se_gltf_buffer_view *view = NULL;
+	s_foreach(&asset->buffer_views, view) {
 		free(view->name);
 		s_json_free(view->extras);
 		s_json_free(view->extensions);
 	}
 	s_array_clear(&asset->buffer_views);
-	s_foreach(&asset->accessors, i) {
-		se_gltf_accessor *acc = s_array_get(&asset->accessors, i);
+	se_gltf_accessor *acc = NULL;
+	s_foreach(&asset->accessors, acc) {
 		free(acc->name);
 		s_json_free(acc->extras);
 		s_json_free(acc->extensions);
@@ -964,8 +1074,8 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 		s_json_free(acc->sparse.values.extensions);
 	}
 	s_array_clear(&asset->accessors);
-	s_foreach(&asset->images, i) {
-		se_gltf_image *img = s_array_get(&asset->images, i);
+	se_gltf_image *img = NULL;
+	s_foreach(&asset->images, img) {
 		free(img->uri);
 		free(img->mime_type);
 		free(img->name);
@@ -974,22 +1084,22 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 		s_json_free(img->extensions);
 	}
 	s_array_clear(&asset->images);
-	s_foreach(&asset->samplers, i) {
-		se_gltf_sampler *sampler = s_array_get(&asset->samplers, i);
+	se_gltf_sampler *sampler = NULL;
+	s_foreach(&asset->samplers, sampler) {
 		free(sampler->name);
 		s_json_free(sampler->extras);
 		s_json_free(sampler->extensions);
 	}
 	s_array_clear(&asset->samplers);
-	s_foreach(&asset->textures, i) {
-		se_gltf_texture *tex = s_array_get(&asset->textures, i);
+	se_gltf_texture *tex = NULL;
+	s_foreach(&asset->textures, tex) {
 		free(tex->name);
 		s_json_free(tex->extras);
 		s_json_free(tex->extensions);
 	}
 	s_array_clear(&asset->textures);
-	s_foreach(&asset->materials, i) {
-		se_gltf_material *mat = s_array_get(&asset->materials, i);
+	se_gltf_material *mat = NULL;
+	s_foreach(&asset->materials, mat) {
 		free(mat->name);
 		free(mat->alpha_mode);
 		s_json_free(mat->extras);
@@ -1020,13 +1130,13 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 		}
 	}
 	s_array_clear(&asset->materials);
-	s_foreach(&asset->meshes, i) {
-		se_gltf_mesh *mesh = s_array_get(&asset->meshes, i);
+	se_gltf_mesh *mesh = NULL;
+	s_foreach(&asset->meshes, mesh) {
 		se_gltf_mesh_free(mesh);
 	}
 	s_array_clear(&asset->meshes);
-	s_foreach(&asset->nodes, i) {
-		se_gltf_node *node = s_array_get(&asset->nodes, i);
+	se_gltf_node *node = NULL;
+	s_foreach(&asset->nodes, node) {
 		free(node->name);
 		s_array_clear(&node->children);
 		s_array_clear(&node->weights);
@@ -1034,33 +1144,33 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 		s_json_free(node->extensions);
 	}
 	s_array_clear(&asset->nodes);
-	s_foreach(&asset->scenes, i) {
-		se_gltf_scene *scene = s_array_get(&asset->scenes, i);
+	se_gltf_scene *scene = NULL;
+	s_foreach(&asset->scenes, scene) {
 		free(scene->name);
 		s_array_clear(&scene->nodes);
 		s_json_free(scene->extras);
 		s_json_free(scene->extensions);
 	}
 	s_array_clear(&asset->scenes);
-	s_foreach(&asset->skins, i) {
-		se_gltf_skin *skin = s_array_get(&asset->skins, i);
+	se_gltf_skin *skin = NULL;
+	s_foreach(&asset->skins, skin) {
 		free(skin->name);
 		s_array_clear(&skin->joints);
 		s_json_free(skin->extras);
 		s_json_free(skin->extensions);
 	}
 	s_array_clear(&asset->skins);
-	s_foreach(&asset->animations, i) {
-		se_gltf_animation *anim = s_array_get(&asset->animations, i);
+	se_gltf_animation *anim = NULL;
+	s_foreach(&asset->animations, anim) {
 		free(anim->name);
-		s_foreach(&anim->samplers, s) {
-			se_gltf_animation_sampler *sampler = s_array_get(&anim->samplers, s);
+		se_gltf_animation_sampler *sampler = NULL;
+		s_foreach(&anim->samplers, sampler) {
 			free(sampler->interpolation);
 			s_json_free(sampler->extras);
 			s_json_free(sampler->extensions);
 		}
-		s_foreach(&anim->channels, c) {
-			se_gltf_animation_channel *channel = s_array_get(&anim->channels, c);
+		se_gltf_animation_channel *channel = NULL;
+		s_foreach(&anim->channels, channel) {
 			free(channel->target.path);
 			s_json_free(channel->target.extras);
 			s_json_free(channel->target.extensions);
@@ -1073,8 +1183,8 @@ static void se_gltf_asset_free(se_gltf_asset *asset) {
 		s_json_free(anim->extensions);
 	}
 	s_array_clear(&asset->animations);
-	s_foreach(&asset->cameras, i) {
-		se_gltf_camera *cam = s_array_get(&asset->cameras, i);
+	se_gltf_camera *cam = NULL;
+	s_foreach(&asset->cameras, cam) {
 		free(cam->name);
 		free(cam->type);
 		s_json_free(cam->extras);
@@ -1241,8 +1351,11 @@ static b8 se_gltf_json_add_float_array(s_json *parent, const char *name, const f
 static b8 se_gltf_json_add_i32_array(s_json *parent, const char *name, const se_gltf_i32_array *arr) {
 	s_json *node = s_json_array_empty(name);
 	if (node == NULL) return false;
-	for (sz i = 0; i < arr->size; i++) {
-		s_json *num = s_json_num(NULL, arr->data[i]);
+	se_gltf_i32_array *mutable_arr = (se_gltf_i32_array *)arr;
+	const i32 *values = s_array_get_data(mutable_arr);
+	const sz count = s_array_get_size(mutable_arr);
+	for (sz i = 0; i < count; i++) {
+		s_json *num = s_json_num(NULL, values[i]);
 		if (num == NULL || !s_json_add(node, num)) {
 			s_json_free(num);
 			s_json_free(node);
@@ -1259,8 +1372,11 @@ static b8 se_gltf_json_add_i32_array(s_json *parent, const char *name, const se_
 static b8 se_gltf_json_add_string_array(s_json *parent, const char *name, const se_gltf_strings *arr) {
 	s_json *node = s_json_array_empty(name);
 	if (node == NULL) return false;
-	for (sz i = 0; i < arr->size; i++) {
-		s_json *str = s_json_str(NULL, arr->data[i]);
+	se_gltf_strings *mutable_arr = (se_gltf_strings *)arr;
+	char **values = s_array_get_data(mutable_arr);
+	const sz count = s_array_get_size(mutable_arr);
+	for (sz i = 0; i < count; i++) {
+		s_json *str = s_json_str(NULL, values[i]);
 		if (str == NULL || !s_json_add(node, str)) {
 			s_json_free(str);
 			s_json_free(node);
@@ -1293,13 +1409,14 @@ static b8 se_gltf_json_add_extras_extensions(s_json *parent, const s_json *extra
 }
 
 static b8 se_gltf_write_buffers_json(const se_gltf_asset *asset, s_json *root, const se_gltf_write_params *params, const char *base_name, char ***out_generated_uris, sz *out_generated_uri_count) {
-	if (asset->buffers.size == 0) return true;
+	const sz buffer_count = s_array_get_size(&asset->buffers);
+	if (buffer_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "buffers");
 	if (arr == NULL) return false;
-	*out_generated_uri_count = asset->buffers.size;
-	*out_generated_uris = (char **)calloc(asset->buffers.size, sizeof(char *));
-	for (sz i = 0; i < asset->buffers.size; i++) {
-		se_gltf_buffer *buf = s_array_get(&asset->buffers, i);
+	*out_generated_uri_count = buffer_count;
+	*out_generated_uris = (char **)calloc(buffer_count, sizeof(char *));
+	for (sz i = 0; i < buffer_count; i++) {
+		se_gltf_buffer *buf = se_gltf_buffer_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		u32 byte_length = buf->byte_length ? buf->byte_length : (u32)buf->data_size;
@@ -1320,7 +1437,7 @@ static b8 se_gltf_write_buffers_json(const se_gltf_asset *asset, s_json *root, c
 				uri = s_files_strdup(buf->uri);
 			} else {
 				char name_buf[SE_MAX_PATH_LENGTH] = {0};
-				if (asset->buffers.size == 1) {
+				if (buffer_count == 1) {
 					snprintf(name_buf, sizeof(name_buf), "%s.bin", base_name);
 				} else {
 					snprintf(name_buf, sizeof(name_buf), "%s_buffer%zu.bin", base_name, i);
@@ -1344,8 +1461,8 @@ static b8 se_gltf_write_glb_buffers_json(const se_gltf_asset *asset, s_json *roo
 	s_json *obj = s_json_object_empty(NULL);
 	if (obj == NULL) return false;
 	if (!se_gltf_json_add_number(obj, "byteLength", (u32)bin_size)) return false;
-	if (asset->buffers.size > 0) {
-		se_gltf_buffer *buf = s_array_get(&asset->buffers, 0);
+	if (s_array_get_size(&asset->buffers) > 0) {
+		se_gltf_buffer *buf = se_gltf_buffer_at(asset, 0);
 		if (buf->name) if (!se_gltf_json_add_string(obj, "name", buf->name)) return false;
 		if (!se_gltf_json_add_extras_extensions(obj, buf->extras, buf->extensions)) return false;
 	}
@@ -1366,11 +1483,12 @@ static b8 se_gltf_write_assets_json(const se_gltf_asset *asset, s_json *root) {
 }
 
 static b8 se_gltf_write_buffer_views_json(const se_gltf_asset *asset, s_json *root, const u32 *buffer_offsets, b8 remap_buffers) {
-	if (asset->buffer_views.size == 0) return true;
+	const sz view_count = s_array_get_size(&asset->buffer_views);
+	if (view_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "bufferViews");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->buffer_views.size; i++) {
-		se_gltf_buffer_view *view = s_array_get(&asset->buffer_views, i);
+	for (sz i = 0; i < view_count; i++) {
+		se_gltf_buffer_view *view = se_gltf_buffer_view_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		i32 buffer_index = view->buffer;
@@ -1392,11 +1510,12 @@ static b8 se_gltf_write_buffer_views_json(const se_gltf_asset *asset, s_json *ro
 }
 
 static b8 se_gltf_write_accessors_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->accessors.size == 0) return true;
+	const sz accessor_count = s_array_get_size(&asset->accessors);
+	if (accessor_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "accessors");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->accessors.size; i++) {
-		se_gltf_accessor *acc = s_array_get(&asset->accessors, i);
+	for (sz i = 0; i < accessor_count; i++) {
+		se_gltf_accessor *acc = se_gltf_accessor_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (acc->has_buffer_view) if (!se_gltf_json_add_number(obj, "bufferView", acc->buffer_view)) return false;
@@ -1433,11 +1552,12 @@ static b8 se_gltf_write_accessors_json(const se_gltf_asset *asset, s_json *root)
 }
 
 static b8 se_gltf_write_images_json(const se_gltf_asset *asset, s_json *root, const se_gltf_write_params *params, const char *base_name, char **out_generated_uris) {
-	if (asset->images.size == 0) return true;
+	const sz image_count = s_array_get_size(&asset->images);
+	if (image_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "images");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->images.size; i++) {
-		se_gltf_image *img = s_array_get(&asset->images, i);
+	for (sz i = 0; i < image_count; i++) {
+		se_gltf_image *img = se_gltf_image_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		char *uri = NULL;
@@ -1480,11 +1600,12 @@ static b8 se_gltf_write_images_json(const se_gltf_asset *asset, s_json *root, co
 }
 
 static b8 se_gltf_write_samplers_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->samplers.size == 0) return true;
+	const sz sampler_count = s_array_get_size(&asset->samplers);
+	if (sampler_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "samplers");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->samplers.size; i++) {
-		se_gltf_sampler *sampler = s_array_get(&asset->samplers, i);
+	for (sz i = 0; i < sampler_count; i++) {
+		se_gltf_sampler *sampler = se_gltf_sampler_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (sampler->has_mag_filter) if (!se_gltf_json_add_number(obj, "magFilter", sampler->mag_filter)) return false;
@@ -1499,11 +1620,12 @@ static b8 se_gltf_write_samplers_json(const se_gltf_asset *asset, s_json *root) 
 }
 
 static b8 se_gltf_write_textures_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->textures.size == 0) return true;
+	const sz texture_count = s_array_get_size(&asset->textures);
+	if (texture_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "textures");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->textures.size; i++) {
-		se_gltf_texture *tex = s_array_get(&asset->textures, i);
+	for (sz i = 0; i < texture_count; i++) {
+		se_gltf_texture *tex = se_gltf_texture_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (tex->has_sampler) if (!se_gltf_json_add_number(obj, "sampler", tex->sampler)) return false;
@@ -1526,11 +1648,12 @@ static b8 se_gltf_write_texture_info_json(s_json *parent, const char *name, cons
 }
 
 static b8 se_gltf_write_materials_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->materials.size == 0) return true;
+	const sz material_count = s_array_get_size(&asset->materials);
+	if (material_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "materials");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->materials.size; i++) {
-		se_gltf_material *mat = s_array_get(&asset->materials, i);
+	for (sz i = 0; i < material_count; i++) {
+		se_gltf_material *mat = se_gltf_material_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (mat->name) if (!se_gltf_json_add_string(obj, "name", mat->name)) return false;
@@ -1574,24 +1697,27 @@ static b8 se_gltf_write_materials_json(const se_gltf_asset *asset, s_json *root)
 }
 
 static b8 se_gltf_write_meshes_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->meshes.size == 0) return true;
+	const sz mesh_count = s_array_get_size(&asset->meshes);
+	if (mesh_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "meshes");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->meshes.size; i++) {
-		se_gltf_mesh *mesh = s_array_get(&asset->meshes, i);
+	for (sz i = 0; i < mesh_count; i++) {
+		se_gltf_mesh *mesh = se_gltf_mesh_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (mesh->name) if (!se_gltf_json_add_string(obj, "name", mesh->name)) return false;
 		s_json *prims = se_gltf_json_add_array(obj, "primitives");
 		if (prims == NULL) return false;
-		for (sz p = 0; p < mesh->primitives.size; p++) {
-			se_gltf_primitive *prim = s_array_get(&mesh->primitives, p);
+		for (sz p = 0; p < s_array_get_size(&mesh->primitives); p++) {
+			s_handle prim_handle = s_array_handle(&mesh->primitives, (u32)p);
+			se_gltf_primitive *prim = s_array_get(&mesh->primitives, prim_handle);
 			s_json *prim_obj = s_json_object_empty(NULL);
 			if (prim_obj == NULL) return false;
 			s_json *attrs = s_json_object_empty("attributes");
 			if (attrs == NULL) return false;
-			for (sz a = 0; a < prim->attributes.attributes.size; a++) {
-				se_gltf_attribute *attr = s_array_get(&prim->attributes.attributes, a);
+			for (sz a = 0; a < s_array_get_size(&prim->attributes.attributes); a++) {
+				s_handle attr_handle = s_array_handle(&prim->attributes.attributes, (u32)a);
+				se_gltf_attribute *attr = s_array_get(&prim->attributes.attributes, attr_handle);
 				s_json *num = s_json_num(attr->name, attr->accessor);
 				if (num == NULL || !s_json_add(attrs, num)) { s_json_free(num); return false; }
 			}
@@ -1599,15 +1725,17 @@ static b8 se_gltf_write_meshes_json(const se_gltf_asset *asset, s_json *root) {
 			if (prim->has_indices) if (!se_gltf_json_add_number(prim_obj, "indices", prim->indices)) return false;
 			if (prim->has_material) if (!se_gltf_json_add_number(prim_obj, "material", prim->material)) return false;
 			if (prim->has_mode) if (!se_gltf_json_add_number(prim_obj, "mode", prim->mode)) return false;
-			if (prim->targets.size > 0) {
+			if (s_array_get_size(&prim->targets) > 0) {
 				s_json *targets = se_gltf_json_add_array(prim_obj, "targets");
 				if (targets == NULL) return false;
-				for (sz t = 0; t < prim->targets.size; t++) {
-					se_gltf_attribute_set *target = s_array_get(&prim->targets, t);
+				for (sz t = 0; t < s_array_get_size(&prim->targets); t++) {
+					s_handle target_handle = s_array_handle(&prim->targets, (u32)t);
+					se_gltf_attribute_set *target = s_array_get(&prim->targets, target_handle);
 					s_json *target_obj = s_json_object_empty(NULL);
 					if (target_obj == NULL) return false;
-					for (sz a = 0; a < target->attributes.size; a++) {
-						se_gltf_attribute *attr = s_array_get(&target->attributes, a);
+					for (sz a = 0; a < s_array_get_size(&target->attributes); a++) {
+						s_handle attr_handle = s_array_handle(&target->attributes, (u32)a);
+						se_gltf_attribute *attr = s_array_get(&target->attributes, attr_handle);
 						s_json *num = s_json_num(attr->name, attr->accessor);
 						if (num == NULL || !s_json_add(target_obj, num)) { s_json_free(num); return false; }
 					}
@@ -1617,11 +1745,13 @@ static b8 se_gltf_write_meshes_json(const se_gltf_asset *asset, s_json *root) {
 			if (!se_gltf_json_add_extras_extensions(prim_obj, prim->extras, prim->extensions)) return false;
 			if (!s_json_add(prims, prim_obj)) { s_json_free(prim_obj); return false; }
 		}
-		if (mesh->has_weights && mesh->weights.size > 0) {
+		if (mesh->has_weights && s_array_get_size(&mesh->weights) > 0) {
 			s_json *weights = s_json_array_empty("weights");
 			if (weights == NULL) return false;
-			for (sz w = 0; w < mesh->weights.size; w++) {
-				s_json *num = s_json_num(NULL, mesh->weights.data[w]);
+			f32 *values = s_array_get_data(&mesh->weights);
+			const sz weight_count = s_array_get_size(&mesh->weights);
+			for (sz w = 0; w < weight_count; w++) {
+				s_json *num = s_json_num(NULL, values[w]);
 				if (num == NULL || !s_json_add(weights, num)) { s_json_free(num); return false; }
 			}
 			if (!s_json_add(obj, weights)) { s_json_free(weights); return false; }
@@ -1633,15 +1763,16 @@ static b8 se_gltf_write_meshes_json(const se_gltf_asset *asset, s_json *root) {
 }
 
 static b8 se_gltf_write_nodes_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->nodes.size == 0) return true;
+	const sz node_count = s_array_get_size(&asset->nodes);
+	if (node_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "nodes");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->nodes.size; i++) {
-		se_gltf_node *node = s_array_get(&asset->nodes, i);
+	for (sz i = 0; i < node_count; i++) {
+		se_gltf_node *node = se_gltf_node_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (node->name) if (!se_gltf_json_add_string(obj, "name", node->name)) return false;
-		if (node->children.size > 0) if (!se_gltf_json_add_i32_array(obj, "children", &node->children)) return false;
+		if (s_array_get_size(&node->children) > 0) if (!se_gltf_json_add_i32_array(obj, "children", &node->children)) return false;
 		if (node->has_mesh) if (!se_gltf_json_add_number(obj, "mesh", node->mesh)) return false;
 		if (node->has_skin) if (!se_gltf_json_add_number(obj, "skin", node->skin)) return false;
 		if (node->has_camera) if (!se_gltf_json_add_number(obj, "camera", node->camera)) return false;
@@ -1649,11 +1780,13 @@ static b8 se_gltf_write_nodes_json(const se_gltf_asset *asset, s_json *root) {
 		if (node->has_translation) if (!se_gltf_json_add_float_array(obj, "translation", node->translation, 3)) return false;
 		if (node->has_rotation) if (!se_gltf_json_add_float_array(obj, "rotation", node->rotation, 4)) return false;
 		if (node->has_scale) if (!se_gltf_json_add_float_array(obj, "scale", node->scale, 3)) return false;
-		if (node->has_weights && node->weights.size > 0) {
+		if (node->has_weights && s_array_get_size(&node->weights) > 0) {
 			s_json *weights = s_json_array_empty("weights");
 			if (weights == NULL) return false;
-			for (sz w = 0; w < node->weights.size; w++) {
-				s_json *num = s_json_num(NULL, node->weights.data[w]);
+			f32 *values = s_array_get_data(&node->weights);
+			const sz weight_count = s_array_get_size(&node->weights);
+			for (sz w = 0; w < weight_count; w++) {
+				s_json *num = s_json_num(NULL, values[w]);
 				if (num == NULL || !s_json_add(weights, num)) { s_json_free(num); return false; }
 			}
 			if (!s_json_add(obj, weights)) { s_json_free(weights); return false; }
@@ -1665,15 +1798,16 @@ static b8 se_gltf_write_nodes_json(const se_gltf_asset *asset, s_json *root) {
 }
 
 static b8 se_gltf_write_scenes_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->scenes.size == 0) return true;
+	const sz scene_count = s_array_get_size(&asset->scenes);
+	if (scene_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "scenes");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->scenes.size; i++) {
-		se_gltf_scene *scene = s_array_get(&asset->scenes, i);
+	for (sz i = 0; i < scene_count; i++) {
+		se_gltf_scene *scene = se_gltf_scene_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (scene->name) if (!se_gltf_json_add_string(obj, "name", scene->name)) return false;
-		if (scene->nodes.size > 0) if (!se_gltf_json_add_i32_array(obj, "nodes", &scene->nodes)) return false;
+		if (s_array_get_size(&scene->nodes) > 0) if (!se_gltf_json_add_i32_array(obj, "nodes", &scene->nodes)) return false;
 		if (!se_gltf_json_add_extras_extensions(obj, scene->extras, scene->extensions)) return false;
 		if (!s_json_add(arr, obj)) { s_json_free(obj); return false; }
 	}
@@ -1682,11 +1816,12 @@ static b8 se_gltf_write_scenes_json(const se_gltf_asset *asset, s_json *root) {
 }
 
 static b8 se_gltf_write_skins_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->skins.size == 0) return true;
+	const sz skin_count = s_array_get_size(&asset->skins);
+	if (skin_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "skins");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->skins.size; i++) {
-		se_gltf_skin *skin = s_array_get(&asset->skins, i);
+	for (sz i = 0; i < skin_count; i++) {
+		se_gltf_skin *skin = se_gltf_skin_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (skin->name) if (!se_gltf_json_add_string(obj, "name", skin->name)) return false;
@@ -1700,18 +1835,20 @@ static b8 se_gltf_write_skins_json(const se_gltf_asset *asset, s_json *root) {
 }
 
 static b8 se_gltf_write_animations_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->animations.size == 0) return true;
+	const sz anim_count = s_array_get_size(&asset->animations);
+	if (anim_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "animations");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->animations.size; i++) {
-		se_gltf_animation *anim = s_array_get(&asset->animations, i);
+	for (sz i = 0; i < anim_count; i++) {
+		se_gltf_animation *anim = se_gltf_animation_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (anim->name) if (!se_gltf_json_add_string(obj, "name", anim->name)) return false;
 		s_json *samplers = se_gltf_json_add_array(obj, "samplers");
 		if (samplers == NULL) return false;
-		for (sz s = 0; s < anim->samplers.size; s++) {
-			se_gltf_animation_sampler *sampler = s_array_get(&anim->samplers, s);
+		for (sz s = 0; s < s_array_get_size(&anim->samplers); s++) {
+			s_handle sampler_handle = s_array_handle(&anim->samplers, (u32)s);
+			se_gltf_animation_sampler *sampler = s_array_get(&anim->samplers, sampler_handle);
 			s_json *sampler_obj = s_json_object_empty(NULL);
 			if (sampler_obj == NULL) return false;
 			if (!se_gltf_json_add_number(sampler_obj, "input", sampler->input)) return false;
@@ -1722,8 +1859,9 @@ static b8 se_gltf_write_animations_json(const se_gltf_asset *asset, s_json *root
 		}
 		s_json *channels = se_gltf_json_add_array(obj, "channels");
 		if (channels == NULL) return false;
-		for (sz c = 0; c < anim->channels.size; c++) {
-			se_gltf_animation_channel *channel = s_array_get(&anim->channels, c);
+		for (sz c = 0; c < s_array_get_size(&anim->channels); c++) {
+			s_handle channel_handle = s_array_handle(&anim->channels, (u32)c);
+			se_gltf_animation_channel *channel = s_array_get(&anim->channels, channel_handle);
 			s_json *channel_obj = s_json_object_empty(NULL);
 			if (channel_obj == NULL) return false;
 			if (!se_gltf_json_add_number(channel_obj, "sampler", channel->sampler)) return false;
@@ -1742,11 +1880,12 @@ static b8 se_gltf_write_animations_json(const se_gltf_asset *asset, s_json *root
 }
 
 static b8 se_gltf_write_cameras_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->cameras.size == 0) return true;
+	const sz camera_count = s_array_get_size(&asset->cameras);
+	if (camera_count == 0) return true;
 	s_json *arr = se_gltf_json_add_array(root, "cameras");
 	if (arr == NULL) return false;
-	for (sz i = 0; i < asset->cameras.size; i++) {
-		se_gltf_camera *cam = s_array_get(&asset->cameras, i);
+	for (sz i = 0; i < camera_count; i++) {
+		se_gltf_camera *cam = se_gltf_camera_at(asset, i);
 		s_json *obj = s_json_object_empty(NULL);
 		if (obj == NULL) return false;
 		if (cam->name) if (!se_gltf_json_add_string(obj, "name", cam->name)) return false;
@@ -1774,8 +1913,8 @@ static b8 se_gltf_write_cameras_json(const se_gltf_asset *asset, s_json *root) {
 }
 
 static b8 se_gltf_write_top_level_json(const se_gltf_asset *asset, s_json *root) {
-	if (asset->extensions_used.size > 0) if (!se_gltf_json_add_string_array(root, "extensionsUsed", &asset->extensions_used)) return false;
-	if (asset->extensions_required.size > 0) if (!se_gltf_json_add_string_array(root, "extensionsRequired", &asset->extensions_required)) return false;
+	if (s_array_get_size(&asset->extensions_used) > 0) if (!se_gltf_json_add_string_array(root, "extensionsUsed", &asset->extensions_used)) return false;
+	if (s_array_get_size(&asset->extensions_required) > 0) if (!se_gltf_json_add_string_array(root, "extensionsRequired", &asset->extensions_required)) return false;
 	if (!se_gltf_json_add_extras_extensions(root, asset->extras, asset->extensions)) return false;
 	return true;
 }
@@ -1810,13 +1949,13 @@ static b8 se_gltf_write_glb(const se_gltf_asset *asset, const char *path, const 
 }
 
 static b8 se_gltf_collect_buffer_data(const se_gltf_asset *asset, u8 **out_data, sz *out_size, u32 **out_offsets) {
-	sz buffer_count = asset->buffers.size;
+	sz buffer_count = s_array_get_size(&asset->buffers);
 	if (buffer_count == 0) { *out_data = NULL; *out_size = 0; return true; }
 	u32 *offsets = (u32 *)malloc(sizeof(u32) * buffer_count);
 	if (offsets == NULL) return false;
 	sz total = 0;
 	for (sz i = 0; i < buffer_count; i++) {
-		se_gltf_buffer *buf = s_array_get(&asset->buffers, i);
+		se_gltf_buffer *buf = se_gltf_buffer_at(asset, i);
 		offsets[i] = (u32)total;
 		sz size = buf->data_size;
 		total += (size + 3) & ~3u;
@@ -1825,7 +1964,7 @@ static b8 se_gltf_collect_buffer_data(const se_gltf_asset *asset, u8 **out_data,
 	if (data == NULL) { free(offsets); return false; }
 	memset(data, 0, total);
 	for (sz i = 0; i < buffer_count; i++) {
-		se_gltf_buffer *buf = s_array_get(&asset->buffers, i);
+		se_gltf_buffer *buf = se_gltf_buffer_at(asset, i);
 		if (buf->data == NULL) {
 			free(offsets);
 			free(data);
@@ -1840,8 +1979,9 @@ static b8 se_gltf_collect_buffer_data(const se_gltf_asset *asset, u8 **out_data,
 }
 
 static b8 se_gltf_write_external_buffers(const se_gltf_asset *asset, const char *dir, char **uris) {
-	for (sz i = 0; i < asset->buffers.size; i++) {
-		se_gltf_buffer *buf = s_array_get(&asset->buffers, i);
+	const sz buffer_count = s_array_get_size(&asset->buffers);
+	for (sz i = 0; i < buffer_count; i++) {
+		se_gltf_buffer *buf = se_gltf_buffer_at(asset, i);
 		if (uris[i] == NULL) continue;
 		if (buf->data == NULL) return false;
 		char full_path[SE_MAX_PATH_LENGTH] = {0};
@@ -1856,8 +1996,9 @@ static b8 se_gltf_write_external_buffers(const se_gltf_asset *asset, const char 
 }
 
 static b8 se_gltf_write_external_images(const se_gltf_asset *asset, const char *dir, char **uris) {
-	for (sz i = 0; i < asset->images.size; i++) {
-		se_gltf_image *img = s_array_get(&asset->images, i);
+	const sz image_count = s_array_get_size(&asset->images);
+	for (sz i = 0; i < image_count; i++) {
+		se_gltf_image *img = se_gltf_image_at(asset, i);
 		if (uris[i] == NULL) continue;
 		if (img->data == NULL) return false;
 		char full_path[SE_MAX_PATH_LENGTH] = {0};
@@ -1893,8 +2034,11 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 	if (!cfg.write_glb) {
 		if (!se_gltf_write_buffers_json(asset, root, &cfg, base_name, &buffer_uris, &buffer_uri_count)) { s_json_free(root); return false; }
 	}
-	if (asset->images.size > 0) {
-		image_uris = (char **)calloc(asset->images.size, sizeof(char *));
+	{
+		const sz image_count = s_array_get_size(&asset->images);
+		if (image_count > 0) {
+			image_uris = (char **)calloc(image_count, sizeof(char *));
+		}
 	}
 	if (!se_gltf_write_buffer_views_json(asset, root, NULL, false) ||
 		!se_gltf_write_accessors_json(asset, root) ||
@@ -1985,7 +2129,8 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 		free(buffer_uris);
 	}
 	if (image_uris) {
-		for (sz i = 0; i < asset->images.size; i++) free(image_uris[i]);
+		const sz image_count = s_array_get_size(&asset->images);
+		for (sz i = 0; i < image_count; i++) free(image_uris[i]);
 		free(image_uris);
 	}
 	return ok;

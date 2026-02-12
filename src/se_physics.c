@@ -325,8 +325,8 @@ void se_physics_body_2d_update_mass(se_physics_body_2d *body) {
 		return;
 	}
 	f32 total_area = 0.0f;
-	s_foreach(&body->shapes, i) {
-		se_physics_shape_2d *shape = s_array_get(&body->shapes, i);
+	se_physics_shape_2d *shape = NULL;
+	s_foreach(&body->shapes, shape) {
 		if (shape->type == SE_PHYSICS_SHAPE_2D_MESH) {
 			continue;
 		}
@@ -339,8 +339,8 @@ void se_physics_body_2d_update_mass(se_physics_body_2d *body) {
 		return;
 	}
 	f32 inertia = 0.0f;
-	s_foreach(&body->shapes, i) {
-		se_physics_shape_2d *shape = s_array_get(&body->shapes, i);
+	shape = NULL;
+	s_foreach(&body->shapes, shape) {
 		f32 area = se_physics_shape_2d_area(shape);
 		if (area <= 0.0f) {
 			continue;
@@ -374,12 +374,12 @@ void se_physics_body_3d_update_mass(se_physics_body_3d *body) {
 		return;
 	}
 	f32 total_volume = 0.0f;
-	s_foreach(&body->shapes, i) {
-		se_physics_shape_3d *shape = s_array_get(&body->shapes, i);
-		if (shape->type == SE_PHYSICS_SHAPE_3D_MESH) {
+	se_physics_shape_3d *shape3d = NULL;
+	s_foreach(&body->shapes, shape3d) {
+		if (shape3d->type == SE_PHYSICS_SHAPE_3D_MESH) {
 			continue;
 		}
-		total_volume += se_physics_shape_3d_volume(shape);
+		total_volume += se_physics_shape_3d_volume(shape3d);
 	}
 	if (total_volume <= 0.0f) {
 		body->inv_mass = 1.0f / body->mass;
@@ -388,22 +388,22 @@ void se_physics_body_3d_update_mass(se_physics_body_3d *body) {
 		return;
 	}
 	f32 inertia = 0.0f;
-	s_foreach(&body->shapes, i) {
-		se_physics_shape_3d *shape = s_array_get(&body->shapes, i);
-		f32 volume = se_physics_shape_3d_volume(shape);
+	shape3d = NULL;
+	s_foreach(&body->shapes, shape3d) {
+		f32 volume = se_physics_shape_3d_volume(shape3d);
 		if (volume <= 0.0f) {
 			continue;
 		}
 		f32 shape_mass = body->mass * (volume / total_volume);
-		s_vec3 offset = shape->offset;
+		s_vec3 offset = shape3d->offset;
 		f32 dist_sq = offset.x * offset.x + offset.y * offset.y + offset.z * offset.z;
-		if (shape->type == SE_PHYSICS_SHAPE_3D_SPHERE) {
-			f32 r = shape->sphere.radius;
+		if (shape3d->type == SE_PHYSICS_SHAPE_3D_SPHERE) {
+			f32 r = shape3d->sphere.radius;
 			inertia += 0.4f * shape_mass * r * r + shape_mass * dist_sq;
-		} else if (shape->type == SE_PHYSICS_SHAPE_3D_AABB || shape->type == SE_PHYSICS_SHAPE_3D_BOX) {
-			f32 w = shape->box.half_extents.x * 2.0f;
-			f32 h = shape->box.half_extents.y * 2.0f;
-			f32 d = shape->box.half_extents.z * 2.0f;
+		} else if (shape3d->type == SE_PHYSICS_SHAPE_3D_AABB || shape3d->type == SE_PHYSICS_SHAPE_3D_BOX) {
+			f32 w = shape3d->box.half_extents.x * 2.0f;
+			f32 h = shape3d->box.half_extents.y * 2.0f;
+			f32 d = shape3d->box.half_extents.z * 2.0f;
 			inertia += (shape_mass * (w * w + h * h + d * d) / 12.0f) + shape_mass * dist_sq;
 		}
 	}
@@ -800,7 +800,8 @@ se_box_2d se_physics_triangle_bounds_2d(const se_physics_mesh_2d *mesh, u32 tri_
 
 u32 se_physics_bvh_build_2d(se_physics_shape_2d *shape, u32 start, u32 count) {
 	u32 node_index = (u32)s_array_get_size(&shape->bvh_nodes);
-	se_physics_bvh_node_2d *node = s_array_increment(&shape->bvh_nodes);
+	s_handle node_handle = s_array_increment(&shape->bvh_nodes);
+	se_physics_bvh_node_2d *node = s_array_get(&shape->bvh_nodes, node_handle);
 	memset(node, 0, sizeof(*node));
 
 	se_box_2d bounds = {0};
@@ -1121,7 +1122,8 @@ se_box_3d se_physics_triangle_bounds_3d(const se_physics_mesh_3d *mesh, u32 tri_
 
 u32 se_physics_bvh_build_3d(se_physics_shape_3d *shape, u32 start, u32 count) {
 	u32 node_index = (u32)s_array_get_size(&shape->bvh_nodes);
-	se_physics_bvh_node_3d *node = s_array_increment(&shape->bvh_nodes);
+	s_handle node_handle = s_array_increment(&shape->bvh_nodes);
+	se_physics_bvh_node_3d *node = s_array_get(&shape->bvh_nodes, node_handle);
 	memset(node, 0, sizeof(*node));
 
 	se_box_3d bounds = {0};
@@ -1638,24 +1640,26 @@ se_physics_world_2d *se_physics_world_2d_create(const se_physics_world_params_2d
 	world->shapes_per_body = cfg.shapes_per_body;
 	world->on_contact = cfg.on_contact;
 	world->user_data = cfg.user_data;
-	s_array_init(&world->bodies, cfg.bodies_count);
-	s_array_init(&world->contacts, cfg.contacts_count);
+	s_array_init(&world->bodies);
+	s_array_reserve(&world->bodies, cfg.bodies_count);
+	s_array_init(&world->contacts);
+	s_array_reserve(&world->contacts, cfg.contacts_count);
 	se_set_last_error(SE_RESULT_OK);
 	return world;
 }
 
 void se_physics_world_2d_destroy(se_physics_world_2d *world) {
 	if (!world) return;
-	s_foreach(&world->bodies, i) {
-		se_physics_body_2d *body = s_array_get(&world->bodies, i);
+	se_physics_body_2d *body = NULL;
+	s_foreach(&world->bodies, body) {
 		if (!body->is_valid) continue;
-		s_foreach(&body->shapes, s) {
-			se_physics_shape_2d *shape = s_array_get(&body->shapes, s);
+		se_physics_shape_2d *shape = NULL;
+		s_foreach(&body->shapes, shape) {
 			if (shape->bvh_triangles) {
 				free(shape->bvh_triangles);
 				shape->bvh_triangles = NULL;
 			}
-			if (shape->bvh_nodes.data) {
+			if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
 				s_array_clear(&shape->bvh_nodes);
 			}
 			shape->bvh_built = false;
@@ -1688,24 +1692,26 @@ se_physics_world_3d *se_physics_world_3d_create(const se_physics_world_params_3d
 	world->shapes_per_body = cfg.shapes_per_body;
 	world->on_contact = cfg.on_contact;
 	world->user_data = cfg.user_data;
-	s_array_init(&world->bodies, cfg.bodies_count);
-	s_array_init(&world->contacts, cfg.contacts_count);
+	s_array_init(&world->bodies);
+	s_array_reserve(&world->bodies, cfg.bodies_count);
+	s_array_init(&world->contacts);
+	s_array_reserve(&world->contacts, cfg.contacts_count);
 	se_set_last_error(SE_RESULT_OK);
 	return world;
 }
 
 void se_physics_world_3d_destroy(se_physics_world_3d *world) {
 	if (!world) return;
-	s_foreach(&world->bodies, i) {
-		se_physics_body_3d *body = s_array_get(&world->bodies, i);
+	se_physics_body_3d *body = NULL;
+	s_foreach(&world->bodies, body) {
 		if (!body->is_valid) continue;
-		s_foreach(&body->shapes, s) {
-			se_physics_shape_3d *shape = s_array_get(&body->shapes, s);
+		se_physics_shape_3d *shape = NULL;
+		s_foreach(&body->shapes, shape) {
 			if (shape->bvh_triangles) {
 				free(shape->bvh_triangles);
 				shape->bvh_triangles = NULL;
 			}
-			if (shape->bvh_nodes.data) {
+			if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
 				s_array_clear(&shape->bvh_nodes);
 			}
 			shape->bvh_built = false;
@@ -1735,8 +1741,8 @@ se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const 
 	}
 
 	se_physics_body_2d *body = NULL;
-	s_foreach(&world->bodies, i) {
-		se_physics_body_2d *slot = s_array_get(&world->bodies, i);
+	s_foreach(&world->bodies, body) {
+		se_physics_body_2d *slot = body;
 		if (!slot->is_valid) {
 			body = slot;
 			break;
@@ -1747,7 +1753,8 @@ se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const 
 			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
-		body = s_array_increment(&world->bodies);
+		s_handle body_handle = s_array_increment(&world->bodies);
+		body = s_array_get(&world->bodies, body_handle);
 	}
 	memset(body, 0, sizeof(*body));
 	body->type = cfg.type;
@@ -1763,7 +1770,8 @@ se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const 
 	if (body->type != SE_PHYSICS_BODY_DYNAMIC) {
 		body->mass = 0.0f;
 	}
-	s_array_init(&body->shapes, world->shapes_per_body);
+	s_array_init(&body->shapes);
+	s_array_reserve(&body->shapes, world->shapes_per_body);
 	body->is_valid = true;
 	se_physics_body_2d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
@@ -1773,13 +1781,13 @@ se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const 
 void se_physics_body_2d_destroy(se_physics_world_2d *world, se_physics_body_2d *body) {
 	if (!world || !body) return;
 	if (!body->is_valid) return;
-	s_foreach(&body->shapes, s) {
-		se_physics_shape_2d *shape = s_array_get(&body->shapes, s);
+	se_physics_shape_2d *shape = NULL;
+	s_foreach(&body->shapes, shape) {
 		if (shape->bvh_triangles) {
 			free(shape->bvh_triangles);
 			shape->bvh_triangles = NULL;
 		}
-		if (shape->bvh_nodes.data) {
+		if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
 			s_array_clear(&shape->bvh_nodes);
 		}
 		shape->bvh_built = false;
@@ -1805,8 +1813,8 @@ se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const 
 	}
 
 	se_physics_body_3d *body = NULL;
-	s_foreach(&world->bodies, i) {
-		se_physics_body_3d *slot = s_array_get(&world->bodies, i);
+	s_foreach(&world->bodies, body) {
+		se_physics_body_3d *slot = body;
 		if (!slot->is_valid) {
 			body = slot;
 			break;
@@ -1817,7 +1825,8 @@ se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const 
 			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 			return NULL;
 		}
-		body = s_array_increment(&world->bodies);
+		s_handle body_handle = s_array_increment(&world->bodies);
+		body = s_array_get(&world->bodies, body_handle);
 	}
 	memset(body, 0, sizeof(*body));
 	body->type = cfg.type;
@@ -1833,7 +1842,8 @@ se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const 
 	if (body->type != SE_PHYSICS_BODY_DYNAMIC) {
 		body->mass = 0.0f;
 	}
-	s_array_init(&body->shapes, world->shapes_per_body);
+	s_array_init(&body->shapes);
+	s_array_reserve(&body->shapes, world->shapes_per_body);
 	body->is_valid = true;
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
@@ -1843,13 +1853,13 @@ se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const 
 void se_physics_body_3d_destroy(se_physics_world_3d *world, se_physics_body_3d *body) {
 	if (!world || !body) return;
 	if (!body->is_valid) return;
-	s_foreach(&body->shapes, s) {
-		se_physics_shape_3d *shape = s_array_get(&body->shapes, s);
+	se_physics_shape_3d *shape = NULL;
+	s_foreach(&body->shapes, shape) {
 		if (shape->bvh_triangles) {
 			free(shape->bvh_triangles);
 			shape->bvh_triangles = NULL;
 		}
-		if (shape->bvh_nodes.data) {
+		if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
 			s_array_clear(&shape->bvh_nodes);
 		}
 		shape->bvh_built = false;
@@ -1867,7 +1877,8 @@ se_physics_shape_2d *se_physics_body_2d_add_circle(se_physics_body_2d *body, con
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_2d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_CIRCLE;
 	shape->offset = *offset;
@@ -1889,7 +1900,8 @@ se_physics_shape_2d *se_physics_body_2d_add_aabb(se_physics_body_2d *body, const
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_2d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_AABB;
 	shape->offset = *offset;
@@ -1912,7 +1924,8 @@ se_physics_shape_2d *se_physics_body_2d_add_box(se_physics_body_2d *body, const 
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_2d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_BOX;
 	shape->offset = *offset;
@@ -1936,7 +1949,8 @@ se_physics_shape_2d *se_physics_body_2d_add_mesh(se_physics_body_2d *body, const
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_2d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_MESH;
 	shape->offset = *offset;
@@ -1951,7 +1965,8 @@ se_physics_shape_2d *se_physics_body_2d_add_mesh(se_physics_body_2d *body, const
 			for (u32 i = 0; i < shape->bvh_triangle_count; i++) {
 				shape->bvh_triangles[i] = i;
 			}
-			s_array_init(&shape->bvh_nodes, shape->bvh_triangle_count * 2);
+			s_array_init(&shape->bvh_nodes);
+			s_array_reserve(&shape->bvh_nodes, shape->bvh_triangle_count * 2);
 			se_physics_bvh_build_2d(shape, 0, (u32)shape->bvh_triangle_count);
 			shape->bvh_built = true;
 		}
@@ -1970,7 +1985,8 @@ se_physics_shape_3d *se_physics_body_3d_add_sphere(se_physics_body_3d *body, con
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_3d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_SPHERE;
 	shape->offset = *offset;
@@ -1992,7 +2008,8 @@ se_physics_shape_3d *se_physics_body_3d_add_aabb(se_physics_body_3d *body, const
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_3d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_AABB;
 	shape->offset = *offset;
@@ -2015,7 +2032,8 @@ se_physics_shape_3d *se_physics_body_3d_add_box(se_physics_body_3d *body, const 
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_3d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_BOX;
 	shape->offset = *offset;
@@ -2039,7 +2057,8 @@ se_physics_shape_3d *se_physics_body_3d_add_mesh(se_physics_body_3d *body, const
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return NULL;
 	}
-	se_physics_shape_3d *shape = s_array_increment(&body->shapes);
+	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_MESH;
 	shape->offset = *offset;
@@ -2054,7 +2073,8 @@ se_physics_shape_3d *se_physics_body_3d_add_mesh(se_physics_body_3d *body, const
 			for (u32 i = 0; i < shape->bvh_triangle_count; i++) {
 				shape->bvh_triangles[i] = i;
 			}
-			s_array_init(&shape->bvh_nodes, shape->bvh_triangle_count * 2);
+			s_array_init(&shape->bvh_nodes);
+			s_array_reserve(&shape->bvh_nodes, shape->bvh_triangle_count * 2);
 			se_physics_bvh_build_3d(shape, 0, (u32)shape->bvh_triangle_count);
 			shape->bvh_built = true;
 		}
@@ -2195,10 +2215,12 @@ static void se_physics_integrate_kinematic_body_3d(se_physics_body_3d *body, f32
 
 void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 	if (!world || dt <= 0.0f) return;
-	world->contacts.size = 0;
+	const sz contacts_capacity = s_array_get_capacity(&world->contacts);
+	s_array_clear(&world->contacts);
+	s_array_reserve(&world->contacts, contacts_capacity);
 
-	s_foreach(&world->bodies, i) {
-		se_physics_body_2d *body = s_array_get(&world->bodies, i);
+	se_physics_body_2d *body = NULL;
+	s_foreach(&world->bodies, body) {
 		if (!body->is_valid) continue;
 		if (body->type == SE_PHYSICS_BODY_DYNAMIC) {
 			se_physics_integrate_body_2d(body, &world->gravity, dt);
@@ -2209,19 +2231,21 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 
 	sz body_count = s_array_get_size(&world->bodies);
 	for (sz i = 0; i < body_count; i++) {
-		se_physics_body_2d *a = s_array_get(&world->bodies, i);
+		s_handle a_handle = s_array_handle(&world->bodies, (u32)i);
+		se_physics_body_2d *a = s_array_get(&world->bodies, a_handle);
 		if (!a->is_valid) continue;
 		for (sz j = i + 1; j < body_count; j++) {
-			se_physics_body_2d *b = s_array_get(&world->bodies, j);
+			s_handle b_handle = s_array_handle(&world->bodies, (u32)j);
+			se_physics_body_2d *b = s_array_get(&world->bodies, b_handle);
 			if (!b->is_valid) continue;
-			s_foreach(&a->shapes, sa) {
-				se_physics_shape_2d *shape_a = s_array_get(&a->shapes, sa);
-				s_foreach(&b->shapes, sb) {
-					se_physics_shape_2d *shape_b = s_array_get(&b->shapes, sb);
-					se_physics_contact_2d contact = {0};
-					if (se_physics_shapes_collide_2d(a, shape_a, b, shape_b, &contact)) {
-						contact.a = a;
-						contact.b = b;
+				se_physics_shape_2d *shape_a = NULL;
+				s_foreach(&a->shapes, shape_a) {
+					se_physics_shape_2d *shape_b = NULL;
+					s_foreach(&b->shapes, shape_b) {
+						se_physics_contact_2d contact = {0};
+						if (se_physics_shapes_collide_2d(a, shape_a, b, shape_b, &contact)) {
+							contact.a = a;
+							contact.b = b;
 						contact.shape_a = shape_a;
 						contact.shape_b = shape_b;
 						contact.restitution = (a->restitution + b->restitution) * 0.5f;
@@ -2231,7 +2255,9 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 							continue;
 						}
 						if (s_array_get_size(&world->contacts) < s_array_get_capacity(&world->contacts)) {
-							*s_array_increment(&world->contacts) = contact;
+							s_handle contact_handle = s_array_increment(&world->contacts);
+							se_physics_contact_2d *contact_ptr = s_array_get(&world->contacts, contact_handle);
+							*contact_ptr = contact;
 						}
 					}
 				}
@@ -2240,16 +2266,16 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 	}
 
 	for (u32 iter = 0; iter < world->solver_iterations; iter++) {
-		s_foreach(&world->contacts, c) {
-			se_physics_contact_2d *contact = s_array_get(&world->contacts, c);
+		se_physics_contact_2d *contact = NULL;
+		s_foreach(&world->contacts, contact) {
 			if (contact->is_trigger) continue;
 			if (contact->a->inv_mass == 0.0f && contact->b->inv_mass == 0.0f) continue;
 			se_physics_resolve_contact_2d(contact);
 		}
 	}
 
-	s_foreach(&world->contacts, c) {
-		se_physics_contact_2d *contact = s_array_get(&world->contacts, c);
+	se_physics_contact_2d *contact = NULL;
+	s_foreach(&world->contacts, contact) {
 		if (!contact->is_trigger) {
 			se_physics_positional_correction_2d(contact);
 		}
@@ -2261,10 +2287,12 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 
 void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 	if (!world || dt <= 0.0f) return;
-	world->contacts.size = 0;
+	const sz contacts_capacity = s_array_get_capacity(&world->contacts);
+	s_array_clear(&world->contacts);
+	s_array_reserve(&world->contacts, contacts_capacity);
 
-	s_foreach(&world->bodies, i) {
-		se_physics_body_3d *body = s_array_get(&world->bodies, i);
+	se_physics_body_3d *body = NULL;
+	s_foreach(&world->bodies, body) {
 		if (!body->is_valid) continue;
 		if (body->type == SE_PHYSICS_BODY_DYNAMIC) {
 			se_physics_integrate_body_3d(body, &world->gravity, dt);
@@ -2275,17 +2303,19 @@ void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 
 	sz body_count = s_array_get_size(&world->bodies);
 	for (sz i = 0; i < body_count; i++) {
-		se_physics_body_3d *a = s_array_get(&world->bodies, i);
+		s_handle a_handle = s_array_handle(&world->bodies, (u32)i);
+		se_physics_body_3d *a = s_array_get(&world->bodies, a_handle);
 		if (!a->is_valid) continue;
 		for (sz j = i + 1; j < body_count; j++) {
-			se_physics_body_3d *b = s_array_get(&world->bodies, j);
+			s_handle b_handle = s_array_handle(&world->bodies, (u32)j);
+			se_physics_body_3d *b = s_array_get(&world->bodies, b_handle);
 			if (!b->is_valid) continue;
-			s_foreach(&a->shapes, sa) {
-				se_physics_shape_3d *shape_a = s_array_get(&a->shapes, sa);
-				s_foreach(&b->shapes, sb) {
-					se_physics_shape_3d *shape_b = s_array_get(&b->shapes, sb);
-					se_physics_contact_3d contact = {0};
-					if (se_physics_shapes_collide_3d(a, shape_a, b, shape_b, &contact)) {
+				se_physics_shape_3d *shape_a = NULL;
+				s_foreach(&a->shapes, shape_a) {
+					se_physics_shape_3d *shape_b = NULL;
+					s_foreach(&b->shapes, shape_b) {
+						se_physics_contact_3d contact = {0};
+						if (se_physics_shapes_collide_3d(a, shape_a, b, shape_b, &contact)) {
 						contact.a = a;
 						contact.b = b;
 						contact.shape_a = shape_a;
@@ -2297,7 +2327,9 @@ void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 							continue;
 						}
 						if (s_array_get_size(&world->contacts) < s_array_get_capacity(&world->contacts)) {
-							*s_array_increment(&world->contacts) = contact;
+							s_handle contact_handle = s_array_increment(&world->contacts);
+							se_physics_contact_3d *contact_ptr = s_array_get(&world->contacts, contact_handle);
+							*contact_ptr = contact;
 						}
 					}
 				}
@@ -2306,16 +2338,16 @@ void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 	}
 
 	for (u32 iter = 0; iter < world->solver_iterations; iter++) {
-		s_foreach(&world->contacts, c) {
-			se_physics_contact_3d *contact = s_array_get(&world->contacts, c);
+		se_physics_contact_3d *contact = NULL;
+		s_foreach(&world->contacts, contact) {
 			if (contact->is_trigger) continue;
 			if (contact->a->inv_mass == 0.0f && contact->b->inv_mass == 0.0f) continue;
 			se_physics_resolve_contact_3d(contact);
 		}
 	}
 
-	s_foreach(&world->contacts, c) {
-		se_physics_contact_3d *contact = s_array_get(&world->contacts, c);
+	se_physics_contact_3d *contact = NULL;
+	s_foreach(&world->contacts, contact) {
 		if (!contact->is_trigger) {
 			se_physics_positional_correction_3d(contact);
 		}
@@ -2625,11 +2657,11 @@ b8 se_physics_world_2d_raycast(se_physics_world_2d *world, const s_vec2 *origin,
 	b8 hit = false;
 	f32 best_t = max_distance;
 	se_physics_raycast_hit_2d best = {0};
-	s_foreach(&world->bodies, i) {
-		se_physics_body_2d *body = s_array_get(&world->bodies, i);
+	se_physics_body_2d *body = NULL;
+	s_foreach(&world->bodies, body) {
 		if (!body->is_valid) continue;
-		s_foreach(&body->shapes, s) {
-			se_physics_shape_2d *shape = s_array_get(&body->shapes, s);
+		se_physics_shape_2d *shape = NULL;
+		s_foreach(&body->shapes, shape) {
 			f32 t = 0.0f;
 			s_vec2 normal = s_vec2(0.0f, 1.0f);
 			if (se_physics_raycast_shape_2d(body, shape, origin, &dir, max_distance, &t, &normal)) {
@@ -2659,11 +2691,11 @@ b8 se_physics_world_3d_raycast(se_physics_world_3d *world, const s_vec3 *origin,
 	b8 hit = false;
 	f32 best_t = max_distance;
 	se_physics_raycast_hit_3d best = {0};
-	s_foreach(&world->bodies, i) {
-		se_physics_body_3d *body = s_array_get(&world->bodies, i);
+	se_physics_body_3d *body = NULL;
+	s_foreach(&world->bodies, body) {
 		if (!body->is_valid) continue;
-		s_foreach(&body->shapes, s) {
-			se_physics_shape_3d *shape = s_array_get(&body->shapes, s);
+		se_physics_shape_3d *shape = NULL;
+		s_foreach(&body->shapes, shape) {
 			f32 t = 0.0f;
 			s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
 			if (se_physics_raycast_shape_3d(body, shape, origin, &dir, max_distance, &t, &normal)) {

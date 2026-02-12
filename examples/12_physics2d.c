@@ -11,7 +11,7 @@
 
 typedef struct {
 	se_physics_body_2d *body;
-	se_object_2d *object;
+	se_object_2d_handle object;
 	f32 size;
 	b8 is_circle;
 } physics_2d_slot;
@@ -31,11 +31,11 @@ void physics_2d_on_contact(const se_physics_contact_2d *contact, void *user_data
 int main(void) {
 	se_context *ctx = se_context_create();
 
-	se_window *window = se_window_create(ctx, "Syphax-Engine - Physics 2D", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_window_handle window = se_window_create("Syphax-Engine - Physics 2D", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.05f, 0.06f, 0.08f, 1.0f));
 
-	se_scene_2d *scene = se_scene_2d_create(ctx, &s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), BODY_COUNT + 1);
+	se_scene_2d_handle scene = se_scene_2d_create(&s_vec2(WINDOW_WIDTH, WINDOW_HEIGHT), BODY_COUNT + 1);
 	se_scene_2d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
 
 	se_physics_world_params_2d world_params = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS;
@@ -50,8 +50,11 @@ int main(void) {
 	floor_params.position = s_vec2(0.0f, -0.9f);
 	se_physics_body_2d *floor_body = se_physics_body_2d_create(world, &floor_params);
 	se_physics_body_2d_add_aabb(floor_body, &s_vec2(0.0f, 0.0f), &s_vec2(0.95f, 0.06f), false);
-	se_object_2d *floor_object = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("physics2d/button.glsl"), &s_mat3_identity, 0);
-	se_shader_set_vec3(floor_object->shader, "u_color", &s_vec3(0.2f, 0.25f, 0.32f));
+	se_object_2d_handle floor_object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/button.glsl"), &s_mat3_identity, 0);
+	se_object_2d *floor_object_ptr = s_array_get(&ctx->objects_2d, floor_object);
+	if (floor_object_ptr) {
+		se_shader_set_vec3(floor_object_ptr->shader, "u_color", &s_vec3(0.2f, 0.25f, 0.32f));
+	}
 	se_object_2d_set_position(floor_object, &floor_body->position);
 	se_object_2d_set_scale(floor_object, &s_vec2(0.95f, 0.06f));
 	se_scene_2d_add_object(scene, floor_object);
@@ -68,8 +71,11 @@ int main(void) {
 		} else {
 			se_physics_body_2d_add_box(body, &s_vec2(0.0f, 0.0f), &s_vec2(size, size), 0.0f, false);
 		}
-		se_object_2d *object = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("physics2d/button.glsl"), &s_mat3_identity, 0);
-		se_shader_set_vec3(object->shader, "u_color", is_circle ? &s_vec3(0.45f, 0.75f, 0.9f) : &s_vec3(0.9f, 0.6f, 0.35f));
+		se_object_2d_handle object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/button.glsl"), &s_mat3_identity, 0);
+		se_object_2d *object_ptr = s_array_get(&ctx->objects_2d, object);
+		if (object_ptr) {
+			se_shader_set_vec3(object_ptr->shader, "u_color", is_circle ? &s_vec3(0.45f, 0.75f, 0.9f) : &s_vec3(0.9f, 0.6f, 0.35f));
+		}
 		se_object_2d_set_position(object, &body->position);
 		se_object_2d_set_scale(object, &s_vec2(size, size));
 		se_scene_2d_add_object(scene, object);
@@ -81,7 +87,7 @@ int main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_context_reload_changed_shaders(ctx);
+		se_context_reload_changed_shaders();
 
 		const f32 dt = (f32)se_window_get_delta_time(window);
 		se_physics_world_2d_step(world, dt);
@@ -89,7 +95,7 @@ int main(void) {
 			se_object_2d_set_position(slots[i].object, &slots[i].body->position);
 		}
 
-		se_scene_2d_draw(scene, ctx, window);
+		se_scene_2d_draw(scene, window);
 	}
 
 	se_physics_world_2d_destroy(world);

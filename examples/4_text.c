@@ -8,9 +8,9 @@
 
 i32 main(void) {
 	se_context *ctx = se_context_create();
-	se_window *window = se_window_create(ctx, "Syphax-Engine - Text Example", WIDTH, HEIGHT);
-	se_text_handle *text_handle = se_text_handle_create(ctx, 0);
-	se_font *font = se_font_load(text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.f);
+	se_window_handle window = se_window_create("Syphax-Engine - Text Example", WIDTH, HEIGHT);
+	se_text_handle *text_handle = se_text_handle_create(0);
+	se_font_handle font = se_font_load(text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.f);
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 

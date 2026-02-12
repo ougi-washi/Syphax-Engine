@@ -16,13 +16,14 @@ typedef struct se_camera {
 	f32 aspect;
 } se_camera;
 typedef s_array(se_camera, se_cameras);
-typedef se_camera *se_camera_ptr;
-typedef s_array(se_camera_ptr, se_cameras_ptr);
+typedef se_camera_handle se_camera_ptr;
+typedef s_array(se_camera_handle, se_cameras_ptr);
 
-extern se_camera *se_camera_create(se_context *ctx);
-extern void se_camera_destroy(se_context *ctx, se_camera *camera);
-extern s_mat4 se_camera_get_view_matrix(const se_camera *camera);
-extern s_mat4 se_camera_get_projection_matrix(const se_camera *camera);
-extern void se_camera_set_aspect(se_camera *camera, const f32 width, const f32 height);
+extern se_camera_handle se_camera_create(void);
+extern void se_camera_destroy(const se_camera_handle camera);
+extern se_camera *se_camera_get(const se_camera_handle camera);
+extern s_mat4 se_camera_get_view_matrix(const se_camera_handle camera);
+extern s_mat4 se_camera_get_projection_matrix(const se_camera_handle camera);
+extern void se_camera_set_aspect(const se_camera_handle camera, const f32 width, const f32 height);
 
 #endif // SE_CAMERA_H

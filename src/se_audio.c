@@ -158,9 +158,12 @@ se_audio_engine* se_audio_init(const se_audio_config* config) {
 		return NULL;
 	}
 
-	s_array_init(&engine->clips, engine->config.max_clips);
-	s_array_init(&engine->streams, engine->config.max_streams);
-	s_array_init(&engine->captures, engine->config.max_captures);
+	s_array_init(&engine->clips);
+	s_array_reserve(&engine->clips, engine->config.max_clips);
+	s_array_init(&engine->streams);
+	s_array_reserve(&engine->streams, engine->config.max_streams);
+	s_array_init(&engine->captures);
+	s_array_reserve(&engine->captures, engine->config.max_captures);
 	engine->initialized = true;
 	se_set_last_error(SE_RESULT_OK);
 	return engine;
@@ -176,8 +179,8 @@ void se_audio_shutdown(se_audio_engine* engine) {
 
 	se_audio_stop_all(engine);
 
-	s_foreach(&engine->clips, clip_index) {
-		se_audio_clip* clip = s_array_get(&engine->clips, clip_index);
+	se_audio_clip* clip = NULL;
+	s_foreach(&engine->clips, clip) {
 		if (clip->in_use) {
 			ma_sound_uninit(&clip->sound);
 			se_audio_free_analysis_data(clip);
@@ -185,16 +188,16 @@ void se_audio_shutdown(se_audio_engine* engine) {
 	}
 	s_array_clear(&engine->clips);
 
-	s_foreach(&engine->streams, stream_index) {
-		se_audio_stream* stream = s_array_get(&engine->streams, stream_index);
+	se_audio_stream* stream = NULL;
+	s_foreach(&engine->streams, stream) {
 		if (stream->in_use) {
 			ma_sound_uninit(&stream->sound);
 		}
 	}
 	s_array_clear(&engine->streams);
 
-	s_foreach(&engine->captures, capture_index) {
-		se_audio_capture* capture = s_array_get(&engine->captures, capture_index);
+	se_audio_capture* capture = NULL;
+	s_foreach(&engine->captures, capture) {
 		if (capture->active) {
 			ma_device_uninit(&capture->device);
 			ma_pcm_rb_uninit(&capture->ring_buffer);
@@ -224,14 +227,14 @@ void se_audio_stop_all(se_audio_engine* engine) {
 	if (!engine || !engine->initialized) {
 		return;
 	}
-	s_foreach(&engine->clips, clip_index) {
-		se_audio_clip* clip = s_array_get(&engine->clips, clip_index);
+	se_audio_clip* clip = NULL;
+	s_foreach(&engine->clips, clip) {
 		if (clip->in_use) {
 			ma_sound_stop(&clip->sound);
 		}
 	}
-	s_foreach(&engine->streams, stream_index) {
-		se_audio_stream* stream = s_array_get(&engine->streams, stream_index);
+	se_audio_stream* stream = NULL;
+	s_foreach(&engine->streams, stream) {
 		if (stream->in_use) {
 			ma_sound_stop(&stream->sound);
 		}
@@ -245,14 +248,14 @@ void se_audio_bus_set_volume(se_audio_engine* engine, se_audio_bus bus, f32 volu
 	se_audio_bus sanitized = se_audio_sanitize_bus(bus);
 	engine->bus_volumes[sanitized] = se_audio_clamp_volume(volume);
 
-	s_foreach(&engine->clips, clip_index) {
-		se_audio_clip* clip = s_array_get(&engine->clips, clip_index);
+	se_audio_clip* clip = NULL;
+	s_foreach(&engine->clips, clip) {
 		if (clip->in_use && clip->bus == sanitized) {
 			se_audio_clip_refresh_volume(clip);
 		}
 	}
-	s_foreach(&engine->streams, stream_index) {
-		se_audio_stream* stream = s_array_get(&engine->streams, stream_index);
+	se_audio_stream* stream = NULL;
+	s_foreach(&engine->streams, stream) {
 		if (stream->in_use && stream->bus == sanitized) {
 			se_audio_stream_refresh_volume(stream);
 		}
@@ -671,51 +674,54 @@ b8 se_audio_buffer_analyze_bands(const f32* samples, sz frame_count, u32 channel
 }
 
 static se_audio_clip* se_audio_acquire_clip_slot(se_audio_engine* engine) {
-	s_foreach(&engine->clips, i) {
-		se_audio_clip* clip = s_array_get(&engine->clips, i);
+	se_audio_clip* clip = NULL;
+	s_foreach(&engine->clips, clip) {
 		if (!clip->in_use) {
 			clip->owner = engine;
 			return clip;
 		}
 	}
-	if (engine->clips.size >= engine->clips.capacity) {
+	if (s_array_get_size(&engine->clips) >= s_array_get_capacity(&engine->clips)) {
 		return NULL;
 	}
-	se_audio_clip* clip = s_array_increment(&engine->clips);
+	s_handle clip_handle = s_array_increment(&engine->clips);
+	clip = s_array_get(&engine->clips, clip_handle);
 	memset(clip, 0, sizeof(se_audio_clip));
 	clip->owner = engine;
 	return clip;
 }
 
 static se_audio_stream* se_audio_acquire_stream_slot(se_audio_engine* engine) {
-	s_foreach(&engine->streams, i) {
-		se_audio_stream* stream = s_array_get(&engine->streams, i);
+	se_audio_stream* stream = NULL;
+	s_foreach(&engine->streams, stream) {
 		if (!stream->in_use) {
 			stream->owner = engine;
 			return stream;
 		}
 	}
-	if (engine->streams.size >= engine->streams.capacity) {
+	if (s_array_get_size(&engine->streams) >= s_array_get_capacity(&engine->streams)) {
 		return NULL;
 	}
-	se_audio_stream* stream = s_array_increment(&engine->streams);
+	s_handle stream_handle = s_array_increment(&engine->streams);
+	stream = s_array_get(&engine->streams, stream_handle);
 	memset(stream, 0, sizeof(se_audio_stream));
 	stream->owner = engine;
 	return stream;
 }
 
 static se_audio_capture* se_audio_acquire_capture_slot(se_audio_engine* engine) {
-	s_foreach(&engine->captures, i) {
-		se_audio_capture* capture = s_array_get(&engine->captures, i);
+	se_audio_capture* capture = NULL;
+	s_foreach(&engine->captures, capture) {
 		if (!capture->active) {
 			capture->owner = engine;
 			return capture;
 		}
 	}
-	if (engine->captures.size >= engine->captures.capacity) {
+	if (s_array_get_size(&engine->captures) >= s_array_get_capacity(&engine->captures)) {
 		return NULL;
 	}
-	se_audio_capture* capture = s_array_increment(&engine->captures);
+	s_handle capture_handle = s_array_increment(&engine->captures);
+	capture = s_array_get(&engine->captures, capture_handle);
 	memset(capture, 0, sizeof(se_audio_capture));
 	capture->owner = engine;
 	return capture;

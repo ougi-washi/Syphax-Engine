@@ -46,32 +46,32 @@ typedef struct se_shader {
 	b8 needs_reload;
 } se_shader;
 typedef s_array(se_shader, se_shaders);
-typedef se_shader *se_shader_ptr;
-typedef s_array(se_shader_ptr, se_shaders_ptr);
+typedef se_shader_handle se_shader_ptr;
+typedef s_array(se_shader_handle, se_shaders_ptr);
 
-extern se_shader *se_shader_load(se_context *ctx, const char *vs_path, const char *fs_path);
-extern se_shader *se_shader_load_from_memory(se_context *ctx, const char *vs_data, const char *fs_data);
-extern void se_shader_destroy(se_context *ctx, se_shader *shader);
-extern b8 se_shader_reload_if_changed(se_shader *shader);
-extern void se_shader_use(se_context *ctx, se_shader *shader, const b8 update_uniforms, const b8 update_global_uniforms);
-extern i32 se_shader_get_uniform_location(se_shader *shader, const char *name);
-extern f32 *se_shader_get_uniform_float(se_shader *shader, const char *name);
-extern s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name);
-extern s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name);
-extern s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name);
-extern i32 *se_shader_get_uniform_int(se_shader *shader, const char *name);
-extern s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name);
-extern u32 *se_shader_get_uniform_texture(se_shader *shader, const char *name);
-extern void se_shader_set_float(se_shader *shader, const char *name, f32 value);
-extern void se_shader_set_vec2(se_shader *shader, const char *name, const s_vec2 *value);
-extern void se_shader_set_vec3(se_shader *shader, const char *name, const s_vec3 *value);
-extern void se_shader_set_vec4(se_shader *shader, const char *name, const s_vec4 *value);
-extern void se_shader_set_int(se_shader *shader, const char *name, i32 value);
-extern void se_shader_set_mat3(se_shader *shader, const char *name, const s_mat3 *value);
-extern void se_shader_set_mat4(se_shader *shader, const char *name, const s_mat4 *value);
-extern void se_shader_set_texture(se_shader *shader, const char *name, const u32 texture);
-extern void se_context_reload_changed_shaders(se_context *ctx);
-extern se_uniforms *se_context_get_global_uniforms(se_context *ctx);
+extern se_shader_handle se_shader_load(const char *vs_path, const char *fs_path);
+extern se_shader_handle se_shader_load_from_memory(const char *vs_data, const char *fs_data);
+extern void se_shader_destroy(const se_shader_handle shader);
+extern b8 se_shader_reload_if_changed(const se_shader_handle shader);
+extern void se_shader_use(const se_shader_handle shader, const b8 update_uniforms, const b8 update_global_uniforms);
+extern i32 se_shader_get_uniform_location(const se_shader_handle shader, const char *name);
+extern f32 *se_shader_get_uniform_float(const se_shader_handle shader, const char *name);
+extern s_vec2 *se_shader_get_uniform_vec2(const se_shader_handle shader, const char *name);
+extern s_vec3 *se_shader_get_uniform_vec3(const se_shader_handle shader, const char *name);
+extern s_vec4 *se_shader_get_uniform_vec4(const se_shader_handle shader, const char *name);
+extern i32 *se_shader_get_uniform_int(const se_shader_handle shader, const char *name);
+extern s_mat4 *se_shader_get_uniform_mat4(const se_shader_handle shader, const char *name);
+extern u32 *se_shader_get_uniform_texture(const se_shader_handle shader, const char *name);
+extern void se_shader_set_float(const se_shader_handle shader, const char *name, f32 value);
+extern void se_shader_set_vec2(const se_shader_handle shader, const char *name, const s_vec2 *value);
+extern void se_shader_set_vec3(const se_shader_handle shader, const char *name, const s_vec3 *value);
+extern void se_shader_set_vec4(const se_shader_handle shader, const char *name, const s_vec4 *value);
+extern void se_shader_set_int(const se_shader_handle shader, const char *name, i32 value);
+extern void se_shader_set_mat3(const se_shader_handle shader, const char *name, const s_mat3 *value);
+extern void se_shader_set_mat4(const se_shader_handle shader, const char *name, const s_mat4 *value);
+extern void se_shader_set_texture(const se_shader_handle shader, const char *name, const u32 texture);
+extern void se_context_reload_changed_shaders(void);
+extern se_uniforms *se_context_get_global_uniforms(void);
 
 // Uniform functions
 extern void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value);
@@ -82,6 +82,7 @@ extern void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 valu
 extern void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const s_mat3 *value);
 extern void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *value);
 extern void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 texture);
-extern void se_uniform_apply(se_context *ctx, se_shader *shader, const b8 update_global_uniforms);
+extern void se_uniform_apply(const se_shader_handle shader, const b8 update_global_uniforms);
+
 
 #endif // SE_SHADER_H

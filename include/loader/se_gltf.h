@@ -224,10 +224,11 @@ typedef struct {
 	s_json *extras;
 	s_json *extensions;
 } se_gltf_primitive;
+typedef s_array(se_gltf_primitive, se_gltf_primitives);
 
 typedef struct {
 	char *name;
-	s_array(se_gltf_primitive, primitives);
+	se_gltf_primitives primitives;
 	se_gltf_f32_array weights;
 	b8 has_weights;
 	s_json *extras;

@@ -15,21 +15,20 @@ typedef struct {
 
 i32 main(void) {
 	se_context *ctx = se_context_create();
-	se_window *window = se_window_create(ctx, "Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
-	se_scene_3d *scene = se_scene_3d_create_for_window(ctx, window, INSTANCE_TOTAL + 4);
-	se_model *cube_model = NULL;
-	se_object_3d *cube_field = NULL;
+	se_window_handle window = se_window_create("Syphax-Engine - Scene 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_scene_3d_handle scene = se_scene_3d_create_for_window(window, INSTANCE_TOTAL + 4);
+	se_model_handle cube_model = S_HANDLE_NULL;
+	se_object_3d_handle cube_field = S_HANDLE_NULL;
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	cube_model = se_model_load_obj_simple(
-		ctx,
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"));
 
 	s_mat4 identity = s_mat4_identity;
-	cube_field = se_object_3d_create(ctx, cube_model, &identity, INSTANCE_TOTAL);
+	cube_field = se_object_3d_create(cube_model, &identity, INSTANCE_TOTAL);
 	se_scene_3d_add_object(scene, cube_field);
 
 	se_instance_slot slots[INSTANCE_TOTAL] = {0};
@@ -52,13 +51,17 @@ i32 main(void) {
 		}
 	}
 
-	scene->camera->position = s_vec3(6.0f, 5.0f, 10.0f);
-	scene->camera->target = s_vec3(0.0f, 0.0f, 0.0f);
-	scene->camera->up = s_vec3(0.0f, 1.0f, 0.0f);
+	se_scene_3d *scene_ptr = s_array_get(&ctx->scenes_3d, scene);
+	se_camera *camera = scene_ptr ? s_array_get(&ctx->cameras, scene_ptr->camera) : NULL;
+	if (camera) {
+		camera->position = s_vec3(6.0f, 5.0f, 10.0f);
+		camera->target = s_vec3(0.0f, 0.0f, 0.0f);
+		camera->up = s_vec3(0.0f, 1.0f, 0.0f);
+	}
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_context_reload_changed_shaders(ctx);
+		se_context_reload_changed_shaders();
 
 		const f32 time = (f32)se_window_get_time(window);
 		for (sz i = 0; i < INSTANCE_TOTAL; i++) {
@@ -69,7 +72,7 @@ i32 main(void) {
 			se_object_3d_set_instance_transform(cube_field, slots[i].id, &transform);
 		}
 
-		se_scene_3d_draw(scene, ctx, window);
+		se_scene_3d_draw(scene, window);
 	}
 
 	se_window_destroy(window);

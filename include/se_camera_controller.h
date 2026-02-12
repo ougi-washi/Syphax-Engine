@@ -13,8 +13,8 @@ typedef enum {
 } se_camera_controller_preset;
 
 typedef struct {
-	se_window* window;
-	se_camera* camera;
+	se_window_handle window;
+	se_camera_handle camera;
 	f32 movement_speed;
 	f32 mouse_x_speed;
 	f32 mouse_y_speed;
@@ -30,7 +30,7 @@ typedef struct {
 	se_camera_controller_preset preset;
 } se_camera_controller_params;
 
-#define SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS ((se_camera_controller_params){ .window = NULL, .camera = NULL, .movement_speed = 120.0f, .mouse_x_speed = 0.0012f, .mouse_y_speed = 0.0012f, .min_pitch = -1.55f, .max_pitch = 1.55f, .min_focus_distance = 0.0f, .max_focus_distance = 0.0f, .enabled = true, .invert_y = false, .look_toggle = false, .lock_cursor_while_active = true, .use_raw_mouse_motion = true, .preset = SE_CAMERA_CONTROLLER_PRESET_UE })
+#define SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS ((se_camera_controller_params){ .window = S_HANDLE_NULL, .camera = S_HANDLE_NULL, .movement_speed = 120.0f, .mouse_x_speed = 0.0012f, .mouse_y_speed = 0.0012f, .min_pitch = -1.55f, .max_pitch = 1.55f, .min_focus_distance = 0.0f, .max_focus_distance = 0.0f, .enabled = true, .invert_y = false, .look_toggle = false, .lock_cursor_while_active = true, .use_raw_mouse_motion = true, .preset = SE_CAMERA_CONTROLLER_PRESET_UE })
 
 typedef struct se_camera_controller se_camera_controller;
 

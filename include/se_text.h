@@ -24,15 +24,15 @@ typedef s_array(se_font, se_fonts);
 typedef struct {
 	se_quad quad;
 	s_mat4 buffer[SE_TEXT_CHAR_COUNT];
-	se_shader* text_shader;
+	se_shader_handle text_shader;
 	i32 text_vertex_index; // ?
 	se_context* ctx;
 } se_text_handle;
 
 // Font && text functions
-extern se_text_handle* se_text_handle_create(se_context* ctx, const u32 fonts_count);
+extern se_text_handle* se_text_handle_create(const u32 fonts_count);
 extern void se_text_handle_destroy(se_text_handle* text_handle);
-extern se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 size);
-extern void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset);
+extern se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const f32 size);
+extern void se_text_render(se_text_handle* text_handle, const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset);
 
 #endif // SE_TEXT_H

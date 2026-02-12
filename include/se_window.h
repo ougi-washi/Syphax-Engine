@@ -164,7 +164,7 @@ typedef enum {
 	SE_WINDOW_CURSOR_DISABLED
 } se_window_cursor_mode;
 
-typedef void (*se_input_event_callback)(void* window, void* data); // Data is a ptr for the user to store/pass data. Handle it carefully.
+typedef void (*se_input_event_callback)(se_window_handle window, void* data);
 typedef struct {
 	i32 id;
 	b8 active : 1;
@@ -176,7 +176,7 @@ typedef struct {
 	b8 interacted : 1;
 } se_input_event;
 
-typedef void(*se_resize_event_callback)(void* window, void* data);
+typedef void(*se_resize_event_callback)(se_window_handle window, void* data);
 typedef struct {
 	se_resize_event_callback callback;
 	void* data;
@@ -203,7 +203,7 @@ typedef struct se_window {
 	b8 should_close : 1;
 
 	se_quad quad;
-	se_shader* shader;
+	se_shader_handle shader;
 
 	u16 target_fps;
 	se_time time;
@@ -218,46 +218,46 @@ typedef struct se_window {
 
 typedef s_array(se_window, se_windows);
 
-extern se_window* se_window_create(se_context* context, const char* title, const u32 width, const u32 height);
-extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
-extern void se_window_tick(se_window* window); // update + poll events (single-window convenience)
-extern void se_window_set_current_context(se_window* window);
-extern void se_window_render_quad(se_window* window);	 // mid-frame: draws using window's quad
-extern void se_window_render_screen(se_window* window); // frame end: clear, renders the frame and swaps buffers
-extern void se_window_present(se_window* window); // swaps buffers (alias for render_screen)
-extern void se_window_present_frame(se_window* window, const s_vec4* clear_color);
+extern se_window_handle se_window_create(const char* title, const u32 width, const u32 height);
+extern void se_window_update(const se_window_handle window);
+extern void se_window_tick(const se_window_handle window);
+extern void se_window_set_current_context(const se_window_handle window);
+extern void se_window_render_quad(const se_window_handle window);
+extern void se_window_render_screen(const se_window_handle window);
+extern void se_window_present(const se_window_handle window);
+extern void se_window_present_frame(const se_window_handle window, const s_vec4* clear_color);
 extern void se_window_poll_events();
-extern b8 se_window_is_key_down(se_window* window, se_key key);
-extern b8 se_window_is_key_pressed(se_window* window, se_key key);
-extern b8 se_window_is_key_released(se_window* window, se_key key);
-extern b8 se_window_is_mouse_down(se_window* window, se_mouse_button button);
-extern b8 se_window_is_mouse_pressed(se_window* window, se_mouse_button button);
-extern b8 se_window_is_mouse_released(se_window* window, se_mouse_button button);
-extern f32 se_window_get_mouse_position_x(se_window* window);
-extern f32 se_window_get_mouse_position_y(se_window* window);
-extern void se_window_get_mouse_position_normalized(se_window* window, s_vec2* out_mouse_position);
-extern void se_window_get_mouse_delta(se_window* window, s_vec2* out_mouse_delta);
-extern void se_window_get_mouse_delta_normalized(se_window* window, s_vec2* out_mouse_delta);
-extern void se_window_get_scroll_delta(se_window* window, s_vec2* out_scroll_delta);
-extern void se_window_set_cursor_mode(se_window* window, const se_window_cursor_mode mode);
-extern se_window_cursor_mode se_window_get_cursor_mode(se_window* window);
-extern b8 se_window_is_raw_mouse_motion_supported(se_window* window);
-extern void se_window_set_raw_mouse_motion(se_window* window, const b8 enabled);
-extern b8 se_window_is_raw_mouse_motion_enabled(se_window* window);
-extern b8 se_window_should_close(se_window* window);
-extern void se_window_set_should_close(se_window* window, const b8 should_close);
-extern void se_window_set_exit_keys(se_window* window, se_key_combo* keys);
-extern void se_window_set_exit_key(se_window* window, se_key key);
-extern void se_window_check_exit_keys(se_window* window);
-extern f64 se_window_get_delta_time(se_window* window);
-extern f64 se_window_get_fps(se_window* window);
-extern f64 se_window_get_time(se_window* window);
-extern void se_window_set_target_fps(se_window* window, const u16 fps);
-extern i32 se_window_register_input_event(se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
-extern void se_window_update_input_event(const i32 input_event_id, se_window* window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
-extern void se_window_register_resize_event(se_window* window, se_resize_event_callback callback, void* data);
-extern void se_window_destroy(se_window* window);
-extern void se_window_destroy_all();
+extern b8 se_window_is_key_down(const se_window_handle window, se_key key);
+extern b8 se_window_is_key_pressed(const se_window_handle window, se_key key);
+extern b8 se_window_is_key_released(const se_window_handle window, se_key key);
+extern b8 se_window_is_mouse_down(const se_window_handle window, se_mouse_button button);
+extern b8 se_window_is_mouse_pressed(const se_window_handle window, se_mouse_button button);
+extern b8 se_window_is_mouse_released(const se_window_handle window, se_mouse_button button);
+extern f32 se_window_get_mouse_position_x(const se_window_handle window);
+extern f32 se_window_get_mouse_position_y(const se_window_handle window);
+extern void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position);
+extern void se_window_get_mouse_delta(const se_window_handle window, s_vec2* out_mouse_delta);
+extern void se_window_get_mouse_delta_normalized(const se_window_handle window, s_vec2* out_mouse_delta);
+extern void se_window_get_scroll_delta(const se_window_handle window, s_vec2* out_scroll_delta);
+extern void se_window_set_cursor_mode(const se_window_handle window, const se_window_cursor_mode mode);
+extern se_window_cursor_mode se_window_get_cursor_mode(const se_window_handle window);
+extern b8 se_window_is_raw_mouse_motion_supported(const se_window_handle window);
+extern void se_window_set_raw_mouse_motion(const se_window_handle window, const b8 enabled);
+extern b8 se_window_is_raw_mouse_motion_enabled(const se_window_handle window);
+extern b8 se_window_should_close(const se_window_handle window);
+extern void se_window_set_should_close(const se_window_handle window, const b8 should_close);
+extern void se_window_set_exit_keys(const se_window_handle window, se_key_combo* keys);
+extern void se_window_set_exit_key(const se_window_handle window, se_key key);
+extern void se_window_check_exit_keys(const se_window_handle window);
+extern f64 se_window_get_delta_time(const se_window_handle window);
+extern f64 se_window_get_fps(const se_window_handle window);
+extern f64 se_window_get_time(const se_window_handle window);
+extern void se_window_set_target_fps(const se_window_handle window, const u16 fps);
+extern i32 se_window_register_input_event(const se_window_handle window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
+extern void se_window_update_input_event(const i32 input_event_id, const se_window_handle window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
+extern void se_window_register_resize_event(const se_window_handle window, se_resize_event_callback callback, void* data);
+extern void se_window_destroy(const se_window_handle window);
+extern void se_window_destroy_all(void);
 
 #define se_window_loop(_window, ...) do { \
 	while (!se_window_should_close((_window))) { \

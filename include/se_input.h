@@ -47,18 +47,20 @@ typedef struct se_input_binding {
 typedef s_array(se_input_binding, se_input_bindings);
 
 typedef struct se_input_handle {
-	se_window* window;
+	se_context* ctx;
+	se_window_handle window;
 	se_input_bindings bindings;
+	u16 bindings_capacity;
 	b8 enabled : 1;
 } se_input_handle;
 
-extern se_input_handle* se_input_create(se_window* window, const u16 bindings_capacity);
+extern se_input_handle* se_input_create(const se_window_handle window, const u16 bindings_capacity);
 extern void se_input_destroy(se_input_handle* input_handle);
 extern b8 se_input_bind(se_input_handle* input_handle, const i32 id, const se_input_state state, se_input_callback callback, void* user_data);
 extern void se_input_unbind_all(se_input_handle* input_handle);
 extern void se_input_set_enabled(se_input_handle* input_handle, const b8 enabled);
-extern b8 se_input_is_enabled(const se_input_handle* input_handle);
+extern b8 se_input_is_enabled(se_input_handle* input_handle);
 extern void se_input_tick(se_input_handle* input_handle);
-extern f32 se_input_get_value(const se_input_handle* input_handle, const i32 id, const se_input_state state);
+extern f32 se_input_get_value(se_input_handle* input_handle, const i32 id, const se_input_state state);
 
 #endif // SE_INPUT_H

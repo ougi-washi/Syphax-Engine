@@ -26,19 +26,18 @@ s_mat4 physics_3d_build_transform(const s_vec3 *position, const s_vec3 *half_ext
 int main(void) {
 	se_context *ctx = se_context_create();
 
-	se_window *window = se_window_create(ctx, "Syphax-Engine - Physics 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_window_handle window = se_window_create("Syphax-Engine - Physics 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
 
-	se_scene_3d *scene = se_scene_3d_create_for_window(ctx, window, BODY_COUNT + 1);
+	se_scene_3d_handle scene = se_scene_3d_create_for_window(window, BODY_COUNT + 1);
 
-	se_model *cube_model = se_model_load_obj_simple(
-		ctx,
+	se_model_handle cube_model = se_model_load_obj_simple(
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("physics3d/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("physics3d/scene3d_fragment.glsl"));
 
-	se_object_3d *cubes = se_object_3d_create(ctx, cube_model, &s_mat4_identity, BODY_COUNT + 1);
+	se_object_3d_handle cubes = se_object_3d_create(cube_model, &s_mat4_identity, BODY_COUNT + 1);
 	se_scene_3d_add_object(scene, cubes);
 
 	se_physics_world_params_3d world_params = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
@@ -73,15 +72,19 @@ int main(void) {
 		slots[i].half_extents = half_extents;
 	}
 
-	scene->camera->position = s_vec3(0.0f, 4.0f, 10.0f);
-	scene->camera->target = s_vec3(0.0f, 0.0f, 0.0f);
-	scene->camera->up = s_vec3(0.0f, 1.0f, 0.0f);
-	scene->camera->near = 0.1f;
-	scene->camera->far = 100.0f;
+	se_camera_handle scene_camera_handle = se_scene_3d_get_camera(scene);
+	se_camera *scene_camera = se_camera_get(scene_camera_handle);
+	if (scene_camera) {
+		scene_camera->position = s_vec3(0.0f, 4.0f, 10.0f);
+		scene_camera->target = s_vec3(0.0f, 0.0f, 0.0f);
+		scene_camera->up = s_vec3(0.0f, 1.0f, 0.0f);
+		scene_camera->near = 0.1f;
+		scene_camera->far = 100.0f;
+	}
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_context_reload_changed_shaders(ctx);
+		se_context_reload_changed_shaders();
 
 		const f32 dt = (f32)se_window_get_delta_time(window);
 		se_physics_world_3d_step(world, dt);
@@ -93,7 +96,7 @@ int main(void) {
 			se_object_3d_set_instance_transform(cubes, slots[i].instance, &transform);
 		}
 
-		se_scene_3d_draw(scene, ctx, window);
+		se_scene_3d_draw(scene, window);
 	}
 
 	se_physics_world_3d_destroy(world);

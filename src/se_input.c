@@ -37,8 +37,9 @@ static b8 se_input_binding_is_valid(const se_input_binding* binding) {
 	return false;
 }
 
-se_input_handle* se_input_create(se_window* window, const u16 bindings_capacity) {
-	if (!window || bindings_capacity == 0) {
+se_input_handle* se_input_create(const se_window_handle window, const u16 bindings_capacity) {
+	se_context *ctx = se_current_context();
+	if (!ctx || window == S_HANDLE_NULL || bindings_capacity == 0) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -49,8 +50,10 @@ se_input_handle* se_input_create(se_window* window, const u16 bindings_capacity)
 		return NULL;
 	}
 
+	input_handle->ctx = ctx;
 	input_handle->window = window;
-	s_array_init(&input_handle->bindings, bindings_capacity);
+	input_handle->bindings_capacity = bindings_capacity;
+	s_array_init(&input_handle->bindings);
 	input_handle->enabled = true;
 	se_set_last_error(SE_RESULT_OK);
 	return input_handle;
@@ -69,7 +72,7 @@ b8 se_input_bind(se_input_handle* input_handle, const i32 id, const se_input_sta
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
-	if (input_handle->bindings.size >= input_handle->bindings.capacity) {
+	if (s_array_get_size(&input_handle->bindings) >= input_handle->bindings_capacity) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return false;
 	}
@@ -87,7 +90,9 @@ b8 se_input_bind(se_input_handle* input_handle, const i32 id, const se_input_sta
 		return false;
 	}
 
-	*s_array_increment(&input_handle->bindings) = binding;
+	s_handle binding_handle = s_array_increment(&input_handle->bindings);
+	se_input_binding* binding_slot = s_array_get(&input_handle->bindings, binding_handle);
+	*binding_slot = binding;
 	se_set_last_error(SE_RESULT_OK);
 	return true;
 }
@@ -96,10 +101,10 @@ void se_input_unbind_all(se_input_handle* input_handle) {
 	if (!input_handle) {
 		return;
 	}
-	if (input_handle->bindings.data && input_handle->bindings.capacity > 0) {
-		memset(input_handle->bindings.data, 0, sizeof(*input_handle->bindings.data) * input_handle->bindings.capacity);
+	if (s_array_get_size(&input_handle->bindings) > 0) {
+		s_array_clear(&input_handle->bindings);
+		s_array_init(&input_handle->bindings);
 	}
-	input_handle->bindings.size = 0;
 }
 
 void se_input_set_enabled(se_input_handle* input_handle, const b8 enabled) {
@@ -109,14 +114,14 @@ void se_input_set_enabled(se_input_handle* input_handle, const b8 enabled) {
 	input_handle->enabled = enabled;
 }
 
-b8 se_input_is_enabled(const se_input_handle* input_handle) {
+b8 se_input_is_enabled(se_input_handle* input_handle) {
 	if (!input_handle) {
 		return false;
 	}
 	return input_handle->enabled;
 }
 
-static b8 se_input_binding_check_digital(se_window* window, se_input_binding* binding) {
+static b8 se_input_binding_check_digital(const se_window_handle window, se_input_binding* binding) {
 	b8 fired = false;
 	binding->value = 0.0f;
 
@@ -148,7 +153,7 @@ static b8 se_input_binding_check_axis(se_input_binding* binding, const s_vec2* m
 }
 
 void se_input_tick(se_input_handle* input_handle) {
-	if (!input_handle || !input_handle->window || !input_handle->enabled) {
+	if (!input_handle || input_handle->window == S_HANDLE_NULL || !input_handle->enabled) {
 		return;
 	}
 
@@ -157,8 +162,8 @@ void se_input_tick(se_input_handle* input_handle) {
 	se_window_get_mouse_delta(input_handle->window, &mouse_delta);
 	se_window_get_scroll_delta(input_handle->window, &scroll_delta);
 
-	for (sz i = 0; i < input_handle->bindings.size; i++) {
-		se_input_binding* binding = &input_handle->bindings.data[i];
+	for (sz i = 0; i < s_array_get_size(&input_handle->bindings); i++) {
+		se_input_binding* binding = s_array_get(&input_handle->bindings, s_array_handle(&input_handle->bindings, (u32)i));
 		if (!binding->is_valid) {
 			continue;
 		}
@@ -176,14 +181,14 @@ void se_input_tick(se_input_handle* input_handle) {
 	}
 }
 
-f32 se_input_get_value(const se_input_handle* input_handle, const i32 id, const se_input_state state) {
+f32 se_input_get_value(se_input_handle* input_handle, const i32 id, const se_input_state state) {
 	if (!input_handle) {
 		return 0.0f;
 	}
 
 	f32 value = 0.0f;
-	for (sz i = 0; i < input_handle->bindings.size; i++) {
-		const se_input_binding* binding = &input_handle->bindings.data[i];
+	for (sz i = 0; i < s_array_get_size(&input_handle->bindings); i++) {
+		const se_input_binding* binding = s_array_get(&input_handle->bindings, s_array_handle(&input_handle->bindings, (u32)i));
 		if (!binding->is_valid) {
 			continue;
 		}

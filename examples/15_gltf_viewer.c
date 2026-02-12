@@ -14,18 +14,18 @@ int main(void) {
 
 	se_context* ctx = se_context_create();
 
-	se_window* window = se_window_create(ctx, "Syphax-Engine - glTF Viewer", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_window_handle window = se_window_create("Syphax-Engine - glTF Viewer", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	const u16 scene_objects_capacity = 4096;
-	se_scene_3d* scene = se_scene_3d_create_for_window(ctx, window, scene_objects_capacity);
+	se_scene_3d_handle scene = se_scene_3d_create_for_window(window, scene_objects_capacity);
 	se_scene_3d_set_culling(scene, false);
 
-	se_shader* mesh_shader = se_shader_load(ctx, SE_RESOURCE_EXAMPLE("gltf_viewer/gltf_vertex.glsl"), SE_RESOURCE_EXAMPLE("gltf_viewer/gltf_fragment.glsl"));
+	se_shader_handle mesh_shader = se_shader_load(SE_RESOURCE_EXAMPLE("gltf_viewer/gltf_vertex.glsl"), SE_RESOURCE_EXAMPLE("gltf_viewer/gltf_fragment.glsl"));
 
-	se_texture* default_texture = se_texture_load(ctx, SE_RESOURCE_EXAMPLE("gltf/Sponza/white.png"), SE_REPEAT);
+	se_texture_handle default_texture = se_texture_load(SE_RESOURCE_EXAMPLE("gltf/Sponza/white.png"), SE_REPEAT);
 
-	se_uniforms *global_uniforms = se_context_get_global_uniforms(ctx);
+	se_uniforms *global_uniforms = se_context_get_global_uniforms();
 	const s_vec3 light_direction_0 = s_vec3(-0.25f, 0.90f, 0.34f);
 	const s_vec3 light_direction_1 = s_vec3(0.74f, 0.48f, -0.31f);
 	const s_vec3 light_direction_2 = s_vec3(-0.08f, -0.62f, -0.78f);
@@ -46,20 +46,21 @@ int main(void) {
 	se_uniform_set_float(global_uniforms, "u_exposure", 1.08f);
 
 	sz objects_added = 0;
-	se_gltf_asset* asset = se_gltf_scene_load(ctx, scene, gltf_path, NULL, mesh_shader, default_texture, SE_REPEAT, &objects_added);
+	se_gltf_asset* asset = se_gltf_scene_load(scene, gltf_path, NULL, mesh_shader, default_texture, SE_REPEAT, &objects_added);
 
 	printf("15_gltf_viewer :: loaded gltf asset, meshes=%zu materials=%zu textures=%zu images=%zu objects=%zu\n",
-		asset->meshes.size,
-		asset->materials.size,
-		asset->textures.size,
-		asset->images.size,
+		s_array_get_size(&asset->meshes),
+		s_array_get_size(&asset->materials),
+		s_array_get_size(&asset->textures),
+		s_array_get_size(&asset->images),
 		objects_added);
 	printf("15_gltf_viewer :: added %zu objects\n", objects_added);
 	se_gltf_scene_fit_camera(scene, asset);
 
 	se_camera_controller_params camera_controller_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
 	camera_controller_params.window = window;
-	camera_controller_params.camera = scene->camera;
+	se_camera_handle scene_camera_handle = se_scene_3d_get_camera(scene);
+	camera_controller_params.camera = scene_camera_handle;
 	camera_controller_params.movement_speed = 10.;
 	camera_controller_params.mouse_x_speed = 0.01f;
 	camera_controller_params.mouse_y_speed = 0.01f;
@@ -67,7 +68,8 @@ int main(void) {
 	se_camera_controller* camera_controller = se_camera_controller_create(&camera_controller_params);
 	se_camera_controller_set_invert_y(camera_controller, true);
 
-	s_vec3 scene_center = scene->camera->target;
+	se_camera *scene_camera = se_camera_get(scene_camera_handle);
+	s_vec3 scene_center = scene_camera ? scene_camera->target : s_vec3(0.0f, 0.0f, 0.0f);
 	f32 scene_radius = 1.0f;
 	if (!se_gltf_scene_compute_bounds(asset, &scene_center, &scene_radius)) {
 		scene_radius = 1.0f;
@@ -79,9 +81,9 @@ int main(void) {
 	
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_context_reload_changed_shaders(ctx);
+		se_context_reload_changed_shaders();
 		se_camera_controller_tick(camera_controller, (f32)se_window_get_delta_time(window));
-		se_scene_3d_draw(scene, ctx, window);
+		se_scene_3d_draw(scene, window);
 	}
 
 	se_camera_controller_destroy(camera_controller);

@@ -8,9 +8,9 @@
 
 i32 main(void) {
 	se_context *ctx = se_context_create();
-	se_window *window_main = se_window_create(ctx, "Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
-	se_window *window_1 = se_window_create(ctx, "Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
-	se_window *window_2 = se_window_create(ctx, "Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
+	se_window_handle window_main = se_window_create("Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
+	se_window_handle window_1 = se_window_create("Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
+	se_window_handle window_2 = se_window_create("Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
 	se_window_set_exit_key(window_main, SE_KEY_ESCAPE);
 
 	while (!se_window_should_close(window_main)) {

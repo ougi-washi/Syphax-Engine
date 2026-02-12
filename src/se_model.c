@@ -6,6 +6,10 @@
 
 static void se_model_cleanup(se_model *model);
 
+static se_model *se_model_from_handle(se_context *ctx, const se_model_handle model) {
+	return s_array_get(&ctx->models, model);
+}
+
 void se_mesh_translate(se_mesh *mesh, const s_vec3 *v) {
     s_mat4_translate(&mesh->matrix, v);
 }
@@ -61,8 +65,8 @@ void se_mesh_discard_cpu_data(se_mesh *mesh) {
 
 void se_model_discard_cpu_data(se_model *model) {
 	s_assertf(model, "se_model_discard_cpu_data :: model is null");
-	s_foreach(&model->meshes, i) {
-		se_mesh *mesh = s_array_get(&model->meshes, i);
+	se_mesh *mesh = NULL;
+	s_foreach(&model->meshes, mesh) {
 		se_mesh_discard_cpu_data(mesh);
 	}
 }
@@ -107,14 +111,22 @@ static b8 se_mesh_cpu_reserve_vertices(se_mesh_cpu_data *cpu, const u32 needed) 
 	}
 
 	s_array(se_vertex_3d, grown_vertices) = {0};
-	s_array_init(&grown_vertices, new_capacity);
-	s_foreach(&cpu->vertices, i) {
-		*s_array_increment(&grown_vertices) = *s_array_get(&cpu->vertices, i);
+	s_array_init(&grown_vertices);
+	s_array_reserve(&grown_vertices, new_capacity);
+	se_vertex_3d *vertex = NULL;
+	s_foreach(&cpu->vertices, vertex) {
+		s_handle vertex_handle = s_array_increment(&grown_vertices);
+		se_vertex_3d *dst = s_array_get(&grown_vertices, vertex_handle);
+		*dst = *vertex;
 	}
 	s_array_clear(&cpu->vertices);
-	s_array_init(&cpu->vertices, new_capacity);
-	s_foreach(&grown_vertices, i) {
-		*s_array_increment(&cpu->vertices) = *s_array_get(&grown_vertices, i);
+	s_array_init(&cpu->vertices);
+	s_array_reserve(&cpu->vertices, new_capacity);
+	vertex = NULL;
+	s_foreach(&grown_vertices, vertex) {
+		s_handle vertex_handle = s_array_increment(&cpu->vertices);
+		se_vertex_3d *dst = s_array_get(&cpu->vertices, vertex_handle);
+		*dst = *vertex;
 	}
 	s_array_clear(&grown_vertices);
 	return true;
@@ -139,14 +151,22 @@ static b8 se_mesh_cpu_reserve_indices(se_mesh_cpu_data *cpu, const u32 needed) {
 	}
 
 	s_array(u32, grown_indices) = {0};
-	s_array_init(&grown_indices, new_capacity);
-	s_foreach(&cpu->indices, i) {
-		*s_array_increment(&grown_indices) = *s_array_get(&cpu->indices, i);
+	s_array_init(&grown_indices);
+	s_array_reserve(&grown_indices, new_capacity);
+	u32 *index = NULL;
+	s_foreach(&cpu->indices, index) {
+		s_handle index_handle = s_array_increment(&grown_indices);
+		u32 *dst = s_array_get(&grown_indices, index_handle);
+		*dst = *index;
 	}
 	s_array_clear(&cpu->indices);
-	s_array_init(&cpu->indices, new_capacity);
-	s_foreach(&grown_indices, i) {
-		*s_array_increment(&cpu->indices) = *s_array_get(&grown_indices, i);
+	s_array_init(&cpu->indices);
+	s_array_reserve(&cpu->indices, new_capacity);
+	index = NULL;
+	s_foreach(&grown_indices, index) {
+		s_handle index_handle = s_array_increment(&cpu->indices);
+		u32 *dst = s_array_get(&cpu->indices, index_handle);
+		*dst = *index;
 	}
 	s_array_clear(&grown_indices);
 	return true;
@@ -163,9 +183,12 @@ static b8 se_mesh_cpu_set_file_path(se_mesh_cpu_data *cpu, const char *source_pa
 	}
 
 	const sz source_path_size = strlen(source_path) + 1;
-	s_array_init(&cpu->file_path, source_path_size);
+	s_array_init(&cpu->file_path);
+	s_array_reserve(&cpu->file_path, source_path_size);
 	for (sz i = 0; i < source_path_size; i++) {
-		*s_array_increment(&cpu->file_path) = source_path[i];
+		s_handle char_handle = s_array_increment(&cpu->file_path);
+		c8 *dst = s_array_get(&cpu->file_path, char_handle);
+		*dst = source_path[i];
 	}
 
 	return true;
@@ -245,7 +268,7 @@ static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_siz
 // Helper function to finalize a mesh
 static b8 se_mesh_finalize(se_mesh *mesh,
 						   const char *source_path,
-						   se_shaders_ptr *shaders,
+						   const se_shaders_ptr *shaders,
 						   const u32 se_mesh_index,
 						   const se_mesh_data_flags mesh_data_flags) {
 	if (mesh == NULL) {
@@ -264,13 +287,17 @@ static b8 se_mesh_finalize(se_mesh *mesh,
 	mesh->gpu.index_count = (u32)s_array_get_size(&mesh->cpu.indices);
 
 	if (shaders != NULL && s_array_get_size(shaders) > 0) {
-		mesh->shader = *s_array_get(shaders, se_mesh_index % s_array_get_size(shaders));
+		se_shaders_ptr *shader_array = (se_shaders_ptr *)shaders;
+		sz shader_count = s_array_get_size(shader_array);
+		s_handle shader_entry = s_array_handle(shader_array, (u32)(se_mesh_index % shader_count));
+		se_shader_handle *shader_ptr = s_array_get(shader_array, shader_entry);
+		mesh->shader = shader_ptr ? *shader_ptr : S_HANDLE_NULL;
 	} else {
-		mesh->shader = NULL;
+		mesh->shader = S_HANDLE_NULL;
 	}
 
-	const se_vertex_3d *vertices = s_array_get(&mesh->cpu.vertices, 0);
-	const u32 *indices = s_array_get(&mesh->cpu.indices, 0);
+	const se_vertex_3d *vertices = s_array_get_data(&mesh->cpu.vertices);
+	const u32 *indices = s_array_get_data(&mesh->cpu.indices);
 	if ((mesh_data_flags & SE_MESH_DATA_GPU) != 0 && !se_mesh_create_gpu_data(mesh, vertices, indices, mesh->gpu.vertex_count, mesh->gpu.index_count)) {
 		se_mesh_release_gpu_data(mesh);
 		se_mesh_discard_cpu_data(mesh);
@@ -291,34 +318,32 @@ static b8 se_mesh_finalize(se_mesh *mesh,
 	return true;
 }
 
-se_model *se_model_load_obj_ex(se_context *ctx, const char *path, se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags) {
+se_model_handle se_model_load_obj_ex(const char *path, const se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags) {
+	se_context *ctx = se_current_context();
 	if (!ctx || !path || !se_mesh_data_flags_are_valid(mesh_data_flags)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
-	if (s_array_get_capacity(&ctx->models) == s_array_get_size(&ctx->models)) {
-		const sz current_capacity = s_array_get_capacity(&ctx->models);
-		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
-		s_array_resize(&ctx->models, next_capacity);
-	}
-	se_model *model = s_array_increment(&ctx->models);
+	se_model_handle model_handle = s_array_increment(&ctx->models);
+	se_model *model = s_array_get(&ctx->models, model_handle);
 	memset(model, 0, sizeof(*model));
-	s_array_init(&model->meshes, 64);
+	s_array_init(&model->meshes);
+	s_array_reserve(&model->meshes, 64);
 
 	char full_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!se_paths_resolve_resource_path(full_path, SE_MAX_PATH_LENGTH, path)) {
 		se_model_cleanup(model);
-		s_array_remove_at(&ctx->models, s_array_get_size(&ctx->models) - 1);
+		s_array_remove(&ctx->models, model_handle);
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
 	char *file_data = NULL;
 	if (!s_file_read(full_path, &file_data, NULL)) {
 		se_model_cleanup(model);
-		s_array_remove_at(&ctx->models, s_array_get_size(&ctx->models) - 1);
+		s_array_remove(&ctx->models, model_handle);
 		se_set_last_error(SE_RESULT_IO);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
 	// Arrays for temporary storage (shared across all meshes)
@@ -406,7 +431,8 @@ se_model *se_model_load_obj_ex(se_context *ctx, const char *path, se_shaders_ptr
 		// Face
 		hse_faces = true;
 		if (current_mesh == NULL) {
-			current_mesh = s_array_increment(&model->meshes);
+			s_handle mesh_handle = s_array_increment(&model->meshes);
+			current_mesh = s_array_get(&model->meshes, mesh_handle);
 			memset(current_mesh, 0, sizeof(*current_mesh));
 			current_mesh_index = (u32)(s_array_get_size(&model->meshes) - 1);
 		}
@@ -434,12 +460,15 @@ se_model *se_model_load_obj_ex(se_context *ctx, const char *path, se_shaders_ptr
 				}
 
 				const u32 next_index = (u32)s_array_get_size(&current_mesh->cpu.vertices);
-				se_vertex_3d *new_vertex = s_array_increment(&current_mesh->cpu.vertices);
+				s_handle vertex_handle = s_array_increment(&current_mesh->cpu.vertices);
+				se_vertex_3d *new_vertex = s_array_get(&current_mesh->cpu.vertices, vertex_handle);
 				new_vertex->position = temp_vertices[vi];
 				new_vertex->normal = temp_normals[ni];
 				new_vertex->uv = temp_uvs[ti];
 
-				*s_array_increment(&current_mesh->cpu.indices) = next_index;
+				s_handle index_handle = s_array_increment(&current_mesh->cpu.indices);
+				u32 *new_index = s_array_get(&current_mesh->cpu.indices, index_handle);
+				*new_index = next_index;
 			}
 		} else {
 			matches = sscanf(line, "f %d//%d %d//%d %d//%d", &v1, &n1, &v2, &n2, &v3, &n3);
@@ -460,16 +489,19 @@ se_model *se_model_load_obj_ex(se_context *ctx, const char *path, se_shaders_ptr
 						continue;
 					}
 
-					const u32 next_index = (u32)s_array_get_size(&current_mesh->cpu.vertices);
-					se_vertex_3d *new_vertex = s_array_increment(&current_mesh->cpu.vertices);
-					new_vertex->position = temp_vertices[vi];
-					new_vertex->normal = temp_normals[ni];
-					new_vertex->uv = (s_vec2){0.0f, 0.0f};
+				const u32 next_index = (u32)s_array_get_size(&current_mesh->cpu.vertices);
+				s_handle vertex_handle = s_array_increment(&current_mesh->cpu.vertices);
+				se_vertex_3d *new_vertex = s_array_get(&current_mesh->cpu.vertices, vertex_handle);
+				new_vertex->position = temp_vertices[vi];
+				new_vertex->normal = temp_normals[ni];
+				new_vertex->uv = (s_vec2){0.0f, 0.0f};
 
-					*s_array_increment(&current_mesh->cpu.indices) = next_index;
-				}
+				s_handle index_handle = s_array_increment(&current_mesh->cpu.indices);
+				u32 *new_index = s_array_get(&current_mesh->cpu.indices, index_handle);
+				*new_index = next_index;
 			}
 		}
+	}
 	}
 	}
 
@@ -490,82 +522,90 @@ se_model *se_model_load_obj_ex(se_context *ctx, const char *path, se_shaders_ptr
 
 	if (!ok) {
 		se_model_cleanup(model);
-		s_array_remove_at(&ctx->models, s_array_get_size(&ctx->models) - 1);
+		s_array_remove(&ctx->models, model_handle);
 		se_set_last_error(SE_RESULT_IO);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
 	// If no meshes were created, create a default one
 	if (s_array_get_size(&model->meshes) == 0) {
-	s_array_clear(&model->meshes);
-	s_array_remove_at(&ctx->models, s_array_get_size(&ctx->models) - 1);
-	se_set_last_error(SE_RESULT_NOT_FOUND);
-	return NULL;
+		s_array_clear(&model->meshes);
+		s_array_remove(&ctx->models, model_handle);
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return S_HANDLE_NULL;
 	}
 
 	se_set_last_error(SE_RESULT_OK);
-	return model;
+	return model_handle;
 }
 
-se_model *se_model_load_obj(se_context *ctx, const char *path, se_shaders_ptr *shaders) {
-	return se_model_load_obj_ex(ctx, path, shaders, SE_MESH_DATA_GPU);
+se_model_handle se_model_load_obj(const char *path, const se_shaders_ptr *shaders) {
+	return se_model_load_obj_ex(path, shaders, SE_MESH_DATA_GPU);
 }
 
-se_model *se_model_load_obj_simple_ex(se_context *ctx, const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags) {
+se_model_handle se_model_load_obj_simple_ex(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags) {
+	se_context *ctx = se_current_context();
 	if (!ctx || !obj_path || !vertex_shader_path || !fragment_shader_path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
-	se_shader *shader = se_shader_load(ctx, vertex_shader_path, fragment_shader_path);
-	if (!shader) {
-		return NULL;
+	se_shader_handle shader = se_shader_load(vertex_shader_path, fragment_shader_path);
+	if (shader == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
 	}
 
 	se_shaders_ptr shaders = {0};
-	s_array_init(&shaders, 1);
-	*s_array_increment(&shaders) = shader;
+	s_array_init(&shaders);
+	s_array_reserve(&shaders, 1);
+	{
+		s_handle shader_handle = s_array_increment(&shaders);
+		se_shader_handle *shader_slot = s_array_get(&shaders, shader_handle);
+		*shader_slot = shader;
+	}
 
-	se_model *model = se_model_load_obj_ex(ctx, obj_path, &shaders, mesh_data_flags);
+	se_model_handle model = se_model_load_obj_ex(obj_path, &shaders, mesh_data_flags);
 	s_array_clear(&shaders);
-	if (!model) {
-		se_shader_destroy(ctx, shader);
-		return NULL;
+	if (model == S_HANDLE_NULL) {
+		se_shader_destroy(shader);
+		return S_HANDLE_NULL;
 	}
 
 	se_set_last_error(SE_RESULT_OK);
 	return model;
 }
 
-se_model *se_model_load_obj_simple(se_context *ctx, const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path) {
-	return se_model_load_obj_simple_ex(ctx, obj_path, vertex_shader_path, fragment_shader_path, SE_MESH_DATA_GPU);
+se_model_handle se_model_load_obj_simple(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path) {
+	return se_model_load_obj_simple_ex(obj_path, vertex_shader_path, fragment_shader_path, SE_MESH_DATA_GPU);
 }
 
-void se_model_destroy(se_context *ctx, se_model *model) {
+void se_model_destroy(const se_model_handle model) {
+	se_context *ctx = se_current_context();
 	s_assertf(ctx, "se_model_destroy :: ctx is null");
-	s_assertf(model, "se_model_destroy :: model is null");
-	se_model_cleanup(model);
-	for (sz i = 0; i < s_array_get_size(&ctx->models); i++) {
-		se_model *slot = s_array_get(&ctx->models, i);
-		if (slot == model) {
-			s_array_remove_at(&ctx->models, i);
-			break;
-		}
-	}
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	s_assertf(model_ptr, "se_model_destroy :: model is null");
+	se_model_cleanup(model_ptr);
+	s_array_remove(&ctx->models, model);
 }
 
-void se_model_render(se_context *ctx, se_model *model, se_camera *camera) {
+void se_model_render(const se_model_handle model, const se_camera_handle camera) {
+	se_context *ctx = se_current_context();
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	s_assertf(model_ptr, "se_model_render :: model is null");
 	// set up global view/proj once per frame
 	const s_mat4 proj = se_camera_get_projection_matrix(camera);
 	const s_mat4 view = se_camera_get_view_matrix(camera);
-	s_foreach(&model->meshes, i) {
-		se_mesh *mesh = s_array_get(&model->meshes, i);
-		if (!se_mesh_has_gpu_data(mesh) || mesh->gpu.index_count == 0 || mesh->shader == NULL) {
+	se_mesh *mesh = NULL;
+	s_foreach(&model_ptr->meshes, mesh) {
+		if (!se_mesh_has_gpu_data(mesh) || mesh->gpu.index_count == 0 || mesh->shader == S_HANDLE_NULL) {
 			continue;
 		}
-		se_shader *sh = mesh->shader;
+		se_shader *sh = s_array_get(&ctx->shaders, mesh->shader);
+		if (!sh) {
+			continue;
+		}
 
-		se_shader_use(ctx, sh, true, true);
+		se_shader_use(mesh->shader, true, true);
 
 		s_mat4 vp = s_mat4_mul(&proj, &view);
 		s_mat4 mvp = s_mat4_mul(&vp, &mesh->matrix);
@@ -597,32 +637,41 @@ void se_model_render(se_context *ctx, se_model *model, se_camera *camera) {
 }
 
 static void se_model_cleanup(se_model *model) {
-	s_foreach(&model->meshes, i) {
-		se_mesh *mesh = s_array_get(&model->meshes, i);
+	se_mesh *mesh = NULL;
+	s_foreach(&model->meshes, mesh) {
 		se_mesh_release_gpu_data(mesh);
 		se_mesh_discard_cpu_data(mesh);
 	}
 	s_array_clear(&model->meshes);
 }
 
-void se_model_translate(se_model *model, const s_vec3 *v) {
-	s_foreach(&model->meshes, i) {
-	se_mesh *mesh = s_array_get(&model->meshes, i);
-	se_mesh_translate(mesh, v);
+void se_model_translate(const se_model_handle model, const s_vec3 *v) {
+	se_context *ctx = se_current_context();
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	s_assertf(model_ptr, "se_model_translate :: model is null");
+	se_mesh *mesh = NULL;
+	s_foreach(&model_ptr->meshes, mesh) {
+		se_mesh_translate(mesh, v);
 	}
 }
 
-void se_model_rotate(se_model *model, const s_vec3 *v) {
-	s_foreach(&model->meshes, i) {
-	se_mesh *mesh = s_array_get(&model->meshes, i);
-	se_mesh_rotate(mesh, v);
+void se_model_rotate(const se_model_handle model, const s_vec3 *v) {
+	se_context *ctx = se_current_context();
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	s_assertf(model_ptr, "se_model_rotate :: model is null");
+	se_mesh *mesh = NULL;
+	s_foreach(&model_ptr->meshes, mesh) {
+		se_mesh_rotate(mesh, v);
 	}
 }
 
-void se_model_scale(se_model *model, const s_vec3 *v) {
-	s_foreach(&model->meshes, i) {
-	se_mesh *mesh = s_array_get(&model->meshes, i);
-	se_mesh_scale(mesh, v);
+void se_model_scale(const se_model_handle model, const s_vec3 *v) {
+	se_context *ctx = se_current_context();
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	s_assertf(model_ptr, "se_model_scale :: model is null");
+	se_mesh *mesh = NULL;
+	s_foreach(&model_ptr->meshes, mesh) {
+		se_mesh_scale(mesh, v);
 	}
 }
 
@@ -654,7 +703,8 @@ void se_mesh_instance_create(se_mesh_instance *out_instance, const se_mesh *mesh
 	glBindVertexArray(0);
 
 	if (instance_count > 0) {
-		s_array_init(&out_instance->instance_buffers, instance_count);
+		s_array_init(&out_instance->instance_buffers);
+		s_array_reserve(&out_instance->instance_buffers, instance_count);
 		out_instance->instance_buffers_dirty = true;
 	}
 }
@@ -668,7 +718,8 @@ void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffe
 
 	glBindVertexArray(instance->vao);
 
-	se_instance_buffer *new_buffer = s_array_increment(&instance->instance_buffers);
+	s_handle buffer_handle = s_array_increment(&instance->instance_buffers);
+	se_instance_buffer *new_buffer = s_array_get(&instance->instance_buffers, buffer_handle);
 	new_buffer->vbo = 0;
 	new_buffer->buffer_ptr = buffer;
 	new_buffer->buffer_size = sizeof(s_mat4) * instance_count;
@@ -697,8 +748,8 @@ void se_mesh_instance_update(se_mesh_instance *instance) {
 		return;
 	}
 
-	s_foreach(&instance->instance_buffers, i) {
-		se_instance_buffer *current_buffer = s_array_get(&instance->instance_buffers, i);
+	se_instance_buffer *current_buffer = NULL;
+	s_foreach(&instance->instance_buffers, current_buffer) {
 		glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
 		glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -708,8 +759,8 @@ void se_mesh_instance_update(se_mesh_instance *instance) {
 
 void se_mesh_instance_destroy(se_mesh_instance *instance) {
 	s_assertf(instance, "se_mesh_instance_destroy :: instance is null");
-	s_foreach(&instance->instance_buffers, i) {
-		se_instance_buffer *current_buffer = s_array_get(&instance->instance_buffers, i);
+	se_instance_buffer *current_buffer = NULL;
+	s_foreach(&instance->instance_buffers, current_buffer) {
 		glDeleteBuffers(1, &current_buffer->vbo);
 	}
 	s_array_clear(&instance->instance_buffers);

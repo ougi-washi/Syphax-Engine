@@ -10,9 +10,10 @@
 #define WINDOW_HEIGHT 720
 
 typedef struct {
+	se_context* ctx;
 	se_input_handle* input;
-	se_window* window;
-	se_scene_3d* scene;
+	se_window_handle window;
+	se_scene_3d_handle scene;
 	s_vec3 target;
 	f32 yaw;
 	f32 pitch;
@@ -24,7 +25,15 @@ typedef struct {
 } input_viewer_state;
 
 static void input_viewer_apply_camera(input_viewer_state* state) {
-	if (!state || !state->scene || !state->scene->camera) {
+	if (!state || !state->ctx) {
+		return;
+	}
+	se_scene_3d *scene_ptr = s_array_get(&state->ctx->scenes_3d, state->scene);
+	if (!scene_ptr) {
+		return;
+	}
+	se_camera *camera = s_array_get(&state->ctx->cameras, scene_ptr->camera);
+	if (!camera) {
 		return;
 	}
 
@@ -38,9 +47,9 @@ static void input_viewer_apply_camera(input_viewer_state* state) {
 		sinf(state->pitch) * state->distance,
 		cosf(state->yaw) * cosf(state->pitch) * state->distance);
 
-	state->scene->camera->position = s_vec3_add(&state->target, &orbit_offset);
-	state->scene->camera->target = state->target;
-	state->scene->camera->up = s_vec3(0.0f, 1.0f, 0.0f);
+	camera->position = s_vec3_add(&state->target, &orbit_offset);
+	camera->target = state->target;
+	camera->up = s_vec3(0.0f, 1.0f, 0.0f);
 }
 
 static void input_viewer_on_key_w(void* user_data) {
@@ -102,21 +111,21 @@ static void input_viewer_on_scroll_y(void* user_data) {
 
 int main(void) {
 	se_context* ctx = se_context_create();
-	se_window* window = se_window_create(ctx, "Syphax-Engine - Input Viewer", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_window_handle window = se_window_create("Syphax-Engine - Input Viewer", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.07f, 0.09f, 0.11f, 1.0f));
 
-	se_scene_3d* scene = se_scene_3d_create_for_window(ctx, window, 1);
+	se_scene_3d_handle scene = se_scene_3d_create_for_window(window, 1);
 
-	se_model* cube_model = se_model_load_obj_simple(
-		ctx,
+	se_model_handle cube_model = se_model_load_obj_simple(
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("input/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("input/scene3d_fragment.glsl"));
-	se_scene_3d_add_model(ctx, scene, cube_model, &s_mat4_identity);
+	se_scene_3d_add_model(scene, cube_model, &s_mat4_identity);
 
 	se_input_handle* input = se_input_create(window, 8);
 	input_viewer_state viewer = {
+		.ctx = ctx,
 		.input = input,
 		.window = window,
 		.scene = scene,
@@ -149,9 +158,9 @@ int main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_context_reload_changed_shaders(ctx);
+		se_context_reload_changed_shaders();
 		se_input_tick(input);
-		se_scene_3d_draw(scene, ctx, window);
+		se_scene_3d_draw(scene, window);
 	}
 
 	se_input_destroy(input);

@@ -6,9 +6,9 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 
-i32 main(void) {
+int main(void) {
 	se_context *ctx = se_context_create();
-	se_window *window = se_window_create(ctx, "Syphax-Engine - Window Example", WIDTH, HEIGHT);
+	se_window_handle window = se_window_create("Syphax-Engine - Window Example", WIDTH, HEIGHT);
 	se_render_set_background_color(s_vec4(0.5f, 0.5f, 0.5f, 1.0f));
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 

@@ -9,6 +9,9 @@
 static GLuint se_shader_compile(const char *source, GLenum type);
 static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source);
 static void se_shader_cleanup(se_shader *shader);
+static se_shader* se_shader_from_handle(se_context *ctx, const se_shader_handle shader) {
+	return s_array_get(&ctx->shaders, shader);
+}
 
 static GLuint se_shader_compile(const char *source, GLenum type) {
 	if (source == NULL || source[0] == '\0') {
@@ -92,30 +95,30 @@ b8 se_shader_load_internal(se_shader *shader) {
 	shader->fragment_mtime = 0;
 	s_file_mtime(shader->vertex_path, &shader->vertex_mtime);
 	s_file_mtime(shader->fragment_path, &shader->fragment_mtime);
-	s_array_init(&shader->uniforms, SE_UNIFORMS_MAX);
+	s_array_init(&shader->uniforms);
 	printf("se_shader_load_internal :: created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
 	return true;
 }
 
-se_shader *se_shader_load(se_context *ctx, const char *vertex_file_path, const char *fragment_file_path) {
+se_shader_handle se_shader_load(const char *vertex_file_path, const char *fragment_file_path) {
+	se_context *ctx = se_current_context();
 	if (!ctx || !vertex_file_path || !fragment_file_path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
-	if (s_array_get_capacity(&ctx->shaders) <= s_array_get_size(&ctx->shaders)) {
-		const sz current_capacity = s_array_get_capacity(&ctx->shaders);
-		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
-		s_array_resize(&ctx->shaders, next_capacity);
+	if (s_array_get_capacity(&ctx->shaders) == 0) {
+		s_array_init(&ctx->shaders);
 	}
-	se_shader *new_shader = s_array_increment(&ctx->shaders);
+	se_shader_handle shader_handle = s_array_increment(&ctx->shaders);
+	se_shader *new_shader = s_array_get(&ctx->shaders, shader_handle);
 	memset(new_shader, 0, sizeof(*new_shader));
 
 	// make path absolute
 	if (strlen(vertex_file_path) > 0) {
 		if (!se_paths_resolve_resource_path(new_shader->vertex_path, SE_MAX_PATH_LENGTH, vertex_file_path)) {
-			s_array_remove_at(&ctx->shaders, s_array_get_size(&ctx->shaders) - 1);
+			s_array_remove(&ctx->shaders, shader_handle);
 			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-			return NULL;
+			return S_HANDLE_NULL;
 		}
 	} else {
 		new_shader->vertex_path[0] = '\0';
@@ -123,9 +126,9 @@ se_shader *se_shader_load(se_context *ctx, const char *vertex_file_path, const c
 
 	if (strlen(fragment_file_path) > 0) {
 		if (!se_paths_resolve_resource_path(new_shader->fragment_path, SE_MAX_PATH_LENGTH, fragment_file_path)) {
-			s_array_remove_at(&ctx->shaders, s_array_get_size(&ctx->shaders) - 1);
+			s_array_remove(&ctx->shaders, shader_handle);
 			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-			return NULL;
+			return S_HANDLE_NULL;
 		}
 	} else {
 		new_shader->fragment_path[0] = '\0';
@@ -133,84 +136,82 @@ se_shader *se_shader_load(se_context *ctx, const char *vertex_file_path, const c
 
 	if (se_shader_load_internal(new_shader)) {
 		se_set_last_error(SE_RESULT_OK);
-		return new_shader;
+		return shader_handle;
 	}
-	s_array_remove_at(&ctx->shaders, s_array_get_size(&ctx->shaders) - 1);
+	s_array_remove(&ctx->shaders, shader_handle);
 	se_set_last_error(SE_RESULT_IO);
-	return NULL;
+	return S_HANDLE_NULL;
 }
 
-se_shader *se_shader_load_from_memory(se_context *ctx, const char *vertex_source, const char *fragment_source) {
+se_shader_handle se_shader_load_from_memory(const char *vertex_source, const char *fragment_source) {
+	se_context *ctx = se_current_context();
 	if (!ctx || !vertex_source || !fragment_source) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
-
-	if (s_array_get_capacity(&ctx->shaders) <= s_array_get_size(&ctx->shaders)) {
-		const sz current_capacity = s_array_get_capacity(&ctx->shaders);
-		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
-		s_array_resize(&ctx->shaders, next_capacity);
+	if (s_array_get_capacity(&ctx->shaders) == 0) {
+		s_array_init(&ctx->shaders);
 	}
-
-	se_shader *new_shader = s_array_increment(&ctx->shaders);
+	se_shader_handle shader_handle = s_array_increment(&ctx->shaders);
+	se_shader *new_shader = s_array_get(&ctx->shaders, shader_handle);
 
 	memset(new_shader, 0, sizeof(*new_shader));
 	new_shader->program = se_shader_create_program(vertex_source, fragment_source);
 	if (new_shader->program == 0) {
-		s_array_remove_at(&ctx->shaders, s_array_get_size(&ctx->shaders) - 1);
+		s_array_remove(&ctx->shaders, shader_handle);
 		se_set_last_error(SE_RESULT_IO);
-		return NULL;
+		return S_HANDLE_NULL;
 	}
 
-	s_array_init(&new_shader->uniforms, SE_UNIFORMS_MAX);
+	s_array_init(&new_shader->uniforms);
 	new_shader->vertex_path[0] = '\0';
 	new_shader->fragment_path[0] = '\0';
 	new_shader->vertex_mtime = 0;
 	new_shader->fragment_mtime = 0;
 	new_shader->needs_reload = false;
 	se_set_last_error(SE_RESULT_OK);
-	return new_shader;
+	return shader_handle;
 }
 
-void se_shader_destroy(se_context *ctx, se_shader *shader) {
+void se_shader_destroy(const se_shader_handle shader) {
+	se_context *ctx = se_current_context();
 	s_assertf(ctx, "se_shader_destroy :: ctx is null");
-	s_assertf(shader, "se_shader_destroy :: shader is null");
-	se_shader_cleanup(shader);
-	for (sz i = 0; i < s_array_get_size(&ctx->shaders); i++) {
-		se_shader *slot = s_array_get(&ctx->shaders, i);
-		if (slot == shader) {
-			s_array_remove_at(&ctx->shaders, i);
-			break;
-		}
-	}
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	s_assertf(shader_ptr, "se_shader_destroy :: shader is null");
+	se_shader_cleanup(shader_ptr);
+	s_array_remove(&ctx->shaders, shader);
 }
 
-b8 se_shader_reload_if_changed(se_shader *shader) {
-	if (shader == NULL) {
+b8 se_shader_reload_if_changed(const se_shader_handle shader) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	if (shader_ptr == NULL) {
 		return false;
 	}
-	if (strlen(shader->vertex_path) == 0 || strlen(shader->fragment_path) == 0) {
+	if (strlen(shader_ptr->vertex_path) == 0 || strlen(shader_ptr->fragment_path) == 0) {
 	return false;
 	}
 
 	time_t vertex_mtime = 0;
 	time_t fragment_mtime = 0;
-	s_file_mtime(shader->vertex_path, &vertex_mtime);
-	s_file_mtime(shader->fragment_path, &fragment_mtime);
+	s_file_mtime(shader_ptr->vertex_path, &vertex_mtime);
+	s_file_mtime(shader_ptr->fragment_path, &fragment_mtime);
 
-	if (vertex_mtime != shader->vertex_mtime ||
-		fragment_mtime != shader->fragment_mtime) {
-	printf("se_shader_reload_if_changed :: Reloading shader: %s, %s\n", shader->vertex_path, shader->fragment_path);
-	return se_shader_load_internal(shader);
+	if (vertex_mtime != shader_ptr->vertex_mtime ||
+		fragment_mtime != shader_ptr->fragment_mtime) {
+	printf("se_shader_reload_if_changed :: Reloading shader: %s, %s\n", shader_ptr->vertex_path, shader_ptr->fragment_path);
+	return se_shader_load_internal(shader_ptr);
 	}
 
 	return false;
 }
 
-void se_shader_use(se_context *ctx, se_shader *shader, const b8 update_uniforms, const b8 update_global_uniforms) {
-	glUseProgram(shader->program);
+void se_shader_use(const se_shader_handle shader, const b8 update_uniforms, const b8 update_global_uniforms) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	glUseProgram(shader_ptr->program);
 	if (update_uniforms) {
-	se_uniform_apply(ctx, shader, update_global_uniforms);
+		se_uniform_apply(shader, update_global_uniforms);
 	}
 }
 
@@ -223,13 +224,17 @@ static void se_shader_cleanup(se_shader *shader) {
 	}
 }
 
-i32 se_shader_get_uniform_location(se_shader *shader, const char *name) {
-	return (i32)glGetUniformLocation(shader->program, name);
+i32 se_shader_get_uniform_location(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	return (i32)glGetUniformLocation(shader_ptr->program, name);
 }
 
-f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+f32 *se_shader_get_uniform_float(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.f;
 		}
@@ -237,9 +242,11 @@ f32 *se_shader_get_uniform_float(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+s_vec2 *se_shader_get_uniform_vec2(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.vec2;
 		}
@@ -247,9 +254,11 @@ s_vec2 *se_shader_get_uniform_vec2(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+s_vec3 *se_shader_get_uniform_vec3(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.vec3;
 		}
@@ -257,9 +266,11 @@ s_vec3 *se_shader_get_uniform_vec3(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+s_vec4 *se_shader_get_uniform_vec4(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.vec4;
 		}
@@ -267,9 +278,11 @@ s_vec4 *se_shader_get_uniform_vec4(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-i32 *se_shader_get_uniform_int(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+i32 *se_shader_get_uniform_int(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.i;
 		}
@@ -277,9 +290,11 @@ i32 *se_shader_get_uniform_int(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+s_mat4 *se_shader_get_uniform_mat4(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.mat4;
 		}
@@ -287,9 +302,11 @@ s_mat4 *se_shader_get_uniform_mat4(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-u32 *se_shader_get_uniform_texture(se_shader *shader, const char *name) {
-	s_foreach(&shader->uniforms, i) {
-		se_uniform *uniform = s_array_get(&shader->uniforms, i);
+u32 *se_shader_get_uniform_texture(const se_shader_handle shader, const char *name) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
 			return &uniform->value.texture;
 		}
@@ -297,53 +314,68 @@ u32 *se_shader_get_uniform_texture(se_shader *shader, const char *name) {
 	return NULL;
 }
 
-void se_shader_set_float(se_shader *shader, const char *name, f32 value) {
-	se_uniform_set_float(&shader->uniforms, name, value);
+void se_shader_set_float(const se_shader_handle shader, const char *name, f32 value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_float(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_vec2(se_shader *shader, const char *name, const s_vec2 *value) {
-	se_uniform_set_vec2(&shader->uniforms, name, value);
+void se_shader_set_vec2(const se_shader_handle shader, const char *name, const s_vec2 *value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_vec2(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_vec3(se_shader *shader, const char *name, const s_vec3 *value) {
-	se_uniform_set_vec3(&shader->uniforms, name, value);
+void se_shader_set_vec3(const se_shader_handle shader, const char *name, const s_vec3 *value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_vec3(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_vec4(se_shader *shader, const char *name, const s_vec4 *value) {
-	se_uniform_set_vec4(&shader->uniforms, name, value);
+void se_shader_set_vec4(const se_shader_handle shader, const char *name, const s_vec4 *value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_vec4(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_int(se_shader *shader, const char *name, i32 value) {
-	se_uniform_set_int(&shader->uniforms, name, value);
+void se_shader_set_int(const se_shader_handle shader, const char *name, i32 value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_int(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_mat3(se_shader *shader, const char *name, const s_mat3 *value) {
-	se_uniform_set_mat3(&shader->uniforms, name, value);
+void se_shader_set_mat3(const se_shader_handle shader, const char *name, const s_mat3 *value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_mat3(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_mat4(se_shader *shader, const char *name, const s_mat4 *value) {
-	se_uniform_set_mat4(&shader->uniforms, name, value);
+void se_shader_set_mat4(const se_shader_handle shader, const char *name, const s_mat4 *value) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_mat4(&shader_ptr->uniforms, name, value);
 }
 
-void se_shader_set_texture(se_shader *shader, const char *name, const u32 texture) {
-	se_uniform_set_texture(&shader->uniforms, name, texture);
+void se_shader_set_texture(const se_shader_handle shader, const char *name, const u32 texture) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_uniform_set_texture(&shader_ptr->uniforms, name, texture);
 }
 
-void se_context_reload_changed_shaders(se_context *ctx) {
+void se_context_reload_changed_shaders(void) {
+	se_context *ctx = se_current_context();
 	if (ctx == NULL) {
 		return;
 	}
 
-	s_foreach(&ctx->shaders, i) {
-		se_shader *shader = s_array_get(&ctx->shaders, i);
-		if (shader == NULL) {
-			continue;
-		}
-		(void)se_shader_reload_if_changed(shader);
+	for (sz i = 0; i < s_array_get_size(&ctx->shaders); ++i) {
+		se_shader_handle shader_handle = s_array_handle(&ctx->shaders, (u32)i);
+		(void)se_shader_reload_if_changed(shader_handle);
 	}
 }
 
-se_uniforms *se_context_get_global_uniforms(se_context *ctx) {
+se_uniforms *se_context_get_global_uniforms(void) {
+	se_context *ctx = se_current_context();
 	if (ctx == NULL) {
 		return NULL;
 	}
@@ -376,30 +408,32 @@ se_uniforms *se_context_get_global_uniforms(se_context *ctx) {
 
 // Uniform functions
 void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value) {
-	s_foreach(uniforms, i) {
-	se_uniform *found_uniform = s_array_get(uniforms, i);
-	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
-		found_uniform->type = SE_UNIFORM_FLOAT;
-		found_uniform->value.f = value;
-		return;
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
+		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+			found_uniform->type = SE_UNIFORM_FLOAT;
+			found_uniform->value.f = value;
+			return;
+		}
 	}
-	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_FLOAT;
 	new_uniform->value.f = value;
 }
 
 void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const s_vec2 *value) {
-	s_foreach(uniforms, i) {
-	se_uniform *found_uniform = s_array_get(uniforms, i);
-	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
-		found_uniform->type = SE_UNIFORM_VEC2;
-		memcpy(&found_uniform->value.vec2, value, sizeof(s_vec2));
-		return;
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
+		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+			found_uniform->type = SE_UNIFORM_VEC2;
+			memcpy(&found_uniform->value.vec2, value, sizeof(s_vec2));
+			return;
+		}
 	}
-	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC2;
 	memcpy(&new_uniform->value.vec2, value, sizeof(s_vec2));
@@ -409,75 +443,80 @@ void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const s_vec3 *
 	s_assertf(uniforms, "se_uniform_set_vec3 :: uniforms is null");
 	s_assertf(name, "se_uniform_set_vec3 :: name is null");
 	s_assertf(value, "se_uniform_set_vec3 :: value is null");
-	s_foreach(uniforms, i) {
-	se_uniform *found_uniform = s_array_get(uniforms, i);
-	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
-		found_uniform->type = SE_UNIFORM_VEC3;
-		memcpy(&found_uniform->value.vec3, value, sizeof(s_vec3));
-		return;
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
+		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+			found_uniform->type = SE_UNIFORM_VEC3;
+			memcpy(&found_uniform->value.vec3, value, sizeof(s_vec3));
+			return;
+		}
 	}
-	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC3;
 	memcpy(&new_uniform->value.vec3, value, sizeof(s_vec3));
 }
 
 void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const s_vec4 *value) {
-	s_foreach(uniforms, i) {
-	se_uniform *found_uniform = s_array_get(uniforms, i);
-	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
-		found_uniform->type = SE_UNIFORM_VEC4;
-		memcpy(&found_uniform->value.vec4, value, sizeof(s_vec4));
-		return;
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
+		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+			found_uniform->type = SE_UNIFORM_VEC4;
+			memcpy(&found_uniform->value.vec4, value, sizeof(s_vec4));
+			return;
+		}
 	}
-	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC4;
 	memcpy(&new_uniform->value.vec4, value, sizeof(s_vec4));
 }
 
 void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 value) {
-	s_foreach(uniforms, i) {
-	se_uniform *found_uniform = s_array_get(uniforms, i);
-	if (found_uniform && strcmp(found_uniform->name, name) == 0) {
-		found_uniform->type = SE_UNIFORM_INT;
-		found_uniform->value.i = value;
-		return;
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
+		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
+			found_uniform->type = SE_UNIFORM_INT;
+			found_uniform->value.i = value;
+			return;
+		}
 	}
-	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_INT;
 	new_uniform->value.i = value;
 }
 
 void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const s_mat3 *value) {
-	s_foreach(uniforms, i) {
-		se_uniform *found_uniform = s_array_get(uniforms, i);
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
 		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 			found_uniform->type = SE_UNIFORM_MAT3;
 			memcpy(&found_uniform->value.mat3, value, sizeof(s_mat3));
 			return;
 		}
 	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_MAT3;
 	memcpy(&new_uniform->value.mat3, value, sizeof(s_mat3));
 }
 
 void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *value) {
-	s_foreach(uniforms, i) {
-		se_uniform *found_uniform = s_array_get(uniforms, i);
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
 		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 			found_uniform->type = SE_UNIFORM_MAT4;
 			memcpy(&found_uniform->value.mat4, value, sizeof(s_mat4));
 			return;
 		}
 	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_MAT4;
 	memcpy(&new_uniform->value.mat4, value, sizeof(s_mat4));
@@ -486,58 +525,61 @@ void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *
 void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 texture) {
 	s_assertf(uniforms, "se_uniform_set_texture :: uniforms is null");
 	s_assertf(name, "se_uniform_set_texture :: name is null");
-	s_foreach(uniforms, i) {
-	se_uniform *found_uniform = s_array_get(uniforms, i);
+	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
+		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
 		if (found_uniform && strcmp(found_uniform->name, name) == 0) {
 			found_uniform->type = SE_UNIFORM_TEXTURE;
 			found_uniform->value.texture = texture;
 			return;
 		}
 	}
-	se_uniform *new_uniform = s_array_increment(uniforms);
+	s_handle uniform_handle = s_array_increment(uniforms);
+	se_uniform *new_uniform = s_array_get(uniforms, uniform_handle);
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_TEXTURE;
 	new_uniform->value.texture = texture;
 	printf("se_uniform_set_texture :: added texture uniform: %s, id: %d, ptr: %p\n", name, texture, new_uniform);
 }
 
-void se_uniform_apply(se_context *ctx, se_shader *shader, const b8 update_global_uniforms) {
-	glUseProgram(shader->program);
+void se_uniform_apply(const se_shader_handle shader, const b8 update_global_uniforms) {
+	se_context *ctx = se_current_context();
+	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	glUseProgram(shader_ptr->program);
 	u32 texture_unit = 0;
-	s_foreach(&shader->uniforms, i) {
-	se_uniform *uniform = s_array_get(&shader->uniforms, i);
-	GLint location = glGetUniformLocation(shader->program, uniform->name);
-	if (location == -1) {
-		continue;
-	};
-	switch (uniform->type) {
-		case SE_UNIFORM_FLOAT:
-			glUniform1fv(location, 1, &uniform->value.f);
-			break;
-		case SE_UNIFORM_VEC2:
-			glUniform2fv(location, 1, &uniform->value.vec2.x);
-			break;
-		case SE_UNIFORM_VEC3:
-			glUniform3fv(location, 1, &uniform->value.vec3.x);
-			break;
-		case SE_UNIFORM_VEC4:
-			glUniform4fv(location, 1, &uniform->value.vec4.x);
-			break;
-		case SE_UNIFORM_INT:
-			glUniform1i(location, uniform->value.i);
-			break;
-		case SE_UNIFORM_MAT3:
-			glUniformMatrix3fv(location, 1, GL_FALSE, uniform->value.mat3.m[0]);
-			break;
-		case SE_UNIFORM_MAT4:
-			glUniformMatrix4fv(location, 1, GL_FALSE, uniform->value.mat4.m[0]);
-			break;
-		case SE_UNIFORM_TEXTURE:
-			glActiveTexture(GL_TEXTURE0 + texture_unit);
-			glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
-			glUniform1i(location, texture_unit);
-			texture_unit++;
-			break;
+	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
+		GLint location = glGetUniformLocation(shader_ptr->program, uniform->name);
+		if (location == -1) {
+			continue;
+		}
+		switch (uniform->type) {
+			case SE_UNIFORM_FLOAT:
+				glUniform1fv(location, 1, &uniform->value.f);
+				break;
+			case SE_UNIFORM_VEC2:
+				glUniform2fv(location, 1, &uniform->value.vec2.x);
+				break;
+			case SE_UNIFORM_VEC3:
+				glUniform3fv(location, 1, &uniform->value.vec3.x);
+				break;
+			case SE_UNIFORM_VEC4:
+				glUniform4fv(location, 1, &uniform->value.vec4.x);
+				break;
+			case SE_UNIFORM_INT:
+				glUniform1i(location, uniform->value.i);
+				break;
+			case SE_UNIFORM_MAT3:
+				glUniformMatrix3fv(location, 1, GL_FALSE, uniform->value.mat3.m[0]);
+				break;
+			case SE_UNIFORM_MAT4:
+				glUniformMatrix4fv(location, 1, GL_FALSE, uniform->value.mat4.m[0]);
+				break;
+			case SE_UNIFORM_TEXTURE:
+				glActiveTexture(GL_TEXTURE0 + texture_unit);
+				glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
+				glUniform1i(location, texture_unit);
+				texture_unit++;
+				break;
 		}
 	}
 
@@ -546,40 +588,40 @@ void se_uniform_apply(se_context *ctx, se_shader *shader, const b8 update_global
 	}
 
 	// apply global uniforms
-	s_foreach(&ctx->global_uniforms, i) {
-	se_uniform *uniform = s_array_get(&ctx->global_uniforms, i);
-	GLint location = glGetUniformLocation(shader->program, uniform->name);
-	if (location == -1) {
-		continue;
-	};
-	switch (uniform->type) {
-		case SE_UNIFORM_FLOAT:
-			glUniform1fv(location, 1, &uniform->value.f);
-			break;
-		case SE_UNIFORM_VEC2:
-			glUniform2fv(location, 1, &uniform->value.vec2.x);
-			break;
-		case SE_UNIFORM_VEC3:
-			glUniform3fv(location, 1, &uniform->value.vec3.x);
-			break;
-		case SE_UNIFORM_VEC4:
-			glUniform4fv(location, 1, &uniform->value.vec4.x);
-			break;
-		case SE_UNIFORM_INT:
-			glUniform1i(location, uniform->value.i);
-			break;
-		case SE_UNIFORM_MAT3:
-			glUniformMatrix3fv(location, 1, GL_FALSE, uniform->value.mat3.m[0]);
-			break;
-		case SE_UNIFORM_MAT4:
-			glUniformMatrix4fv(location, 1, GL_FALSE, uniform->value.mat4.m[0]);
-			break;
-		case SE_UNIFORM_TEXTURE:
-			glActiveTexture(GL_TEXTURE0 + texture_unit);
-			glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
-			glUniform1i(location, texture_unit);
-			texture_unit++;
-			break;
+	for (sz i = 0; i < s_array_get_size(&ctx->global_uniforms); ++i) {
+		se_uniform *uniform = s_array_get(&ctx->global_uniforms, s_array_handle(&ctx->global_uniforms, (u32)i));
+		GLint location = glGetUniformLocation(shader_ptr->program, uniform->name);
+		if (location == -1) {
+			continue;
+		}
+		switch (uniform->type) {
+			case SE_UNIFORM_FLOAT:
+				glUniform1fv(location, 1, &uniform->value.f);
+				break;
+			case SE_UNIFORM_VEC2:
+				glUniform2fv(location, 1, &uniform->value.vec2.x);
+				break;
+			case SE_UNIFORM_VEC3:
+				glUniform3fv(location, 1, &uniform->value.vec3.x);
+				break;
+			case SE_UNIFORM_VEC4:
+				glUniform4fv(location, 1, &uniform->value.vec4.x);
+				break;
+			case SE_UNIFORM_INT:
+				glUniform1i(location, uniform->value.i);
+				break;
+			case SE_UNIFORM_MAT3:
+				glUniformMatrix3fv(location, 1, GL_FALSE, uniform->value.mat3.m[0]);
+				break;
+			case SE_UNIFORM_MAT4:
+				glUniformMatrix4fv(location, 1, GL_FALSE, uniform->value.mat4.m[0]);
+				break;
+			case SE_UNIFORM_TEXTURE:
+				glActiveTexture(GL_TEXTURE0 + texture_unit);
+				glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
+				glUniform1i(location, texture_unit);
+				texture_unit++;
+				break;
 		}
 	}
 }
