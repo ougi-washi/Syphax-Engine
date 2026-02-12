@@ -3,8 +3,6 @@
 #ifndef SE_RENDER_H
 #define SE_RENDER_H
 
-#include "se_defines.h"
-#include "se_math.h"
 #include "syphax/s_array.h"
 #include <assert.h>
 
