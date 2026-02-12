@@ -231,7 +231,6 @@ b8 se_render_init(void) {
 	se_render_initialized = true;
 	return true;
 }
-static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_size, const char *label);
 
 static b8 se_is_blending = false;
 void se_render_set_blending(const b8 active) {
@@ -456,60 +455,6 @@ void se_quad_destroy(se_quad *quad) {
 	glDeleteVertexArrays(1, &quad->vao);
 	glDeleteBuffers(1, &quad->vbo);
 	glDeleteBuffers(1, &quad->ebo);
-}
-
-static GLuint se_shader_compile(const char *source, GLenum type) {
-	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &source, NULL);
-	glCompileShader(shader);
-
-	GLint success;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-	char info_log[512];
-	glGetShaderInfoLog(shader, 512, NULL, info_log);
-	fprintf(stderr, "se_shader_compile :: Shader compilation failed: %s\n", info_log);
-	glDeleteShader(shader);
-	return 0;
-	}
-
-	return shader;
-}
-
-
-static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source) {
-	GLuint vertex_shader = se_shader_compile(vertex_source, GL_VERTEX_SHADER);
-	GLuint fragment_shader = se_shader_compile(fragment_source, GL_FRAGMENT_SHADER);
-	if (!vertex_shader || !fragment_shader) {
-	if (vertex_shader) {
-		glDeleteShader(vertex_shader);
-	}
-	if (fragment_shader) {
-		glDeleteShader(fragment_shader);
-	}
-	printf("se_shader_create_program :: Failed to create shader program, vertex or fragment shaders are invalid\n");
-	return 0;
-	}
-
-	GLuint program = glCreateProgram();
-	glAttachShader(program, vertex_shader);
-	glAttachShader(program, fragment_shader);
-	glLinkProgram(program);
-
-	GLint success;
-	glGetProgramiv(program, GL_LINK_STATUS, &success);
-	if (!success) {
-		char info_log[512];
-		glGetProgramInfoLog(program, 512, NULL, info_log);
-		fprintf(stderr, "se_shader_create_program :: Shader program linking failed: %s\n", info_log);
-		glDeleteProgram(program);
-		program = 0;
-	}
-
-	glDeleteShader(vertex_shader);
-	glDeleteShader(fragment_shader);
-
-	return program;
 }
 
 #endif // SE_RENDER_BACKEND_OPENGL || SE_RENDER_BACKEND_GLES

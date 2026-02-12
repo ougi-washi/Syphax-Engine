@@ -17,6 +17,9 @@ se_text_handle* se_text_handle_create(const u32 fonts_count) {
 	if (s_array_get_capacity(&ctx->fonts) == 0) {
 		s_array_init(&ctx->fonts);
 	}
+	if (s_array_get_capacity(&ctx->fonts) < resolved_fonts) {
+		s_array_reserve(&ctx->fonts, resolved_fonts);
+	}
 	se_text_handle* text_handle = malloc(sizeof(se_text_handle));
 	if (!text_handle) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
