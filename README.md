@@ -2,11 +2,11 @@
 Simple, fast, and lightweight 2D/3D engine in C.
 
 ### Highlights
-- 2D/3D scenes
-- Render-to-texture and post-processing
+- 2D/3D scenes and physics
 - Window + input helpers
 - Text and UI
 - Audio playback/capture
+- Asset loading (OBJ, glTF)
 
 ### Requirements
 - CMake 3.22+
@@ -18,6 +18,11 @@ Linux packages (Ubuntu): `libglfw3-dev libgl1-mesa-dev mesa-common-dev`
 ### Build
 ```bash
 ./build.sh
+```
+
+Specific target:
+```bash
+./build.sh 1_hello
 ```
 
 Manual build:
@@ -41,9 +46,9 @@ make -j
 #include "se_text.h"
 
 int main() {
-	se_render_handle *render = se_render_handle_create(NULL);
-	se_window *window = se_window_create(render, "Syphax Hello", 1280, 720);
-	se_text_handle *text_handle = se_text_handle_create(render, 0);
+	se_context *ctx = se_context_create();
+	se_window *window = se_window_create(ctx, "Syphax Hello", 1280, 720);
+	se_text_handle *text_handle = se_text_handle_create(ctx, 0);
 	se_font *font = se_font_load(text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
@@ -56,7 +61,7 @@ int main() {
 
 	se_text_handle_destroy(text_handle);
 	se_window_destroy(window);
-	se_render_handle_destroy(render);
+	se_context_destroy(ctx);
 	return 0;
 }
 ```
@@ -68,7 +73,8 @@ int main() {
 - Scope roots live under `resources/internal`, `resources/public`, and `resources/examples`.
 
 ### Project layout
-- `src/` engine modules (`se_*.c` / `se_*.h`)
+- `include/` public headers
+- `src/` engine modules (`se_*.c`)
 - `examples/` runnable samples (build to `bin/<name>`)
 - `resources/` split by ownership (`internal/`, `public/`, `examples/`)
 - `lib/` vendored dependencies
