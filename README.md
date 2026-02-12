@@ -13,7 +13,10 @@ Simple, fast, and lightweight 2D/3D engine in C.
 - OpenGL 3.3
 - GLFW development packages
 
-Linux packages (Ubuntu): `libglfw3-dev libgl1-mesa-dev mesa-common-dev`
+### Initial setup
+```bash
+git submodule update --init --recursive
+```
 
 ### Build
 ```bash
