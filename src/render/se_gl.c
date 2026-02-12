@@ -257,7 +257,35 @@ void se_render_set_blending(const b8 active) {
 void se_render_unbind_framebuffer(void) { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
 
 void se_render_clear(void) {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	if (!se_render_initialized) {
+		return;
+	}
+
+	GLboolean color_mask[4] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE};
+	GLboolean depth_mask = GL_TRUE;
+	GLint stencil_mask = 0xFF;
+	const GLboolean scissor_enabled = glIsEnabled(GL_SCISSOR_TEST);
+
+	glGetBooleanv(GL_COLOR_WRITEMASK, color_mask);
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &depth_mask);
+	glGetIntegerv(GL_STENCIL_WRITEMASK, &stencil_mask);
+
+	if (scissor_enabled) {
+		glDisable(GL_SCISSOR_TEST);
+	}
+
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+	glStencilMask(0xFF);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+	glColorMask(color_mask[0], color_mask[1], color_mask[2], color_mask[3]);
+	glDepthMask(depth_mask);
+	glStencilMask((GLuint)stencil_mask);
+
+	if (scissor_enabled) {
+		glEnable(GL_SCISSOR_TEST);
+	}
 }
 
 void se_render_set_background_color(const s_vec4 color) {

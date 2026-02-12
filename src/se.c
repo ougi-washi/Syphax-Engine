@@ -61,7 +61,6 @@ static void se_context_destroy_ui_storage(se_context *context) {
 			continue;
 		}
 		s_array_clear(&ui_element->children);
-		ui_element->ui_handle = NULL;
 		ui_element->parent = S_HANDLE_NULL;
 		ui_element->scene_2d = S_HANDLE_NULL;
 		ui_element->text = S_HANDLE_NULL;
@@ -103,6 +102,7 @@ se_context *se_context_create(void) {
 	s_array_init(&context->scenes_3d);
 	s_array_init(&context->ui_elements);
 	s_array_init(&context->ui_texts);
+	context->ui_text_handle = NULL;
 
 	if (se_global_context == NULL) {
 		se_set_global_context(context);
@@ -120,6 +120,10 @@ void se_context_destroy(se_context *context) {
 	se_context *prev_ctx = se_push_tls_context(context);
 
 	se_context_destroy_ui_storage(context);
+	if (context->ui_text_handle) {
+		se_text_handle_destroy(context->ui_text_handle);
+		context->ui_text_handle = NULL;
+	}
 
 	while (s_array_get_size(&context->scenes_2d) > 0) {
 		se_scene_2d_handle scene_handle = s_array_handle(&context->scenes_2d, (u32)(s_array_get_size(&context->scenes_2d) - 1));
@@ -187,6 +191,14 @@ void se_context_destroy(se_context *context) {
 
 	s_array_clear(&context->global_uniforms);
 
-	free(context);
+	if (se_global_context == context) {
+		se_global_context = NULL;
+	}
+
+	if (prev_ctx == context) {
+		prev_ctx = NULL;
+	}
 	se_pop_tls_context(prev_ctx);
+
+	free(context);
 }

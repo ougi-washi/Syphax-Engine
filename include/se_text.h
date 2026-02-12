@@ -21,7 +21,7 @@ typedef struct se_font {
 } se_font;
 typedef s_array(se_font, se_fonts);
 
-typedef struct {
+typedef struct se_text_handle {
 	se_quad quad;
 	s_mat4 buffer[SE_TEXT_CHAR_COUNT];
 	se_shader_handle text_shader;

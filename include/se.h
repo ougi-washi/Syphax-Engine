@@ -20,6 +20,7 @@
 #endif
 #endif
 
+typedef struct se_text_handle se_text_handle;
 typedef s_handle se_window_handle;
 typedef s_handle se_font_handle;
 typedef s_handle se_model_handle;
@@ -51,6 +52,7 @@ typedef struct se_context {
 	s_array(struct se_scene_3d, scenes_3d);
 	s_array(struct se_ui_element, ui_elements);
 	s_array(struct se_ui_text, ui_texts);
+	se_text_handle *ui_text_handle;
 } se_context;
 
 extern se_context *se_global_context;
