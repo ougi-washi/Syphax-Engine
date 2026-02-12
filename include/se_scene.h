@@ -1,12 +1,16 @@
 // Syphax-Engine - Ougi Washi
 
-// Ownership: the scene handle owns scene/object arrays and is responsible for cleanup.
+// Ownership: scene/object storage lives in se_context.
 
 #ifndef SE_SCENE_H
 #define SE_SCENE_H
 
 #include "se_render.h"
 #include "se_window.h"
+#include "se_camera.h"
+#include "se_model.h"
+#include "se_render_buffer.h"
+#include "se_framebuffer.h"
 
 #define SE_MAX_SCENES 128
 #define SE_MAX_2D_OBJECTS 1024
@@ -29,7 +33,7 @@ typedef struct {
 	se_buffers buffers;
 } se_instances_2d;
 
-typedef void (*se_object_custom_callback)(se_render_handle *render_handle, void *data);
+typedef void (*se_object_custom_callback)(se_context *ctx, void *data);
 
 #define SE_OBJECT_CUSTOM_DATA_SIZE (16 * 1024)
 
@@ -39,7 +43,7 @@ typedef struct {
 	u8 data[SE_OBJECT_CUSTOM_DATA_SIZE];
 } se_object_custom;
 
-typedef struct {
+typedef struct se_object_2d {
 	s_mat3 transform;
 	union {
 		struct {
@@ -52,76 +56,52 @@ typedef struct {
 	};
 	b8 is_custom : 1;
 	b8 is_visible : 1;
-	b8 is_valid : 1;
 } se_object_2d;
 
 typedef s_array(se_object_2d, se_objects_2d);
 typedef se_object_2d *se_object_2d_ptr;
 typedef s_array(se_object_2d_ptr, se_objects_2d_ptr);
 
-typedef struct {
+typedef struct se_object_3d {
 	se_model *model;
 	s_mat4 transform;
 	se_instances instances;
 	se_mesh_instances mesh_instances;
 	se_transforms render_transforms;
 	b8 is_visible : 1;
-	b8 is_valid : 1;
 } se_object_3d;
+
 typedef s_array(se_object_3d, se_objects_3d);
 typedef se_object_3d *se_object_3d_ptr;
 typedef s_array(se_object_3d_ptr, se_objects_3d_ptr);
 
-typedef struct {
+typedef struct se_scene_2d {
 	se_objects_2d_ptr objects;
 	se_framebuffer_ptr output;
-	b8 is_valid : 1;
 } se_scene_2d;
+
 typedef s_array(se_scene_2d, se_scenes_2d);
 typedef se_scene_2d *se_scene_2d_ptr;
 typedef s_array(se_scene_2d_ptr, se_scenes_2d_ptr);
 
-typedef struct {
+typedef struct se_scene_3d {
 	se_objects_3d_ptr objects;
 	se_camera_ptr camera;
 	se_render_buffers_ptr post_process;
 	se_shader_ptr output_shader;
 	se_framebuffer_ptr output;
 	b8 enable_culling : 1;
-	b8 is_valid : 1;
 } se_scene_3d;
+
 typedef s_array(se_scene_3d, se_scenes_3d);
 typedef se_scene_3d *se_scene_3d_ptr;
 typedef s_array(se_scene_3d_ptr, se_scenes_3d_ptr);
 
-typedef struct {
-	u16 objects_2d_count;
-	u16 objects_3d_count;
-	u16 scenes_2d_count;
-	u16 scenes_3d_count;
-} se_scene_handle_params;
-
-#define SE_SCENE_HANDLE_PARAMS_DEFAULTS ((se_scene_handle_params){ .objects_2d_count = 128, .objects_3d_count = 128, .scenes_2d_count = 16, .scenes_3d_count = 16 })
-
-typedef struct {
-	se_render_handle *render_handle;
-	se_objects_2d objects_2d;
-	se_objects_3d objects_3d;
-	se_scenes_2d scenes_2d;
-	se_scenes_3d scenes_3d;
-} se_scene_handle;
-
-// scene handle functions
-// Ownership: only the scene handle may remove/free objects and scenes it owns.
-extern se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const se_scene_handle_params *params);
-extern void se_scene_handle_destroy(se_scene_handle *scene_handle);
-
 // 2D objects functions
-extern se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count);
-extern se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform);
+extern se_object_2d *se_object_2d_create(se_context *ctx, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count);
+extern se_object_2d *se_object_2d_create_custom(se_context *ctx, se_object_custom *custom, const s_mat3 *transform);
 extern void se_object_custom_set_data(se_object_custom *custom, const void *data, const sz size);
-extern void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_2d *object);
-#define se_object_2d_destroy(scene_handle, object) se_scene_handle_destroy_object_2d((scene_handle), (object))
+extern void se_object_2d_destroy(se_context *ctx, se_object_2d *object);
 extern void se_object_2d_set_transform(se_object_2d *object, const s_mat3 *transform);
 extern s_mat3 se_object_2d_get_transform(se_object_2d *object);
 extern void se_object_2d_set_position(se_object_2d *object, const s_vec2 *position);
@@ -142,30 +122,28 @@ extern b8 se_object_2d_are_instances_dirty(se_object_2d *object);
 extern sz se_object_2d_get_instance_count(se_object_2d *object);
 
 // 2D scene functions
-extern se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
+extern se_scene_2d *se_scene_2d_create(se_context *ctx, const s_vec2 *size, const u16 object_count);
 extern void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio); // ratio can only be 1 for now
-extern void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d *scene);
-#define se_scene_2d_destroy(scene_handle, scene) se_scene_handle_destroy_scene_2d((scene_handle), (scene))
+extern void se_scene_2d_destroy(se_context *ctx, se_scene_2d *scene);
 extern void se_scene_2d_bind(se_scene_2d *scene);
 extern void se_scene_2d_unbind(se_scene_2d *scene);
-extern void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle); // Does not bind/unbind
-extern void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle); // Binds/unbinds the scene
-extern void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window);
-extern void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window);
+extern void se_scene_2d_render_raw(se_scene_2d *scene, se_context *ctx); // Does not bind/unbind
+extern void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_context *ctx); // Binds/unbinds the scene
+extern void se_scene_2d_render_to_screen(se_scene_2d *scene, se_context *ctx, se_window *window);
+extern void se_scene_2d_draw(se_scene_2d *scene, se_context *ctx, se_window *window);
 extern void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object);
 extern void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object);
 
 // 3D scene functions
-extern se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count);
-extern se_scene_3d *se_scene_3d_create_for_window(se_scene_handle *scene_handle, se_window *window, const u16 object_count);
+extern se_scene_3d *se_scene_3d_create(se_context *ctx, const s_vec2 *size, const u16 object_count);
+extern se_scene_3d *se_scene_3d_create_for_window(se_context *ctx, se_window *window, const u16 object_count);
 extern void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio);
-extern void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene);
-#define se_scene_3d_destroy(scene_handle, scene) se_scene_handle_destroy_scene_3d((scene_handle), (scene))
-extern void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle);
-extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
-extern void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window);
+extern void se_scene_3d_destroy(se_context *ctx, se_scene_3d *scene);
+extern void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_context *ctx);
+extern void se_scene_3d_render_to_screen(se_scene_3d *scene, se_context *ctx, se_window *window);
+extern void se_scene_3d_draw(se_scene_3d *scene, se_context *ctx, se_window *window);
 extern void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object);
-extern se_object_3d *se_scene_3d_add_model(se_scene_handle *scene_handle, se_scene_3d *scene, se_model *model, const s_mat4 *transform);
+extern se_object_3d *se_scene_3d_add_model(se_context *ctx, se_scene_3d *scene, se_model *model, const s_mat4 *transform);
 extern void se_scene_3d_remove_object(se_scene_3d *scene, se_object_3d *object);
 extern void se_scene_3d_set_camera(se_scene_3d *scene, se_camera *camera);
 extern void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled);
@@ -173,9 +151,8 @@ extern void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_bu
 extern void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer);
 
 // 3D objects functions
-extern se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model, const s_mat4 *transform, const sz max_instances_count);
-extern void se_scene_handle_destroy_object_3d(se_scene_handle *scene_handle, se_object_3d *object);
-#define se_object_3d_destroy(scene_handle, object) se_scene_handle_destroy_object_3d((scene_handle), (object))
+extern se_object_3d *se_object_3d_create(se_context *ctx, se_model *model, const s_mat4 *transform, const sz max_instances_count);
+extern void se_object_3d_destroy(se_context *ctx, se_object_3d *object);
 extern void se_object_3d_set_transform(se_object_3d *object, const s_mat4 *transform);
 extern s_mat4 se_object_3d_get_transform(se_object_3d *object);
 extern se_instance_id se_object_3d_add_instance(se_object_3d *object, const s_mat4 *transform, const s_mat4 *buffer);

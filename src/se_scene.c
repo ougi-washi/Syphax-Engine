@@ -5,108 +5,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Scene handle owns its arrays; only the handle should remove/free entries.
+// Scene/object memory is owned by the se_context arrays.
 
 #define SE_OBJECT_2D_VERTEX_SHADER_PATH SE_RESOURCE_INTERNAL("shaders/object_2d_vertex.glsl")
 
-se_scene_handle *se_scene_handle_create(se_render_handle *render_handle, const se_scene_handle_params *params) {
-	se_scene_handle_params resolved = SE_SCENE_HANDLE_PARAMS_DEFAULTS;
-	if (params) {
-		resolved = *params;
-		if (resolved.objects_2d_count == 0) {
-			resolved.objects_2d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.objects_2d_count;
-		}
-		if (resolved.objects_3d_count == 0) {
-			resolved.objects_3d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.objects_3d_count;
-		}
-		if (resolved.scenes_2d_count == 0) {
-			resolved.scenes_2d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.scenes_2d_count;
-		}
-		if (resolved.scenes_3d_count == 0) {
-			resolved.scenes_3d_count = SE_SCENE_HANDLE_PARAMS_DEFAULTS.scenes_3d_count;
-		}
-	}
-	se_scene_handle *scene_handle = (se_scene_handle *)malloc(sizeof(se_scene_handle));
-	if (!scene_handle) {
-		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
-		return NULL;
-	}
-	memset(scene_handle, 0, sizeof(se_scene_handle));
-
-	s_array_init(&scene_handle->objects_2d, resolved.objects_2d_count);
-	s_array_init(&scene_handle->objects_3d, resolved.objects_3d_count);
-	s_array_init(&scene_handle->scenes_2d, resolved.scenes_2d_count);
-	s_array_init(&scene_handle->scenes_3d, resolved.scenes_3d_count);
-
-	// if render handle is null, this is a scene handle that is not used for
-	// rendering (eg. server side implementation)
-	if (render_handle) {
-		scene_handle->render_handle = render_handle;
-	} else {
-		scene_handle->render_handle = NULL;
-	}
-
-	se_set_last_error(SE_RESULT_OK);
-	return scene_handle;
-}
-
-void se_scene_handle_destroy(se_scene_handle *scene_handle) {
-	s_assertf(scene_handle, "se_scene_handle_destroy :: scene_handle is null");
-	s_foreach(&scene_handle->objects_2d, i) {
-		se_object_2d *current_object = s_array_get(&scene_handle->objects_2d, i);
-		se_scene_handle_destroy_object_2d(scene_handle, current_object);
-	}
-	s_array_clear(&scene_handle->objects_2d);
-
-	s_foreach(&scene_handle->objects_3d, i) {
-		se_object_3d *current_object = s_array_get(&scene_handle->objects_3d, i);
-		se_scene_handle_destroy_object_3d(scene_handle, current_object);
-	}
-	s_array_clear(&scene_handle->objects_3d);
-
-	s_foreach(&scene_handle->scenes_2d, i) {
-		se_scene_2d *current_scene = s_array_get(&scene_handle->scenes_2d, i);
-		se_scene_handle_destroy_scene_2d(scene_handle, current_scene);
-	}
-	s_array_clear(&scene_handle->scenes_2d);
-
-	s_foreach(&scene_handle->scenes_3d, i) {
-		se_scene_3d *current_scene = s_array_get(&scene_handle->scenes_3d, i);
-		se_scene_handle_destroy_scene_3d(scene_handle, current_scene);
-	}
-	free(scene_handle);
-}
-
-se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count) {
-	if (!scene_handle || !fragment_shader_path || !transform) {
+se_object_2d *se_object_2d_create(se_context *ctx, const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count) {
+	if (!ctx || !fragment_shader_path || !transform) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	se_object_2d *new_object = NULL;
-	s_foreach(&scene_handle->objects_2d, i) {
-		se_object_2d *slot = s_array_get(&scene_handle->objects_2d, i);
-		if (!slot->is_valid) {
-			new_object = slot;
-			break;
-		}
+	if (s_array_get_capacity(&ctx->objects_2d) == 0) {
+		s_array_resize(&ctx->objects_2d, SE_MAX_2D_OBJECTS);
 	}
-	if (!new_object) {
-		if (s_array_get_capacity(&scene_handle->objects_2d) == s_array_get_size(&scene_handle->objects_2d)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		new_object = s_array_increment(&scene_handle->objects_2d);
+	if (s_array_get_size(&ctx->objects_2d) >= s_array_get_capacity(&ctx->objects_2d)) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
 	}
+	se_object_2d *new_object = s_array_increment(&ctx->objects_2d);
 	memset(new_object, 0, sizeof(*new_object));
 	const sz instance_capacity = (max_instances_count > 0) ? max_instances_count : 1;
 	se_quad_2d_create(&new_object->quad, (u32)(instance_capacity * 2));
 	new_object->transform = *transform;
 	new_object->is_custom = false;
 	new_object->is_visible = true;
-	new_object->is_valid = true;
-	if (scene_handle->render_handle) {
-		s_foreach(&scene_handle->render_handle->shaders, i) {
-		    se_shader *curr_shader = s_array_get(&scene_handle->render_handle->shaders, i);
+	if (ctx) {
+		s_foreach(&ctx->shaders, i) {
+		    se_shader *curr_shader = s_array_get(&ctx->shaders, i);
 		    if (curr_shader && strcmp(curr_shader->fragment_path, fragment_shader_path) == 0) {
 		    	new_object->shader = curr_shader;
 		    	break;
@@ -114,7 +38,7 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 		}
 		if (!new_object->shader) {
 			se_shader *shader = se_shader_load(
-				scene_handle->render_handle,
+				ctx,
 				SE_OBJECT_2D_VERTEX_SHADER_PATH,
 				fragment_shader_path);
 			if (!shader) {
@@ -153,32 +77,24 @@ se_object_2d *se_object_2d_create(se_scene_handle *scene_handle, const c8 *fragm
 	return new_object;
 }
 
-se_object_2d *se_object_2d_create_custom(se_scene_handle *scene_handle, se_object_custom *custom, const s_mat3 *transform) {
-	if (!scene_handle || !custom || !transform) {
+se_object_2d *se_object_2d_create_custom(se_context *ctx, se_object_custom *custom, const s_mat3 *transform) {
+	if (!ctx || !custom || !transform) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	s_assertf(custom->data_size <= SE_OBJECT_CUSTOM_DATA_SIZE, "se_object_2d_create_custom :: data_size exceeds SE_OBJECT_CUSTOM_DATA_SIZE");
-	se_object_2d *new_object = NULL;
-	s_foreach(&scene_handle->objects_2d, i) {
-		se_object_2d *slot = s_array_get(&scene_handle->objects_2d, i);
-		if (!slot->is_valid) {
-			new_object = slot;
-			break;
-		}
+	if (s_array_get_capacity(&ctx->objects_2d) == 0) {
+		s_array_resize(&ctx->objects_2d, SE_MAX_2D_OBJECTS);
 	}
-	if (!new_object) {
-		if (s_array_get_capacity(&scene_handle->objects_2d) == s_array_get_size(&scene_handle->objects_2d)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		new_object = s_array_increment(&scene_handle->objects_2d);
+	if (s_array_get_size(&ctx->objects_2d) >= s_array_get_capacity(&ctx->objects_2d)) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
 	}
+	se_object_2d *new_object = s_array_increment(&ctx->objects_2d);
 	memset(new_object, 0, sizeof(*new_object));
 	new_object->transform = *transform;
 	new_object->is_custom = true;
 	new_object->is_visible = true;
-	new_object->is_valid = true;
 	memcpy(&new_object->custom, custom, sizeof(se_object_custom));
 	se_set_last_error(SE_RESULT_OK);
 	return new_object;
@@ -192,13 +108,9 @@ void se_object_custom_set_data(se_object_custom *custom, const void *data, const
 	custom->data_size = size;
 }
 
-void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_2d *object) {
-	s_assertf(scene_handle, "se_scene_handle_destroy_object_2d :: scene_handle is null");
-	s_assertf(object, "se_scene_handle_destroy_object_2d :: object is null");
-	if (!object->is_valid) {
-		return;
-	}
-	printf("se_scene_handle_destroy_object_2d :: scene_handle: %p, object: %p\n", scene_handle, object);
+void se_object_2d_destroy(se_context *ctx, se_object_2d *object) {
+	s_assertf(ctx, "se_object_2d_destroy :: ctx is null");
+	s_assertf(object, "se_object_2d_destroy :: object is null");
 	if (!object->is_custom) {
 		se_quad_destroy(&object->quad);
 		object->quad.vao = 0;
@@ -211,10 +123,17 @@ void se_scene_handle_destroy_object_2d(se_scene_handle *scene_handle, se_object_
 	s_array_clear(&object->instances.transforms);
 	s_array_clear(&object->instances.buffers);
 	object->is_visible = false;
-	object->is_valid = false;
 	if (object->is_custom) {
 		object->custom.render = NULL;
 		object->custom.data_size = 0;
+	}
+
+	for (sz i = 0; i < s_array_get_size(&ctx->objects_2d); i++) {
+		se_object_2d *slot = s_array_get(&ctx->objects_2d, i);
+		if (slot == object) {
+			s_array_remove_at(&ctx->objects_2d, i);
+			break;
+		}
 	}
 }
 
@@ -289,7 +208,19 @@ se_instance_id se_object_2d_add_instance(se_object_2d *object, const s_mat3 *tra
 	s_assertf(object, "se_object_2d_set_instance_add :: object is null");
 	s_assertf(transform, "se_object_2d_set_instance_add :: transform is null");
 	s_assertf(buffer, "se_object_2d_set_instance_add :: buffer is null");
-	s_assertf(s_array_get_capacity(&object->instances.ids) > 0, "se_object_2d_set_instance_add :: object instances capacity is 0");
+	if (s_array_get_capacity(&object->instances.ids) == 0) {
+		s_array_resize(&object->instances.ids, 2);
+		s_array_resize(&object->instances.transforms, 2);
+		s_array_resize(&object->instances.buffers, 2);
+		s_array_resize(&object->render_transforms, 2);
+	}
+	if (s_array_get_size(&object->instances.ids) == s_array_get_capacity(&object->instances.ids)) {
+		const sz next_capacity = s_array_get_capacity(&object->instances.ids) + 2;
+		s_array_resize(&object->instances.ids, next_capacity);
+		s_array_resize(&object->instances.transforms, next_capacity);
+		s_array_resize(&object->instances.buffers, next_capacity);
+		s_array_resize(&object->render_transforms, next_capacity);
+	}
 
 	const sz prev_instances_count = s_array_get_size(&object->instances.ids);
 	se_instance_id new_id = 0;
@@ -393,36 +324,28 @@ sz se_object_2d_get_instance_count(se_object_2d *object) {
 	return s_array_get_size(&object->instances.ids);
 }
 
-se_scene_2d *se_scene_2d_create(se_scene_handle *scene_handle,
+se_scene_2d *se_scene_2d_create(se_context *ctx,
 							const s_vec2 *size, const u16 object_count) {
-	if (!scene_handle || !scene_handle->render_handle || !size || object_count == 0) {
+	if (!ctx || !size || object_count == 0) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	se_scene_2d *new_scene = NULL;
-	s_foreach(&scene_handle->scenes_2d, i) {
-		se_scene_2d *slot = s_array_get(&scene_handle->scenes_2d, i);
-		if (!slot->is_valid) {
-			new_scene = slot;
-			break;
-		}
+	if (s_array_get_capacity(&ctx->scenes_2d) == 0) {
+		s_array_resize(&ctx->scenes_2d, SE_MAX_SCENES);
 	}
-	if (!new_scene) {
-		if (s_array_get_capacity(&scene_handle->scenes_2d) == s_array_get_size(&scene_handle->scenes_2d)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		new_scene = s_array_increment(&scene_handle->scenes_2d);
+	if (s_array_get_size(&ctx->scenes_2d) >= s_array_get_capacity(&ctx->scenes_2d)) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
 	}
+	se_scene_2d *new_scene = s_array_increment(&ctx->scenes_2d);
 	memset(new_scene, 0, sizeof(*new_scene));
-	se_framebuffer *framebuffer = se_framebuffer_create(scene_handle->render_handle, size);
+	se_framebuffer *framebuffer = se_framebuffer_create(ctx, size);
 	if (!framebuffer) {
-		memset(new_scene, 0, sizeof(*new_scene));
+		s_array_remove_last(&ctx->scenes_2d);
 		return NULL;
 	}
 	new_scene->output = framebuffer;
 	s_array_init(&new_scene->objects, object_count);
-	new_scene->is_valid = true;
 	se_set_last_error(SE_RESULT_OK);
 	return new_scene;
 }
@@ -436,8 +359,8 @@ void se_scene_2d_resize_callback(void *window, void *scene) {
 	s_assertf(window_ptr, "se_scene_2d_resize_callback :: window_ptr is null");
 	s_assertf(scene_ptr, "se_scene_2d_resize_callback :: scene_ptr is null");
 
-	se_render_handle *render_handle_ptr = window_ptr->render_handle;
-	s_assertf(render_handle_ptr, "se_scene_2d_resize_callback :: render_handle_ptr is null");
+	se_context *ctx_ptr = window_ptr->context;
+	s_assertf(ctx_ptr, "se_scene_2d_resize_callback :: ctx_ptr is null");
 
 	se_framebuffer_ptr framebuffer = scene_ptr->output;
 	s_assertf(framebuffer, "se_scene_2d_resize_callback :: framebuffer is null");
@@ -463,7 +386,7 @@ void se_scene_2d_resize_callback(void *window, void *scene) {
 	//}
 
 	se_framebuffer_set_size(framebuffer, &new_size);
-	se_scene_2d_render_to_buffer(scene, render_handle_ptr);
+	se_scene_2d_render_to_buffer(scene, ctx_ptr);
 }
 
 void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_vec2 *ratio) {
@@ -481,16 +404,19 @@ void se_scene_2d_set_auto_resize(se_scene_2d *scene, se_window *window, const s_
 	se_window_register_resize_event(window, se_scene_2d_resize_callback, scene);
 }
 
-void se_scene_handle_destroy_scene_2d(se_scene_handle *scene_handle, se_scene_2d *scene) {
-	s_assertf(scene_handle, "se_scene_handle_destroy_scene_2d :: scene_handle is null");
-	s_assertf(scene, "se_scene_handle_destroy_scene_2d :: scene is null");
-	if (!scene->is_valid) {
-		return;
-	}
-	se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
+void se_scene_2d_destroy(se_context *ctx, se_scene_2d *scene) {
+	s_assertf(ctx, "se_scene_2d_destroy :: ctx is null");
+	s_assertf(scene, "se_scene_2d_destroy :: scene is null");
+	se_framebuffer_destroy(ctx, scene->output);
 	scene->output = NULL;
 	s_array_clear(&scene->objects);
-	scene->is_valid = false;
+	for (sz i = 0; i < s_array_get_size(&ctx->scenes_2d); i++) {
+		se_scene_2d *slot = s_array_get(&ctx->scenes_2d, i);
+		if (slot == scene) {
+			s_array_remove_at(&ctx->scenes_2d, i);
+			break;
+		}
+	}
 }
 
 void se_scene_2d_bind(se_scene_2d *scene) {
@@ -505,12 +431,9 @@ void se_scene_2d_unbind(se_scene_2d *scene) {
 	se_render_set_blending(false);
 }
 
-void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle) {
+void se_scene_2d_render_raw(se_scene_2d *scene, se_context *ctx) {
 	s_assertf(scene, "se_scene_2d_render_raw :: scene is null");
-	s_assertf(render_handle, "se_scene_2d_render_raw :: render_handle is null");
-	if (!scene->is_valid) {
-		return;
-	}
+	s_assertf(ctx, "se_scene_2d_render_raw :: ctx is null");
 
 	se_render_clear();
 		s_foreach(&scene->objects, i) {
@@ -520,38 +443,32 @@ void se_scene_2d_render_raw(se_scene_2d *scene, se_render_handle *render_handle)
 			    continue;
 			}
 			se_object_2d *current_object_2d = *current_object_2d_ptr;
-			if (!current_object_2d || !current_object_2d->is_valid || !current_object_2d->is_visible) {
+			if (!current_object_2d || !current_object_2d->is_visible) {
 				continue;
 			}
 			if (current_object_2d->is_custom) {
 				if (current_object_2d->custom.render) {
-					current_object_2d->custom.render(render_handle, current_object_2d->custom.data);
+					current_object_2d->custom.render(ctx, current_object_2d->custom.data);
 				}
 			} else {
-				se_shader_use(render_handle, current_object_2d->shader, true, true);
+				se_shader_use(ctx, current_object_2d->shader, true, true);
 				const sz instance_count = se_object_2d_get_instance_count(current_object_2d);
 				se_quad_render(&current_object_2d->quad, instance_count);
 			}
 		}
 }
 
-void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_render_handle *render_handle) {
+void se_scene_2d_render_to_buffer(se_scene_2d *scene, se_context *ctx) {
 	s_assertf(scene, "se_scene_2d_render_to_buffer :: scene is null");
-	s_assertf(render_handle, "se_scene_2d_render_to_buffer :: render_handle is null");
-	if (!scene->is_valid) {
-		return;
-	}
+	s_assertf(ctx, "se_scene_2d_render_to_buffer :: ctx is null");
 
 	se_scene_2d_bind(scene);
-	se_scene_2d_render_raw(scene, render_handle);
+	se_scene_2d_render_raw(scene, ctx);
 	se_scene_2d_unbind(scene);
 }
 
-void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
-	if (render_handle == NULL) {
-		return;
-	}
-	if (!scene->is_valid) {
+void se_scene_2d_render_to_screen(se_scene_2d *scene, se_context *ctx, se_window *window) {
+	if (ctx == NULL) {
 		return;
 	}
 
@@ -562,17 +479,21 @@ void se_scene_2d_render_to_screen(se_scene_2d *scene, se_render_handle *render_h
 	se_render_set_blending(false);
 }
 
-void se_scene_2d_draw(se_scene_2d *scene, se_render_handle *render_handle, se_window *window) {
-	se_scene_2d_render_to_buffer(scene, render_handle);
+void se_scene_2d_draw(se_scene_2d *scene, se_context *ctx, se_window *window) {
+	se_scene_2d_render_to_buffer(scene, ctx);
 	se_render_clear();
-	se_scene_2d_render_to_screen(scene, render_handle, window);
+	se_scene_2d_render_to_screen(scene, ctx, window);
 	se_window_render_screen(window);
 }
 
 void se_scene_2d_add_object(se_scene_2d *scene, se_object_2d *object) {
 	s_assertf(scene, "se_scene_2d_add_object :: scene is null");
 	s_assertf(object, "se_scene_2d_add_object :: object is null");
-	printf("se_scene_2d_add_object :: scene: %p, object: %p\n", scene, object);
+	if (s_array_get_size(&scene->objects) == s_array_get_capacity(&scene->objects)) {
+		const sz current_capacity = s_array_get_capacity(&scene->objects);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&scene->objects, next_capacity);
+	}
 	s_array_add(&scene->objects, object);
 }
 
@@ -583,45 +504,37 @@ void se_scene_2d_remove_object(se_scene_2d *scene, se_object_2d *object) {
 	s_array_remove(&scene->objects, &object);
 }
 
-se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *size, const u16 object_count) {
-	if (!scene_handle || !scene_handle->render_handle || !size || object_count == 0) {
+se_scene_3d *se_scene_3d_create(se_context *ctx, const s_vec2 *size, const u16 object_count) {
+	if (!ctx || !size || object_count == 0) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	se_scene_3d *new_scene = NULL;
-	s_foreach(&scene_handle->scenes_3d, i) {
-		se_scene_3d *slot = s_array_get(&scene_handle->scenes_3d, i);
-		if (!slot->is_valid) {
-			new_scene = slot;
-			break;
-		}
+	if (s_array_get_capacity(&ctx->scenes_3d) == 0) {
+		s_array_resize(&ctx->scenes_3d, SE_MAX_SCENES);
 	}
-	if (!new_scene) {
-		if (s_array_get_capacity(&scene_handle->scenes_3d) == s_array_get_size(&scene_handle->scenes_3d)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		new_scene = s_array_increment(&scene_handle->scenes_3d);
+	if (s_array_get_size(&ctx->scenes_3d) >= s_array_get_capacity(&ctx->scenes_3d)) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
 	}
+	se_scene_3d *new_scene = s_array_increment(&ctx->scenes_3d);
 	memset(new_scene, 0, sizeof(*new_scene));
-	se_framebuffer *framebuffer = se_framebuffer_create(scene_handle->render_handle, size);
+	se_framebuffer *framebuffer = se_framebuffer_create(ctx, size);
 	if (!framebuffer) {
-		memset(new_scene, 0, sizeof(*new_scene));
+		s_array_remove_last(&ctx->scenes_3d);
 		return NULL;
 	}
 	new_scene->output = framebuffer;
 	s_array_init(&new_scene->objects, object_count);
 	s_array_init(&new_scene->post_process, object_count);
 	new_scene->output_shader = NULL;
-	se_camera *camera = se_render_handle_create_camera(scene_handle->render_handle);
+	se_camera *camera = se_camera_create(ctx);
 	if (!camera) {
-		se_render_handle_destroy_framebuffer(scene_handle->render_handle, new_scene->output);
-		memset(new_scene, 0, sizeof(*new_scene));
+		se_framebuffer_destroy(ctx, new_scene->output);
+		s_array_remove_last(&ctx->scenes_3d);
 		return NULL;
 	}
 	new_scene->camera = camera;
 	new_scene->enable_culling = true;
-	new_scene->is_valid = true;
 	if (new_scene->camera) {
 		se_camera_set_aspect(new_scene->camera, size->x, size->y);
 	}
@@ -629,14 +542,14 @@ se_scene_3d *se_scene_3d_create(se_scene_handle *scene_handle, const s_vec2 *siz
 	return new_scene;
 }
 
-se_scene_3d *se_scene_3d_create_for_window(se_scene_handle *scene_handle, se_window *window, const u16 object_count) {
-	if (!scene_handle || !window || object_count == 0) {
+se_scene_3d *se_scene_3d_create_for_window(se_context *ctx, se_window *window, const u16 object_count) {
+	if (!ctx || !window || object_count == 0) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 
 	const s_vec2 size = s_vec2((f32)window->width, (f32)window->height);
-	se_scene_3d *scene = se_scene_3d_create(scene_handle, &size, object_count);
+	se_scene_3d *scene = se_scene_3d_create(ctx, &size, object_count);
 	if (!scene) {
 		return NULL;
 	}
@@ -656,8 +569,8 @@ void se_scene_3d_resize_callback(void *window, void *scene) {
 	s_assertf(window_ptr, "se_scene_3d_resize_callback :: window_ptr is null");
 	s_assertf(scene_ptr, "se_scene_3d_resize_callback :: scene_ptr is null");
 
-	se_render_handle *render_handle_ptr = window_ptr->render_handle;
-	s_assertf(render_handle_ptr, "se_scene_3d_resize_callback :: render_handle_ptr is null");
+	se_context *ctx_ptr = window_ptr->context;
+	s_assertf(ctx_ptr, "se_scene_3d_resize_callback :: ctx_ptr is null");
 
 	se_framebuffer_ptr framebuffer = scene_ptr->output;
 	s_assertf(framebuffer, "se_scene_3d_resize_callback :: framebuffer is null");
@@ -669,7 +582,7 @@ void se_scene_3d_resize_callback(void *window, void *scene) {
 	if (scene_ptr->camera) {
 		se_camera_set_aspect(scene_ptr->camera, new_size.x, new_size.y);
 	}
-	se_scene_3d_render_to_buffer(scene_ptr, render_handle_ptr);
+	se_scene_3d_render_to_buffer(scene_ptr, ctx_ptr);
 }
 
 void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_vec2 *ratio) {
@@ -685,32 +598,32 @@ void se_scene_3d_set_auto_resize(se_scene_3d *scene, se_window *window, const s_
 	se_window_register_resize_event(window, se_scene_3d_resize_callback, scene);
 }
 
-void se_scene_handle_destroy_scene_3d(se_scene_handle *scene_handle, se_scene_3d *scene) {
-	printf("se_scene_handle_destroy_scene_3d :: scene: %p\n", scene);
-	if (!scene->is_valid) {
-		return;
-	}
-	if (scene->camera && scene_handle->render_handle) {
-		se_render_handle_destroy_camera(scene_handle->render_handle, scene->camera);
+void se_scene_3d_destroy(se_context *ctx, se_scene_3d *scene) {
+	printf("se_scene_3d_destroy :: scene: %p\n", scene);
+	if (scene->camera && ctx) {
+		se_camera_destroy(ctx, scene->camera);
 		scene->camera = NULL;
 	}
 	if (scene->output) {
-		se_render_handle_destroy_framebuffer(scene_handle->render_handle, scene->output);
+		se_framebuffer_destroy(ctx, scene->output);
 		scene->output = NULL;
 	}
 	s_array_clear(&scene->post_process);
 	s_array_clear(&scene->objects);
-	scene->is_valid = false;
+	for (sz i = 0; i < s_array_get_size(&ctx->scenes_3d); i++) {
+		se_scene_3d *slot = s_array_get(&ctx->scenes_3d, i);
+		if (slot == scene) {
+			s_array_remove_at(&ctx->scenes_3d, i);
+			break;
+		}
+	}
 }
 
-void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_handle) {
-	if (render_handle == NULL) {
+void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_context *ctx) {
+	if (ctx == NULL) {
 		return;
 	}
 	s_assertf(scene, "se_scene_3d_render_to_buffer :: scene is null");
-	if (!scene->is_valid) {
-		return;
-	}
 	s_assertf(scene->output, "se_scene_3d_render_to_buffer :: scene output is null");
 
 	se_framebuffer_bind(scene->output);
@@ -739,7 +652,7 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 			continue;
 		}
 		se_object_3d *object = *object_ptr;
-		if (!object->is_valid || !object->is_visible || object->model == NULL) {
+		if (!object->is_visible || object->model == NULL) {
 			continue;
 		}
 
@@ -775,7 +688,7 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 				continue;
 			}
 
-			se_shader_use(render_handle, shader, true, true);
+			se_shader_use(ctx, shader, true, true);
 			glBindVertexArray(mesh_instance->vao);
 			glDrawElementsInstanced(GL_TRIANGLES, mesh->gpu.index_count, GL_UNSIGNED_INT, 0, (GLsizei)instance_count);
 		}
@@ -783,11 +696,8 @@ void se_scene_3d_render_to_buffer(se_scene_3d *scene, se_render_handle *render_h
 	se_framebuffer_unbind(scene->output);
 }
 
-void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
-	if (render_handle == NULL) {
-		return;
-	}
-	if (!scene->is_valid) {
+void se_scene_3d_render_to_screen(se_scene_3d *scene, se_context *ctx, se_window *window) {
+	if (ctx == NULL) {
 		return;
 	}
 
@@ -799,34 +709,29 @@ void se_scene_3d_render_to_screen(se_scene_3d *scene, se_render_handle *render_h
 	se_render_set_blending(false);
 }
 
-void se_scene_3d_draw(se_scene_3d *scene, se_render_handle *render_handle, se_window *window) {
-	se_scene_3d_render_to_buffer(scene, render_handle);
-	se_scene_3d_render_to_screen(scene, render_handle, window);
+void se_scene_3d_draw(se_scene_3d *scene, se_context *ctx, se_window *window) {
+	se_scene_3d_render_to_buffer(scene, ctx);
+	se_scene_3d_render_to_screen(scene, ctx, window);
 	se_window_render_screen(window);
 }
 
 void se_scene_3d_add_object(se_scene_3d *scene, se_object_3d *object) {
 	s_assertf(scene, "se_scene_3d_add_object :: scene is null");
 	s_assertf(object, "se_scene_3d_add_object :: object is null");
-	printf("se_scene_3d_add_object :: scene: %p, object: %p\n", scene, object);
+	if (s_array_get_size(&scene->objects) == s_array_get_capacity(&scene->objects)) {
+		const sz current_capacity = s_array_get_capacity(&scene->objects);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&scene->objects, next_capacity);
+	}
 	s_array_add(&scene->objects, object);
 }
 
-se_object_3d *se_scene_3d_add_model(se_scene_handle *scene_handle, se_scene_3d *scene, se_model *model, const s_mat4 *transform) {
-	if (!scene_handle || !scene || !model || !transform) {
+se_object_3d *se_scene_3d_add_model(se_context *ctx, se_scene_3d *scene, se_model *model, const s_mat4 *transform) {
+	if (!ctx || !scene || !model || !transform) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	if (!scene->is_valid) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
-	}
-	if (s_array_get_size(&scene->objects) >= s_array_get_capacity(&scene->objects)) {
-		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
-	}
-
-	se_object_3d *object = se_object_3d_create(scene_handle, model, transform, 0);
+	se_object_3d *object = se_object_3d_create(ctx, model, transform, 0);
 	if (!object) {
 		return NULL;
 	}
@@ -852,6 +757,11 @@ void se_scene_3d_set_culling(se_scene_3d *scene, const b8 enabled) {
 }
 
 void se_scene_3d_add_post_process_buffer(se_scene_3d *scene, se_render_buffer *buffer) {
+	if (s_array_get_size(&scene->post_process) == s_array_get_capacity(&scene->post_process)) {
+		const sz current_capacity = s_array_get_capacity(&scene->post_process);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&scene->post_process, next_capacity);
+	}
 	s_array_add(&scene->post_process, buffer);
 }
 
@@ -859,31 +769,23 @@ void se_scene_3d_remove_post_process_buffer(se_scene_3d *scene, se_render_buffer
 	s_array_remove(&scene->post_process, &buffer);
 }
 
-se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model, const s_mat4 *transform, const sz max_instances_count) {
-	if (!scene_handle || !model || !transform) {
+se_object_3d *se_object_3d_create(se_context *ctx, se_model *model, const s_mat4 *transform, const sz max_instances_count) {
+	if (!ctx || !model || !transform) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	se_object_3d *new_object = NULL;
-	s_foreach(&scene_handle->objects_3d, i) {
-		se_object_3d *slot = s_array_get(&scene_handle->objects_3d, i);
-		if (!slot->is_valid) {
-			new_object = slot;
-			break;
-		}
+	if (s_array_get_capacity(&ctx->objects_3d) == 0) {
+		s_array_resize(&ctx->objects_3d, SE_MAX_3D_OBJECTS);
 	}
-	if (!new_object) {
-		if (s_array_get_capacity(&scene_handle->objects_3d) == s_array_get_size(&scene_handle->objects_3d)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		new_object = s_array_increment(&scene_handle->objects_3d);
+	if (s_array_get_size(&ctx->objects_3d) >= s_array_get_capacity(&ctx->objects_3d)) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
 	}
+	se_object_3d *new_object = s_array_increment(&ctx->objects_3d);
 	memset(new_object, 0, sizeof(*new_object));
 	new_object->model = model;
 	new_object->transform = *transform;
 	new_object->is_visible = true;
-	new_object->is_valid = true;
 	const sz instance_capacity = (max_instances_count > 0) ? max_instances_count : 1;
 	s_array_init(&new_object->instances.ids, instance_capacity);
 	s_array_init(&new_object->instances.transforms, instance_capacity);
@@ -921,12 +823,9 @@ se_object_3d *se_object_3d_create(se_scene_handle *scene_handle, se_model *model
 	return new_object;
 }
 
-void se_scene_handle_destroy_object_3d(se_scene_handle *scene_handle, se_object_3d *object) {
-	s_assertf(scene_handle, "se_scene_handle_destroy_object_3d :: scene_handle is null");
-	s_assertf(object, "se_scene_handle_destroy_object_3d :: object is null");
-	if (!object->is_valid) {
-		return;
-	}
+void se_object_3d_destroy(se_context *ctx, se_object_3d *object) {
+	s_assertf(ctx, "se_object_3d_destroy :: ctx is null");
+	s_assertf(object, "se_object_3d_destroy :: object is null");
 	s_foreach(&object->mesh_instances, i) {
 		se_mesh_instance *mesh_instance = s_array_get(&object->mesh_instances, i);
 		se_mesh_instance_destroy(mesh_instance);
@@ -938,7 +837,13 @@ void se_scene_handle_destroy_object_3d(se_scene_handle *scene_handle, se_object_
 	s_array_clear(&object->instances.buffers);
 	object->model = NULL;
 	object->is_visible = false;
-	object->is_valid = false;
+	for (sz i = 0; i < s_array_get_size(&ctx->objects_3d); i++) {
+		se_object_3d *slot = s_array_get(&ctx->objects_3d, i);
+		if (slot == object) {
+			s_array_remove_at(&ctx->objects_3d, i);
+			break;
+		}
+	}
 }
 
 void se_object_3d_set_transform(se_object_3d *object, const s_mat4 *transform) {
@@ -956,7 +861,19 @@ se_instance_id se_object_3d_add_instance(se_object_3d *object, const s_mat4 *tra
 	s_assertf(object, "se_object_3d_add_instance :: object is null");
 	s_assertf(transform, "se_object_3d_add_instance :: transform is null");
 	s_assertf(buffer, "se_object_3d_add_instance :: buffer is null");
-	s_assertf(s_array_get_capacity(&object->instances.ids) > 0, "se_object_3d_add_instance :: object instances capacity is 0");
+	if (s_array_get_capacity(&object->instances.ids) == 0) {
+		s_array_resize(&object->instances.ids, 2);
+		s_array_resize(&object->instances.transforms, 2);
+		s_array_resize(&object->instances.buffers, 2);
+		s_array_resize(&object->render_transforms, 2);
+	}
+	if (s_array_get_size(&object->instances.ids) == s_array_get_capacity(&object->instances.ids)) {
+		const sz next_capacity = s_array_get_capacity(&object->instances.ids) + 2;
+		s_array_resize(&object->instances.ids, next_capacity);
+		s_array_resize(&object->instances.transforms, next_capacity);
+		s_array_resize(&object->instances.buffers, next_capacity);
+		s_array_resize(&object->render_transforms, next_capacity);
+	}
 
 	const sz prev_instances_count = s_array_get_size(&object->instances.ids);
 	se_instance_id new_id = 0;

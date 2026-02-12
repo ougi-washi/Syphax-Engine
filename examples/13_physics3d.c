@@ -24,23 +24,21 @@ s_mat4 physics_3d_build_transform(const s_vec3 *position, const s_vec3 *half_ext
 }
 
 int main(void) {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
+	se_context *ctx = se_context_create();
 
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - Physics 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_window *window = se_window_create(ctx, "Syphax-Engine - Physics 3D", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
 
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
-
-	se_scene_3d *scene = se_scene_3d_create_for_window(scene_handle, window, BODY_COUNT + 1);
+	se_scene_3d *scene = se_scene_3d_create_for_window(ctx, window, BODY_COUNT + 1);
 
 	se_model *cube_model = se_model_load_obj_simple(
-		render_handle,
+		ctx,
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("physics3d/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("physics3d/scene3d_fragment.glsl"));
 
-	se_object_3d *cubes = se_object_3d_create(scene_handle, cube_model, &s_mat4_identity, BODY_COUNT + 1);
+	se_object_3d *cubes = se_object_3d_create(ctx, cube_model, &s_mat4_identity, BODY_COUNT + 1);
 	se_scene_3d_add_object(scene, cubes);
 
 	se_physics_world_params_3d world_params = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
@@ -83,7 +81,7 @@ int main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_render_handle_reload_changed_shaders(render_handle);
+		se_context_reload_changed_shaders(ctx);
 
 		const f32 dt = (f32)se_window_get_delta_time(window);
 		se_physics_world_3d_step(world, dt);
@@ -95,12 +93,11 @@ int main(void) {
 			se_object_3d_set_instance_transform(cubes, slots[i].instance, &transform);
 		}
 
-		se_scene_3d_draw(scene, render_handle, window);
+		se_scene_3d_draw(scene, ctx, window);
 	}
 
 	se_physics_world_3d_destroy(world);
-	se_scene_handle_destroy(scene_handle);
-	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
+	se_context_destroy(ctx);
 	return 0;
 }

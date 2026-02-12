@@ -5,6 +5,7 @@
 
 #include "syphax/s_types.h"
 
+#define SE_MAX_NAME_LENGTH 64
 #define SE_MAX_PATH_LENGTH 256
 #ifndef RESOURCES_DIR
 #	define RESOURCES_DIR "resources/"

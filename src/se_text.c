@@ -7,26 +7,27 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32 fonts_count) {
-	if (!render_handle) {
+se_text_handle* se_text_handle_create(se_context* ctx, const u32 fonts_count) {
+	if (!ctx) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	u32 resolved_fonts = fonts_count > 0 ? fonts_count : SE_TEXT_HANDLE_DEFAULT_FONTS;
+	if (s_array_get_capacity(&ctx->fonts) == 0) {
+		s_array_init(&ctx->fonts, resolved_fonts);
+	}
 	se_text_handle* text_handle = malloc(sizeof(se_text_handle));
 	if (!text_handle) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return NULL;
 	}
 	memset(text_handle, 0, sizeof(se_text_handle));
-	text_handle->render_handle = render_handle;
-	s_array_init(&text_handle->fonts, resolved_fonts);
+	text_handle->ctx = ctx;
 	se_quad_2d_create(&text_handle->quad, SE_TEXT_CHAR_COUNT);
 	se_quad_2d_add_instance_buffer(&text_handle->quad, text_handle->buffer, SE_TEXT_CHAR_COUNT);
-	se_shader* shader = se_shader_load(render_handle, SE_RESOURCE_INTERNAL("shaders/text_vert.glsl"), SE_RESOURCE_INTERNAL("shaders/text_frag.glsl"));
+	se_shader* shader = se_shader_load(ctx, SE_RESOURCE_INTERNAL("shaders/text_vert.glsl"), SE_RESOURCE_INTERNAL("shaders/text_frag.glsl"));
 	if (!shader) {
 		se_quad_destroy(&text_handle->quad);
-		s_array_clear(&text_handle->fonts);
 		free(text_handle);
 		return NULL;
 	}
@@ -37,11 +38,6 @@ se_text_handle* se_text_handle_create(se_render_handle* render_handle, const u32
 
 void se_text_handle_destroy(se_text_handle* text_handle) {
 	s_assertf(text_handle, "se_text_handle_destroy :: text_handle is null");
-	s_foreach(&text_handle->fonts, i) {
-		se_font* curr_font = s_array_get(&text_handle->fonts, i);
-		glDeleteTextures(1, &curr_font->atlas_texture);
-	}
-	s_array_clear(&text_handle->fonts);
 	se_quad_destroy(&text_handle->quad);
 	free(text_handle);
 	text_handle = NULL;
@@ -52,22 +48,28 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	se_render_handle* render_handle = text_handle->render_handle;
-	if (!render_handle) {
+	se_context* ctx = text_handle->ctx;
+	if (!ctx) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 	
 	// Check if font is already loaded
-	s_foreach(&text_handle->fonts, i) {
-		se_font* curr_font = s_array_get(&text_handle->fonts, i);
+	s_foreach(&ctx->fonts, i) {
+		se_font* curr_font = s_array_get(&ctx->fonts, i);
 		if (strcmp(curr_font->path, path) == 0 && curr_font->size == size) {
 			se_set_last_error(SE_RESULT_OK);
 			return curr_font;
 		}
 	}
 
-	se_font* new_font = s_array_increment(&text_handle->fonts);
+	if (s_array_get_capacity(&ctx->fonts) == s_array_get_size(&ctx->fonts)) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return NULL;
+	}
+
+	se_font* new_font = s_array_increment(&ctx->fonts);
+	memset(new_font, 0, sizeof(*new_font));
 	 
 	strcpy(new_font->path, path);
 
@@ -104,9 +106,9 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 	s_array_init(&new_font->packed_characters, new_font->characters_count);
 	s_array_init(&new_font->aligned_quads, new_font->characters_count);
 
-	stbtt_pack_context ctx;
-	stbtt_PackBegin(&ctx, atlas_bitmap, new_font->atlas_width, new_font->atlas_height, 0, 1, NULL);
-	stbtt_PackFontRange(&ctx, font_file_data, 0, new_font->size, new_font->first_character, new_font->characters_count, new_font->packed_characters.data);
+	stbtt_pack_context pack_ctx;
+	stbtt_PackBegin(&pack_ctx, atlas_bitmap, new_font->atlas_width, new_font->atlas_height, 0, 1, NULL);
+	stbtt_PackFontRange(&pack_ctx, font_file_data, 0, new_font->size, new_font->first_character, new_font->characters_count, new_font->packed_characters.data);
 	
 	for (i32 i = 0; i < new_font->characters_count; i++) {
 		f32 unused_x, unused_y;
@@ -138,8 +140,8 @@ se_font* se_font_load(se_text_handle* text_handle, const char* path, const f32 s
 
 void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset) {
 	s_assertf(text_handle, "se_text_render :: text_handle is null");
-	se_render_handle* render_handle = text_handle->render_handle;
-	s_assertf(render_handle, "se_text_render :: render_handle is null");
+	se_context* ctx = text_handle->ctx;
+	s_assertf(ctx, "se_text_render :: ctx is null");
 	s_assertf(font, "se_text_render :: font is null");
 	s_assertf(text, "se_text_render :: text is null");
 	
@@ -195,7 +197,7 @@ void se_text_render(se_text_handle* text_handle, se_font* font, const c8* text, 
 	}
 	
 	se_render_set_blending(true);
-	se_shader_use(text_handle->render_handle, text_handle->text_shader, true, true);
+	se_shader_use(text_handle->ctx, text_handle->text_shader, true, true);
 	text_handle->quad.instance_buffers_dirty = true;
 	se_quad_render(&text_handle->quad, glyph_count);
 	se_render_set_blending(false);

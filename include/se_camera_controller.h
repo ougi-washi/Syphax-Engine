@@ -3,7 +3,7 @@
 #ifndef SE_CAMERA_CONTROLLER_H
 #define SE_CAMERA_CONTROLLER_H
 
-#include "se_render.h"
+#include "se_camera.h"
 #include "se_window.h"
 
 typedef enum {

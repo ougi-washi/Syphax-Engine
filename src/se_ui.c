@@ -4,30 +4,31 @@
 
 #include <string.h>
 
-se_ui_handle *se_ui_handle_create(se_window *window, se_render_handle *render_handle, const se_ui_handle_params *params) {
-	if (!window || !render_handle) {
+typedef struct {
+	se_text_handle *text_handle;
+	c8 text[SE_TEXT_CHAR_COUNT];
+	se_font *font;
+	s_vec2 position;
+} se_ui_text_render_data;
+
+static void se_ui_text_render(se_context *ctx, void *data);
+
+se_ui_handle *se_ui_handle_create(
+	se_window *window,
+	se_context *ctx,
+	u16 objects_per_element_count,
+	u16 children_per_element_count,
+	u16 texts_count,
+	u16 fonts_count) {
+	if (!window || !ctx) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	se_ui_handle_params resolved = SE_UI_HANDLE_PARAMS_DEFAULTS;
-	if (params) {
-		resolved = *params;
-		if (resolved.elements_count == 0) {
-			resolved.elements_count = SE_UI_HANDLE_PARAMS_DEFAULTS.elements_count;
-		}
-		if (resolved.children_per_element_count == 0) {
-			resolved.children_per_element_count = SE_UI_HANDLE_PARAMS_DEFAULTS.children_per_element_count;
-		}
-		if (resolved.objects_per_element_count == 0) {
-			resolved.objects_per_element_count = SE_UI_HANDLE_PARAMS_DEFAULTS.objects_per_element_count;
-		}
-		if (resolved.texts_count == 0) {
-			resolved.texts_count = SE_UI_HANDLE_PARAMS_DEFAULTS.texts_count;
-		}
-		if (resolved.fonts_count == 0) {
-			resolved.fonts_count = SE_UI_HANDLE_PARAMS_DEFAULTS.fonts_count;
-		}
-	}
+
+	const u16 effective_objects_per_element_count = (objects_per_element_count == 0) ? 1 : objects_per_element_count;
+	const u16 effective_children_per_element_count = (children_per_element_count == 0) ? 1 : children_per_element_count;
+	const u16 effective_texts_count = (texts_count == 0) ? 2 : texts_count;
+	const u16 effective_fonts_count = (fonts_count == 0) ? 2 : fonts_count;
 
 	se_ui_handle *ui_handle = malloc(sizeof(se_ui_handle));
 	if (!ui_handle) {
@@ -36,34 +37,23 @@ se_ui_handle *se_ui_handle_create(se_window *window, se_render_handle *render_ha
 	}
 	memset(ui_handle, 0, sizeof(se_ui_handle));
 	ui_handle->window = window;
-	ui_handle->render_handle = render_handle;
-	s_array_init(&ui_handle->ui_elements, resolved.elements_count);
-	ui_handle->objects_per_element_count = resolved.objects_per_element_count;
-	ui_handle->children_per_element_count = resolved.children_per_element_count;
-
-	se_scene_handle_params scene_params = {0};
-	scene_params.objects_2d_count = resolved.elements_count * resolved.objects_per_element_count + 1;
-	scene_params.objects_3d_count = 0;
-	scene_params.scenes_2d_count = resolved.elements_count * resolved.children_per_element_count + 1;
-	scene_params.scenes_3d_count = 0;
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, &scene_params);
-	if (!scene_handle) {
-		s_array_clear(&ui_handle->ui_elements);
-		free(ui_handle);
-		return NULL;
+	ui_handle->ctx = ctx;
+	if (s_array_get_capacity(&ctx->ui_elements) == 0) {
+		s_array_init(&ctx->ui_elements, 2);
 	}
-	ui_handle->scene_handle = scene_handle;
+	if (s_array_get_capacity(&ctx->ui_texts) == 0) {
+		s_array_init(&ctx->ui_texts, effective_texts_count);
+	}
+	ui_handle->objects_per_element_count = effective_objects_per_element_count;
+	ui_handle->children_per_element_count = effective_children_per_element_count;
 
-	if (resolved.fonts_count > 0) {
-		se_text_handle *text_handle = se_text_handle_create(render_handle, resolved.fonts_count);
+	if (effective_fonts_count > 0) {
+		se_text_handle *text_handle = se_text_handle_create(ctx, effective_fonts_count);
 		if (!text_handle) {
-			se_scene_handle_destroy(ui_handle->scene_handle);
-			s_array_clear(&ui_handle->ui_elements);
 			free(ui_handle);
 			return NULL;
 		}
 		ui_handle->text_handle = text_handle;
-		s_array_init(&ui_handle->ui_texts, resolved.texts_count);
 	}
 	se_set_last_error(SE_RESULT_OK);
 	return ui_handle;
@@ -71,19 +61,21 @@ se_ui_handle *se_ui_handle_create(se_window *window, se_render_handle *render_ha
 
 void se_ui_handle_destroy(se_ui_handle *ui_handle) {
 	s_assertf(ui_handle, "se_ui_handle_destroy :: ui_handle is null");
-	s_foreach(&ui_handle->ui_elements, i) {
-		se_ui_element *current_ui = s_array_get(&ui_handle->ui_elements, i);
+	// Iterate in reverse to safely remove elements during iteration
+	sz i = s_array_get_size(&ui_handle->ctx->ui_elements);
+	while (i-- > 0) {
+		se_ui_element *current_ui = s_array_get(&ui_handle->ctx->ui_elements, i);
 		if (!current_ui) {
 			continue;
 		}
-		se_ui_handle_destroy_element(ui_handle, current_ui);
+		// Only destroy elements owned by this handle
+		if (current_ui->ui_handle == ui_handle) {
+			se_ui_handle_destroy_element(ui_handle, current_ui);
+		}
 	}
-	s_array_clear(&ui_handle->ui_elements);
-	se_scene_handle_destroy(ui_handle->scene_handle);
 	if (ui_handle->text_handle) { // Text handle is optional
 		se_text_handle_destroy(ui_handle->text_handle);
 	}
-	s_array_clear(&ui_handle->ui_texts);
 	free(ui_handle);
 	ui_handle = NULL;
 }
@@ -91,12 +83,9 @@ void se_ui_handle_destroy(se_ui_handle *ui_handle) {
 void se_ui_handle_destroy_element(se_ui_handle *ui_handle, se_ui_element *ui) {
 	s_assertf(ui_handle, "se_ui_handle_destroy_element :: ui_handle is null");
 	s_assertf(ui, "se_ui_handle_destroy_element :: ui is null");
-	if (!ui->is_valid) {
-		return;
-	}
 	while (s_array_get_size(&ui->children) > 0) {
 		se_ui_element_ptr *child_ptr = s_array_get(&ui->children, 0);
-		if (!child_ptr || !*child_ptr || !(*child_ptr)->is_valid) {
+		if (!child_ptr || !*child_ptr) {
 			s_array_remove_at(&ui->children, 0);
 			continue;
 		}
@@ -106,11 +95,19 @@ void se_ui_handle_destroy_element(se_ui_handle *ui_handle, se_ui_element *ui) {
 		se_ui_element_detach_child(ui->parent, ui);
 	}
 	s_array_clear(&ui->children);
-	se_scene_handle_destroy_scene_2d(ui_handle->scene_handle, ui->scene_2d);
+	if (ui->scene_2d) {
+		se_scene_2d_destroy(ui_handle->ctx, ui->scene_2d);
+	}
 	ui->scene_2d = NULL;
 	ui->text = NULL;
 	ui->parent = NULL;
-	ui->is_valid = false;
+	for (sz i = 0; i < s_array_get_size(&ui_handle->ctx->ui_elements); i++) {
+		se_ui_element *slot = s_array_get(&ui_handle->ctx->ui_elements, i);
+		if (slot == ui) {
+			s_array_remove_at(&ui_handle->ctx->ui_elements, i);
+			break;
+		}
+	}
 }
 
 se_ui_element *se_ui_element_create(se_ui_handle *ui_handle, const se_ui_element_params *params) {
@@ -119,21 +116,12 @@ se_ui_element *se_ui_element_create(se_ui_handle *ui_handle, const se_ui_element
 		return NULL;
 	}
 
-	se_ui_element *new_ui = NULL;
-	s_foreach(&ui_handle->ui_elements, i) {
-		se_ui_element *slot = s_array_get(&ui_handle->ui_elements, i);
-		if (!slot->is_valid) {
-			new_ui = slot;
-			break;
-		}
+	if (s_array_get_capacity(&ui_handle->ctx->ui_elements) == s_array_get_size(&ui_handle->ctx->ui_elements)) {
+		const sz current_capacity = s_array_get_capacity(&ui_handle->ctx->ui_elements);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&ui_handle->ctx->ui_elements, next_capacity);
 	}
-	if (!new_ui) {
-		if (s_array_get_capacity(&ui_handle->ui_elements) == s_array_get_size(&ui_handle->ui_elements)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		new_ui = s_array_increment(&ui_handle->ui_elements);
-	}
+	se_ui_element *new_ui = s_array_increment(&ui_handle->ctx->ui_elements);
 	memset(new_ui, 0, sizeof(*new_ui));
 	new_ui->ui_handle = ui_handle;
 	new_ui->parent = NULL;
@@ -142,11 +130,10 @@ se_ui_element *se_ui_element_create(se_ui_handle *ui_handle, const se_ui_element
 	new_ui->position = params->position;
 	new_ui->size = params->size;
 	new_ui->padding = params->padding;
-	new_ui->is_valid = true;
 
-	se_scene_2d *scene = se_scene_2d_create(ui_handle->scene_handle, &s_vec2(1920, 1080), ui_handle->objects_per_element_count); // TODO: maybe expose size
+	se_scene_2d *scene = se_scene_2d_create(ui_handle->ctx, &s_vec2(1920, 1080), ui_handle->objects_per_element_count);
 	if (!scene) {
-		memset(new_ui, 0, sizeof(*new_ui));
+		s_array_remove_at(&ui_handle->ctx->ui_elements, s_array_get_size(&ui_handle->ctx->ui_elements) - 1);
 		return NULL;
 	}
 	new_ui->scene_2d = scene;
@@ -180,7 +167,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_render :: ui_handle is null");
 
-	if (!ui->is_valid || !ui->visible) {
+	if (!ui->visible) {
 	    return;
 	}
 
@@ -191,7 +178,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	    	continue;
 	    }
 	    se_ui_element *current_ui = *current_ui_ptr;
-	    if (!current_ui || !current_ui->is_valid) {
+	    if (!current_ui) {
 	    	printf("se_ui_element_render :: children index %zu is null\n", i);
 	    	continue;
 	    }
@@ -199,7 +186,7 @@ void se_ui_element_render(se_ui_element *ui) {
 	}
 
 	se_scene_2d_bind(ui->scene_2d);
-	se_scene_2d_render_raw(ui->scene_2d, ui->ui_handle->render_handle);
+	se_scene_2d_render_raw(ui->scene_2d, ui->ui_handle->ctx);
 	if (ui->text) {
 		se_font *font = se_font_load(ui_handle->text_handle, ui->text->font_path, ui->text->font_size); // TODO: store font instead of path
 		if (font) {
@@ -215,9 +202,9 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
 	s_assertf(ui->scene_2d, "se_ui_element_render_to_screen :: scene_2d is null");
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_render_to_screen :: ui_handle is null");
-	s_assertf(ui_handle->render_handle, "se_ui_element_render_to_screen :: render_handle is null");
+	s_assertf(ui_handle->ctx, "se_ui_element_render_to_screen :: ctx is null");
 	s_assertf(ui_handle->window, "se_ui_element_render_to_screen :: window is null");
-	if (!ui->is_valid || !ui->visible) {
+	if (!ui->visible) {
 		return;
 	}
 
@@ -228,13 +215,13 @@ void se_ui_element_render_to_screen(se_ui_element *ui) {
 	    	continue;
 	    }
 	    se_ui_element *current_ui = *current_ui_ptr;
-	    if (!current_ui || !current_ui->is_valid) {
+	    if (!current_ui) {
 	    	printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
 	    	continue;
 	    }
 	    se_ui_element_render_to_screen(current_ui);
 	    }
-    se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->render_handle, ui_handle->window);
+    se_scene_2d_render_to_screen(ui->scene_2d, ui_handle->ctx, ui_handle->window);
 }
 
 void se_ui_element_set_position(se_ui_element *ui, const s_vec2 *position) {
@@ -275,11 +262,12 @@ void se_ui_element_set_text(se_ui_element *ui, const c8 *text, const c8 *font_pa
 	}
 
 	if (!ui->text) {
-		if (s_array_get_capacity(&ui_handle->ui_texts) <= s_array_get_size(&ui_handle->ui_texts)) {
-			printf("se_ui_element_set_text :: error, ui_handle->ui_texts is full, allocate more space\n");
-			return;
+		if (s_array_get_capacity(&ui_handle->ctx->ui_texts) <= s_array_get_size(&ui_handle->ctx->ui_texts)) {
+			const sz current_capacity = s_array_get_capacity(&ui_handle->ctx->ui_texts);
+			const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+			s_array_resize(&ui_handle->ctx->ui_texts, next_capacity);
 		}
-		ui->text = s_array_increment(&ui_handle->ui_texts);
+		ui->text = s_array_increment(&ui_handle->ctx->ui_texts);
 	}
 
 	strcpy(ui->text->characters, text);
@@ -336,6 +324,10 @@ void se_ui_element_update_objects(se_ui_element *ui) {
 	    }
 	    se_object_2d_set_position(current_object_2d, &position);
 	    se_object_2d_set_scale(current_object_2d, &object_scale);
+	    if (current_object_2d->is_custom && current_object_2d->custom.render == se_ui_text_render) {
+	    	se_ui_text_render_data *text_render_data = (se_ui_text_render_data *)current_object_2d->custom.data;
+	    	text_render_data->position = position;
+	    }
 	    if (ui->layout == SE_UI_LAYOUT_HORIZONTAL) {
 	    	position.x += scale.x;
 	    } else if (ui->layout == SE_UI_LAYOUT_VERTICAL) {
@@ -398,11 +390,8 @@ se_object_2d_ptr se_ui_element_add_object(se_ui_element *ui, const c8 *fragment_
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_add_object :: ui_handle is null");
 
-	se_scene_handle *scene_handle = ui_handle->scene_handle;
-	s_assertf(scene_handle, "se_ui_element_add_object :: scene_handle is null");
-
 	s_mat3 transform = s_mat3_identity;
-	se_object_2d_ptr object_2d = se_object_2d_create(scene_handle, fragment_shader_path, &transform, 0);
+	se_object_2d_ptr object_2d = se_object_2d_create(ui_handle->ctx, fragment_shader_path, &transform, 0);
 	if (!object_2d) {
 		return NULL;
 	}
@@ -412,14 +401,8 @@ se_object_2d_ptr se_ui_element_add_object(se_ui_element *ui, const c8 *fragment_
 	return object_2d;
 }
 
-typedef struct {
-	se_text_handle *text_handle;
-	c8 text[SE_TEXT_CHAR_COUNT];
-	se_font *font;
-} se_ui_text_render_data;
-
-static void se_ui_text_render(se_render_handle *render_handle, void *data) {
-	s_assertf(render_handle, "se_ui_text_render :: render_handle is null");
+static void se_ui_text_render(se_context *ctx, void *data) {
+	s_assertf(ctx, "se_ui_text_render :: ctx is null");
 	s_assertf(data, "se_ui_text_render :: data is null");
 
 	se_ui_text_render_data *text_render_data = (se_ui_text_render_data *)data;
@@ -427,7 +410,7 @@ static void se_ui_text_render(se_render_handle *render_handle, void *data) {
 	s_assertf(text_render_data->font, "se_ui_text_render :: text_render_data->font is null");
 	s_assertf(text_render_data->text, "se_ui_text_render :: text_render_data->text is null");
 
-	se_text_render(text_render_data->text_handle, text_render_data->font, text_render_data->text, &s_vec2(0, 0), &s_vec2(1., 1.), .03f);
+	se_text_render(text_render_data->text_handle, text_render_data->font, text_render_data->text, &text_render_data->position, &s_vec2(1., 1.), .03f);
 }
 
 se_object_2d_ptr se_ui_element_add_text(se_ui_element *ui, const c8 *text, const c8 *font_path, const f32 font_size) {
@@ -439,15 +422,12 @@ se_object_2d_ptr se_ui_element_add_text(se_ui_element *ui, const c8 *text, const
 	se_ui_handle *ui_handle = ui->ui_handle;
 	s_assertf(ui_handle, "se_ui_element_add_text :: ui_handle is null");
 
-	se_scene_handle *scene_handle = ui_handle->scene_handle;
-	s_assertf(scene_handle, "se_ui_element_add_text :: scene_handle is null");
-
 	se_text_handle *text_handle = ui_handle->text_handle;
 	s_assertf(text_handle, "se_ui_element_add_text :: text_handle is null");
 
 
-	se_render_handle *render_handle = ui_handle->render_handle;
-	s_assertf(render_handle, "se_ui_element_add_text :: render_handle is null");
+	se_context *ctx = ui_handle->ctx;
+	s_assertf(ctx, "se_ui_element_add_text :: ctx is null");
 	if (strlen(text) >= SE_TEXT_CHAR_COUNT) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
@@ -455,7 +435,8 @@ se_object_2d_ptr se_ui_element_add_text(se_ui_element *ui, const c8 *text, const
 
 	se_ui_text_render_data text_render_data = {
 		.text_handle = text_handle,
-		.font = NULL
+		.font = NULL,
+		.position = {0, 0}
 	};
 	se_font *font = se_font_load(ui_handle->text_handle, font_path, font_size);
 	if (!font) {
@@ -468,7 +449,7 @@ se_object_2d_ptr se_ui_element_add_text(se_ui_element *ui, const c8 *text, const
 	object_custom.render = &se_ui_text_render;
 	se_object_custom_set_data(&object_custom, &text_render_data, sizeof(text_render_data));
 
-	se_object_2d_ptr object_2d = se_object_2d_create_custom(scene_handle, &object_custom, &s_mat3_identity);
+	se_object_2d_ptr object_2d = se_object_2d_create_custom(ctx, &object_custom, &s_mat3_identity);
 	if (!object_2d) {
 		return NULL;
 	}
@@ -498,6 +479,11 @@ se_ui_element *se_ui_element_add_child(se_ui_element *parent_ui, const se_ui_ele
 		return NULL;
 	}
 	new_ui->parent = parent_ui;
+	if (s_array_get_size(&parent_ui->children) == s_array_get_capacity(&parent_ui->children)) {
+		const sz current_capacity = s_array_get_capacity(&parent_ui->children);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&parent_ui->children, next_capacity);
+	}
 	s_array_add(&parent_ui->children, new_ui);
 	se_ui_element_update_children(parent_ui);
 	se_set_last_error(SE_RESULT_OK);

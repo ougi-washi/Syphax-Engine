@@ -101,20 +101,19 @@ static void input_viewer_on_scroll_y(void* user_data) {
 }
 
 int main(void) {
-	se_render_handle* render_handle = se_render_handle_create(NULL);
-	se_window* window = se_window_create(render_handle, "Syphax-Engine - Input Viewer", WINDOW_WIDTH, WINDOW_HEIGHT);
+	se_context* ctx = se_context_create();
+	se_window* window = se_window_create(ctx, "Syphax-Engine - Input Viewer", WINDOW_WIDTH, WINDOW_HEIGHT);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_render_set_background_color(s_vec4(0.07f, 0.09f, 0.11f, 1.0f));
 
-	se_scene_handle* scene_handle = se_scene_handle_create(render_handle, NULL);
-	se_scene_3d* scene = se_scene_3d_create_for_window(scene_handle, window, 1);
+	se_scene_3d* scene = se_scene_3d_create_for_window(ctx, window, 1);
 
 	se_model* cube_model = se_model_load_obj_simple(
-		render_handle,
+		ctx,
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("input/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("input/scene3d_fragment.glsl"));
-	se_scene_3d_add_model(scene_handle, scene, cube_model, &s_mat4_identity);
+	se_scene_3d_add_model(ctx, scene, cube_model, &s_mat4_identity);
 
 	se_input_handle* input = se_input_create(window, 8);
 	input_viewer_state viewer = {
@@ -150,14 +149,13 @@ int main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_render_handle_reload_changed_shaders(render_handle);
+		se_context_reload_changed_shaders(ctx);
 		se_input_tick(input);
-		se_scene_3d_draw(scene, render_handle, window);
+		se_scene_3d_draw(scene, ctx, window);
 	}
 
 	se_input_destroy(input);
-	se_scene_handle_destroy(scene_handle);
-	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
+	se_context_destroy(ctx);
 	return 0;
 }

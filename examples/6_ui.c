@@ -34,8 +34,8 @@ void on_button_stop_hovered(void *window, void *data) {
 }
 
 i32 main(void) {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
+	se_context *ctx = se_context_create();
+	se_window *window = se_window_create(ctx, "Syphax-Engine - UI Example", WIDTH, HEIGHT);
 	se_ui_handle *ui_handle = NULL;
 	se_ui_element *root = NULL;
 	se_ui_element *toolbar = NULL;
@@ -49,10 +49,13 @@ i32 main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
-	se_ui_handle_params ui_handle_params = SE_UI_HANDLE_PARAMS_DEFAULTS;
-	ui_handle = se_ui_handle_create(window, render_handle, &ui_handle_params);
+	ui_handle = se_ui_handle_create(window, ctx, 16, 16, 256, 16);
 
-	se_ui_element_params ui_element_params = SE_UI_ELEMENT_PARAMS_DEFAULTS;
+	se_ui_element_params ui_element_params = {0};
+	ui_element_params.visible = true;
+	ui_element_params.position = s_vec2(0.0f, 0.0f);
+	ui_element_params.size = s_vec2(1.0f, 1.0f);
+	ui_element_params.padding = s_vec2(0.01f, 0.01f);
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
 	root = se_ui_element_create(ui_handle, &ui_element_params);
 
@@ -108,7 +111,7 @@ i32 main(void) {
 	}
 
 	se_ui_handle_destroy(ui_handle);
-	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
+	se_context_destroy(ctx);
 	return 0;
 }

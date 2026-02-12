@@ -3,8 +3,10 @@
 #ifndef SE_WINDOW_H
 #define SE_WINDOW_H
 
+#include "se.h"
+#include "se_math.h"
 #include "se_render.h"
-
+#include "se_shader.h"
 
 typedef enum {
 	SE_KEY_UNKNOWN = -1,
@@ -182,9 +184,9 @@ typedef struct {
 
 typedef s_array(se_key, se_key_combo);
 
-typedef struct {
+typedef struct se_window {
 	void* handle;
-	se_render_handle* render_handle;
+	se_context* context;
 	u32 width;
 	u32 height;
 
@@ -216,8 +218,7 @@ typedef struct {
 
 typedef s_array(se_window, se_windows);
 
-extern se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height);
-extern void se_window_attach_render(se_window* window, se_render_handle* render_handle);
+extern se_window* se_window_create(se_context* context, const char* title, const u32 width, const u32 height);
 extern void se_window_update(se_window* window); // frame start: updates time and frame count for the new frame
 extern void se_window_tick(se_window* window); // update + poll events (single-window convenience)
 extern void se_window_set_current_context(se_window* window);

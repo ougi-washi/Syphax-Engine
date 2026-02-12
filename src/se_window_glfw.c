@@ -13,23 +13,24 @@
 #define SE_MAX_INPUT_EVENTS 1024
 #define SE_MAX_RESIZE_HANDLE 1024
 
-static se_windows windows_container = { 0 };
+typedef s_array(se_window*, se_windows_registry);
+static se_windows_registry windows_registry = {0};
 static GLFWwindow* current_conext_window = NULL;
 
-static se_result se_window_init_render(se_window* window, se_render_handle* render_handle) {
+static se_result se_window_init_render(se_window* window, se_context* context) {
 	s_assertf(window, "se_window_init_render :: window is null");
-	if (!render_handle) {
+	if (!context) {
 		return SE_RESULT_INVALID_ARGUMENT;
 	}
-	if (window->render_handle == render_handle && window->shader) {
+	if (window->context == context && window->shader) {
 		return SE_RESULT_OK;
 	}
-	window->render_handle = render_handle;
+	window->context = context;
 	if (window->quad.vao == 0) {
 		se_quad_2d_create(&window->quad, 0);
 	}
 	if (!window->shader) {
-		se_shader *shader = se_shader_load(render_handle, SE_RESOURCE_INTERNAL("shaders/render_quad_vert.glsl"), SE_RESOURCE_INTERNAL("shaders/render_quad_frag.glsl"));
+		se_shader *shader = se_shader_load(context, SE_RESOURCE_INTERNAL("shaders/render_quad_vert.glsl"), SE_RESOURCE_INTERNAL("shaders/render_quad_frag.glsl"));
 		if (!shader) {
 			return se_get_last_error();
 		}
@@ -101,8 +102,8 @@ void gl_error_callback(i32 error, const c8* description) {
 	printf("GLFW Error %d: %s\n", error, description);
 }
 
-se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height) {
-	if (!title) {
+se_window* se_window_create(se_context* context, const char* title, const u32 width, const u32 height) {
+	if (!context || !title) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -114,17 +115,18 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 		return NULL;
 	}
 
-	if (s_array_get_capacity(&windows_container) == 0) {
-		s_array_init(&windows_container, SE_MAX_WINDOWS);
+	if (s_array_get_capacity(&context->windows) == 0) {
+		s_array_init(&context->windows, 2);
 	}
-	se_window* new_window = s_array_increment(&windows_container);
-	memset(new_window, 0, sizeof(se_window));
-	new_window->render_handle = NULL;
 
-	if (new_window == NULL) {
-		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
-		return NULL;
+	if (s_array_get_capacity(&context->windows) == s_array_get_size(&context->windows)) {
+		const sz current_capacity = s_array_get_capacity(&context->windows);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&context->windows, next_capacity);
 	}
+	se_window* new_window = s_array_increment(&context->windows);
+
+	memset(new_window, 0, sizeof(se_window));
 	s_array_init(&new_window->input_events, SE_MAX_INPUT_EVENTS);
 	s_array_init(&new_window->resize_handles, SE_MAX_RESIZE_HANDLE);
 
@@ -138,6 +140,9 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	 
 	new_window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
 	if (!new_window->handle) {
+		s_array_clear(&new_window->input_events);
+		s_array_clear(&new_window->resize_handles);
+		s_array_remove_at(&context->windows, s_array_get_size(&context->windows) - 1);
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
@@ -166,8 +171,16 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	glEnable(GL_DEPTH_TEST);
 	
 	//create_fullscreen_quad(&new_window->quad_vao, &new_window->quad_vbo, &new_window->quad_ebo);
-	se_result render_result = se_window_init_render(new_window, render_handle);
+	se_result render_result = se_window_init_render(new_window, context);
 	if (render_result != SE_RESULT_OK) {
+		if (new_window->quad.vao != 0) {
+			se_quad_destroy(&new_window->quad);
+		}
+		glfwDestroyWindow((GLFWwindow *)new_window->handle);
+		new_window->handle = NULL;
+		s_array_clear(&new_window->input_events);
+		s_array_clear(&new_window->resize_handles);
+		s_array_remove_at(&context->windows, s_array_get_size(&context->windows) - 1);
 		se_set_last_error(render_result);
 		return NULL;
 	}
@@ -177,13 +190,25 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->time.delta = 0;
 	new_window->frame_count = 0;
 	new_window->target_fps = 30;
+
+	if (s_array_get_capacity(&windows_registry) == 0) {
+		s_array_init(&windows_registry, 2);
+	}
+	if (s_array_get_capacity(&windows_registry) == s_array_get_size(&windows_registry)) {
+		const sz current_capacity = s_array_get_capacity(&windows_registry);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&windows_registry, next_capacity);
+	}
+	se_window **slot = s_array_increment(&windows_registry);
+	*slot = new_window;
+
 	se_set_last_error(SE_RESULT_OK);
 	return new_window;
 }
 
-void se_window_attach_render(se_window* window, se_render_handle* render_handle) {
+void se_window_attach_render(se_window* window, se_context* context) {
 	s_assertf(window, "se_window_attach_render :: window is null");
-	se_window_init_render(window, render_handle);
+	se_window_init_render(window, context);
 }
 
 extern void se_window_update(se_window* window) {
@@ -213,7 +238,7 @@ void se_window_set_current_context(se_window* window) {
 
 void se_window_render_quad(se_window* window) {
 	s_assertf(window->shader, "se_window_render_quad :: shader is null");
-	se_shader_use(window->render_handle, window->shader, true, false);
+	se_shader_use(window->context, window->shader, true, false);
 	se_quad_render(&window->quad, 0);
 }
 
@@ -249,8 +274,15 @@ void se_window_present_frame(se_window* window, const s_vec4* clear_color) {
 
 void se_window_poll_events(){
 	glfwPollEvents();
-	s_foreach(&windows_container, i) {
-		se_window* window = s_array_get(&windows_container, i);
+	s_foreach(&windows_registry, i) {
+		se_window** window_ptr = s_array_get(&windows_registry, i);
+		if (window_ptr == NULL || *window_ptr == NULL) {
+			continue;
+		}
+		se_window* window = *window_ptr;
+		if (window->handle == NULL) {
+			continue;
+		}
 		s_vec2 mouse_position = {0};
 		se_window_get_mouse_position_normalized(window, &mouse_position);
 		se_input_event* out_event = NULL;
@@ -490,6 +522,11 @@ i32 se_window_register_input_event(se_window* window, const se_box_2d* box, cons
 	s_assertf(window, "se_window_register_input_event :: window is null");
 	s_assertf(box, "se_window_register_input_event :: box is null");
 
+	if (s_array_get_size(&window->input_events) == s_array_get_capacity(&window->input_events)) {
+		const sz current_capacity = s_array_get_capacity(&window->input_events);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&window->input_events, next_capacity);
+	}
 	se_input_event* new_event = s_array_increment(&window->input_events);
 	s_assertf(new_event, "se_window_register_input_event :: Array is full");
 	c8 event_ptr[16];
@@ -533,7 +570,11 @@ void se_window_update_input_event(const i32 input_event_id, se_window* window, c
 void se_window_register_resize_event(se_window* window, se_resize_event_callback callback, void* data) {
 	s_assertf(window, "se_window_register_resize_event :: window is null");
 	s_assertf(callback, "se_window_register_resize_event :: callback is null");
-	
+	if (s_array_get_size(&window->resize_handles) == s_array_get_capacity(&window->resize_handles)) {
+		const sz current_capacity = s_array_get_capacity(&window->resize_handles);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&window->resize_handles, next_capacity);
+	}
 	se_resize_handle* new_event = s_array_increment(&window->resize_handles);
 	s_assertf(new_event, "se_window_register_resize_event :: Array is full");
 	new_event->callback = callback;
@@ -541,29 +582,61 @@ void se_window_register_resize_event(se_window* window, se_resize_event_callback
 }
 
 void se_window_destroy(se_window* window) {
-	s_assertf(window, "se_window_destroy :: window is null");
-	s_assertf(window->handle, "se_window_destroy :: window->handle is null");
+	if (window == NULL) {
+		return;
+	}
 
-	se_quad_destroy(&window->quad);
+	if (window->quad.vao != 0) {
+		se_quad_destroy(&window->quad);
+	}
 	s_array_clear(&window->input_events);
 	s_array_clear(&window->resize_handles);
 
-	glfwDestroyWindow((GLFWwindow*)window->handle);
+	if (window->handle) {
+		glfwDestroyWindow((GLFWwindow*)window->handle);
+	}
 	window->handle = NULL;
 
-	s_array_remove(&windows_container, window);
-	if (s_array_get_size(&windows_container) == 0) {
-		// Maybe clear up the window manager if needed
-		s_array_clear(&windows_container);
+	// Swap-remove from windows_registry to maintain pointer stability
+	for (sz i = 0; i < s_array_get_size(&windows_registry); i++) {
+		se_window **slot = s_array_get(&windows_registry, i);
+		if (*slot == window) {
+			// Swap with last element instead of memmove
+			se_window **last_slot = s_array_get(&windows_registry, s_array_get_size(&windows_registry) - 1);
+			*slot = *last_slot;
+			s_array_remove_last(&windows_registry);
+			break;
+		}
+	}
+
+	if (window->context) {
+		// Swap-remove from context's windows array to maintain pointer stability
+		for (sz i = 0; i < s_array_get_size(&window->context->windows); i++) {
+			se_window *slot = s_array_get(&window->context->windows, i);
+			if (slot == window) {
+				// Swap with last element instead of memmove
+				se_window *last_slot = s_array_get(&window->context->windows, s_array_get_size(&window->context->windows) - 1);
+				window->context->windows.data[i] = *last_slot;
+				s_array_remove_last(&window->context->windows);
+				break;
+			}
+		}
+	}
+
+	if (s_array_get_size(&windows_registry) == 0) {
+		s_array_clear(&windows_registry);
 		glfwTerminate();
 	}
 }
 
 void se_window_destroy_all(){
-	// TODO: implement single clear instead of destroying one by one 
-	s_foreach_reverse(&windows_container, i) {
-		se_window* window = s_array_get(&windows_container, i);
-		se_window_destroy(window);
+	while (s_array_get_size(&windows_registry) > 0) {
+		se_window **window_ptr = s_array_get(&windows_registry, s_array_get_size(&windows_registry) - 1);
+		if (window_ptr == NULL || *window_ptr == NULL) {
+			s_array_remove_at(&windows_registry, s_array_get_size(&windows_registry) - 1);
+			continue;
+		}
+		se_window_destroy(*window_ptr);
 	}
 }
 

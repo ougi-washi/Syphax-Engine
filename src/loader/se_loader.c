@@ -17,8 +17,7 @@ typedef struct {
 } se_gltf_accessor_view;
 
 typedef struct {
-	se_render_handle *render_handle;
-	se_scene_handle *scene_handle;
+	se_context *ctx;
 	se_scene_3d *scene;
 	const se_gltf_asset *asset;
 	se_shader *mesh_shader;
@@ -240,14 +239,14 @@ static void se_gltf_model_release(se_model *model) {
 	s_array_clear(&model->meshes);
 }
 
-static void se_gltf_model_rollback(se_render_handle *render_handle, se_model *model) {
-	if (render_handle == NULL || model == NULL) return;
+static void se_gltf_model_rollback(se_context *ctx, se_model *model) {
+	if (ctx == NULL || model == NULL) return;
 	se_gltf_model_release(model);
 	memset(model, 0, sizeof(*model));
-	if (render_handle->models.size > 0) {
-		se_model *last = s_array_get(&render_handle->models, render_handle->models.size - 1);
+	if (ctx->models.size > 0) {
+		se_model *last = s_array_get(&ctx->models, ctx->models.size - 1);
 		if (last == model) {
-			render_handle->models.size--;
+			ctx->models.size--;
 		}
 	}
 }
@@ -280,12 +279,12 @@ static b8 se_gltf_get_accessor_view(const se_gltf_asset *asset, const se_gltf_ac
 	return true;
 }
 
-static se_texture *se_gltf_texture_from_cache(se_render_handle *render_handle,
+static se_texture *se_gltf_texture_from_cache(se_context *ctx,
 									 const se_gltf_asset *asset,
 									 se_textures_ptr *texture_cache,
 									 const i32 texture_index,
 									 const se_texture_wrap wrap) {
-	if (render_handle == NULL || asset == NULL || texture_cache == NULL) return NULL;
+	if (ctx == NULL || asset == NULL || texture_cache == NULL) return NULL;
 	if (texture_index < 0 || (sz)texture_index >= asset->textures.size || (sz)texture_index >= texture_cache->size) {
 		return NULL;
 	}
@@ -293,7 +292,7 @@ static se_texture *se_gltf_texture_from_cache(se_render_handle *render_handle,
 	se_texture **cached = s_array_get(texture_cache, texture_index);
 	if (cached == NULL) return NULL;
 	if (*cached == NULL) {
-		*cached = se_gltf_texture_load(render_handle, asset, texture_index, wrap);
+		*cached = se_gltf_texture_load(ctx, asset, texture_index, wrap);
 	}
 	return *cached;
 }
@@ -340,7 +339,7 @@ static void se_gltf_set_default_material_uniforms(se_shader *shader, se_texture 
 	se_shader_set_float(shader, "u_alpha_cutoff", 0.5f);
 }
 
-static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
+static se_shader *se_gltf_get_material_shader(se_context *ctx,
 									   const se_gltf_asset *asset,
 									   const i32 material_index,
 									   se_shader *mesh_shader,
@@ -348,7 +347,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 									   const se_texture_wrap wrap,
 									   se_textures_ptr *texture_cache,
 									   se_shaders_ptr *material_shader_cache) {
-	if (render_handle == NULL || asset == NULL || mesh_shader == NULL || texture_cache == NULL || material_shader_cache == NULL) {
+	if (ctx == NULL || asset == NULL || mesh_shader == NULL || texture_cache == NULL || material_shader_cache == NULL) {
 		return mesh_shader;
 	}
 	if (material_index < 0 || (sz)material_index >= asset->materials.size || (sz)material_index >= material_shader_cache->size) {
@@ -359,7 +358,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 	if (cached_shader == NULL) return mesh_shader;
 	if (*cached_shader != NULL) return *cached_shader;
 
-	se_shader *material_shader = se_shader_load(render_handle, mesh_shader->vertex_path, mesh_shader->fragment_path);
+	se_shader *material_shader = se_shader_load(ctx, mesh_shader->vertex_path, mesh_shader->fragment_path);
 	if (material_shader == NULL) {
 		return mesh_shader;
 	}
@@ -400,7 +399,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 			}
 			if (pbr->has_base_color_texture) {
 				se_texture *tex = se_gltf_texture_from_cache(
-					render_handle,
+								ctx,
 					asset,
 					texture_cache,
 					pbr->base_color_texture.index,
@@ -412,7 +411,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 
 			if (pbr->has_metallic_roughness_texture) {
 				se_texture *tex = se_gltf_texture_from_cache(
-					render_handle,
+								ctx,
 					asset,
 					texture_cache,
 					pbr->metallic_roughness_texture.index,
@@ -429,7 +428,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 				ao_factor = material->occlusion_texture.strength;
 			}
 			se_texture *tex = se_gltf_texture_from_cache(
-				render_handle,
+				ctx,
 				asset,
 				texture_cache,
 				material->occlusion_texture.info.index,
@@ -449,7 +448,7 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 
 		if (material->has_emissive_texture) {
 			se_texture *tex = se_gltf_texture_from_cache(
-				render_handle,
+				ctx,
 				asset,
 				texture_cache,
 				material->emissive_texture.index,
@@ -496,8 +495,8 @@ static se_shader *se_gltf_get_material_shader(se_render_handle *render_handle,
 	return material_shader;
 }
 
-static void se_gltf_apply_model_materials(se_render_handle *render_handle, const se_gltf_asset *asset, const se_gltf_mesh *gltf_mesh, se_model *model, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap, se_textures_ptr *texture_cache, se_shaders_ptr *material_shader_cache) {
-	if (render_handle == NULL || asset == NULL || gltf_mesh == NULL || model == NULL || texture_cache == NULL) return;
+static void se_gltf_apply_model_materials(se_context *ctx, const se_gltf_asset *asset, const se_gltf_mesh *gltf_mesh, se_model *model, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap, se_textures_ptr *texture_cache, se_shaders_ptr *material_shader_cache) {
+	if (ctx == NULL || asset == NULL || gltf_mesh == NULL || model == NULL || texture_cache == NULL) return;
 
 	if (mesh_shader != NULL) {
 		se_gltf_set_default_material_uniforms(mesh_shader, default_texture);
@@ -515,7 +514,7 @@ static void se_gltf_apply_model_materials(se_render_handle *render_handle, const
 			se_gltf_primitive *prim = s_array_get(&gltf_mesh->primitives, prim_index);
 			if (prim != NULL && prim->has_material && prim->material >= 0 && (sz)prim->material < asset->materials.size) {
 				mesh_material_shader = se_gltf_get_material_shader(
-					render_handle,
+					ctx,
 					asset,
 					prim->material,
 					mesh_shader,
@@ -725,13 +724,13 @@ static b8 se_gltf_add_node_objects_recursive(se_gltf_scene_build_context *ctx, c
 
 		se_model **cached_model = s_array_get(ctx->model_cache, node->mesh);
 		if (*cached_model == NULL) {
-			*cached_model = se_gltf_model_load(ctx->render_handle, ctx->asset, node->mesh);
+			*cached_model = se_gltf_model_load(ctx->ctx, ctx->asset, node->mesh);
 			if (*cached_model == NULL) return false;
 			se_gltf_mesh *gltf_mesh = s_array_get(&ctx->asset->meshes, node->mesh);
-			se_gltf_apply_model_materials(ctx->render_handle, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache, ctx->material_shader_cache);
+			se_gltf_apply_model_materials(ctx->ctx, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache, ctx->material_shader_cache);
 		}
 
-		se_object_3d *object = se_object_3d_create(ctx->scene_handle, *cached_model, &world, 1);
+		se_object_3d *object = se_object_3d_create(ctx->ctx, *cached_model, &world, 1);
 		if (object == NULL) return false;
 
 		s_mat4 identity = s_mat4_identity;
@@ -756,13 +755,13 @@ static b8 se_gltf_add_mesh_objects_fallback(se_gltf_scene_build_context *ctx) {
 	for (sz mesh_index = 0; mesh_index < ctx->asset->meshes.size; mesh_index++) {
 		se_model **cached_model = s_array_get(ctx->model_cache, mesh_index);
 		if (*cached_model == NULL) {
-			*cached_model = se_gltf_model_load(ctx->render_handle, ctx->asset, (i32)mesh_index);
+			*cached_model = se_gltf_model_load(ctx->ctx, ctx->asset, (i32)mesh_index);
 			if (*cached_model == NULL) return false;
 			se_gltf_mesh *gltf_mesh = s_array_get(&ctx->asset->meshes, mesh_index);
-			se_gltf_apply_model_materials(ctx->render_handle, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache, ctx->material_shader_cache);
+			se_gltf_apply_model_materials(ctx->ctx, ctx->asset, gltf_mesh, *cached_model, ctx->mesh_shader, ctx->default_texture, ctx->wrap, ctx->texture_cache, ctx->material_shader_cache);
 		}
 
-		se_object_3d *object = se_object_3d_create(ctx->scene_handle, *cached_model, &identity, 1);
+		se_object_3d *object = se_object_3d_create(ctx->ctx, *cached_model, &identity, 1);
 		if (object == NULL) return false;
 		se_object_3d_add_instance(object, &identity, &identity);
 		se_scene_3d_add_object(ctx->scene, object);
@@ -772,8 +771,8 @@ static b8 se_gltf_add_mesh_objects_fallback(se_gltf_scene_build_context *ctx) {
 	return true;
 }
 
-se_model *se_gltf_model_load_ex(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags) {
-	if (render_handle == NULL || asset == NULL || !se_loader_mesh_data_flags_are_valid(mesh_data_flags)) {
+se_model *se_gltf_model_load_ex(se_context *ctx, const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags) {
+	if (ctx == NULL || asset == NULL || !se_loader_mesh_data_flags_are_valid(mesh_data_flags)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -781,9 +780,10 @@ se_model *se_gltf_model_load_ex(se_render_handle *render_handle, const se_gltf_a
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	if (s_array_get_capacity(&render_handle->models) == s_array_get_size(&render_handle->models)) {
-		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+	if (s_array_get_capacity(&ctx->models) == s_array_get_size(&ctx->models)) {
+		const sz current_capacity = s_array_get_capacity(&ctx->models);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&ctx->models, next_capacity);
 	}
 
 	se_gltf_mesh *mesh = s_array_get(&asset->meshes, mesh_index);
@@ -792,7 +792,7 @@ se_model *se_gltf_model_load_ex(se_render_handle *render_handle, const se_gltf_a
 		return NULL;
 	}
 
-	se_model *model = s_array_increment(&render_handle->models);
+	se_model *model = s_array_increment(&ctx->models);
 	memset(model, 0, sizeof(*model));
 	s_array_init(&model->meshes, mesh->primitives.size);
 
@@ -960,22 +960,21 @@ se_model *se_gltf_model_load_ex(se_render_handle *render_handle, const se_gltf_a
 		}
 	}
 
-	model->is_valid = true;
 	se_set_last_error(SE_RESULT_OK);
 	return model;
 
 fail:
-	se_gltf_model_rollback(render_handle, model);
+	se_gltf_model_rollback(ctx, model);
 	se_set_last_error(error);
 	return NULL;
 }
 
-se_model *se_gltf_model_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 mesh_index) {
-	return se_gltf_model_load_ex(render_handle, asset, mesh_index, SE_MESH_DATA_GPU);
+se_model *se_gltf_model_load(se_context *ctx, const se_gltf_asset *asset, const i32 mesh_index) {
+	return se_gltf_model_load_ex(ctx, asset, mesh_index, SE_MESH_DATA_GPU);
 }
 
-se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap) {
-	if (render_handle == NULL || asset == NULL) {
+se_texture *se_gltf_image_load(se_context *ctx, const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap) {
+	if (ctx == NULL || asset == NULL) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -986,7 +985,7 @@ se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_as
 
 	se_gltf_image *image = s_array_get(&asset->images, image_index);
 	if (image->data && image->data_size > 0) {
-		return se_texture_load_from_memory(render_handle, image->data, image->data_size, wrap);
+		return se_texture_load_from_memory(ctx, image->data, image->data_size, wrap);
 	}
 
 	if (image->uri && image->uri[0] != '\0') {
@@ -995,7 +994,7 @@ se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_as
 			sz decoded_size = 0;
 			char *mime = NULL;
 			if (se_loader_parse_data_uri(image->uri, &mime, &decoded, &decoded_size)) {
-				se_texture *texture = se_texture_load_from_memory(render_handle, decoded, decoded_size, wrap);
+				se_texture *texture = se_texture_load_from_memory(ctx, decoded, decoded_size, wrap);
 				free(mime);
 				free(decoded);
 				return texture;
@@ -1009,22 +1008,22 @@ se_texture *se_gltf_image_load(se_render_handle *render_handle, const se_gltf_as
 		if (!se_loader_path_is_absolute(image->uri) && asset->base_dir && asset->base_dir[0] != '\0') {
 			char full_path[SE_MAX_PATH_LENGTH] = {0};
 			if (s_path_join(full_path, SE_MAX_PATH_LENGTH, asset->base_dir, image->uri)) {
-				se_texture *texture = se_texture_load(render_handle, full_path, wrap);
+				se_texture *texture = se_texture_load(ctx, full_path, wrap);
 				if (texture != NULL) {
 					return texture;
 				}
 			}
 		}
 
-		return se_texture_load(render_handle, image->uri, wrap);
+		return se_texture_load(ctx, image->uri, wrap);
 	}
 
 	se_set_last_error(SE_RESULT_NOT_FOUND);
 	return NULL;
 }
 
-se_texture *se_gltf_texture_load(se_render_handle *render_handle, const se_gltf_asset *asset, const i32 texture_index, const se_texture_wrap wrap) {
-	if (render_handle == NULL || asset == NULL) {
+se_texture *se_gltf_texture_load(se_context *ctx, const se_gltf_asset *asset, const i32 texture_index, const se_texture_wrap wrap) {
+	if (ctx == NULL || asset == NULL) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -1043,11 +1042,11 @@ se_texture *se_gltf_texture_load(se_render_handle *render_handle, const se_gltf_
 		return NULL;
 	}
 
-	return se_gltf_image_load(render_handle, asset, texture->source, wrap);
+	return se_gltf_image_load(ctx, asset, texture->source, wrap);
 }
 
-se_model *se_gltf_model_load_first(se_render_handle *render_handle, const char *path, const se_gltf_load_params *params) {
-	if (render_handle == NULL || path == NULL || path[0] == '\0') {
+se_model *se_gltf_model_load_first(se_context *ctx, const char *path, const se_gltf_load_params *params) {
+	if (ctx == NULL || path == NULL || path[0] == '\0') {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -1063,15 +1062,15 @@ se_model *se_gltf_model_load_first(se_render_handle *render_handle, const char *
 		return NULL;
 	}
 
-	se_model *model = se_gltf_model_load(render_handle, asset, 0);
+	se_model *model = se_gltf_model_load(ctx, asset, 0);
 	se_result result = se_get_last_error();
 	se_gltf_free(asset);
 	se_set_last_error(result);
 	return model;
 }
 
-sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handle *scene_handle, se_scene_3d *scene, const se_gltf_asset *asset, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap) {
-	if (render_handle == NULL || scene_handle == NULL || scene == NULL || asset == NULL) {
+sz se_gltf_scene_load_from_asset(se_context *context, se_scene_3d *scene, const se_gltf_asset *asset, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap) {
+	if (context == NULL || scene == NULL || asset == NULL) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return 0;
 	}
@@ -1101,17 +1100,16 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 		*slot = NULL;
 	}
 
-	se_gltf_scene_build_context ctx = {0};
-	ctx.render_handle = render_handle;
-	ctx.scene_handle = scene_handle;
-	ctx.scene = scene;
-	ctx.asset = asset;
-	ctx.mesh_shader = mesh_shader;
-	ctx.default_texture = default_texture;
-	ctx.wrap = wrap;
-	ctx.model_cache = &model_cache;
-	ctx.texture_cache = &texture_cache;
-	ctx.material_shader_cache = &material_shader_cache;
+	se_gltf_scene_build_context build_ctx = {0};
+	build_ctx.ctx = context;
+	build_ctx.scene = scene;
+	build_ctx.asset = asset;
+	build_ctx.mesh_shader = mesh_shader;
+	build_ctx.default_texture = default_texture;
+	build_ctx.wrap = wrap;
+	build_ctx.model_cache = &model_cache;
+	build_ctx.texture_cache = &texture_cache;
+	build_ctx.material_shader_cache = &material_shader_cache;
 
 	b8 ok = true;
 	if (asset->scenes.size > 0) {
@@ -1127,7 +1125,7 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 			s_mat4 identity = s_mat4_identity;
 			s_foreach(&default_scene->nodes, i) {
 				i32 *root_node = s_array_get(&default_scene->nodes, i);
-				if (root_node == NULL || !se_gltf_add_node_objects_recursive(&ctx, *root_node, &identity, 0)) {
+				if (root_node == NULL || !se_gltf_add_node_objects_recursive(&build_ctx, *root_node, &identity, 0)) {
 					ok = false;
 					if (se_get_last_error() == SE_RESULT_OK) {
 						se_set_last_error(SE_RESULT_IO);
@@ -1137,7 +1135,7 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 			}
 		}
 	} else {
-		ok = se_gltf_add_mesh_objects_fallback(&ctx);
+		ok = se_gltf_add_mesh_objects_fallback(&build_ctx);
 		if (!ok && se_get_last_error() == SE_RESULT_OK) {
 			se_set_last_error(SE_RESULT_IO);
 		}
@@ -1147,7 +1145,7 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 	s_array_clear(&material_shader_cache);
 	s_array_clear(&model_cache);
 
-	if (!ok || ctx.added_objects == 0) {
+	if (!ok || build_ctx.added_objects == 0) {
 		if (ok) {
 			se_set_last_error(SE_RESULT_NOT_FOUND);
 		}
@@ -1155,14 +1153,14 @@ sz se_gltf_scene_load_from_asset(se_render_handle *render_handle, se_scene_handl
 	}
 
 	se_set_last_error(SE_RESULT_OK);
-	return ctx.added_objects;
+	return build_ctx.added_objects;
 }
 
-se_gltf_asset *se_gltf_scene_load(se_render_handle *render_handle, se_scene_handle *scene_handle, se_scene_3d *scene, const char *path, const se_gltf_load_params *load_params, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap, sz *out_objects_loaded) {
+se_gltf_asset *se_gltf_scene_load(se_context *ctx, se_scene_3d *scene, const char *path, const se_gltf_load_params *load_params, se_shader *mesh_shader, se_texture *default_texture, const se_texture_wrap wrap, sz *out_objects_loaded) {
 	if (out_objects_loaded) {
 		*out_objects_loaded = 0;
 	}
-	if (render_handle == NULL || scene_handle == NULL || scene == NULL || path == NULL || path[0] == '\0') {
+	if (ctx == NULL || scene == NULL || path == NULL || path[0] == '\0') {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
@@ -1172,7 +1170,7 @@ se_gltf_asset *se_gltf_scene_load(se_render_handle *render_handle, se_scene_hand
 		return NULL;
 	}
 
-	sz objects_loaded = se_gltf_scene_load_from_asset(render_handle, scene_handle, scene, asset, mesh_shader, default_texture, wrap);
+	sz objects_loaded = se_gltf_scene_load_from_asset(ctx, scene, asset, mesh_shader, default_texture, wrap);
 	if (objects_loaded == 0) {
 		se_result result = se_get_last_error();
 		se_gltf_free(asset);

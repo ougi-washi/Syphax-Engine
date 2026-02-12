@@ -7,10 +7,10 @@
 #define HEIGHT 1080
 
 i32 main(void) {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
-	se_window *window_main = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
-	se_window *window_1 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
-	se_window *window_2 = se_window_create(render_handle, "Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
+	se_context *ctx = se_context_create();
+	se_window *window_main = se_window_create(ctx, "Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
+	se_window *window_1 = se_window_create(ctx, "Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);
+	se_window *window_2 = se_window_create(ctx, "Syphax-Engine - Multi Window Example - Window 2", WIDTH, HEIGHT);
 	se_window_set_exit_key(window_main, SE_KEY_ESCAPE);
 
 	while (!se_window_should_close(window_main)) {
@@ -38,6 +38,6 @@ i32 main(void) {
 	se_window_destroy(window_1);
 	se_window_destroy(window_2);
 	se_window_destroy(window_main);
-	se_render_handle_destroy(render_handle);
+	se_context_destroy(ctx);
 	return 0;
 }

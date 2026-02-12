@@ -22,7 +22,6 @@ typedef struct se_ui_element{
 	se_scene_2d* scene_2d;
 	struct se_ui_text* text;
 	b8 visible : 1;
-	b8 is_valid : 1;
 	s_array(struct se_ui_element*, children);
 } se_ui_element;
 typedef s_array(se_ui_element, se_ui_elements);
@@ -35,7 +34,6 @@ typedef struct {
 	s_vec2 padding;
 	b8 visible : 1;
 } se_ui_element_params;
-#define SE_UI_ELEMENT_PARAMS_DEFAULTS { .layout = SE_UI_LAYOUT_HORIZONTAL, .position = s_vec2(0, 0), .size = s_vec2(1, 1), .padding = s_vec2(.05, .05), .visible = 1 }
 
 typedef struct se_ui_text {
 	c8 characters[SE_TEXT_CHAR_COUNT];
@@ -47,26 +45,14 @@ typedef se_ui_text* se_ui_text_ptr;
 
 typedef struct se_ui_handle {
 	se_window* window;
-	se_render_handle* render_handle;
-	se_scene_handle* scene_handle;
+	se_context* ctx;
 	se_text_handle* text_handle;
-	se_ui_elements ui_elements;
-	se_ui_texts ui_texts;
 
 	u16 objects_per_element_count;
 	u16 children_per_element_count;
 } se_ui_handle;
 
-typedef struct {
-	u16 elements_count;
-	u16 children_per_element_count;
-	u16 objects_per_element_count;
-	u16 texts_count;
-	u16 fonts_count;
-} se_ui_handle_params;
-#define SE_UI_HANDLE_PARAMS_DEFAULTS ((se_ui_handle_params){ .elements_count = 8, .children_per_element_count = 8, .objects_per_element_count = 16, .texts_count = 128, .fonts_count = 1 })
-
-extern se_ui_handle* se_ui_handle_create(se_window* window, se_render_handle* render_handle, const se_ui_handle_params* params);
+extern se_ui_handle* se_ui_handle_create(se_window* window, se_context* ctx, u16 objects_per_element_count, u16 children_per_element_count, u16 texts_count, u16 fonts_count);
 extern void se_ui_handle_destroy(se_ui_handle* ui_handle);
 // Ownership: only the UI handle may remove/free elements it owns.
 extern void se_ui_handle_destroy_element(se_ui_handle* ui_handle, se_ui_element* ui);

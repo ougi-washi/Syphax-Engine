@@ -20,10 +20,9 @@ void on_button_no_pressed(void *window, void *data) {
 }
 
 i32 main(void) {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
-	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
+	se_context *ctx = se_context_create();
+	se_window *window = se_window_create(ctx, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
+	se_scene_2d *scene_2d = se_scene_2d_create(ctx, &s_vec2(WIDTH, HEIGHT), 4);
 	se_object_2d *borders = NULL;
 	se_object_2d *panel = NULL;
 	se_object_2d *button_yes = NULL;
@@ -33,10 +32,10 @@ i32 main(void) {
 
 	s_mat3 transform = s_mat3_identity;
 
-	borders = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene2d/borders.glsl"), &transform, 0);
-	panel = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &transform, 0);
-	button_yes = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &transform, 0);
-	button_no = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &transform, 0);
+	borders = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("scene2d/borders.glsl"), &transform, 0);
+	panel = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &transform, 0);
+	button_yes = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &transform, 0);
+	button_no = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &transform, 0);
 	se_object_2d_set_scale(borders, &s_vec2(0.95, 0.95));
 	se_object_2d_set_scale(panel, &s_vec2(0.5, 0.5));
 	se_object_2d_set_position(button_yes, &s_vec2(0.15, 0.));
@@ -67,17 +66,16 @@ i32 main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_render_handle_reload_changed_shaders(render_handle);
+		se_context_reload_changed_shaders(ctx);
 
 		s_vec2 current_pos = se_object_2d_get_position(button_yes);
 		se_object_2d_set_position(button_yes, &s_vec2(current_pos.x + 0.005, current_pos.y + 0.005));
 		se_object_2d_get_box_2d(button_yes, &button_box_yes);
 		se_window_update_input_event(button_yes_update_id, window, &button_box_yes, 0, &on_button_yes_pressed, NULL, &button_yes_data);
-		se_scene_2d_draw(scene_2d, render_handle, window);
+		se_scene_2d_draw(scene_2d, ctx, window);
 	}
 
-	se_scene_handle_destroy(scene_handle);
-	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
+	se_context_destroy(ctx);
 	return 0;
 }

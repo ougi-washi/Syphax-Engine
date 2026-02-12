@@ -7,19 +7,27 @@
 #include <stdlib.h>
 #include <string.h>
 
-static se_windows windows_container = { 0 };
+typedef s_array(se_window*, se_windows_registry);
+static se_windows_registry windows_registry = {0};
 
-se_window* se_window_create(se_render_handle* render_handle, const char* title, const u32 width, const u32 height) {
-	if (!title) {
+se_window* se_window_create(se_context* context, const char* title, const u32 width, const u32 height) {
+	if (!context || !title) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
-	if (s_array_get_capacity(&windows_container) == 0) {
-		s_array_init(&windows_container, 8);
+	if (s_array_get_capacity(&context->windows) == 0) {
+		s_array_init(&context->windows, 2);
 	}
-	se_window* new_window = s_array_increment(&windows_container);
+
+	if (s_array_get_capacity(&context->windows) == s_array_get_size(&context->windows)) {
+		const sz current_capacity = s_array_get_capacity(&context->windows);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&context->windows, next_capacity);
+	}
+	se_window* new_window = s_array_increment(&context->windows);
+
 	memset(new_window, 0, sizeof(se_window));
-	new_window->render_handle = render_handle;
+	new_window->context = context;
 	new_window->width = width;
 	new_window->height = height;
 	new_window->handle = NULL;
@@ -29,14 +37,26 @@ se_window* se_window_create(se_render_handle* render_handle, const char* title, 
 	new_window->should_close = false;
 	new_window->target_fps = 30;
 	new_window->time.current = 0.0;
+
+	if (s_array_get_capacity(&windows_registry) == 0) {
+		s_array_init(&windows_registry, 2);
+	}
+	if (s_array_get_capacity(&windows_registry) == s_array_get_size(&windows_registry)) {
+		const sz current_capacity = s_array_get_capacity(&windows_registry);
+		const sz next_capacity = (current_capacity == 0) ? 2 : (current_capacity + 2);
+		s_array_resize(&windows_registry, next_capacity);
+	}
+	se_window **slot = s_array_increment(&windows_registry);
+	*slot = new_window;
+
 	printf("[terminal] window: %s (%u x %u)\n", title, width, height);
 	se_set_last_error(SE_RESULT_OK);
 	return new_window;
 }
 
-void se_window_attach_render(se_window* window, se_render_handle* render_handle) {
+void se_window_attach_render(se_window* window, se_context* context) {
 	s_assertf(window, "se_window_attach_render :: window is null");
-	window->render_handle = render_handle;
+	window->context = context;
 }
 
 void se_window_update(se_window* window) {
@@ -302,20 +322,46 @@ void se_window_destroy(se_window* window) {
 	if (!window) {
 		return;
 	}
-	se_quad_destroy(&window->quad);
-	if (s_array_get_size(&windows_container) == 0) {
-		return;
+	if (window->quad.vao != 0) {
+		se_quad_destroy(&window->quad);
 	}
-	s_array_remove(&windows_container, window);
-	if (s_array_get_size(&windows_container) == 0) {
-		s_array_clear(&windows_container);
+	// Swap-remove from windows_registry to maintain pointer stability
+	for (sz i = 0; i < s_array_get_size(&windows_registry); i++) {
+		se_window **slot = s_array_get(&windows_registry, i);
+		if (*slot == window) {
+			// Swap with last element instead of memmove
+			se_window **last_slot = s_array_get(&windows_registry, s_array_get_size(&windows_registry) - 1);
+			*slot = *last_slot;
+			s_array_remove_last(&windows_registry);
+			break;
+		}
+	}
+	if (window->context) {
+		// Swap-remove from context's windows array to maintain pointer stability
+		for (sz i = 0; i < s_array_get_size(&window->context->windows); i++) {
+			se_window *slot_in_ctx = s_array_get(&window->context->windows, i);
+			if (slot_in_ctx == window) {
+				// Swap with last element instead of memmove
+				se_window *last_slot = s_array_get(&window->context->windows, s_array_get_size(&window->context->windows) - 1);
+				window->context->windows.data[i] = *last_slot;
+				s_array_remove_last(&window->context->windows);
+				break;
+			}
+		}
+	}
+	if (s_array_get_size(&windows_registry) == 0) {
+		s_array_clear(&windows_registry);
 	}
 }
 
 void se_window_destroy_all(){
-	s_foreach_reverse(&windows_container, i) {
-		se_window* window = s_array_get(&windows_container, i);
-		se_window_destroy(window);
+	while (s_array_get_size(&windows_registry) > 0) {
+		se_window **window_ptr = s_array_get(&windows_registry, s_array_get_size(&windows_registry) - 1);
+		if (window_ptr == NULL || *window_ptr == NULL) {
+			s_array_remove_at(&windows_registry, s_array_get_size(&windows_registry) - 1);
+			continue;
+		}
+		se_window_destroy(*window_ptr);
 	}
 }
 

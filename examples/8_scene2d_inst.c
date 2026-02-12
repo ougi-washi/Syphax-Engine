@@ -8,16 +8,15 @@
 #define INSTANCE_COUNT 16
 
 i32 main(void) {
-	se_render_handle *render_handle = se_render_handle_create(NULL);
-	se_window *window = se_window_create(render_handle, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
-	se_scene_handle *scene_handle = se_scene_handle_create(render_handle, NULL);
-	se_scene_2d *scene_2d = se_scene_2d_create(scene_handle, &s_vec2(WIDTH, HEIGHT), 4);
+	se_context *ctx = se_context_create();
+	se_window *window = se_window_create(ctx, "Syphax-Engine - Scene 2D Example", WIDTH, HEIGHT);
+	se_scene_2d *scene_2d = se_scene_2d_create(ctx, &s_vec2(WIDTH, HEIGHT), 4);
 	se_object_2d *button = NULL;
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	s_mat3 transform = s_mat3_identity;
-	button = se_object_2d_create(scene_handle, SE_RESOURCE_EXAMPLE("scene2d_inst/instance.glsl"), &transform, 16);
+	button = se_object_2d_create(ctx, SE_RESOURCE_EXAMPLE("scene2d_inst/instance.glsl"), &transform, 16);
 	se_object_2d_set_position(button, &s_vec2(0.15, 0.));
 	se_object_2d_set_scale(button, &s_vec2(0.1, 0.1));
 	s_mat3 instance_transform = s_mat3_identity;
@@ -32,15 +31,14 @@ i32 main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
-		se_render_handle_reload_changed_shaders(render_handle);
+		se_context_reload_changed_shaders(ctx);
 		// Update position using setter
 		s_vec2 current_pos = se_object_2d_get_position(button);
 		se_object_2d_set_position(button, &s_vec2(current_pos.x + 0.001, current_pos.y));
-		se_scene_2d_draw(scene_2d, render_handle, window);
+		se_scene_2d_draw(scene_2d, ctx, window);
 	}
 
-	se_scene_handle_destroy(scene_handle);
-	se_render_handle_destroy(render_handle);
 	se_window_destroy(window);
+	se_context_destroy(ctx);
 	return 0;
 }
