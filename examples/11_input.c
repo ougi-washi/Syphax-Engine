@@ -10,7 +10,6 @@
 #define WINDOW_HEIGHT 720
 
 typedef struct {
-	se_context* ctx;
 	se_input_handle* input;
 	se_window_handle window;
 	se_scene_3d_handle scene;
@@ -25,14 +24,11 @@ typedef struct {
 } input_viewer_state;
 
 static void input_viewer_apply_camera(input_viewer_state* state) {
-	if (!state || !state->ctx) {
+	if (!state) {
 		return;
 	}
-	se_scene_3d *scene_ptr = s_array_get(&state->ctx->scenes_3d, state->scene);
-	if (!scene_ptr) {
-		return;
-	}
-	se_camera *camera = s_array_get(&state->ctx->cameras, scene_ptr->camera);
+	const se_camera_handle camera_handle = se_scene_3d_get_camera(state->scene);
+	se_camera *camera = se_camera_get(camera_handle);
 	if (!camera) {
 		return;
 	}
@@ -125,7 +121,6 @@ int main(void) {
 
 	se_input_handle* input = se_input_create(window, 8);
 	input_viewer_state viewer = {
-		.ctx = ctx,
 		.input = input,
 		.window = window,
 		.scene = scene,

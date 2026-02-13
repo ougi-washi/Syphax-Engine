@@ -141,6 +141,16 @@ typedef struct {
 	f64 frame_start;
 } se_time;
 
+typedef struct {
+	u64 frames_presented;
+	u64 key_events;
+	u64 mouse_button_events;
+	u64 mouse_move_events;
+	u64 scroll_events;
+	f64 last_present_duration;
+	f64 last_sleep_duration;
+} se_window_diagnostics;
+
 typedef enum {
 	SE_INPUT_EVENT_KEY,
 	SE_INPUT_EVENT_MOUSE
@@ -177,6 +187,7 @@ typedef struct {
 } se_input_event;
 
 typedef void(*se_resize_event_callback)(se_window_handle window, void* data);
+typedef void(*se_window_text_callback)(se_window_handle window, const c8* utf8_text, void* data);
 typedef struct {
 	se_resize_event_callback callback;
 	void* data;
@@ -200,6 +211,7 @@ typedef struct se_window {
 	se_window_cursor_mode cursor_mode;
 	b8 raw_mouse_motion_supported : 1;
 	b8 raw_mouse_motion_enabled : 1;
+	b8 vsync_enabled : 1;
 	b8 should_close : 1;
 
 	se_quad quad;
@@ -208,10 +220,13 @@ typedef struct se_window {
 	u16 target_fps;
 	se_time time;
 	u64 frame_count;
+	se_window_diagnostics diagnostics;
 
 	se_key_combo* exit_keys;
 	se_key exit_key;
 	b8 use_exit_key : 1;
+	se_window_text_callback text_callback;
+	void* text_callback_data;
 	s_array(se_resize_handle, resize_handles);
 	s_array(se_input_event, input_events);
 } se_window;
@@ -224,6 +239,8 @@ extern void se_window_tick(const se_window_handle window);
 extern void se_window_set_current_context(const se_window_handle window);
 extern void se_window_render_quad(const se_window_handle window);
 extern void se_window_render_screen(const se_window_handle window);
+extern void se_window_set_vsync(const se_window_handle window, const b8 enabled);
+extern b8 se_window_is_vsync_enabled(const se_window_handle window);
 extern void se_window_present(const se_window_handle window);
 extern void se_window_present_frame(const se_window_handle window, const s_vec4* clear_color);
 extern void se_window_poll_events();
@@ -233,8 +250,23 @@ extern b8 se_window_is_key_released(const se_window_handle window, se_key key);
 extern b8 se_window_is_mouse_down(const se_window_handle window, se_mouse_button button);
 extern b8 se_window_is_mouse_pressed(const se_window_handle window, se_mouse_button button);
 extern b8 se_window_is_mouse_released(const se_window_handle window, se_mouse_button button);
+extern void se_window_clear_input_state(const se_window_handle window);
+extern void se_window_inject_key_state(const se_window_handle window, const se_key key, const b8 down);
+extern void se_window_inject_mouse_button_state(const se_window_handle window, const se_mouse_button button, const b8 down);
+extern void se_window_inject_mouse_position(const se_window_handle window, const f32 x, const f32 y);
+extern void se_window_inject_scroll_delta(const se_window_handle window, const f32 x, const f32 y);
 extern f32 se_window_get_mouse_position_x(const se_window_handle window);
 extern f32 se_window_get_mouse_position_y(const se_window_handle window);
+extern void se_window_get_size(const se_window_handle window, u32* out_width, u32* out_height);
+extern void se_window_get_framebuffer_size(const se_window_handle window, u32* out_width, u32* out_height);
+extern void se_window_get_content_scale(const se_window_handle window, f32* out_xscale, f32* out_yscale);
+extern f32 se_window_get_aspect(const se_window_handle window);
+extern b8 se_window_pixel_to_normalized(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_normalized);
+extern b8 se_window_normalized_to_pixel(const se_window_handle window, const f32 nx, const f32 ny, s_vec2* out_pixel);
+extern b8 se_window_window_to_framebuffer(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_framebuffer);
+extern b8 se_window_framebuffer_to_window(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_window);
+extern void se_window_get_diagnostics(const se_window_handle window, se_window_diagnostics* out_diagnostics);
+extern void se_window_reset_diagnostics(const se_window_handle window);
 extern void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position);
 extern void se_window_get_mouse_delta(const se_window_handle window, s_vec2* out_mouse_delta);
 extern void se_window_get_mouse_delta_normalized(const se_window_handle window, s_vec2* out_mouse_delta);
@@ -256,6 +288,8 @@ extern void se_window_set_target_fps(const se_window_handle window, const u16 fp
 extern i32 se_window_register_input_event(const se_window_handle window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
 extern void se_window_update_input_event(const i32 input_event_id, const se_window_handle window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data);
 extern void se_window_register_resize_event(const se_window_handle window, se_resize_event_callback callback, void* data);
+extern void se_window_set_text_callback(const se_window_handle window, se_window_text_callback callback, void* data);
+extern void se_window_emit_text(const se_window_handle window, const c8* utf8_text);
 extern void se_window_destroy(const se_window_handle window);
 extern void se_window_destroy_all(void);
 

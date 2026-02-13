@@ -51,8 +51,8 @@ i32 main(void) {
 		}
 	}
 
-	se_scene_3d *scene_ptr = s_array_get(&ctx->scenes_3d, scene);
-	se_camera *camera = scene_ptr ? s_array_get(&ctx->cameras, scene_ptr->camera) : NULL;
+	const se_camera_handle camera_handle = se_scene_3d_get_camera(scene);
+	se_camera *camera = se_camera_get(camera_handle);
 	if (camera) {
 		camera->position = s_vec3(6.0f, 5.0f, 10.0f);
 		camera->target = s_vec3(0.0f, 0.0f, 0.0f);

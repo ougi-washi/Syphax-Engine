@@ -3,6 +3,7 @@
 #if defined(SE_WINDOW_BACKEND_TERMINAL)
 
 #include "se_window.h"
+#include "se_debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +36,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	new_window->cursor_mode = SE_WINDOW_CURSOR_NORMAL;
 	new_window->raw_mouse_motion_supported = false;
 	new_window->raw_mouse_motion_enabled = false;
+	new_window->vsync_enabled = false;
 	new_window->should_close = false;
 	new_window->target_fps = 30;
 	new_window->time.current = 0.0;
@@ -57,6 +59,8 @@ void se_window_attach_render(const se_window_handle window) {
 }
 
 void se_window_update(const se_window_handle window) {
+	se_debug_frame_begin();
+	se_debug_trace_begin("window_update");
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	se_window_check_exit_keys(window);
@@ -71,11 +75,14 @@ void se_window_update(const se_window_handle window) {
 	window_ptr->time.delta = window_ptr->time.current - window_ptr->time.last_frame;
 	window_ptr->time.frame_start = window_ptr->time.current;
 	window_ptr->frame_count++;
+	se_debug_trace_end("window_update");
 }
 
 void se_window_tick(const se_window_handle window) {
 	se_window_update(window);
+	se_debug_trace_begin("input_tick");
 	se_window_poll_events();
+	se_debug_trace_end("input_tick");
 }
 
 void se_window_set_current_context(const se_window_handle window) {
@@ -87,9 +94,33 @@ void se_window_render_quad(const se_window_handle window) {
 }
 
 void se_window_render_screen(const se_window_handle window) {
+	se_debug_trace_begin("window_present");
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	printf("[terminal] frame %llu\n", (unsigned long long)window_ptr->frame_count);
+	window_ptr->diagnostics.frames_presented++;
+	window_ptr->diagnostics.last_present_duration = 0.0;
+	window_ptr->diagnostics.last_sleep_duration = 0.0;
+	se_debug_trace_end("window_present");
+	se_debug_frame_end();
+}
+
+void se_window_set_vsync(const se_window_handle window, const b8 enabled) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	window_ptr->vsync_enabled = enabled;
+}
+
+b8 se_window_is_vsync_enabled(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return false;
+	}
+	return window_ptr->vsync_enabled;
 }
 
 void se_window_present(const se_window_handle window) {
@@ -158,6 +189,62 @@ b8 se_window_is_mouse_released(const se_window_handle window, se_mouse_button bu
 	return !window_ptr->mouse_buttons[button] && window_ptr->mouse_buttons_prev[button];
 }
 
+void se_window_clear_input_state(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	memset(window_ptr->keys, 0, sizeof(window_ptr->keys));
+	memset(window_ptr->mouse_buttons, 0, sizeof(window_ptr->mouse_buttons));
+	window_ptr->mouse_dx = 0.0;
+	window_ptr->mouse_dy = 0.0;
+	window_ptr->scroll_dx = 0.0;
+	window_ptr->scroll_dy = 0.0;
+}
+
+void se_window_inject_key_state(const se_window_handle window, const se_key key, const b8 down) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || key < 0 || key >= SE_KEY_COUNT) {
+		return;
+	}
+	window_ptr->keys[key] = down;
+}
+
+void se_window_inject_mouse_button_state(const se_window_handle window, const se_mouse_button button, const b8 down) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || button < 0 || button >= SE_MOUSE_BUTTON_COUNT) {
+		return;
+	}
+	window_ptr->mouse_buttons[button] = down;
+}
+
+void se_window_inject_mouse_position(const se_window_handle window, const f32 x, const f32 y) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	const f64 prev_x = window_ptr->mouse_x;
+	const f64 prev_y = window_ptr->mouse_y;
+	window_ptr->mouse_x = x;
+	window_ptr->mouse_y = y;
+	window_ptr->mouse_dx = window_ptr->mouse_x - prev_x;
+	window_ptr->mouse_dy = window_ptr->mouse_y - prev_y;
+}
+
+void se_window_inject_scroll_delta(const se_window_handle window, const f32 x, const f32 y) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	window_ptr->scroll_dx = x;
+	window_ptr->scroll_dy = y;
+}
+
 f32 se_window_get_mouse_position_x(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
@@ -168,6 +255,110 @@ f32 se_window_get_mouse_position_y(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	return window_ptr ? (f32)window_ptr->mouse_y : 0.0f;
+}
+
+void se_window_get_size(const se_window_handle window, u32* out_width, u32* out_height) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	if (out_width) {
+		*out_width = window_ptr->width;
+	}
+	if (out_height) {
+		*out_height = window_ptr->height;
+	}
+}
+
+void se_window_get_framebuffer_size(const se_window_handle window, u32* out_width, u32* out_height) {
+	se_window_get_size(window, out_width, out_height);
+}
+
+void se_window_get_content_scale(const se_window_handle window, f32* out_xscale, f32* out_yscale) {
+	(void)window;
+	if (out_xscale) {
+		*out_xscale = 1.0f;
+	}
+	if (out_yscale) {
+		*out_yscale = 1.0f;
+	}
+}
+
+f32 se_window_get_aspect(const se_window_handle window) {
+	u32 width = 0;
+	u32 height = 0;
+	se_window_get_framebuffer_size(window, &width, &height);
+	if (height == 0) {
+		return 1.0f;
+	}
+	return (f32)width / (f32)height;
+}
+
+b8 se_window_pixel_to_normalized(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_normalized) {
+	if (!out_normalized) {
+		return false;
+	}
+	u32 width = 0;
+	u32 height = 0;
+	se_window_get_size(window, &width, &height);
+	if (width <= 1 || height <= 1) {
+		return false;
+	}
+	out_normalized->x = (x / (f32)width) * 2.0f - 1.0f;
+	out_normalized->y = 1.0f - (y / (f32)height) * 2.0f;
+	return true;
+}
+
+b8 se_window_normalized_to_pixel(const se_window_handle window, const f32 nx, const f32 ny, s_vec2* out_pixel) {
+	if (!out_pixel) {
+		return false;
+	}
+	u32 width = 0;
+	u32 height = 0;
+	se_window_get_size(window, &width, &height);
+	if (width <= 1 || height <= 1) {
+		return false;
+	}
+	out_pixel->x = (nx * 0.5f + 0.5f) * (f32)width;
+	out_pixel->y = (1.0f - (ny * 0.5f + 0.5f)) * (f32)height;
+	return true;
+}
+
+b8 se_window_window_to_framebuffer(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_framebuffer) {
+	if (!out_framebuffer) {
+		return false;
+	}
+	*out_framebuffer = s_vec2(x, y);
+	(void)window;
+	return true;
+}
+
+b8 se_window_framebuffer_to_window(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_window) {
+	if (!out_window) {
+		return false;
+	}
+	*out_window = s_vec2(x, y);
+	(void)window;
+	return true;
+}
+
+void se_window_get_diagnostics(const se_window_handle window, se_window_diagnostics* out_diagnostics) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || !out_diagnostics) {
+		return;
+	}
+	*out_diagnostics = window_ptr->diagnostics;
+}
+
+void se_window_reset_diagnostics(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	memset(&window_ptr->diagnostics, 0, sizeof(window_ptr->diagnostics));
 }
 
 void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position) {
@@ -340,9 +531,15 @@ void se_window_set_target_fps(const se_window_handle window, const u16 fps) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	if (fps == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return;
 	}
 	window_ptr->target_fps = fps;
+	se_set_last_error(SE_RESULT_OK);
 }
 
 i32 se_window_register_input_event(const se_window_handle window, const se_box_2d* box, const i32 depth, se_input_event_callback on_interact_callback, se_input_event_callback on_stop_interact_callback, void* callback_data) {
@@ -369,6 +566,25 @@ void se_window_register_resize_event(const se_window_handle window, se_resize_ev
 	(void)window;
 	(void)callback;
 	(void)data;
+}
+
+void se_window_set_text_callback(const se_window_handle window, se_window_text_callback callback, void* data) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr) {
+		return;
+	}
+	window_ptr->text_callback = callback;
+	window_ptr->text_callback_data = data;
+}
+
+void se_window_emit_text(const se_window_handle window, const c8* utf8_text) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || !utf8_text || !window_ptr->text_callback) {
+		return;
+	}
+	window_ptr->text_callback(window, utf8_text, window_ptr->text_callback_data);
 }
 
 void se_window_destroy(const se_window_handle window) {

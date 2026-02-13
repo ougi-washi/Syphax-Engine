@@ -25,9 +25,9 @@ i32 main(void) {
 		se_object_2d_add_instance(button, &instance_transform, &s_mat4_identity);
 	}
 
-	se_object_2d *button_ptr = s_array_get(&ctx->objects_2d, button);
-	if (button_ptr) {
-		se_shader_set_vec3(button_ptr->shader, "u_color", &s_vec3(0, 1, 0));
+	const se_shader_handle button_shader = se_object_2d_get_shader(button);
+	if (button_shader != S_HANDLE_NULL) {
+		se_shader_set_vec3(button_shader, "u_color", &s_vec3(0, 1, 0));
 	}
 	se_scene_2d_add_object(scene_2d, button);
 	se_scene_2d_set_auto_resize(scene_2d, window, &s_vec2(1., 1.));

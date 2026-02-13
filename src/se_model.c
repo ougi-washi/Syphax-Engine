@@ -675,6 +675,33 @@ void se_model_scale(const se_model_handle model, const s_vec3 *v) {
 	}
 }
 
+sz se_model_get_mesh_count(const se_model_handle model) {
+	se_context *ctx = se_current_context();
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	if (!model_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return 0;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return s_array_get_size(&model_ptr->meshes);
+}
+
+se_shader_handle se_model_get_mesh_shader(const se_model_handle model, const sz mesh_index) {
+	se_context *ctx = se_current_context();
+	se_model *model_ptr = se_model_from_handle(ctx, model);
+	if (!model_ptr || mesh_index >= s_array_get_size(&model_ptr->meshes)) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return S_HANDLE_NULL;
+	}
+	se_mesh *mesh = s_array_get(&model_ptr->meshes, s_array_handle(&model_ptr->meshes, (u32)mesh_index));
+	if (!mesh) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return S_HANDLE_NULL;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return mesh->shader;
+}
+
 
 void se_mesh_instance_create(se_mesh_instance *out_instance, const se_mesh *mesh, const u32 instance_count) {
 	s_assertf(out_instance, "se_mesh_instance_create :: out_instance is null");

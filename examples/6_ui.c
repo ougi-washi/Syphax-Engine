@@ -81,6 +81,17 @@ i32 main(void) {
 
 	ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
 	toolbar = se_ui_element_add_child(window, root, &ui_element_params);
+	se_ui_layout_rules toolbar_rules = {0};
+	toolbar_rules.anchor_min = s_vec2(0.0f, 0.88f);
+	toolbar_rules.anchor_max = s_vec2(1.0f, 1.0f);
+	toolbar_rules.margin = (se_ui_margin){0.0f, 0.0f, 0.0f, 0.0f};
+	toolbar_rules.min_size = s_vec2(0.0f, 0.0f);
+	toolbar_rules.max_size = s_vec2(0.0f, 0.0f);
+	toolbar_rules.align_x = SE_UI_ALIGN_CENTER;
+	toolbar_rules.align_y = SE_UI_ALIGN_CENTER;
+	toolbar_rules.stretch_x = true;
+	toolbar_rules.stretch_y = true;
+	se_ui_element_set_layout_rules(toolbar, &toolbar_rules);
 	
 	button_minimize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
 	button_maximize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
@@ -103,6 +114,17 @@ i32 main(void) {
 
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
 	content = se_ui_element_add_child(window, root, &ui_element_params);
+	se_ui_layout_rules content_rules = {0};
+	content_rules.anchor_min = s_vec2(0.0f, 0.0f);
+	content_rules.anchor_max = s_vec2(1.0f, 0.88f);
+	content_rules.margin = (se_ui_margin){0.0f, 0.0f, 0.0f, 0.0f};
+	content_rules.min_size = s_vec2(0.0f, 0.0f);
+	content_rules.max_size = s_vec2(0.0f, 0.0f);
+	content_rules.align_x = SE_UI_ALIGN_CENTER;
+	content_rules.align_y = SE_UI_ALIGN_CENTER;
+	content_rules.stretch_x = true;
+	content_rules.stretch_y = true;
+	se_ui_element_set_layout_rules(content, &content_rules);
 	item_1 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
 	item_2 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
 	item_3 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));

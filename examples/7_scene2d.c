@@ -43,13 +43,13 @@ i32 main(void) {
 	se_object_2d_set_position(button_no, &s_vec2(-0.15, 0.));
 	se_object_2d_set_scale(button_no, &s_vec2(0.1, 0.1));
 
-	se_object_2d *button_yes_ptr = s_array_get(&ctx->objects_2d, button_yes);
-	se_object_2d *button_no_ptr = s_array_get(&ctx->objects_2d, button_no);
-	if (button_yes_ptr) {
-		se_shader_set_vec3(button_yes_ptr->shader, "u_color", &s_vec3(0, 1, 0));
+	const se_shader_handle button_yes_shader = se_object_2d_get_shader(button_yes);
+	const se_shader_handle button_no_shader = se_object_2d_get_shader(button_no);
+	if (button_yes_shader != S_HANDLE_NULL) {
+		se_shader_set_vec3(button_yes_shader, "u_color", &s_vec3(0, 1, 0));
 	}
-	if (button_no_ptr) {
-		se_shader_set_vec3(button_no_ptr->shader, "u_color", &s_vec3(1, 0, 0));
+	if (button_no_shader != S_HANDLE_NULL) {
+		se_shader_set_vec3(button_no_shader, "u_color", &s_vec3(1, 0, 0));
 	}
 
 	se_box_2d button_box_yes = {0};

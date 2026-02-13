@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_text.h"
+#include "se_debug.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
 
@@ -146,6 +147,7 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 }
 
 void se_text_render(se_text_handle* text_handle, const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset) {
+	se_debug_trace_begin("text_render");
 	s_assertf(text_handle, "se_text_render :: text_handle is null");
 	se_context* ctx = text_handle->ctx;
 	s_assertf(ctx, "se_text_render :: ctx is null");
@@ -210,4 +212,5 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 	text_handle->quad.instance_buffers_dirty = true;
 	se_quad_render(&text_handle->quad, glyph_count);
 	se_render_set_blending(false);
+	se_debug_trace_end("text_render");
 }

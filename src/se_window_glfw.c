@@ -3,6 +3,7 @@
 #if defined(SE_WINDOW_BACKEND_GLFW)
 
 #include "se_window.h"
+#include "se_debug.h"
 #include "render/se_gl.h"
 #include <unistd.h>
 #include <limits.h>
@@ -68,7 +69,42 @@ static se_key se_window_map_glfw_key(const i32 key) {
 	return SE_KEY_UNKNOWN;
 }
 
+static sz se_window_utf8_encode(const u32 codepoint, c8 out_utf8[5]) {
+	if (!out_utf8) {
+		return 0;
+	}
+	if (codepoint <= 0x7FU) {
+		out_utf8[0] = (c8)codepoint;
+		out_utf8[1] = '\0';
+		return 1;
+	}
+	if (codepoint <= 0x7FFU) {
+		out_utf8[0] = (c8)(0xC0U | ((codepoint >> 6) & 0x1FU));
+		out_utf8[1] = (c8)(0x80U | (codepoint & 0x3FU));
+		out_utf8[2] = '\0';
+		return 2;
+	}
+	if (codepoint <= 0xFFFFU) {
+		out_utf8[0] = (c8)(0xE0U | ((codepoint >> 12) & 0x0FU));
+		out_utf8[1] = (c8)(0x80U | ((codepoint >> 6) & 0x3FU));
+		out_utf8[2] = (c8)(0x80U | (codepoint & 0x3FU));
+		out_utf8[3] = '\0';
+		return 3;
+	}
+	if (codepoint <= 0x10FFFFU) {
+		out_utf8[0] = (c8)(0xF0U | ((codepoint >> 18) & 0x07U));
+		out_utf8[1] = (c8)(0x80U | ((codepoint >> 12) & 0x3FU));
+		out_utf8[2] = (c8)(0x80U | ((codepoint >> 6) & 0x3FU));
+		out_utf8[3] = (c8)(0x80U | (codepoint & 0x3FU));
+		out_utf8[4] = '\0';
+		return 4;
+	}
+	return 0;
+}
+
 static void key_callback(GLFWwindow* glfw_handle, i32 key, i32 scancode, i32 action, i32 mods) {
+	(void)scancode;
+	(void)mods;
 	se_window* window = se_window_from_glfw(glfw_handle);
 	se_key mapped = se_window_map_glfw_key(key);
 	if (mapped != SE_KEY_UNKNOWN) {
@@ -77,6 +113,7 @@ static void key_callback(GLFWwindow* glfw_handle, i32 key, i32 scancode, i32 act
 		} else if (action == GLFW_RELEASE) {
 			window->keys[mapped] = false;
 		}
+		window->diagnostics.key_events++;
 	}
 }
 
@@ -86,9 +123,11 @@ static void mouse_callback(GLFWwindow* glfw_handle, double xpos, double ypos) {
 	window->mouse_dy = ypos - window->mouse_y;
 	window->mouse_x = xpos;
 	window->mouse_y = ypos;
+	window->diagnostics.mouse_move_events++;
 }
 
 static void mouse_button_callback(GLFWwindow* glfw_handle, i32 button, i32 action, i32 mods) {
+	(void)mods;
 	se_window* window = se_window_from_glfw(glfw_handle);
 	if (button >= 0 && button < SE_MOUSE_BUTTON_COUNT) {
 		if (action == GLFW_PRESS) {
@@ -96,6 +135,7 @@ static void mouse_button_callback(GLFWwindow* glfw_handle, i32 button, i32 actio
 		} else if (action == GLFW_RELEASE) {
 			window->mouse_buttons[button] = false;
 		}
+		window->diagnostics.mouse_button_events++;
 	}
 }
 
@@ -103,6 +143,23 @@ static void scroll_callback(GLFWwindow* glfw_handle, double xoffset, double yoff
 	se_window* window = se_window_from_glfw(glfw_handle);
 	window->scroll_dx += xoffset;
 	window->scroll_dy += yoffset;
+	window->diagnostics.scroll_events++;
+}
+
+static void char_callback(GLFWwindow* glfw_handle, unsigned int codepoint) {
+	se_window_user_ptr* user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer(glfw_handle);
+	if (!user_ptr || !user_ptr->ctx || user_ptr->window == S_HANDLE_NULL) {
+		return;
+	}
+	se_window* window = s_array_get(&user_ptr->ctx->windows, user_ptr->window);
+	if (!window || !window->text_callback) {
+		return;
+	}
+	c8 utf8[5] = {0};
+	if (se_window_utf8_encode((u32)codepoint, utf8) == 0) {
+		return;
+	}
+	window->text_callback(user_ptr->window, utf8, window->text_callback_data);
 }
 
 static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 height) {
@@ -113,6 +170,7 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
 	se_window* window = s_array_get(&user_ptr->ctx->windows, user_ptr->window);
 	window->width = width;
 	window->height = height;
+	se_debug_log(SE_DEBUG_LEVEL_DEBUG, SE_DEBUG_CATEGORY_WINDOW, "Framebuffer resized: %d x %d", width, height);
 	glViewport(0, 0, width, height);
 	printf("frambuffer_size_change_fallback\n");
 	for (sz i = 0; i < s_array_get_size(&window->resize_handles); ++i) {
@@ -174,6 +232,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	new_window->cursor_mode = SE_WINDOW_CURSOR_NORMAL;
 	new_window->raw_mouse_motion_supported = glfwRawMouseMotionSupported();
 	new_window->raw_mouse_motion_enabled = false;
+	new_window->vsync_enabled = false;
 	new_window->should_close = false;
 	
 	se_window_set_current_context(window_handle);
@@ -190,13 +249,14 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	user_ptr->ctx = context;
 	user_ptr->window = window_handle;
 	glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, user_ptr);
-	glfwSwapInterval(0); 
+	glfwSwapInterval(0);
 	
 	// Set callbacks
 	glfwSetKeyCallback((GLFWwindow*)new_window->handle, key_callback);
 	glfwSetCursorPosCallback((GLFWwindow*)new_window->handle, mouse_callback);
 	glfwSetMouseButtonCallback((GLFWwindow*)new_window->handle, mouse_button_callback);
 	glfwSetScrollCallback((GLFWwindow*)new_window->handle, scroll_callback);
+	glfwSetCharCallback((GLFWwindow*)new_window->handle, char_callback);
 	glfwSetFramebufferSizeCallback((GLFWwindow*)new_window->handle, framebuffer_size_callback);
 	
 	se_render_init();
@@ -246,6 +306,8 @@ void se_window_attach_render(const se_window_handle window) {
 }
 
 extern void se_window_update(const se_window_handle window) {
+	se_debug_frame_begin();
+	se_debug_trace_begin("window_update");
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	se_window_check_exit_keys(window);
@@ -260,11 +322,14 @@ extern void se_window_update(const se_window_handle window) {
 	window_ptr->time.delta = window_ptr->time.current - window_ptr->time.last_frame;
 	window_ptr->time.frame_start = window_ptr->time.current;
 	window_ptr->frame_count++;
+	se_debug_trace_end("window_update");
 }
 
 void se_window_tick(const se_window_handle window) {
 	se_window_update(window);
+	se_debug_trace_begin("input_tick");
 	se_window_poll_events();
+	se_debug_trace_end("input_tick");
 }
 
 void se_window_set_current_context(const se_window_handle window) {
@@ -283,23 +348,61 @@ void se_window_render_quad(const se_window_handle window) {
 }
 
 void se_window_render_screen(const se_window_handle window) {
+	se_debug_trace_begin("window_present");
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	f64 target_frame_time = 1.0 / window_ptr->target_fps;
-	f64 now = glfwGetTime();
-	f64 elapsed = now - window_ptr->time.frame_start;
-	f64 time_left = target_frame_time - elapsed;
-
-	if (time_left > 0) {
-		usleep((time_left) * 1000000);
+	const f64 present_begin = glfwGetTime();
+	window_ptr->diagnostics.last_sleep_duration = 0.0;
+	if (!window_ptr->vsync_enabled && window_ptr->target_fps > 0) {
+		const f64 target_frame_time = 1.0 / window_ptr->target_fps;
+		const f64 now = glfwGetTime();
+		const f64 elapsed = now - window_ptr->time.frame_start;
+		f64 time_left = target_frame_time - elapsed;
+		if (time_left > 0.0) {
+			/*
+			 * Coarse sleep first, then spin for the final sub-millisecond window.
+			 * This avoids repeatedly sleeping in 1ms chunks, which caused
+			 * significant oversleep and unstable high-FPS pacing.
+			 */
+			const f64 coarse_guard = 0.001;
+			if (time_left > coarse_guard) {
+				const f64 coarse_sleep = time_left - coarse_guard;
+				usleep((useconds_t)(coarse_sleep * 1000000.0));
+				window_ptr->diagnostics.last_sleep_duration += coarse_sleep;
+			}
+			const f64 wait_end = window_ptr->time.frame_start + target_frame_time;
+			while (glfwGetTime() < wait_end) {
+				/* busy wait for precise frame boundary */
+			}
+			const f64 after_wait = glfwGetTime();
+			const f64 slept = after_wait - now;
+			if (slept > window_ptr->diagnostics.last_sleep_duration) {
+				window_ptr->diagnostics.last_sleep_duration = slept;
+			}
+		}
 	}
-
-	f64 wait_end = window_ptr->time.frame_start + target_frame_time;
-	while (glfwGetTime() < wait_end) {
-		usleep(1000);
-	}
-
+	se_debug_render_overlay(window, NULL);
 	glfwSwapBuffers((GLFWwindow*)window_ptr->handle);
+	window_ptr->diagnostics.frames_presented++;
+	window_ptr->diagnostics.last_present_duration = glfwGetTime() - present_begin;
+	se_debug_trace_end("window_present");
+	se_debug_frame_end();
+}
+
+void se_window_set_vsync(const se_window_handle window, const b8 enabled) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_set_vsync :: window is null");
+	se_window_set_current_context(window);
+	glfwSwapInterval(enabled ? 1 : 0);
+	window_ptr->vsync_enabled = enabled;
+}
+
+b8 se_window_is_vsync_enabled(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_is_vsync_enabled :: window is null");
+	return window_ptr->vsync_enabled;
 }
 
 void se_window_present(const se_window_handle window) {
@@ -421,6 +524,58 @@ b8 se_window_is_mouse_released(const se_window_handle window, se_mouse_button bu
 	return !window_ptr->mouse_buttons[button] && window_ptr->mouse_buttons_prev[button];
 }
 
+void se_window_clear_input_state(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_clear_input_state :: window is null");
+	memset(window_ptr->keys, 0, sizeof(window_ptr->keys));
+	memset(window_ptr->mouse_buttons, 0, sizeof(window_ptr->mouse_buttons));
+	window_ptr->mouse_dx = 0.0;
+	window_ptr->mouse_dy = 0.0;
+	window_ptr->scroll_dx = 0.0;
+	window_ptr->scroll_dy = 0.0;
+}
+
+void se_window_inject_key_state(const se_window_handle window, const se_key key, const b8 down) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_inject_key_state :: window is null");
+	if (key < 0 || key >= SE_KEY_COUNT) {
+		return;
+	}
+	window_ptr->keys[key] = down;
+}
+
+void se_window_inject_mouse_button_state(const se_window_handle window, const se_mouse_button button, const b8 down) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_inject_mouse_button_state :: window is null");
+	if (button < 0 || button >= SE_MOUSE_BUTTON_COUNT) {
+		return;
+	}
+	window_ptr->mouse_buttons[button] = down;
+}
+
+void se_window_inject_mouse_position(const se_window_handle window, const f32 x, const f32 y) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_inject_mouse_position :: window is null");
+	const f64 prev_x = window_ptr->mouse_x;
+	const f64 prev_y = window_ptr->mouse_y;
+	window_ptr->mouse_x = x;
+	window_ptr->mouse_y = y;
+	window_ptr->mouse_dx = window_ptr->mouse_x - prev_x;
+	window_ptr->mouse_dy = window_ptr->mouse_y - prev_y;
+}
+
+void se_window_inject_scroll_delta(const se_window_handle window, const f32 x, const f32 y) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_inject_scroll_delta :: window is null");
+	window_ptr->scroll_dx = x;
+	window_ptr->scroll_dy = y;
+}
+
 f32 se_window_get_mouse_position_x(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
@@ -433,6 +588,165 @@ f32 se_window_get_mouse_position_y(const se_window_handle window) {
 	se_window* window_ptr = se_window_from_handle(context, window);
 	s_assertf(window_ptr, "se_window_get_mouse_position_y :: window is null");
 	return (f32)window_ptr->mouse_y;
+}
+
+void se_window_get_size(const se_window_handle window, u32* out_width, u32* out_height) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_get_size :: window is null");
+	if (!out_width && !out_height) {
+		return;
+	}
+
+	i32 width = (i32)window_ptr->width;
+	i32 height = (i32)window_ptr->height;
+	if (window_ptr->handle) {
+		glfwGetWindowSize((GLFWwindow*)window_ptr->handle, &width, &height);
+	}
+
+	if (out_width) {
+		*out_width = (u32)s_max(width, 0);
+	}
+	if (out_height) {
+		*out_height = (u32)s_max(height, 0);
+	}
+}
+
+void se_window_get_framebuffer_size(const se_window_handle window, u32* out_width, u32* out_height) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_get_framebuffer_size :: window is null");
+	if (!out_width && !out_height) {
+		return;
+	}
+
+	i32 width = (i32)window_ptr->width;
+	i32 height = (i32)window_ptr->height;
+	if (window_ptr->handle) {
+		glfwGetFramebufferSize((GLFWwindow*)window_ptr->handle, &width, &height);
+	}
+
+	if (out_width) {
+		*out_width = (u32)s_max(width, 0);
+	}
+	if (out_height) {
+		*out_height = (u32)s_max(height, 0);
+	}
+}
+
+void se_window_get_content_scale(const se_window_handle window, f32* out_xscale, f32* out_yscale) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_get_content_scale :: window is null");
+	if (!out_xscale && !out_yscale) {
+		return;
+	}
+
+	f32 xscale = 1.0f;
+	f32 yscale = 1.0f;
+	if (window_ptr->handle) {
+		glfwGetWindowContentScale((GLFWwindow*)window_ptr->handle, &xscale, &yscale);
+	}
+
+	if (out_xscale) {
+		*out_xscale = xscale;
+	}
+	if (out_yscale) {
+		*out_yscale = yscale;
+	}
+}
+
+f32 se_window_get_aspect(const se_window_handle window) {
+	u32 width = 0;
+	u32 height = 0;
+	se_window_get_framebuffer_size(window, &width, &height);
+	if (height == 0) {
+		return 1.0f;
+	}
+	return (f32)width / (f32)height;
+}
+
+b8 se_window_pixel_to_normalized(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_normalized) {
+	if (!out_normalized) {
+		return false;
+	}
+	u32 width = 0;
+	u32 height = 0;
+	se_window_get_size(window, &width, &height);
+	if (width <= 1 || height <= 1) {
+		return false;
+	}
+	out_normalized->x = (x / (f32)width) * 2.0f - 1.0f;
+	out_normalized->y = 1.0f - (y / (f32)height) * 2.0f;
+	return true;
+}
+
+b8 se_window_normalized_to_pixel(const se_window_handle window, const f32 nx, const f32 ny, s_vec2* out_pixel) {
+	if (!out_pixel) {
+		return false;
+	}
+	u32 width = 0;
+	u32 height = 0;
+	se_window_get_size(window, &width, &height);
+	if (width <= 1 || height <= 1) {
+		return false;
+	}
+	out_pixel->x = (nx * 0.5f + 0.5f) * (f32)width;
+	out_pixel->y = (1.0f - (ny * 0.5f + 0.5f)) * (f32)height;
+	return true;
+}
+
+b8 se_window_window_to_framebuffer(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_framebuffer) {
+	if (!out_framebuffer) {
+		return false;
+	}
+	u32 window_w = 0;
+	u32 window_h = 0;
+	u32 fb_w = 0;
+	u32 fb_h = 0;
+	se_window_get_size(window, &window_w, &window_h);
+	se_window_get_framebuffer_size(window, &fb_w, &fb_h);
+	if (window_w <= 1 || window_h <= 1 || fb_w <= 1 || fb_h <= 1) {
+		return false;
+	}
+	out_framebuffer->x = x * ((f32)fb_w / (f32)window_w);
+	out_framebuffer->y = y * ((f32)fb_h / (f32)window_h);
+	return true;
+}
+
+b8 se_window_framebuffer_to_window(const se_window_handle window, const f32 x, const f32 y, s_vec2* out_window) {
+	if (!out_window) {
+		return false;
+	}
+	u32 window_w = 0;
+	u32 window_h = 0;
+	u32 fb_w = 0;
+	u32 fb_h = 0;
+	se_window_get_size(window, &window_w, &window_h);
+	se_window_get_framebuffer_size(window, &fb_w, &fb_h);
+	if (window_w <= 1 || window_h <= 1 || fb_w <= 1 || fb_h <= 1) {
+		return false;
+	}
+	out_window->x = x * ((f32)window_w / (f32)fb_w);
+	out_window->y = y * ((f32)window_h / (f32)fb_h);
+	return true;
+}
+
+void se_window_get_diagnostics(const se_window_handle window, se_window_diagnostics* out_diagnostics) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_get_diagnostics :: window is null");
+	if (!out_diagnostics) {
+		return;
+	}
+	*out_diagnostics = window_ptr->diagnostics;
+}
+
+void se_window_reset_diagnostics(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_reset_diagnostics :: window is null");
+	memset(&window_ptr->diagnostics, 0, sizeof(window_ptr->diagnostics));
 }
 
 void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position) {
@@ -596,7 +910,14 @@ f64 se_window_get_time(const se_window_handle window) {
 void se_window_set_target_fps(const se_window_handle window, const u16 fps) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_set_target_fps :: window is null");
+	if (fps == 0) {
+		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_WINDOW, "Ignored target_fps=0");
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
 	window_ptr->target_fps = fps;
+	se_set_last_error(SE_RESULT_OK);
 }
 
 // TODO: move somewhere else and optimize it if it used a lot
@@ -675,6 +996,24 @@ void se_window_register_resize_event(const se_window_handle window, se_resize_ev
 	se_resize_handle* new_event = s_array_get(&window_ptr->resize_handles, handle);
 	new_event->callback = callback;
 	new_event->data = data;
+}
+
+void se_window_set_text_callback(const se_window_handle window, se_window_text_callback callback, void* data) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_set_text_callback :: window is null");
+	window_ptr->text_callback = callback;
+	window_ptr->text_callback_data = data;
+}
+
+void se_window_emit_text(const se_window_handle window, const c8* utf8_text) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr, "se_window_emit_text :: window is null");
+	if (!utf8_text || !window_ptr->text_callback) {
+		return;
+	}
+	window_ptr->text_callback(window, utf8_text, window_ptr->text_callback_data);
 }
 
 void se_window_destroy(const se_window_handle window) {

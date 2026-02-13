@@ -3,6 +3,7 @@
 #include "se.h"
 
 #include "se_camera.h"
+#include "se_debug.h"
 #include "se_framebuffer.h"
 #include "se_model.h"
 #include "se_render_buffer.h"
@@ -78,6 +79,39 @@ static void se_context_destroy_ui_storage(se_context *context) {
 	s_array_clear(&context->ui_texts);
 }
 
+static void se_context_log_leaks(se_context *context) {
+	if (!context) {
+		return;
+	}
+	if (s_array_get_size(&context->windows) > 0) {
+		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_CORE, "Context teardown with %zu window(s) still alive", s_array_get_size(&context->windows));
+	}
+	if (s_array_get_size(&context->scenes_2d) > 0 || s_array_get_size(&context->scenes_3d) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+			"Context teardown with scenes alive (2d=%zu, 3d=%zu)",
+			s_array_get_size(&context->scenes_2d),
+			s_array_get_size(&context->scenes_3d));
+	}
+	if (s_array_get_size(&context->objects_2d) > 0 || s_array_get_size(&context->objects_3d) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+			"Context teardown with objects alive (2d=%zu, 3d=%zu)",
+			s_array_get_size(&context->objects_2d),
+			s_array_get_size(&context->objects_3d));
+	}
+	if (s_array_get_size(&context->textures) > 0 || s_array_get_size(&context->shaders) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+			"Context teardown with GPU resources alive (textures=%zu, shaders=%zu)",
+			s_array_get_size(&context->textures),
+			s_array_get_size(&context->shaders));
+	}
+}
+
 se_context *se_context_create(void) {
 	se_context *context = malloc(sizeof(se_context));
 	if (context == NULL) {
@@ -118,6 +152,7 @@ se_context *se_context_create(void) {
 void se_context_destroy(se_context *context) {
 	s_assertf(context, "se_context_destroy :: context is null");
 	se_context *prev_ctx = se_push_tls_context(context);
+	se_context_log_leaks(context);
 
 	se_context_destroy_ui_storage(context);
 	if (context->ui_text_handle) {

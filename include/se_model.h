@@ -58,6 +58,8 @@ extern void se_model_render(const se_model_handle model, const se_camera_handle 
 extern void se_model_translate(const se_model_handle model, const s_vec3 *v);
 extern void se_model_rotate(const se_model_handle model, const s_vec3 *v);
 extern void se_model_scale(const se_model_handle model, const s_vec3 *v);
+extern sz se_model_get_mesh_count(const se_model_handle model);
+extern se_shader_handle se_model_get_mesh_shader(const se_model_handle model, const sz mesh_index);
 extern b8 se_mesh_has_cpu_data(const se_mesh *mesh);
 extern b8 se_mesh_has_gpu_data(const se_mesh *mesh);
 extern void se_mesh_discard_cpu_data(se_mesh *mesh);

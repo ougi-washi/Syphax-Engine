@@ -20,10 +20,36 @@ typedef i32 se_instance_id;
 typedef s_array(se_instance_id, se_instance_ids);
 typedef s_array(s_mat4, se_transforms);
 typedef s_array(s_mat4, se_buffers);
+typedef s_array(b8, se_instance_actives);
+
+typedef b8 (*se_scene_pick_filter_2d)(se_object_2d_handle object, void* user_data);
+typedef b8 (*se_scene_pick_filter_3d)(se_object_3d_handle object, void* user_data);
+
+typedef enum {
+	SE_SCENE_DEBUG_MARKER_LINE = 0,
+	SE_SCENE_DEBUG_MARKER_BOX,
+	SE_SCENE_DEBUG_MARKER_SPHERE,
+	SE_SCENE_DEBUG_MARKER_TEXT
+} se_scene_debug_marker_type;
+
+typedef struct {
+	se_scene_debug_marker_type type;
+	s_vec3 a;
+	s_vec3 b;
+	s_vec4 color;
+	f32 radius;
+	c8 text[64];
+} se_scene_debug_marker;
+typedef s_array(se_scene_debug_marker, se_scene_debug_markers);
+
 typedef struct {
 	se_instance_ids ids;
 	se_transforms transforms;
 	se_buffers buffers;
+	se_instance_actives actives;
+	se_instance_ids free_indices;
+	se_buffers metadata;
+	se_instance_id next_id;
 } se_instances;
 
 typedef s_array(s_mat3, se_transforms_2d);
@@ -31,6 +57,10 @@ typedef struct {
 	se_instance_ids ids;
 	se_transforms_2d transforms;
 	se_buffers buffers;
+	se_instance_actives actives;
+	se_instance_ids free_indices;
+	se_buffers metadata;
+	se_instance_id next_id;
 } se_instances_2d;
 
 typedef void (*se_object_custom_callback)(void *data);
@@ -51,6 +81,7 @@ typedef struct se_object_2d {
 			se_shader_handle shader;
 			se_instances_2d instances;
 			se_transforms_2d render_transforms;
+			se_buffers render_buffers;
 		};
 		se_object_custom custom;
 	};
@@ -90,7 +121,10 @@ typedef struct se_scene_3d {
 	se_render_buffers_ptr post_process;
 	se_shader_handle output_shader;
 	se_framebuffer_handle output;
+	se_scene_debug_markers debug_markers;
+	s_mat4 last_vp;
 	b8 enable_culling : 1;
+	b8 has_last_vp : 1;
 } se_scene_3d;
 
 typedef s_array(se_scene_3d, se_scenes_3d);
@@ -113,11 +147,19 @@ extern void se_object_2d_set_shader(const se_object_2d_handle object, const se_s
 extern se_shader_handle se_object_2d_get_shader(const se_object_2d_handle object);
 extern void se_object_2d_update_uniforms(const se_object_2d_handle object);
 extern se_instance_id se_object_2d_add_instance(const se_object_2d_handle object, const s_mat3 *transform, const s_mat4 *buffer);
+extern b8 se_object_2d_remove_instance(const se_object_2d_handle object, const se_instance_id instance_id);
 extern i32 se_object_2d_get_instance_index(const se_object_2d_handle object, const se_instance_id instance_id);
 extern void se_object_2d_set_instance_transform(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat3 *transform);
 extern void se_object_2d_set_instance_buffer(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4 *buffer);
 extern void se_object_2d_set_instances_transforms(const se_object_2d_handle object, const se_transforms_2d *transforms);
 extern void se_object_2d_set_instances_buffers(const se_object_2d_handle object, const se_buffers *buffers);
+extern void se_object_2d_set_instances_transforms_bulk(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat3* transforms, const sz count);
+extern void se_object_2d_set_instances_buffers_bulk(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count);
+extern b8 se_object_2d_set_instance_active(const se_object_2d_handle object, const se_instance_id instance_id, const b8 active);
+extern b8 se_object_2d_is_instance_active(const se_object_2d_handle object, const se_instance_id instance_id);
+extern sz se_object_2d_get_inactive_slot_count(const se_object_2d_handle object);
+extern b8 se_object_2d_set_instance_metadata(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4* metadata);
+extern b8 se_object_2d_get_instance_metadata(const se_object_2d_handle object, const se_instance_id instance_id, s_mat4* out_metadata);
 extern void se_object_2d_set_instances_dirty(const se_object_2d_handle object, const b8 dirty);
 extern b8 se_object_2d_are_instances_dirty(const se_object_2d_handle object);
 extern sz se_object_2d_get_instance_count(const se_object_2d_handle object);
@@ -134,6 +176,7 @@ extern void se_scene_2d_render_to_screen(const se_scene_2d_handle scene, const s
 extern void se_scene_2d_draw(const se_scene_2d_handle scene, const se_window_handle window);
 extern void se_scene_2d_add_object(const se_scene_2d_handle scene, const se_object_2d_handle object);
 extern void se_scene_2d_remove_object(const se_scene_2d_handle scene, const se_object_2d_handle object);
+extern b8 se_scene_2d_pick_object(const se_scene_2d_handle scene, const s_vec2* point_ndc, se_scene_pick_filter_2d filter, void* user_data, se_object_2d_handle* out_object);
 
 // 3D scene functions
 extern se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 object_count);
@@ -146,11 +189,18 @@ extern void se_scene_3d_draw(const se_scene_3d_handle scene, const se_window_han
 extern void se_scene_3d_add_object(const se_scene_3d_handle scene, const se_object_3d_handle object);
 extern se_object_3d_handle se_scene_3d_add_model(const se_scene_3d_handle scene, const se_model_handle model, const s_mat4 *transform);
 extern void se_scene_3d_remove_object(const se_scene_3d_handle scene, const se_object_3d_handle object);
+extern b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_object_3d_handle* out_object, f32* out_distance);
 extern void se_scene_3d_set_camera(const se_scene_3d_handle scene, const se_camera_handle camera);
 extern se_camera_handle se_scene_3d_get_camera(const se_scene_3d_handle scene);
 extern void se_scene_3d_set_culling(const se_scene_3d_handle scene, const b8 enabled);
 extern void se_scene_3d_add_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);
 extern void se_scene_3d_remove_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);
+extern void se_scene_3d_debug_line(const se_scene_3d_handle scene, const s_vec3* start, const s_vec3* end, const s_vec4* color);
+extern void se_scene_3d_debug_box(const se_scene_3d_handle scene, const s_vec3* min_corner, const s_vec3* max_corner, const s_vec4* color);
+extern void se_scene_3d_debug_sphere(const se_scene_3d_handle scene, const s_vec3* center, const f32 radius, const s_vec4* color);
+extern void se_scene_3d_debug_text(const se_scene_3d_handle scene, const s_vec3* position, const c8* text, const s_vec4* color);
+extern b8 se_scene_3d_get_debug_markers(const se_scene_3d_handle scene, const se_scene_debug_marker** out_markers, sz* out_count);
+extern void se_scene_3d_clear_debug_markers(const se_scene_3d_handle scene);
 
 // 3D objects functions
 extern se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat4 *transform, const sz max_instances_count);
@@ -158,9 +208,17 @@ extern void se_object_3d_destroy(const se_object_3d_handle object);
 extern void se_object_3d_set_transform(const se_object_3d_handle object, const s_mat4 *transform);
 extern s_mat4 se_object_3d_get_transform(const se_object_3d_handle object);
 extern se_instance_id se_object_3d_add_instance(const se_object_3d_handle object, const s_mat4 *transform, const s_mat4 *buffer);
+extern b8 se_object_3d_remove_instance(const se_object_3d_handle object, const se_instance_id instance_id);
 extern i32 se_object_3d_get_instance_index(const se_object_3d_handle object, const se_instance_id instance_id);
 extern void se_object_3d_set_instance_transform(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *transform);
 extern void se_object_3d_set_instance_buffer(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *buffer);
+extern void se_object_3d_set_instances_transforms_bulk(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* transforms, const sz count);
+extern void se_object_3d_set_instances_buffers_bulk(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count);
+extern b8 se_object_3d_set_instance_active(const se_object_3d_handle object, const se_instance_id instance_id, const b8 active);
+extern b8 se_object_3d_is_instance_active(const se_object_3d_handle object, const se_instance_id instance_id);
+extern sz se_object_3d_get_inactive_slot_count(const se_object_3d_handle object);
+extern b8 se_object_3d_set_instance_metadata(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4* metadata);
+extern b8 se_object_3d_get_instance_metadata(const se_object_3d_handle object, const se_instance_id instance_id, s_mat4* out_metadata);
 extern void se_object_3d_set_instances_dirty(const se_object_3d_handle object, const b8 dirty);
 extern b8 se_object_3d_are_instances_dirty(const se_object_3d_handle object);
 extern sz se_object_3d_get_instance_count(const se_object_3d_handle object);
