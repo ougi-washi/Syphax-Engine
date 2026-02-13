@@ -97,8 +97,8 @@ typedef struct {
 } se_ui_element_params;
 
 typedef struct se_ui_text {
-	c8 characters[SE_TEXT_CHAR_COUNT];
-	c8 font_path[SE_MAX_PATH_LENGTH];
+	s_array(c8, characters);
+	s_array(c8, font_path);
 	f32 font_size; 
 } se_ui_text;
 typedef s_array(se_ui_text, se_ui_texts);

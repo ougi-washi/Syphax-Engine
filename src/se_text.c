@@ -8,6 +8,29 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+static const c8* se_font_get_path_cstr(const se_font* font) {
+	if (!font || font->path.b.size == 0 || font->path.b.data == NULL) {
+		return "";
+	}
+	return (const c8*)font->path.b.data;
+}
+
+static b8 se_font_set_path(se_font* font, const c8* path) {
+	if (!font || !path || path[0] == '\0') {
+		return false;
+	}
+	const sz path_size = strlen(path) + 1;
+	s_array_clear(&font->path);
+	s_array_init(&font->path);
+	s_array_reserve(&font->path, path_size);
+	for (sz i = 0; i < path_size; ++i) {
+		s_handle path_char_handle = s_array_increment(&font->path);
+		c8* dst = s_array_get(&font->path, path_char_handle);
+		*dst = path[i];
+	}
+	return true;
+}
+
 se_text_handle* se_text_handle_create(const u32 fonts_count) {
 	se_context *ctx = se_current_context();
 	if (!ctx) {
@@ -62,7 +85,7 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	// Check if font is already loaded
 	for (sz i = 0; i < s_array_get_size(&ctx->fonts); ++i) {
 		se_font* curr_font = s_array_get(&ctx->fonts, s_array_handle(&ctx->fonts, (u32)i));
-		if (strcmp(curr_font->path, path) == 0 && curr_font->size == size) {
+		if (strcmp(se_font_get_path_cstr(curr_font), path) == 0 && curr_font->size == size) {
 			se_set_last_error(SE_RESULT_OK);
 			return s_array_handle(&ctx->fonts, (u32)i);
 		}
@@ -71,18 +94,25 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	se_font_handle font_handle = s_array_increment(&ctx->fonts);
 	se_font* new_font = s_array_get(&ctx->fonts, font_handle);
 	memset(new_font, 0, sizeof(*new_font));
-	 
-	strcpy(new_font->path, path);
+	s_array_init(&new_font->path);
+	if (!se_font_set_path(new_font, path)) {
+		s_array_clear(&new_font->path);
+		s_array_remove(&ctx->fonts, font_handle);
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
 
 	c8 new_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!se_paths_resolve_resource_path(new_path, SE_MAX_PATH_LENGTH, path)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		s_array_clear(&new_font->path);
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
 	u8* font_file_data = NULL;
 	if (!s_file_read_binary(new_path, &font_file_data, NULL)) {
 		se_set_last_error(SE_RESULT_IO);
+		s_array_clear(&new_font->path);
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
@@ -93,6 +123,7 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	if (font_count == 0) {
 		free(font_file_data);
 		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		s_array_clear(&new_font->path);
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
@@ -156,6 +187,8 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 	s_assertf(text, "se_text_render :: text is null");
 	
 	sz text_size = strlen(text);
+	const i32 first_character = (i32)font_ptr->first_character;
+	const i32 last_character_exclusive = first_character + (i32)font_ptr->characters_count;
 	
 	// Bind texture once
 	glActiveTexture(GL_TEXTURE0);
@@ -168,17 +201,21 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
     text_scale.x *= pixel_scale;
     text_scale.y *= pixel_scale;
 	i32 glyph_count = 0;
-	for (i32 i = 0; i < text_size; i++) {
-		c8 c = text[i];
+	for (sz i = 0; i < text_size; ++i) {
+		const c8 raw_c = text[i];
+		const i32 c = (u8)raw_c;
 		
-		if (c == '\n') {
+		if (raw_c == '\n') {
 			local_position.y -= new_line_offset * size->y;
 			local_position.x = position->x;
 			continue;
 		}
 		
-		if (c >= font_ptr->first_character && c <= font_ptr->first_character + font_ptr->characters_count) {
-			u32 char_index = (u32)(c - font_ptr->first_character);
+		if (c >= first_character && c < last_character_exclusive) {
+			if (glyph_count >= SE_TEXT_CHAR_COUNT) {
+				break;
+			}
+			u32 char_index = (u32)(c - first_character);
 			stbtt_packedchar* packed_char = s_array_get(&font_ptr->packed_characters, s_array_handle(&font_ptr->packed_characters, char_index));
 			stbtt_aligned_quad* aligned_quad = s_array_get(&font_ptr->aligned_quads, s_array_handle(&font_ptr->aligned_quads, char_index));
 			

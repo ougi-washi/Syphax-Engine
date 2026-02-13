@@ -259,7 +259,20 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	glfwSetCharCallback((GLFWwindow*)new_window->handle, char_callback);
 	glfwSetFramebufferSizeCallback((GLFWwindow*)new_window->handle, framebuffer_size_callback);
 	
-	se_render_init();
+	if (!se_render_init()) {
+		se_window_user_ptr* window_user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer((GLFWwindow*)new_window->handle);
+		if (window_user_ptr) {
+			free(window_user_ptr);
+			glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, NULL);
+		}
+		glfwDestroyWindow((GLFWwindow *)new_window->handle);
+		new_window->handle = NULL;
+		s_array_clear(&new_window->input_events);
+		s_array_clear(&new_window->resize_handles);
+		s_array_remove(&context->windows, window_handle);
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		return S_HANDLE_NULL;
+	}
 	
 	glEnable(GL_DEPTH_TEST);
 	
@@ -268,6 +281,11 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	if (render_result != SE_RESULT_OK) {
 		if (new_window->quad.vao != 0) {
 			se_quad_destroy(&new_window->quad);
+		}
+		se_window_user_ptr* window_user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer((GLFWwindow*)new_window->handle);
+		if (window_user_ptr) {
+			free(window_user_ptr);
+			glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, NULL);
 		}
 		glfwDestroyWindow((GLFWwindow *)new_window->handle);
 		new_window->handle = NULL;
@@ -1026,6 +1044,11 @@ void se_window_destroy(const se_window_handle window) {
 	if (window_ptr->quad.vao != 0) {
 		se_quad_destroy(&window_ptr->quad);
 	}
+	if (window_ptr->shader != S_HANDLE_NULL &&
+		s_array_get(&context->shaders, window_ptr->shader) != NULL) {
+		se_shader_destroy(window_ptr->shader);
+	}
+	window_ptr->shader = S_HANDLE_NULL;
 	s_array_clear(&window_ptr->input_events);
 	s_array_clear(&window_ptr->resize_handles);
 
@@ -1050,6 +1073,7 @@ void se_window_destroy(const se_window_handle window) {
 
 	if (s_array_get_size(&windows_registry) == 0) {
 		s_array_clear(&windows_registry);
+		se_render_shutdown();
 		glfwTerminate();
 	}
 }

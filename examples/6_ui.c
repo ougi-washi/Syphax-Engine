@@ -59,16 +59,6 @@ void on_button_stop_hovered(se_window_handle window, void *data) {
 i32 main(void) {
 	se_context *ctx = se_context_create();
 	se_window_handle window = se_window_create("Syphax-Engine - UI Example", WIDTH, HEIGHT);
-	se_ui_element_handle root = S_HANDLE_NULL;
-	se_ui_element_handle toolbar = S_HANDLE_NULL;
-	se_ui_element_handle content = S_HANDLE_NULL;
-	se_object_2d_handle button_minimize = S_HANDLE_NULL;
-	se_object_2d_handle button_maximize = S_HANDLE_NULL;
-	se_object_2d_handle button_exit = S_HANDLE_NULL;
-	se_object_2d_handle item_1 = S_HANDLE_NULL;
-	se_object_2d_handle item_2 = S_HANDLE_NULL;
-	se_object_2d_handle item_3 = S_HANDLE_NULL;
-
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_ui_element_params ui_element_params = {0};
@@ -77,12 +67,12 @@ i32 main(void) {
 	ui_element_params.size = s_vec2(1.0f, 1.0f);
 	ui_element_params.padding = s_vec2(0.01f, 0.01f);
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
-	root = se_ui_element_create(window, &ui_element_params);
+	se_ui_element_handle root = se_ui_element_create(window, &ui_element_params);
 
 	ui_element_params.layout = SE_UI_LAYOUT_HORIZONTAL;
-	toolbar = se_ui_element_add_child(window, root, &ui_element_params);
+	se_ui_element_handle toolbar = se_ui_element_add_child(window, root, &ui_element_params);
 	se_ui_layout_rules toolbar_rules = {0};
-	toolbar_rules.anchor_min = s_vec2(0.0f, 0.88f);
+	toolbar_rules.anchor_min = s_vec2(0.0f, 0.93f);
 	toolbar_rules.anchor_max = s_vec2(1.0f, 1.0f);
 	toolbar_rules.margin = (se_ui_margin){0.0f, 0.0f, 0.0f, 0.0f};
 	toolbar_rules.min_size = s_vec2(0.0f, 0.0f);
@@ -93,9 +83,9 @@ i32 main(void) {
 	toolbar_rules.stretch_y = true;
 	se_ui_element_set_layout_rules(toolbar, &toolbar_rules);
 	
-	button_minimize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
-	button_maximize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
-	button_exit = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_object_2d_handle button_minimize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_object_2d_handle button_maximize = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_object_2d_handle button_exit = se_ui_element_add_object(toolbar, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
 	se_ui_element_add_text(toolbar, "Hello World!", SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.f);
 	{
 		se_shader_handle minimize_shader = se_object_2d_get_shader(button_minimize);
@@ -113,10 +103,10 @@ i32 main(void) {
 	}
 
 	ui_element_params.layout = SE_UI_LAYOUT_VERTICAL;
-	content = se_ui_element_add_child(window, root, &ui_element_params);
+	se_ui_element_handle content = se_ui_element_add_child(window, root, &ui_element_params);
 	se_ui_layout_rules content_rules = {0};
 	content_rules.anchor_min = s_vec2(0.0f, 0.0f);
-	content_rules.anchor_max = s_vec2(1.0f, 0.88f);
+	content_rules.anchor_max = s_vec2(1.0f, 0.93f);
 	content_rules.margin = (se_ui_margin){0.0f, 0.0f, 0.0f, 0.0f};
 	content_rules.min_size = s_vec2(0.0f, 0.0f);
 	content_rules.max_size = s_vec2(0.0f, 0.0f);
@@ -125,9 +115,9 @@ i32 main(void) {
 	content_rules.stretch_x = true;
 	content_rules.stretch_y = true;
 	se_ui_element_set_layout_rules(content, &content_rules);
-	item_1 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
-	item_2 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
-	item_3 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_object_2d_handle item_1 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_object_2d_handle item_2 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
+	se_object_2d_handle item_3 = se_ui_element_add_object(content, SE_RESOURCE_EXAMPLE("ui/button.glsl"));
 	{
 		se_shader_handle item_1_shader = se_object_2d_get_shader(item_1);
 		se_shader_handle item_2_shader = se_object_2d_get_shader(item_2);

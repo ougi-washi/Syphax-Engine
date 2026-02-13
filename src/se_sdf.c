@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_sdf.h"
+#include "se_camera.h"
 #include "se_render.h"
 #include "se_shader.h"
 #include <string.h>
@@ -132,6 +133,7 @@ typedef struct {
 	se_sdf_control_handle stylized_desaturate_control;
 	se_sdf_control_handle stylized_gamma_control;
 	se_sdf_build_diagnostics diagnostics;
+	u64 render_generation;
 	b8 built;
 } se_sdf_runtime_renderer;
 typedef s_array(se_sdf_runtime_renderer, se_sdf_runtime_renderers);
@@ -139,6 +141,7 @@ typedef s_array(se_sdf_runtime_renderer, se_sdf_runtime_renderers);
 static se_sdf_runtime_scenes se_sdf_runtime_scene_storage;
 static se_sdf_runtime_renderers se_sdf_runtime_renderer_storage;
 static b8 se_sdf_runtime_scene_storage_initialized = 0;
+static se_sdf_runtime_renderer* se_sdf_codegen_active_renderer = NULL;
 
 static void se_sdf_runtime_control_clear_binding(se_sdf_runtime_control* control);
 static b8 se_sdf_runtime_control_value_equals(
@@ -148,9 +151,53 @@ static b8 se_sdf_runtime_control_value_equals(
 );
 static b8 se_sdf_runtime_validate_primitive_desc(const se_sdf_primitive_desc* primitive);
 static void se_sdf_runtime_sync_control_bindings(se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* renderer);
+static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer);
+static b8 se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* renderer);
 static void se_sdf_runtime_apply_renderer_shading_bindings(se_sdf_runtime_renderer* renderer);
+static b8 se_sdf_runtime_emit_control_uniform_declarations(
+	se_sdf_runtime_renderer* renderer,
+	se_sdf_string* out
+);
+static const char* se_sdf_runtime_find_node_binding_uniform_name(
+	se_sdf_runtime_renderer* renderer,
+	se_sdf_scene_handle scene,
+	se_sdf_node_handle node,
+	se_sdf_runtime_node_bind_target target
+);
+static const char* se_sdf_runtime_find_primitive_binding_uniform_name(
+	se_sdf_runtime_renderer* renderer,
+	se_sdf_scene_handle scene,
+	se_sdf_node_handle node,
+	se_sdf_primitive_param param
+);
+static b8 se_sdf_runtime_renderer_has_live_shader(const se_sdf_runtime_renderer* renderer);
+static void se_sdf_runtime_renderer_release_shader(se_sdf_runtime_renderer* renderer);
+static void se_sdf_runtime_renderer_release_quad(se_sdf_runtime_renderer* renderer);
+static void se_sdf_runtime_renderer_invalidate_gpu_state(se_sdf_runtime_renderer* renderer);
+static void se_sdf_runtime_renderer_refresh_context_state(se_sdf_runtime_renderer* renderer);
+static s_vec3 se_sdf_runtime_mul_mat4_point(const s_mat4* mat, const s_vec3* point);
+static void se_sdf_runtime_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point);
+static void se_sdf_runtime_scene_bounds_expand_transformed_aabb(
+	se_sdf_scene_bounds* bounds,
+	const s_mat4* transform,
+	const s_vec3* local_min,
+	const s_vec3* local_max
+);
+static b8 se_sdf_runtime_get_primitive_local_bounds(
+	const se_sdf_primitive_desc* primitive,
+	s_vec3* out_min,
+	s_vec3* out_max,
+	b8* out_unbounded
+);
+static void se_sdf_runtime_collect_scene_bounds_recursive(
+	se_sdf_runtime_scene* scene_ptr,
+	se_sdf_scene_handle scene,
+	se_sdf_node_handle node_handle,
+	const s_mat4* parent_transform,
+	se_sdf_scene_bounds* bounds,
+	sz depth,
+	sz max_depth
+);
 
 static void se_sdf_runtime_init_storage(void) {
 	if (se_sdf_runtime_scene_storage_initialized) {
@@ -191,6 +238,75 @@ static void se_sdf_runtime_set_diagnostics(
 	va_start(args, fmt);
 	vsnprintf(renderer->diagnostics.message, sizeof(renderer->diagnostics.message), fmt, args);
 	va_end(args);
+}
+
+static b8 se_sdf_runtime_renderer_has_live_shader(const se_sdf_runtime_renderer* renderer) {
+	if (!renderer || renderer->shader == S_HANDLE_NULL) {
+		return 0;
+	}
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		return 0;
+	}
+	se_shader* shader_ptr = s_array_get(&ctx->shaders, renderer->shader);
+	return shader_ptr != NULL && shader_ptr->program != 0;
+}
+
+static void se_sdf_runtime_renderer_release_shader(se_sdf_runtime_renderer* renderer) {
+	if (!renderer || renderer->shader == S_HANDLE_NULL) {
+		return;
+	}
+	se_context* ctx = se_current_context();
+	if (ctx && s_array_get(&ctx->shaders, renderer->shader) != NULL) {
+		se_shader_destroy(renderer->shader);
+	}
+	renderer->shader = S_HANDLE_NULL;
+}
+
+static void se_sdf_runtime_renderer_release_quad(se_sdf_runtime_renderer* renderer) {
+	if (!renderer || !renderer->quad_ready) {
+		return;
+	}
+	if (se_render_has_context()) {
+		se_quad_destroy(&renderer->quad);
+	}
+	memset(&renderer->quad, 0, sizeof(renderer->quad));
+	renderer->quad_ready = 0;
+}
+
+static void se_sdf_runtime_renderer_invalidate_gpu_state(se_sdf_runtime_renderer* renderer) {
+	if (!renderer) {
+		return;
+	}
+	se_sdf_runtime_renderer_release_shader(renderer);
+	se_sdf_runtime_renderer_release_quad(renderer);
+	renderer->built = 0;
+	for (sz i = 0; i < s_array_get_size(&renderer->controls); ++i) {
+		se_sdf_runtime_control* control = s_array_get(&renderer->controls, s_array_handle(&renderer->controls, (u32)i));
+		if (!control) {
+			continue;
+		}
+		control->cached_uniform_location = -1;
+		control->has_last_uploaded_value = 0;
+		control->dirty = 1;
+	}
+}
+
+static void se_sdf_runtime_renderer_refresh_context_state(se_sdf_runtime_renderer* renderer) {
+	if (!renderer) {
+		return;
+	}
+	const u64 current_generation = se_render_get_generation();
+	if (renderer->render_generation != 0 && current_generation != 0 &&
+		renderer->render_generation != current_generation) {
+		se_sdf_runtime_renderer_invalidate_gpu_state(renderer);
+	}
+	renderer->render_generation = current_generation;
+
+	if (renderer->shader != S_HANDLE_NULL && !se_sdf_runtime_renderer_has_live_shader(renderer)) {
+		renderer->shader = S_HANDLE_NULL;
+		renderer->built = 0;
+	}
 }
 
 static se_sdf_runtime_scene* se_sdf_runtime_scene_from_handle(const se_sdf_scene_handle scene) {
@@ -1068,13 +1184,13 @@ b8 se_sdf_scene_build_primitive_gallery_preset(
 	const i32 rows,
 	const f32 spacing,
 	se_sdf_node_handle* out_root,
-	se_sdf_node_handle* out_hero
+	se_sdf_node_handle* out_focus
 ) {
 	if (scene == SE_SDF_SCENE_NULL || columns <= 0 || rows <= 0) {
 		return 0;
 	}
 	if (out_root) *out_root = SE_SDF_NODE_NULL;
-	if (out_hero) *out_hero = SE_SDF_NODE_NULL;
+	if (out_focus) *out_focus = SE_SDF_NODE_NULL;
 
 	se_sdf_scene_clear(scene);
 
@@ -1095,8 +1211,8 @@ b8 se_sdf_scene_build_primitive_gallery_preset(
 		if (node == SE_SDF_NODE_NULL) {
 			return 0;
 		}
-		if (i == 0 && out_hero) {
-			*out_hero = node;
+		if (i == 0 && out_focus) {
+			*out_focus = node;
 		}
 	}
 
@@ -1156,6 +1272,519 @@ b8 se_sdf_scene_build_orbit_showcase_preset(
 
 	if (out_root) *out_root = root;
 	if (out_center) *out_center = center_node;
+	return 1;
+}
+
+static s_vec3 se_sdf_runtime_mul_mat4_point(const s_mat4* mat, const s_vec3* point) {
+	if (!mat || !point) {
+		return s_vec3(0.0f, 0.0f, 0.0f);
+	}
+	const f32 x = mat->m[0][0] * point->x + mat->m[1][0] * point->y + mat->m[2][0] * point->z + mat->m[3][0];
+	const f32 y = mat->m[0][1] * point->x + mat->m[1][1] * point->y + mat->m[2][1] * point->z + mat->m[3][1];
+	const f32 z = mat->m[0][2] * point->x + mat->m[1][2] * point->y + mat->m[2][2] * point->z + mat->m[3][2];
+	const f32 w = mat->m[0][3] * point->x + mat->m[1][3] * point->y + mat->m[2][3] * point->z + mat->m[3][3];
+	if (fabsf(w) > 0.00001f) {
+		const f32 inv_w = 1.0f / w;
+		return s_vec3(x * inv_w, y * inv_w, z * inv_w);
+	}
+	return s_vec3(x, y, z);
+}
+
+static void se_sdf_runtime_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point) {
+	if (!bounds || !point) {
+		return;
+	}
+	if (!bounds->valid) {
+		bounds->min = *point;
+		bounds->max = *point;
+		bounds->valid = 1;
+		return;
+	}
+	if (point->x < bounds->min.x) bounds->min.x = point->x;
+	if (point->y < bounds->min.y) bounds->min.y = point->y;
+	if (point->z < bounds->min.z) bounds->min.z = point->z;
+	if (point->x > bounds->max.x) bounds->max.x = point->x;
+	if (point->y > bounds->max.y) bounds->max.y = point->y;
+	if (point->z > bounds->max.z) bounds->max.z = point->z;
+}
+
+static void se_sdf_runtime_scene_bounds_expand_transformed_aabb(
+	se_sdf_scene_bounds* bounds,
+	const s_mat4* transform,
+	const s_vec3* local_min,
+	const s_vec3* local_max
+) {
+	if (!bounds || !transform || !local_min || !local_max) {
+		return;
+	}
+	for (u8 ix = 0; ix < 2; ++ix) {
+		for (u8 iy = 0; iy < 2; ++iy) {
+			for (u8 iz = 0; iz < 2; ++iz) {
+				const s_vec3 local_point = s_vec3(
+					ix ? local_max->x : local_min->x,
+					iy ? local_max->y : local_min->y,
+					iz ? local_max->z : local_min->z
+				);
+				const s_vec3 world_point = se_sdf_runtime_mul_mat4_point(transform, &local_point);
+				se_sdf_runtime_scene_bounds_expand_point(bounds, &world_point);
+			}
+		}
+	}
+}
+
+static void se_sdf_runtime_bounds_from_points(
+	const s_vec3* points,
+	const sz count,
+	const f32 inflate,
+	s_vec3* out_min,
+	s_vec3* out_max
+) {
+	if (!points || count == 0 || !out_min || !out_max) {
+		return;
+	}
+	s_vec3 min_v = points[0];
+	s_vec3 max_v = points[0];
+	for (sz i = 1; i < count; ++i) {
+		const s_vec3* point = &points[i];
+		if (point->x < min_v.x) min_v.x = point->x;
+		if (point->y < min_v.y) min_v.y = point->y;
+		if (point->z < min_v.z) min_v.z = point->z;
+		if (point->x > max_v.x) max_v.x = point->x;
+		if (point->y > max_v.y) max_v.y = point->y;
+		if (point->z > max_v.z) max_v.z = point->z;
+	}
+	if (inflate > 0.0f) {
+		min_v.x -= inflate;
+		min_v.y -= inflate;
+		min_v.z -= inflate;
+		max_v.x += inflate;
+		max_v.y += inflate;
+		max_v.z += inflate;
+	}
+	*out_min = min_v;
+	*out_max = max_v;
+}
+
+static b8 se_sdf_runtime_get_primitive_local_bounds(
+	const se_sdf_primitive_desc* primitive,
+	s_vec3* out_min,
+	s_vec3* out_max,
+	b8* out_unbounded
+) {
+	if (!primitive || !out_min || !out_max || !out_unbounded) {
+		return 0;
+	}
+
+	*out_unbounded = 0;
+	switch (primitive->type) {
+		case SE_SDF_PRIMITIVE_PLANE:
+		case SE_SDF_PRIMITIVE_CONE_INFINITE:
+		case SE_SDF_PRIMITIVE_CYLINDER:
+			*out_unbounded = 1;
+			return 0;
+
+		case SE_SDF_PRIMITIVE_SPHERE: {
+			const f32 r = fabsf(primitive->sphere.radius);
+			*out_min = s_vec3(-r, -r, -r);
+			*out_max = s_vec3(r, r, r);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_BOX: {
+			const s_vec3 e = s_vec3(fabsf(primitive->box.size.x), fabsf(primitive->box.size.y), fabsf(primitive->box.size.z));
+			*out_min = s_vec3(-e.x, -e.y, -e.z);
+			*out_max = e;
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_ROUND_BOX: {
+			const f32 r = fabsf(primitive->round_box.roundness);
+			const s_vec3 e = s_vec3(
+				fabsf(primitive->round_box.size.x) + r,
+				fabsf(primitive->round_box.size.y) + r,
+				fabsf(primitive->round_box.size.z) + r
+			);
+			*out_min = s_vec3(-e.x, -e.y, -e.z);
+			*out_max = e;
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_BOX_FRAME: {
+			const f32 t = fabsf(primitive->box_frame.thickness);
+			const s_vec3 e = s_vec3(
+				fabsf(primitive->box_frame.size.x) + t,
+				fabsf(primitive->box_frame.size.y) + t,
+				fabsf(primitive->box_frame.size.z) + t
+			);
+			*out_min = s_vec3(-e.x, -e.y, -e.z);
+			*out_max = e;
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_TORUS: {
+			const f32 major = fabsf(primitive->torus.radii.x);
+			const f32 minor = fabsf(primitive->torus.radii.y);
+			*out_min = s_vec3(-(major + minor), -minor, -(major + minor));
+			*out_max = s_vec3((major + minor), minor, (major + minor));
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CAPPED_TORUS: {
+			const f32 major = fabsf(primitive->capped_torus.major_radius);
+			const f32 minor = fabsf(primitive->capped_torus.minor_radius);
+			const f32 e = major + minor;
+			*out_min = s_vec3(-e, -e, -e);
+			*out_max = s_vec3(e, e, e);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_LINK: {
+			const f32 half_length = fabsf(primitive->link.half_length);
+			const f32 radial = fabsf(primitive->link.outer_radius) + fabsf(primitive->link.inner_radius);
+			*out_min = s_vec3(-radial, -(half_length + radial), -radial);
+			*out_max = s_vec3(radial, (half_length + radial), radial);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CONE: {
+			const f32 h = fabsf(primitive->cone.height);
+			const f32 s = fabsf(primitive->cone.angle_sin_cos.x);
+			const f32 c = fabsf(primitive->cone.angle_sin_cos.y);
+			const f32 radial = c > 0.0001f ? (h * s / c) : h;
+			*out_min = s_vec3(-radial, -h, -radial);
+			*out_max = s_vec3(radial, h, radial);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_HEX_PRISM: {
+			const f32 ex = fabsf(primitive->hex_prism.half_size.x);
+			const f32 ez = fabsf(primitive->hex_prism.half_size.y);
+			*out_min = s_vec3(-ex, -ex, -ez);
+			*out_max = s_vec3(ex, ex, ez);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CAPSULE: {
+			const s_vec3 points[2] = { primitive->capsule.a, primitive->capsule.b };
+			se_sdf_runtime_bounds_from_points(points, 2, fabsf(primitive->capsule.radius), out_min, out_max);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE: {
+			const f32 h = fabsf(primitive->vertical_capsule.height);
+			const f32 r = fabsf(primitive->vertical_capsule.radius);
+			*out_min = s_vec3(-r, -r, -r);
+			*out_max = s_vec3(r, h + r, r);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER: {
+			const f32 r = fabsf(primitive->capped_cylinder.radius);
+			const f32 h = fabsf(primitive->capped_cylinder.half_height);
+			*out_min = s_vec3(-r, -h, -r);
+			*out_max = s_vec3(r, h, r);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY: {
+			const s_vec3 points[2] = { primitive->capped_cylinder_arbitrary.a, primitive->capped_cylinder_arbitrary.b };
+			se_sdf_runtime_bounds_from_points(points, 2, fabsf(primitive->capped_cylinder_arbitrary.radius), out_min, out_max);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_ROUNDED_CYLINDER: {
+			const f32 radial = fmaxf(fabsf(primitive->rounded_cylinder.outer_radius), fabsf(primitive->rounded_cylinder.corner_radius));
+			const f32 h = fabsf(primitive->rounded_cylinder.half_height);
+			*out_min = s_vec3(-radial, -h, -radial);
+			*out_max = s_vec3(radial, h, radial);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CAPPED_CONE: {
+			const f32 h = fabsf(primitive->capped_cone.height);
+			const f32 radial = fmaxf(fabsf(primitive->capped_cone.radius_base), fabsf(primitive->capped_cone.radius_top));
+			*out_min = s_vec3(-radial, -h, -radial);
+			*out_max = s_vec3(radial, h, radial);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY: {
+			const s_vec3 points[2] = { primitive->capped_cone_arbitrary.a, primitive->capped_cone_arbitrary.b };
+			const f32 radial = fmaxf(fabsf(primitive->capped_cone_arbitrary.radius_a), fabsf(primitive->capped_cone_arbitrary.radius_b));
+			se_sdf_runtime_bounds_from_points(points, 2, radial, out_min, out_max);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_SOLID_ANGLE: {
+			const f32 r = fabsf(primitive->solid_angle.radius);
+			*out_min = s_vec3(-r, -r, -r);
+			*out_max = s_vec3(r, r, r);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CUT_SPHERE: {
+			const f32 r = fabsf(primitive->cut_sphere.radius);
+			*out_min = s_vec3(-r, -r, -r);
+			*out_max = s_vec3(r, r, r);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE: {
+			const f32 r = fabsf(primitive->cut_hollow_sphere.radius) + fabsf(primitive->cut_hollow_sphere.thickness);
+			*out_min = s_vec3(-r, -r, -r);
+			*out_max = s_vec3(r, r, r);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_DEATH_STAR: {
+			const f32 ra = fabsf(primitive->death_star.radius_a);
+			const f32 rb = fabsf(primitive->death_star.radius_b);
+			const f32 d = fabsf(primitive->death_star.separation);
+			const f32 ex = fmaxf(ra, d + rb);
+			const f32 eyz = fmaxf(ra, rb);
+			*out_min = s_vec3(-ex, -eyz, -eyz);
+			*out_max = s_vec3(ex, eyz, eyz);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_ROUND_CONE: {
+			const f32 h = fabsf(primitive->round_cone.height);
+			const f32 r1 = fabsf(primitive->round_cone.radius_base);
+			const f32 r2 = fabsf(primitive->round_cone.radius_top);
+			const f32 radial = fmaxf(r1, r2);
+			*out_min = s_vec3(-radial, -r1, -radial);
+			*out_max = s_vec3(radial, h + r2, radial);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY: {
+			const s_vec3 points[2] = { primitive->round_cone_arbitrary.a, primitive->round_cone_arbitrary.b };
+			const f32 radial = fmaxf(fabsf(primitive->round_cone_arbitrary.radius_a), fabsf(primitive->round_cone_arbitrary.radius_b));
+			se_sdf_runtime_bounds_from_points(points, 2, radial, out_min, out_max);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_VESICA_SEGMENT: {
+			const s_vec3 points[2] = { primitive->vesica_segment.a, primitive->vesica_segment.b };
+			se_sdf_runtime_bounds_from_points(points, 2, fabsf(primitive->vesica_segment.width), out_min, out_max);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_RHOMBUS: {
+			const f32 ex = fabsf(primitive->rhombus.length_a) + fabsf(primitive->rhombus.corner_radius);
+			const f32 ey = fabsf(primitive->rhombus.height) + fabsf(primitive->rhombus.corner_radius);
+			const f32 ez = fabsf(primitive->rhombus.length_b) + fabsf(primitive->rhombus.corner_radius);
+			*out_min = s_vec3(-ex, -ey, -ez);
+			*out_max = s_vec3(ex, ey, ez);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_OCTAHEDRON: {
+			const f32 s = fabsf(primitive->octahedron.size);
+			*out_min = s_vec3(-s, -s, -s);
+			*out_max = s_vec3(s, s, s);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND: {
+			const f32 s = fabsf(primitive->octahedron_bound.size);
+			*out_min = s_vec3(-s, -s, -s);
+			*out_max = s_vec3(s, s, s);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_PYRAMID: {
+			const f32 h = fabsf(primitive->pyramid.height);
+			const f32 ex = 0.55f;
+			const f32 ey = h + 0.55f;
+			*out_min = s_vec3(-ex, -ey, -ex);
+			*out_max = s_vec3(ex, ey, ex);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_TRIANGLE: {
+			const s_vec3 points[3] = { primitive->triangle.a, primitive->triangle.b, primitive->triangle.c };
+			se_sdf_runtime_bounds_from_points(points, 3, 0.0f, out_min, out_max);
+			return 1;
+		}
+		case SE_SDF_PRIMITIVE_QUAD: {
+			const s_vec3 points[4] = { primitive->quad.a, primitive->quad.b, primitive->quad.c, primitive->quad.d };
+			se_sdf_runtime_bounds_from_points(points, 4, 0.0f, out_min, out_max);
+			return 1;
+		}
+		default:
+			break;
+	}
+
+	return 0;
+}
+
+static void se_sdf_runtime_collect_scene_bounds_recursive(
+	se_sdf_runtime_scene* scene_ptr,
+	const se_sdf_scene_handle scene,
+	const se_sdf_node_handle node_handle,
+	const s_mat4* parent_transform,
+	se_sdf_scene_bounds* bounds,
+	const sz depth,
+	const sz max_depth
+) {
+	if (!scene_ptr || !bounds || node_handle == SE_SDF_NODE_NULL || depth > max_depth) {
+		return;
+	}
+	se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, node_handle);
+	if (!node) {
+		return;
+	}
+
+	s_mat4 world_transform = node->transform;
+	if (parent_transform) {
+		world_transform = s_mat4_mul(parent_transform, &node->transform);
+	}
+
+	if (!node->is_group) {
+		s_vec3 local_min = s_vec3(0.0f, 0.0f, 0.0f);
+		s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
+		b8 is_unbounded = 0;
+		if (se_sdf_runtime_get_primitive_local_bounds(&node->primitive, &local_min, &local_max, &is_unbounded)) {
+			se_sdf_runtime_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
+		}
+		if (is_unbounded) {
+			bounds->has_unbounded_primitives = 1;
+		}
+	}
+
+	for (sz i = 0; i < s_array_get_size(&node->children); ++i) {
+		se_sdf_node_handle* child = s_array_get(&node->children, s_array_handle(&node->children, (u32)i));
+		if (!child) {
+			continue;
+		}
+		se_sdf_runtime_collect_scene_bounds_recursive(
+			scene_ptr,
+			scene,
+			*child,
+			&world_transform,
+			bounds,
+			depth + 1,
+			max_depth
+		);
+	}
+}
+
+b8 se_sdf_scene_calculate_bounds(const se_sdf_scene_handle scene, se_sdf_scene_bounds* out_bounds) {
+	if (!out_bounds || scene == SE_SDF_SCENE_NULL) {
+		return 0;
+	}
+
+	*out_bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
+
+	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	if (!scene_ptr || scene_ptr->root == SE_SDF_NODE_NULL) {
+		return 0;
+	}
+
+	const sz max_depth = s_array_get_size(&scene_ptr->nodes) + 1;
+	se_sdf_runtime_collect_scene_bounds_recursive(
+		scene_ptr,
+		scene,
+		scene_ptr->root,
+		NULL,
+		out_bounds,
+		0,
+		max_depth
+	);
+
+	if (!out_bounds->valid) {
+		return 0;
+	}
+
+	out_bounds->center = s_vec3(
+		(out_bounds->min.x + out_bounds->max.x) * 0.5f,
+		(out_bounds->min.y + out_bounds->max.y) * 0.5f,
+		(out_bounds->min.z + out_bounds->max.z) * 0.5f
+	);
+	const s_vec3 span = s_vec3(
+		out_bounds->max.x - out_bounds->min.x,
+		out_bounds->max.y - out_bounds->min.y,
+		out_bounds->max.z - out_bounds->min.z
+	);
+	out_bounds->radius = 0.5f * sqrtf(span.x * span.x + span.y * span.y + span.z * span.z);
+	return 1;
+}
+
+b8 se_sdf_scene_align_camera(
+	const se_sdf_scene_handle scene,
+	const se_camera_handle camera,
+	const se_sdf_camera_align_desc* desc,
+	se_sdf_scene_bounds* out_bounds
+) {
+	if (camera == S_HANDLE_NULL) {
+		return 0;
+	}
+	se_camera* camera_ptr = se_camera_get(camera);
+	if (!camera_ptr) {
+		return 0;
+	}
+
+	se_sdf_scene_bounds bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
+	if (!se_sdf_scene_calculate_bounds(scene, &bounds)) {
+		if (out_bounds) {
+			*out_bounds = bounds;
+		}
+		return 0;
+	}
+	if (out_bounds) {
+		*out_bounds = bounds;
+	}
+
+	se_sdf_camera_align_desc align = SE_SDF_CAMERA_ALIGN_DESC_DEFAULTS;
+	if (desc) {
+		align = *desc;
+	}
+
+	f32 padding = align.padding;
+	if (padding <= 0.0f) {
+		padding = 1.0f;
+	}
+	f32 radius = fmaxf(bounds.radius * padding, fmaxf(align.min_radius, 0.0f));
+	if (radius < 0.0001f) {
+		radius = 0.0001f;
+	}
+
+	s_vec3 direction = align.view_direction;
+	f32 direction_len = s_vec3_length(&direction);
+	if (direction_len <= 0.0001f) {
+		direction = s_vec3(0.0f, 0.0f, 1.0f);
+		direction_len = 1.0f;
+	}
+	direction = s_vec3_divs(&direction, direction_len);
+
+	s_vec3 up = align.up;
+	f32 up_len = s_vec3_length(&up);
+	if (up_len <= 0.0001f) {
+		up = s_vec3(0.0f, 1.0f, 0.0f);
+	} else {
+		up = s_vec3_divs(&up, up_len);
+	}
+	if (fabsf(s_vec3_dot(&direction, &up)) > 0.995f) {
+		up = fabsf(direction.y) < 0.95f ? s_vec3(0.0f, 1.0f, 0.0f) : s_vec3(1.0f, 0.0f, 0.0f);
+	}
+
+	const f32 min_distance = fmaxf(align.min_distance, 0.0001f);
+	const f32 aspect = camera_ptr->aspect > 0.0001f ? camera_ptr->aspect : 1.0f;
+	f32 near_plane = camera_ptr->near;
+	f32 far_plane = camera_ptr->far;
+	f32 distance = min_distance;
+
+	if (camera_ptr->use_orthographic) {
+		f32 ortho_height = 2.0f * radius;
+		if (aspect < 1.0f && aspect > 0.0001f) {
+			ortho_height = 2.0f * radius / aspect;
+		}
+		distance = fmaxf(min_distance, radius * 2.0f);
+		if (align.update_clip_planes) {
+			const f32 near_margin = fmaxf(align.near_margin, 0.0f);
+			const f32 far_margin = fmaxf(align.far_margin, 0.0f);
+			near_plane = fmaxf(0.01f, distance - radius - near_margin);
+			far_plane = fmaxf(near_plane + 0.01f, distance + radius + far_margin);
+			se_camera_set_orthographic(camera, ortho_height, near_plane, far_plane);
+		} else {
+			camera_ptr->ortho_height = ortho_height;
+		}
+	} else {
+		const f32 pi = 3.14159265358979323846f;
+		f32 fov_degrees = camera_ptr->fov;
+		if (fov_degrees <= 1.0f || fov_degrees >= 179.0f) {
+			fov_degrees = 45.0f;
+		}
+		const f32 half_fov_y = (fov_degrees * (pi / 180.0f)) * 0.5f;
+		const f32 half_fov_x = atanf(tanf(half_fov_y) * aspect);
+		const f32 fit_half_fov = fmaxf(0.01f, fminf(half_fov_x, half_fov_y));
+		distance = fmaxf(min_distance, radius / fmaxf(sinf(fit_half_fov), 0.0001f));
+		if (align.update_clip_planes) {
+			const f32 near_margin = fmaxf(align.near_margin, 0.0f);
+			const f32 far_margin = fmaxf(align.far_margin, 0.0f);
+			near_plane = fmaxf(0.01f, distance - radius - near_margin);
+			far_plane = fmaxf(near_plane + 0.01f, distance + radius + far_margin);
+			se_camera_set_perspective(camera, fov_degrees, near_plane, far_plane);
+		}
+	}
+
+	camera_ptr->target = bounds.center;
+	camera_ptr->position = s_vec3_add(&bounds.center, &s_vec3_muls(&direction, distance));
+	camera_ptr->up = up;
 	return 1;
 }
 
@@ -1324,6 +1953,8 @@ static b8 se_sdf_runtime_build_legacy_object_recursive(
 	memset(out, 0, sizeof(*out));
 	s_array_init(&out->children);
 	out->transform = runtime_node->transform;
+	out->source_scene = scene;
+	out->source_node = node_handle;
 	out->operation = runtime_node->operation;
 	out->noise = (se_sdf_noise){0};
 
@@ -1409,6 +2040,7 @@ se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) 
 	renderer->stylized_ground_blend_control = SE_SDF_CONTROL_NULL;
 	renderer->stylized_desaturate_control = SE_SDF_CONTROL_NULL;
 	renderer->stylized_gamma_control = SE_SDF_CONTROL_NULL;
+	renderer->render_generation = se_render_get_generation();
 	se_sdf_runtime_set_diagnostics(renderer, 1, "init", "renderer created");
 	return handle;
 }
@@ -1418,19 +2050,38 @@ void se_sdf_renderer_destroy(const se_sdf_renderer_handle renderer) {
 	if (!renderer_ptr) {
 		return;
 	}
+	se_sdf_runtime_renderer_invalidate_gpu_state(renderer_ptr);
 	s_array_clear(&renderer_ptr->controls);
 	s_array_clear(&renderer_ptr->node_bindings);
 	s_array_clear(&renderer_ptr->primitive_bindings);
-	if (renderer_ptr->shader != S_HANDLE_NULL) {
-		se_shader_destroy(renderer_ptr->shader);
-		renderer_ptr->shader = S_HANDLE_NULL;
-	}
-	if (renderer_ptr->quad_ready) {
-		se_quad_destroy(&renderer_ptr->quad);
-		renderer_ptr->quad_ready = 0;
-	}
 	se_sdf_string_free(&renderer_ptr->generated_fragment_source);
 	s_array_remove(&se_sdf_runtime_renderer_storage, renderer);
+}
+
+void se_sdf_shutdown(void) {
+	if (!se_sdf_runtime_scene_storage_initialized) {
+		return;
+	}
+
+	while (s_array_get_size(&se_sdf_runtime_renderer_storage) > 0) {
+		se_sdf_renderer_handle renderer_handle = s_array_handle(
+			&se_sdf_runtime_renderer_storage,
+			(u32)(s_array_get_size(&se_sdf_runtime_renderer_storage) - 1)
+		);
+		se_sdf_renderer_destroy(renderer_handle);
+	}
+
+	while (s_array_get_size(&se_sdf_runtime_scene_storage) > 0) {
+		se_sdf_scene_handle scene_handle = s_array_handle(
+			&se_sdf_runtime_scene_storage,
+			(u32)(s_array_get_size(&se_sdf_runtime_scene_storage) - 1)
+		);
+		se_sdf_scene_destroy(scene_handle);
+	}
+
+	s_array_clear(&se_sdf_runtime_renderer_storage);
+	s_array_clear(&se_sdf_runtime_scene_storage);
+	se_sdf_runtime_scene_storage_initialized = 0;
 }
 
 b8 se_sdf_renderer_set_scene(const se_sdf_renderer_handle renderer, const se_sdf_scene_handle scene) {
@@ -1442,6 +2093,7 @@ b8 se_sdf_renderer_set_scene(const se_sdf_renderer_handle renderer, const se_sdf
 		return 0;
 	}
 	renderer_ptr->scene = scene;
+	renderer_ptr->built = 0;
 	return 1;
 }
 
@@ -1542,6 +2194,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 	if (!renderer_ptr) {
 		return 0;
 	}
+	se_sdf_runtime_renderer_refresh_context_state(renderer_ptr);
 
 	se_sdf_string_free(&renderer_ptr->generated_fragment_source);
 	se_sdf_string_init(&renderer_ptr->generated_fragment_source, renderer_ptr->desc.shader_source_capacity);
@@ -1558,12 +2211,13 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 
 	char map_name[32] = "map";
 	if (!se_sdf_codegen_emit_fragment_prelude(&renderer_ptr->generated_fragment_source) ||
-		!se_sdf_codegen_emit_uniform_block(&renderer_ptr->generated_fragment_source)) {
+		!se_sdf_codegen_emit_uniform_block(&renderer_ptr->generated_fragment_source) ||
+		!se_sdf_runtime_emit_control_uniform_declarations(renderer_ptr, &renderer_ptr->generated_fragment_source)) {
 		se_sdf_runtime_set_diagnostics(
 			renderer_ptr,
 			0,
 			"codegen_emit",
-			"failed to emit prelude/uniform block"
+			"failed to emit prelude/uniform block/control uniforms"
 		);
 		return 0;
 	}
@@ -1599,7 +2253,9 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 				);
 				return 0;
 			}
+			se_sdf_codegen_active_renderer = renderer_ptr;
 			se_sdf_generate_distance_function(&renderer_ptr->generated_fragment_source, &legacy_root, map_name);
+			se_sdf_codegen_active_renderer = NULL;
 			se_sdf_runtime_free_legacy_object(&legacy_root);
 			emitted_map = 1;
 		}
@@ -1636,10 +2292,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 		return 0;
 	}
 
-	if (renderer_ptr->shader != S_HANDLE_NULL) {
-		se_shader_destroy(renderer_ptr->shader);
-		renderer_ptr->shader = S_HANDLE_NULL;
-	}
+	se_sdf_runtime_renderer_release_shader(renderer_ptr);
 	renderer_ptr->shader = se_shader_load_from_memory(
 		se_sdf_fullscreen_vertex_shader,
 		renderer_ptr->generated_fragment_source.data
@@ -1669,6 +2322,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 	}
 
 	renderer_ptr->built = 1;
+	renderer_ptr->render_generation = se_render_get_generation();
 	renderer_ptr->last_uniform_write_count = 0;
 	se_sdf_runtime_set_diagnostics(
 		renderer_ptr,
@@ -1692,19 +2346,43 @@ b8 se_sdf_renderer_rebuild_if_dirty(const se_sdf_renderer_handle renderer) {
 	return 1;
 }
 
+b8 se_sdf_frame_set_camera(se_sdf_frame_desc* frame, const se_camera_handle camera) {
+	if (!frame || camera == S_HANDLE_NULL) {
+		return 0;
+	}
+	se_camera* camera_ptr = se_camera_get(camera);
+	if (!camera_ptr) {
+		return 0;
+	}
+	frame->has_camera_override = 1;
+	frame->camera_position = camera_ptr->position;
+	frame->camera_target = camera_ptr->target;
+	return 1;
+}
+
 b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_frame_desc* frame) {
 	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
 	if (!renderer_ptr || !frame) {
 		return 0;
 	}
+	if (!se_render_has_context()) {
+		se_sdf_runtime_set_diagnostics(
+			renderer_ptr,
+			0,
+			"render_context",
+			"render skipped: no active render context"
+		);
+		return 0;
+	}
+	se_sdf_runtime_renderer_refresh_context_state(renderer_ptr);
 	if (!renderer_ptr->built) {
 		if (!se_sdf_renderer_build(renderer)) {
 			return 0;
 		}
 	}
 	se_sdf_runtime_sync_control_bindings(renderer_ptr);
-	se_sdf_runtime_apply_node_bindings(renderer_ptr);
-	se_sdf_runtime_apply_primitive_bindings(renderer_ptr);
+	(void)se_sdf_runtime_apply_node_bindings(renderer_ptr);
+	(void)se_sdf_runtime_apply_primitive_bindings(renderer_ptr);
 	se_sdf_runtime_apply_renderer_shading_bindings(renderer_ptr);
 	if (renderer_ptr->shader == S_HANDLE_NULL) {
 		return 0;
@@ -1968,8 +2646,10 @@ static se_sdf_runtime_control* se_sdf_runtime_get_or_create_control(
 		return NULL;
 	}
 	se_sdf_control_handle handle = se_sdf_runtime_find_control_handle(renderer, name);
+	b8 created = 0;
 	if (handle == SE_SDF_CONTROL_NULL) {
 		handle = s_array_increment(&renderer->controls);
+		created = 1;
 	}
 	se_sdf_runtime_control* control = s_array_get(&renderer->controls, handle);
 	if (!control) {
@@ -1984,9 +2664,13 @@ static se_sdf_runtime_control* se_sdf_runtime_get_or_create_control(
 	}
 	if (control->type != type) {
 		se_sdf_runtime_control_clear_binding(control);
+		renderer->built = 0;
 	}
 	control->type = type;
 	control->dirty = 1;
+	if (created) {
+		renderer->built = 0;
+	}
 	if (out_handle) {
 		*out_handle = handle;
 	}
@@ -2149,6 +2833,7 @@ static b8 se_sdf_runtime_bind_node_target(
 		}
 		if (binding->scene == scene && binding->node == node && binding->target == target) {
 			binding->control = control;
+			renderer->built = 0;
 			(void)control_ptr;
 			return 1;
 		}
@@ -2160,13 +2845,15 @@ static b8 se_sdf_runtime_bind_node_target(
 	binding.control = control;
 	binding.target = target;
 	s_array_add(&renderer->node_bindings, binding);
+	renderer->built = 0;
 	return 1;
 }
 
-static void se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer) {
+static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer) {
 	if (!renderer) {
-		return;
+		return 0;
 	}
+	b8 changed = 0;
 
 	for (sz i = 0; i < s_array_get_size(&renderer->node_bindings); ++i) {
 		se_sdf_runtime_node_binding* binding = s_array_get(&renderer->node_bindings, s_array_handle(&renderer->node_bindings, (u32)i));
@@ -2188,21 +2875,41 @@ static void se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer
 		}
 
 		se_sdf_runtime_node_init_control_trs(node_ptr);
+		b8 node_changed = 0;
 		switch (binding->target) {
 			case SE_SDF_RUNTIME_NODE_BIND_TRANSLATION:
-				node_ptr->control_translation = control->value.vec3;
+				node_changed = (node_ptr->control_translation.x != control->value.vec3.x) ||
+					(node_ptr->control_translation.y != control->value.vec3.y) ||
+					(node_ptr->control_translation.z != control->value.vec3.z);
+				if (node_changed) {
+					node_ptr->control_translation = control->value.vec3;
+				}
 				break;
 			case SE_SDF_RUNTIME_NODE_BIND_ROTATION:
-				node_ptr->control_rotation = control->value.vec3;
+				node_changed = (node_ptr->control_rotation.x != control->value.vec3.x) ||
+					(node_ptr->control_rotation.y != control->value.vec3.y) ||
+					(node_ptr->control_rotation.z != control->value.vec3.z);
+				if (node_changed) {
+					node_ptr->control_rotation = control->value.vec3;
+				}
 				break;
 			case SE_SDF_RUNTIME_NODE_BIND_SCALE:
-				node_ptr->control_scale = control->value.vec3;
+				node_changed = (node_ptr->control_scale.x != control->value.vec3.x) ||
+					(node_ptr->control_scale.y != control->value.vec3.y) ||
+					(node_ptr->control_scale.z != control->value.vec3.z);
+				if (node_changed) {
+					node_ptr->control_scale = control->value.vec3;
+				}
 				break;
 			default:
 				break;
 		}
-		se_sdf_runtime_node_apply_control_trs(node_ptr);
+		if (node_changed) {
+			se_sdf_runtime_node_apply_control_trs(node_ptr);
+			changed = 1;
+		}
 	}
+	return changed;
 }
 
 static b8 se_sdf_runtime_apply_primitive_param_float(
@@ -2228,54 +2935,105 @@ static b8 se_sdf_runtime_apply_primitive_param_float(
 	switch (node->primitive.type) {
 		case SE_SDF_PRIMITIVE_SPHERE:
 			if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) {
+				if (node->primitive.sphere.radius == value) return 0;
 				node->primitive.sphere.radius = value;
 				return 1;
 			}
 			break;
 		case SE_SDF_PRIMITIVE_BOX:
-			if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_X) node->primitive.box.size.x = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Y) node->primitive.box.size.y = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Z) node->primitive.box.size.z = value;
+			if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_X) {
+				if (node->primitive.box.size.x == value) return 0;
+				node->primitive.box.size.x = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Y) {
+				if (node->primitive.box.size.y == value) return 0;
+				node->primitive.box.size.y = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Z) {
+				if (node->primitive.box.size.z == value) return 0;
+				node->primitive.box.size.z = value;
+			}
 			else break;
 			return 1;
 		case SE_SDF_PRIMITIVE_ROUND_BOX:
-			if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_X) node->primitive.round_box.size.x = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Y) node->primitive.round_box.size.y = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Z) node->primitive.round_box.size.z = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) node->primitive.round_box.roundness = value;
+			if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_X) {
+				if (node->primitive.round_box.size.x == value) return 0;
+				node->primitive.round_box.size.x = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Y) {
+				if (node->primitive.round_box.size.y == value) return 0;
+				node->primitive.round_box.size.y = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_SIZE_Z) {
+				if (node->primitive.round_box.size.z == value) return 0;
+				node->primitive.round_box.size.z = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) {
+				if (node->primitive.round_box.roundness == value) return 0;
+				node->primitive.round_box.roundness = value;
+			}
 			else break;
 			return 1;
 		case SE_SDF_PRIMITIVE_CAPSULE:
 			if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) {
+				if (node->primitive.capsule.radius == value) return 0;
 				node->primitive.capsule.radius = value;
 				return 1;
 			}
 			break;
 		case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE:
-			if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) node->primitive.vertical_capsule.height = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) node->primitive.vertical_capsule.radius = value;
+			if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) {
+				if (node->primitive.vertical_capsule.height == value) return 0;
+				node->primitive.vertical_capsule.height = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) {
+				if (node->primitive.vertical_capsule.radius == value) return 0;
+				node->primitive.vertical_capsule.radius = value;
+			}
 			else break;
 			return 1;
 		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER:
-			if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) node->primitive.capped_cylinder.radius = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) node->primitive.capped_cylinder.half_height = value;
+			if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) {
+				if (node->primitive.capped_cylinder.radius == value) return 0;
+				node->primitive.capped_cylinder.radius = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) {
+				if (node->primitive.capped_cylinder.half_height == value) return 0;
+				node->primitive.capped_cylinder.half_height = value;
+			}
 			else break;
 			return 1;
 		case SE_SDF_PRIMITIVE_CONE:
 			if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) {
+				if (node->primitive.cone.height == value) return 0;
 				node->primitive.cone.height = value;
 				return 1;
 			}
 			break;
 		case SE_SDF_PRIMITIVE_ROUND_CONE:
-			if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) node->primitive.round_cone.height = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS_A) node->primitive.round_cone.radius_base = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS_B) node->primitive.round_cone.radius_top = value;
+			if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) {
+				if (node->primitive.round_cone.height == value) return 0;
+				node->primitive.round_cone.height = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS_A) {
+				if (node->primitive.round_cone.radius_base == value) return 0;
+				node->primitive.round_cone.radius_base = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS_B) {
+				if (node->primitive.round_cone.radius_top == value) return 0;
+				node->primitive.round_cone.radius_top = value;
+			}
 			else break;
 			return 1;
 		case SE_SDF_PRIMITIVE_CUT_SPHERE:
-			if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) node->primitive.cut_sphere.radius = value;
-			else if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) node->primitive.cut_sphere.cut_height = value;
+			if (param == SE_SDF_PRIMITIVE_PARAM_RADIUS) {
+				if (node->primitive.cut_sphere.radius == value) return 0;
+				node->primitive.cut_sphere.radius = value;
+			}
+			else if (param == SE_SDF_PRIMITIVE_PARAM_HEIGHT) {
+				if (node->primitive.cut_sphere.cut_height == value) return 0;
+				node->primitive.cut_sphere.cut_height = value;
+			}
 			else break;
 			return 1;
 		default:
@@ -2284,10 +3042,11 @@ static b8 se_sdf_runtime_apply_primitive_param_float(
 	return 0;
 }
 
-static void se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* renderer) {
+static b8 se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* renderer) {
 	if (!renderer) {
-		return;
+		return 0;
 	}
+	b8 changed = 0;
 
 	for (sz i = 0; i < s_array_get_size(&renderer->primitive_bindings); ++i) {
 		se_sdf_runtime_primitive_binding* binding = s_array_get(&renderer->primitive_bindings, s_array_handle(&renderer->primitive_bindings, (u32)i));
@@ -2306,8 +3065,11 @@ static void se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* ren
 		if (!node_ptr) {
 			continue;
 		}
-		(void)se_sdf_runtime_apply_primitive_param_float(node_ptr, binding->param, control->value.f);
+		if (se_sdf_runtime_apply_primitive_param_float(node_ptr, binding->param, control->value.f)) {
+			changed = 1;
+		}
 	}
+	return changed;
 }
 
 static void se_sdf_runtime_apply_renderer_shading_bindings(se_sdf_runtime_renderer* renderer) {
@@ -2390,6 +3152,102 @@ static void se_sdf_runtime_apply_renderer_shading_bindings(se_sdf_runtime_render
 	if (control) {
 		renderer->stylized.gamma = control->value.f;
 	}
+}
+
+static const char* se_sdf_runtime_control_glsl_type(const se_sdf_control_type type) {
+	switch (type) {
+		case SE_SDF_CONTROL_FLOAT: return "float";
+		case SE_SDF_CONTROL_VEC2: return "vec2";
+		case SE_SDF_CONTROL_VEC3: return "vec3";
+		case SE_SDF_CONTROL_VEC4: return "vec4";
+		case SE_SDF_CONTROL_INT: return "int";
+		case SE_SDF_CONTROL_MAT4: return "mat4";
+		default: return NULL;
+	}
+}
+
+static b8 se_sdf_runtime_emit_control_uniform_declarations(
+	se_sdf_runtime_renderer* renderer,
+	se_sdf_string* out
+) {
+	if (!renderer || !out) {
+		return 0;
+	}
+
+	sz declared_count = 0;
+	for (sz i = 0; i < s_array_get_size(&renderer->controls); ++i) {
+		const se_sdf_runtime_control* control = s_array_get(
+			&renderer->controls,
+			s_array_handle(&renderer->controls, (u32)i)
+		);
+		if (!control || control->uniform_name[0] == '\0') {
+			continue;
+		}
+		const char* glsl_type = se_sdf_runtime_control_glsl_type(control->type);
+		if (!glsl_type) {
+			continue;
+		}
+		se_sdf_string_append(out, "uniform %s %s;\n", glsl_type, control->uniform_name);
+		declared_count++;
+	}
+	if (declared_count > 0) {
+		se_sdf_string_append(out, "\n");
+	}
+	return !out->oom;
+}
+
+static const char* se_sdf_runtime_find_node_binding_uniform_name(
+	se_sdf_runtime_renderer* renderer,
+	const se_sdf_scene_handle scene,
+	const se_sdf_node_handle node,
+	const se_sdf_runtime_node_bind_target target
+) {
+	if (!renderer || scene == SE_SDF_SCENE_NULL || node == SE_SDF_NODE_NULL) {
+		return NULL;
+	}
+
+	for (sz i = 0; i < s_array_get_size(&renderer->node_bindings); ++i) {
+		const se_sdf_runtime_node_binding* binding = s_array_get(
+			&renderer->node_bindings,
+			s_array_handle(&renderer->node_bindings, (u32)i)
+		);
+		if (!binding || binding->scene != scene || binding->node != node || binding->target != target) {
+			continue;
+		}
+		const se_sdf_runtime_control* control = s_array_get(&renderer->controls, binding->control);
+		if (!control || control->type != SE_SDF_CONTROL_VEC3 || control->uniform_name[0] == '\0') {
+			continue;
+		}
+		return control->uniform_name;
+	}
+	return NULL;
+}
+
+static const char* se_sdf_runtime_find_primitive_binding_uniform_name(
+	se_sdf_runtime_renderer* renderer,
+	const se_sdf_scene_handle scene,
+	const se_sdf_node_handle node,
+	const se_sdf_primitive_param param
+) {
+	if (!renderer || scene == SE_SDF_SCENE_NULL || node == SE_SDF_NODE_NULL) {
+		return NULL;
+	}
+
+	for (sz i = 0; i < s_array_get_size(&renderer->primitive_bindings); ++i) {
+		const se_sdf_runtime_primitive_binding* binding = s_array_get(
+			&renderer->primitive_bindings,
+			s_array_handle(&renderer->primitive_bindings, (u32)i)
+		);
+		if (!binding || binding->scene != scene || binding->node != node || binding->param != param) {
+			continue;
+		}
+		const se_sdf_runtime_control* control = s_array_get(&renderer->controls, binding->control);
+		if (!control || control->type != SE_SDF_CONTROL_FLOAT || control->uniform_name[0] == '\0') {
+			continue;
+		}
+		return control->uniform_name;
+	}
+	return NULL;
 }
 
 se_sdf_control_handle se_sdf_control_define_float(
@@ -2781,6 +3639,7 @@ static b8 se_sdf_runtime_bind_primitive_param_float(
 		}
 		if (binding->scene == scene && binding->node == node && binding->param == param) {
 			binding->control = control;
+			renderer->built = 0;
 			return 1;
 		}
 	}
@@ -2791,6 +3650,7 @@ static b8 se_sdf_runtime_bind_primitive_param_float(
 	binding.param = param;
 	binding.control = control;
 	s_array_add(&renderer->primitive_bindings, binding);
+	renderer->built = 0;
 	return 1;
 }
 
@@ -3762,17 +4622,125 @@ static b8 se_sdf_extract_block_parts(
     return *expr_start < *expr_end;
 }
 
+static const char* se_sdf_codegen_get_node_bind_uniform(
+	const se_sdf_object* obj,
+	const se_sdf_runtime_node_bind_target target
+) {
+	if (!obj || !se_sdf_codegen_active_renderer) {
+		return NULL;
+	}
+	if (obj->source_scene == SE_SDF_SCENE_NULL || obj->source_node == SE_SDF_NODE_NULL) {
+		return NULL;
+	}
+	return se_sdf_runtime_find_node_binding_uniform_name(
+		se_sdf_codegen_active_renderer,
+		obj->source_scene,
+		obj->source_node,
+		target
+	);
+}
+
+static const char* se_sdf_codegen_get_primitive_bind_uniform(
+	const se_sdf_object* obj,
+	const se_sdf_primitive_param param
+) {
+	if (!obj || !se_sdf_codegen_active_renderer) {
+		return NULL;
+	}
+	if (obj->source_scene == SE_SDF_SCENE_NULL || obj->source_node == SE_SDF_NODE_NULL) {
+		return NULL;
+	}
+	return se_sdf_runtime_find_primitive_binding_uniform_name(
+		se_sdf_codegen_active_renderer,
+		obj->source_scene,
+		obj->source_node,
+		param
+	);
+}
+
+static void se_sdf_codegen_write_scalar_expr(
+	char* out,
+	const sz out_size,
+	const f32 fallback_value,
+	const char* uniform_name
+) {
+	if (!out || out_size == 0) {
+		return;
+	}
+	if (uniform_name && uniform_name[0] != '\0') {
+		snprintf(out, out_size, "%s", uniform_name);
+		return;
+	}
+	snprintf(out, out_size, "%.6f", fallback_value);
+}
+
 static void se_sdf_emit_leaf_raw(se_sdf_string* out, se_sdf_object* obj, const char* p_var) {
     switch (obj->type) {
         case SE_SDF_SPHERE:
-            se_sdf_gen_sphere(out, p_var, obj->sphere.radius);
+        {
+            const char* radius_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS);
+            if (radius_uniform) {
+                se_sdf_string_append(out, "(length(%s) - %s)", p_var, radius_uniform);
+            } else {
+                se_sdf_gen_sphere(out, p_var, obj->sphere.radius);
+            }
             break;
+        }
         case SE_SDF_BOX:
-            se_sdf_gen_box(out, p_var, obj->box.size);
+        {
+            const char* sx_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_SIZE_X);
+            const char* sy_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_SIZE_Y);
+            const char* sz_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_SIZE_Z);
+            if (sx_uniform || sy_uniform || sz_uniform) {
+                char sx[96];
+                char sy[96];
+                char sz_val[96];
+                se_sdf_codegen_write_scalar_expr(sx, sizeof(sx), obj->box.size.x, sx_uniform);
+                se_sdf_codegen_write_scalar_expr(sy, sizeof(sy), obj->box.size.y, sy_uniform);
+                se_sdf_codegen_write_scalar_expr(sz_val, sizeof(sz_val), obj->box.size.z, sz_uniform);
+                se_sdf_string_append(
+                    out,
+                    "{ vec3 q = abs(%s) - vec3(%s, %s, %s); length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0); }",
+                    p_var,
+                    sx,
+                    sy,
+                    sz_val
+                );
+            } else {
+                se_sdf_gen_box(out, p_var, obj->box.size);
+            }
             break;
+        }
         case SE_SDF_ROUND_BOX:
-            se_sdf_gen_round_box(out, p_var, obj->round_box.size, obj->round_box.roundness);
+        {
+            const char* sx_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_SIZE_X);
+            const char* sy_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_SIZE_Y);
+            const char* sz_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_SIZE_Z);
+            const char* r_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS);
+            if (sx_uniform || sy_uniform || sz_uniform || r_uniform) {
+                char sx[96];
+                char sy[96];
+                char sz_val[96];
+                char r[96];
+                se_sdf_codegen_write_scalar_expr(sx, sizeof(sx), obj->round_box.size.x, sx_uniform);
+                se_sdf_codegen_write_scalar_expr(sy, sizeof(sy), obj->round_box.size.y, sy_uniform);
+                se_sdf_codegen_write_scalar_expr(sz_val, sizeof(sz_val), obj->round_box.size.z, sz_uniform);
+                se_sdf_codegen_write_scalar_expr(r, sizeof(r), obj->round_box.roundness, r_uniform);
+                se_sdf_string_append(
+                    out,
+                    "{ vec3 q = abs(%s) - vec3(%s, %s, %s) + vec3(%s); length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - %s; }",
+                    p_var,
+                    sx,
+                    sy,
+                    sz_val,
+                    r,
+                    r
+                );
+            } else {
+                se_sdf_gen_round_box(out, p_var, obj->round_box.size, obj->round_box.roundness);
+            }
             break;
+        }
         case SE_SDF_BOX_FRAME:
             se_sdf_gen_box_frame(out, p_var, obj->box_frame.size, obj->box_frame.thickness);
             break;
@@ -3791,8 +4759,22 @@ static void se_sdf_emit_leaf_raw(se_sdf_string* out, se_sdf_object* obj, const c
             se_sdf_gen_cylinder(out, p_var, obj->cylinder.axis_and_radius);
             break;
         case SE_SDF_CONE:
-            se_sdf_gen_cone(out, p_var, obj->cone.angle_sin_cos, obj->cone.height);
+        {
+            const char* height_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_HEIGHT);
+            if (height_uniform) {
+                se_sdf_string_append(out, "{ vec2 q = vec2(length(%s.xz), %s.y); ", p_var, p_var);
+                se_sdf_string_append(out, "vec2 k1 = vec2(%.6f, %s); ", obj->cone.angle_sin_cos.y, height_uniform);
+                se_sdf_string_append(out, "vec2 k2 = vec2(%.6f - %.6f, 2.0 * %s); ", obj->cone.angle_sin_cos.y, obj->cone.angle_sin_cos.x, height_uniform);
+                se_sdf_string_append(out, "vec2 ca = vec2(q.x - min(q.x, (q.y < 0.0) ? %.6f : %.6f), abs(q.y) - %s); ",
+                                     obj->cone.angle_sin_cos.x, obj->cone.angle_sin_cos.y, height_uniform);
+                se_sdf_string_append(out, "vec2 cb = q - k1 + k2 * clamp(dot(k1 - q, k2) / dot(k2, k2), 0.0, 1.0); ");
+                se_sdf_string_append(out, "float s = (cb.x < 0.0 && ca.y < 0.0) ? -1.0 : 1.0; ");
+                se_sdf_string_append(out, "s * sqrt(min(dot(ca, ca), dot(cb, cb))); }");
+            } else {
+                se_sdf_gen_cone(out, p_var, obj->cone.angle_sin_cos, obj->cone.height);
+            }
             break;
+        }
         case SE_SDF_CONE_INFINITE:
             se_sdf_gen_cone_inf(out, p_var, obj->cone_infinite.angle_sin_cos);
             break;
@@ -3803,14 +4785,53 @@ static void se_sdf_emit_leaf_raw(se_sdf_string* out, se_sdf_object* obj, const c
             se_sdf_gen_hex_prism(out, p_var, obj->hex_prism.half_size);
             break;
         case SE_SDF_CAPSULE:
-            se_sdf_gen_capsule(out, p_var, obj->capsule.a, obj->capsule.b, obj->capsule.radius);
+        {
+            const char* radius_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS);
+            if (radius_uniform) {
+                se_sdf_string_append(out, "{ vec3 pa = %s - ", p_var);
+                se_sdf_string_append_vec3(out, obj->capsule.a);
+                se_sdf_string_append(out, "; vec3 ba = ");
+                se_sdf_string_append_vec3(out, obj->capsule.b);
+                se_sdf_string_append(out, " - ");
+                se_sdf_string_append_vec3(out, obj->capsule.a);
+                se_sdf_string_append(out, "; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); ");
+                se_sdf_string_append(out, "length(pa - ba * h) - %s; }", radius_uniform);
+            } else {
+                se_sdf_gen_capsule(out, p_var, obj->capsule.a, obj->capsule.b, obj->capsule.radius);
+            }
             break;
+        }
         case SE_SDF_VERTICAL_CAPSULE:
-            se_sdf_gen_vert_capsule(out, p_var, obj->vertical_capsule.height, obj->vertical_capsule.radius);
+        {
+            const char* height_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_HEIGHT);
+            const char* radius_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS);
+            if (height_uniform || radius_uniform) {
+                char h[96];
+                char r[96];
+                se_sdf_codegen_write_scalar_expr(h, sizeof(h), obj->vertical_capsule.height, height_uniform);
+                se_sdf_codegen_write_scalar_expr(r, sizeof(r), obj->vertical_capsule.radius, radius_uniform);
+                se_sdf_string_append(out, "{ vec3 q = %s; q.y -= clamp(q.y, 0.0, %s); length(q) - %s; }", p_var, h, r);
+            } else {
+                se_sdf_gen_vert_capsule(out, p_var, obj->vertical_capsule.height, obj->vertical_capsule.radius);
+            }
             break;
+        }
         case SE_SDF_CAPPED_CYLINDER:
-            se_sdf_gen_capped_cyl(out, p_var, obj->capped_cylinder.radius, obj->capped_cylinder.half_height);
+        {
+            const char* radius_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS);
+            const char* height_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_HEIGHT);
+            if (radius_uniform || height_uniform) {
+                char r[96];
+                char h[96];
+                se_sdf_codegen_write_scalar_expr(r, sizeof(r), obj->capped_cylinder.radius, radius_uniform);
+                se_sdf_codegen_write_scalar_expr(h, sizeof(h), obj->capped_cylinder.half_height, height_uniform);
+                se_sdf_string_append(out, "{ vec2 d = abs(vec2(length(%s.xz), %s.y)) - vec2(%s, %s); ", p_var, p_var, r, h);
+                se_sdf_string_append(out, "min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); }");
+            } else {
+                se_sdf_gen_capped_cyl(out, p_var, obj->capped_cylinder.radius, obj->capped_cylinder.half_height);
+            }
             break;
+        }
         case SE_SDF_CAPPED_CYLINDER_ARBITRARY:
             se_sdf_gen_capped_cyl_arb(out, p_var, obj->capped_cylinder_arbitrary.a,
                                       obj->capped_cylinder_arbitrary.b, obj->capped_cylinder_arbitrary.radius);
@@ -3832,8 +4853,24 @@ static void se_sdf_emit_leaf_raw(se_sdf_string* out, se_sdf_object* obj, const c
             se_sdf_gen_solid_angle(out, p_var, obj->solid_angle.angle_sin_cos, obj->solid_angle.radius);
             break;
         case SE_SDF_CUT_SPHERE:
-            se_sdf_gen_cut_sphere(out, p_var, obj->cut_sphere.radius, obj->cut_sphere.cut_height);
+        {
+            const char* radius_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS);
+            const char* height_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_HEIGHT);
+            if (radius_uniform || height_uniform) {
+                char r[96];
+                char h[96];
+                se_sdf_codegen_write_scalar_expr(r, sizeof(r), obj->cut_sphere.radius, radius_uniform);
+                se_sdf_codegen_write_scalar_expr(h, sizeof(h), obj->cut_sphere.cut_height, height_uniform);
+                se_sdf_string_append(out, "{ float w = sqrt(%s * %s - %s * %s); ", r, r, h, h);
+                se_sdf_string_append(out, "vec2 q = vec2(length(%s.xz), %s.y); ", p_var, p_var);
+                se_sdf_string_append(out, "float s = max((%s - %s) * q.x * q.x + w * w * (%s + %s - 2.0 * q.y), %s * q.x - w * q.y); ",
+                                     h, r, h, r, h);
+                se_sdf_string_append(out, "(s < 0.0) ? length(q) - %s : (q.x < w) ? %s - q.y : length(q - vec2(w, %s)); }", r, h, h);
+            } else {
+                se_sdf_gen_cut_sphere(out, p_var, obj->cut_sphere.radius, obj->cut_sphere.cut_height);
+            }
             break;
+        }
         case SE_SDF_CUT_HOLLOW_SPHERE:
             se_sdf_gen_cut_hollow_sphere(out, p_var, obj->cut_hollow_sphere.radius,
                                          obj->cut_hollow_sphere.cut_height, obj->cut_hollow_sphere.thickness);
@@ -3843,9 +4880,30 @@ static void se_sdf_emit_leaf_raw(se_sdf_string* out, se_sdf_object* obj, const c
                                   obj->death_star.radius_b, obj->death_star.separation);
             break;
         case SE_SDF_ROUND_CONE:
-            se_sdf_gen_round_cone(out, p_var, obj->round_cone.radius_base,
-                                  obj->round_cone.radius_top, obj->round_cone.height);
+        {
+            const char* radius_a_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS_A);
+            const char* radius_b_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_RADIUS_B);
+            const char* height_uniform = se_sdf_codegen_get_primitive_bind_uniform(obj, SE_SDF_PRIMITIVE_PARAM_HEIGHT);
+            if (radius_a_uniform || radius_b_uniform || height_uniform) {
+                char r1[96];
+                char r2[96];
+                char h[96];
+                se_sdf_codegen_write_scalar_expr(r1, sizeof(r1), obj->round_cone.radius_base, radius_a_uniform);
+                se_sdf_codegen_write_scalar_expr(r2, sizeof(r2), obj->round_cone.radius_top, radius_b_uniform);
+                se_sdf_codegen_write_scalar_expr(h, sizeof(h), obj->round_cone.height, height_uniform);
+                se_sdf_string_append(out, "{ float b = (%s - %s) / %s; ", r1, r2, h);
+                se_sdf_string_append(out, "float a = sqrt(1.0 - b * b); ");
+                se_sdf_string_append(out, "vec2 q = vec2(length(%s.xz), %s.y); ", p_var, p_var);
+                se_sdf_string_append(out, "float k = dot(q, vec2(-b, a)); ");
+                se_sdf_string_append(out, "float d = (k < 0.0) ? (length(q) - %s) : ", r1);
+                se_sdf_string_append(out, "((k > a * %s) ? (length(q - vec2(0.0, %s)) - %s) : (dot(q, vec2(a, b)) - %s)); ", h, h, r2, r1);
+                se_sdf_string_append(out, "d; }");
+            } else {
+                se_sdf_gen_round_cone(out, p_var, obj->round_cone.radius_base,
+                                      obj->round_cone.radius_top, obj->round_cone.height);
+            }
             break;
+        }
         case SE_SDF_ROUND_CONE_ARBITRARY:
             se_sdf_gen_round_cone_arb(out, p_var, obj->round_cone_arbitrary.a,
                                       obj->round_cone_arbitrary.b, obj->round_cone_arbitrary.radius_a,
@@ -3971,7 +5029,103 @@ static void se_sdf_emit_object_eval(
 ) {
     const char* local_p = p_var;
     char transformed_p[32];
-    if (!se_sdf_is_identity(&obj->transform)) {
+	const char* translation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_RUNTIME_NODE_BIND_TRANSLATION);
+	const char* rotation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_RUNTIME_NODE_BIND_ROTATION);
+	const char* scale_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_RUNTIME_NODE_BIND_SCALE);
+	const b8 has_dynamic_trs = (translation_uniform != NULL) || (rotation_uniform != NULL) || (scale_uniform != NULL);
+
+	if (has_dynamic_trs) {
+		const s_vec3 base_translation = s_vec3(
+			obj->transform.m[3][0],
+			obj->transform.m[3][1],
+			obj->transform.m[3][2]
+		);
+		const s_vec3 base_rotation = s_vec3(0.0f, 0.0f, 0.0f);
+		const s_vec3 base_scale = s_vec3(
+			se_sdf_runtime_abs_or_one(obj->transform.m[0][0]),
+			se_sdf_runtime_abs_or_one(obj->transform.m[1][1]),
+			se_sdf_runtime_abs_or_one(obj->transform.m[2][2])
+		);
+		const b8 has_non_identity_scale =
+			(fabsf(base_scale.x - 1.0f) > 0.000001f) ||
+			(fabsf(base_scale.y - 1.0f) > 0.000001f) ||
+			(fabsf(base_scale.z - 1.0f) > 0.000001f);
+		const b8 has_rotation =
+			(rotation_uniform != NULL) ||
+			(fabsf(base_rotation.x) > 0.000001f) ||
+			(fabsf(base_rotation.y) > 0.000001f) ||
+			(fabsf(base_rotation.z) > 0.000001f);
+
+		snprintf(transformed_p, sizeof(transformed_p), "_p%u", (*temp_counter)++);
+		se_sdf_emit_indent(out, indent);
+		se_sdf_string_append(out, "vec3 %s = %s;\n", transformed_p, p_var);
+		se_sdf_emit_indent(out, indent);
+		if (translation_uniform) {
+			se_sdf_string_append(out, "%s -= %s;\n", transformed_p, translation_uniform);
+		} else {
+			se_sdf_string_append(
+				out,
+				"%s -= vec3(%.6f, %.6f, %.6f);\n",
+				transformed_p,
+				base_translation.x,
+				base_translation.y,
+				base_translation.z
+			);
+		}
+		if (scale_uniform || has_non_identity_scale) {
+			se_sdf_emit_indent(out, indent);
+			if (scale_uniform) {
+				se_sdf_string_append(out, "%s /= max(abs(%s), vec3(0.00001));\n", transformed_p, scale_uniform);
+			} else {
+				se_sdf_string_append(
+					out,
+					"%s /= max(abs(vec3(%.6f, %.6f, %.6f)), vec3(0.00001));\n",
+					transformed_p,
+					base_scale.x,
+					base_scale.y,
+					base_scale.z
+				);
+			}
+		}
+		if (has_rotation) {
+			char rot_var[32];
+			char c_var[32];
+			char s_var[32];
+			snprintf(rot_var, sizeof(rot_var), "_r%u", (*temp_counter)++);
+			snprintf(c_var, sizeof(c_var), "_c%u", (*temp_counter)++);
+			snprintf(s_var, sizeof(s_var), "_s%u", (*temp_counter)++);
+			se_sdf_emit_indent(out, indent);
+			if (rotation_uniform) {
+				se_sdf_string_append(out, "vec3 %s = -%s;\n", rot_var, rotation_uniform);
+			} else {
+				se_sdf_string_append(out, "vec3 %s = vec3(%.6f, %.6f, %.6f);\n",
+					rot_var,
+					-base_rotation.x,
+					-base_rotation.y,
+					-base_rotation.z
+				);
+			}
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "float %s = cos(%s.z);\n", c_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "float %s = sin(%s.z);\n", s_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s.xy = mat2(%s, -%s, %s, %s) * %s.xy;\n", transformed_p, c_var, s_var, s_var, c_var, transformed_p);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = cos(%s.y);\n", c_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = sin(%s.y);\n", s_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s.xz = mat2(%s, -%s, %s, %s) * %s.xz;\n", transformed_p, c_var, s_var, s_var, c_var, transformed_p);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = cos(%s.x);\n", c_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = sin(%s.x);\n", s_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s.yz = mat2(%s, -%s, %s, %s) * %s.yz;\n", transformed_p, c_var, s_var, s_var, c_var, transformed_p);
+		}
+		local_p = transformed_p;
+	} else if (!se_sdf_is_identity(&obj->transform)) {
         snprintf(transformed_p, sizeof(transformed_p), "_p%u", (*temp_counter)++);
         se_sdf_emit_indent(out, indent);
         se_sdf_gen_transform(out, p_var, obj->transform, transformed_p);

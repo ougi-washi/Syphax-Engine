@@ -48,6 +48,7 @@ static void se_context_destroy_fonts(se_context *context) {
 			glDeleteTextures(1, &font->atlas_texture);
 			font->atlas_texture = 0;
 		}
+		s_array_clear(&font->path);
 		s_array_clear(&font->packed_characters);
 		s_array_clear(&font->aligned_quads);
 		memset(font, 0, sizeof(*font));
@@ -74,6 +75,8 @@ static void se_context_destroy_ui_storage(se_context *context) {
 		if (ui_text == NULL) {
 			continue;
 		}
+		s_array_clear(&ui_text->characters);
+		s_array_clear(&ui_text->font_path);
 		memset(ui_text, 0, sizeof(*ui_text));
 	}
 	s_array_clear(&context->ui_texts);

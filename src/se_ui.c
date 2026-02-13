@@ -213,6 +213,14 @@ void se_ui_element_destroy(const se_ui_element_handle ui) {
 		se_scene_2d_destroy(ui_ptr->scene_2d);
 	}
 	ui_ptr->scene_2d = S_HANDLE_NULL;
+	if (ui_ptr->text != S_HANDLE_NULL) {
+		se_ui_text *ui_text = s_array_get(&ctx->ui_texts, ui_ptr->text);
+		if (ui_text) {
+			s_array_clear(&ui_text->characters);
+			s_array_clear(&ui_text->font_path);
+		}
+		s_array_remove(&ctx->ui_texts, ui_ptr->text);
+	}
 	ui_ptr->text = S_HANDLE_NULL;
 	ui_ptr->parent = S_HANDLE_NULL;
 	s_array_remove(&ctx->ui_elements, ui);
@@ -316,11 +324,22 @@ void se_ui_element_render(const se_ui_element_handle ui) {
 	if (ui_ptr->text != S_HANDLE_NULL) {
 		se_ui_text *text = s_array_get(&ctx->ui_texts, ui_ptr->text);
 		if (text) {
+			const c8* font_path = "";
+			if (text->font_path.b.size > 0 && text->font_path.b.data != NULL) {
+				font_path = (const c8*)text->font_path.b.data;
+			}
+			const c8* characters = "";
+			if (text->characters.b.size > 0 && text->characters.b.data != NULL) {
+				characters = (const c8*)text->characters.b.data;
+			}
 			se_text_handle *text_handle = se_ui_text_handle_get(ctx);
-			se_font_handle font = se_font_load(text_handle, text->font_path, text->font_size); // TODO: store font instead of path
-			if (font != S_HANDLE_NULL) {
+			se_font_handle font = S_HANDLE_NULL;
+			if (font_path[0] != '\0') {
+				font = se_font_load(text_handle, font_path, text->font_size); // TODO: store font instead of path
+			}
+			if (font != S_HANDLE_NULL && characters[0] != '\0') {
 				// TODO: add/store parameters, add allignment
-				se_text_render(text_handle, font, text->characters, &s_vec2(ui_ptr->position.x + ui_ptr->padding.x, ui_ptr->position.y - ui_ptr->padding.y), &s_vec2(1., 1.), .03f);
+				se_text_render(text_handle, font, characters, &s_vec2(ui_ptr->position.x + ui_ptr->padding.x, ui_ptr->position.y - ui_ptr->padding.y), &s_vec2(1., 1.), .03f);
 			}
 		}
 	}
@@ -576,7 +595,9 @@ void se_ui_element_set_text(const se_ui_element_handle ui, const c8 *text, const
 	se_ui_element *ui_ptr = s_array_get(&ctx->ui_elements, ui);
 	s_assertf(ui_ptr, "se_ui_element_set_text :: ui is null");
 
-	if (strlen(text) > SE_TEXT_CHAR_COUNT) {
+	const sz text_size = strlen(text) + 1;
+	const sz font_path_size = strlen(font_path) + 1;
+	if (text_size > SE_TEXT_CHAR_COUNT) {
 		printf("se_ui_element_set_text :: text is too long, max length is %d\n", SE_TEXT_CHAR_COUNT);
 		return;
 	}
@@ -586,8 +607,25 @@ void se_ui_element_set_text(const se_ui_element_handle ui, const c8 *text, const
 	}
 	se_ui_text *ui_text = s_array_get(&ctx->ui_texts, ui_ptr->text);
 	s_assertf(ui_text, "se_ui_element_set_text :: ui_text is null");
-	strcpy(ui_text->characters, text);
-	strcpy(ui_text->font_path, font_path);
+
+	s_array_clear(&ui_text->characters);
+	s_array_init(&ui_text->characters);
+	s_array_reserve(&ui_text->characters, text_size);
+	for (sz i = 0; i < text_size; ++i) {
+		s_handle character_handle = s_array_increment(&ui_text->characters);
+		c8 *dst = s_array_get(&ui_text->characters, character_handle);
+		*dst = text[i];
+	}
+
+	s_array_clear(&ui_text->font_path);
+	s_array_init(&ui_text->font_path);
+	s_array_reserve(&ui_text->font_path, font_path_size);
+	for (sz i = 0; i < font_path_size; ++i) {
+		s_handle path_char_handle = s_array_increment(&ui_text->font_path);
+		c8 *dst = s_array_get(&ui_text->font_path, path_char_handle);
+		*dst = font_path[i];
+	}
+
 	ui_text->font_size = font_size;
 }
 

@@ -24,16 +24,11 @@ static void *se_gl_get_proc_address(const char *name) {
 #endif
 }
 
-#define INIT_OPENGL_FUNCTION(func, func_type, name) \
-	func = (func_type)se_gl_get_proc_address(name); \
-	if (!func) { \
-		fprintf(stderr, "Failed to load OpenGL function: %s\n", name); \
-		exit(1); \
-	}
-
 #define SE_UNIFORMS_MAX 128
 
 static b8 se_render_initialized = false;
+static b8 se_is_blending = false;
+static u64 se_render_generation = 0;
 
 PFNGLDELETEBUFFERS se_glDeleteBuffers = NULL;
 PFNGLGENBUFFERS se_glGenBuffers = NULL;
@@ -98,10 +93,10 @@ PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer = NULL;
 	} \
 	if (!func) { \
 		fprintf(stderr, "Failed to load OpenGL function: %s\n", name); \
-		exit(1); \
+		return false; \
 	}
 
-void se_init_opengl(void) {
+b8 se_init_opengl(void) {
 #if defined(SE_RENDER_BACKEND_GLES)
 	SE_GL_ASSIGN(se_glDeleteBuffers, PFNGLDELETEBUFFERS, "glDeleteBuffers", glDeleteBuffers);
 	SE_GL_ASSIGN(se_glGenBuffers, PFNGLGENBUFFERS, "glGenBuffers", glGenBuffers);
@@ -215,24 +210,47 @@ void se_init_opengl(void) {
 	SE_GL_ASSIGN(se_glGenerateMipmap, PFNGLGENERATEMIPMAP, "glGenerateMipmap", NULL);
 	SE_GL_ASSIGN(se_glBlitFramebuffer, PFNGLBLITFRAMEBUFFER, "glBlitFramebuffer", NULL);
 #endif
-}
-
-b8 se_render_init(void) {
-	if (se_render_initialized) {
-		return true;
-	}
-#if defined(SE_WINDOW_BACKEND_GLFW)
-	if (!glfwGetCurrentContext()) {
-		printf("se_render_init :: no active OpenGL context\n");
-		return false;
-	}
-#endif
-	se_init_opengl();
-	se_render_initialized = true;
 	return true;
 }
 
-static b8 se_is_blending = false;
+b8 se_render_init(void) {
+#if defined(SE_WINDOW_BACKEND_GLFW)
+	if (!glfwGetCurrentContext()) {
+		printf("se_render_init :: no active OpenGL context\n");
+		se_render_initialized = false;
+		return false;
+	}
+#endif
+	if (se_render_initialized) {
+		return true;
+	}
+	if (!se_init_opengl()) {
+		fprintf(stderr, "se_render_init :: failed to load required OpenGL symbols\n");
+		se_render_initialized = false;
+		return false;
+	}
+	se_render_initialized = true;
+	se_render_generation++;
+	return true;
+}
+
+void se_render_shutdown(void) {
+	se_render_initialized = false;
+	se_is_blending = false;
+}
+
+b8 se_render_has_context(void) {
+#if defined(SE_WINDOW_BACKEND_GLFW)
+	return glfwGetCurrentContext() != NULL;
+#else
+	return se_render_initialized;
+#endif
+}
+
+u64 se_render_get_generation(void) {
+	return se_render_generation;
+}
+
 void se_render_set_blending(const b8 active) {
 	if (active) {
 		if (se_is_blending) {

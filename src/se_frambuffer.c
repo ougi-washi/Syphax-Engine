@@ -92,6 +92,14 @@ void se_framebuffer_set_size(const se_framebuffer_handle framebuffer, const s_ve
 	s_assertf(size, "se_framebuffer_set_size :: size is null");
 
 	framebuffer_ptr->size = *size;
+	GLint previous_framebuffer = 0;
+	GLint previous_texture = 0;
+	GLint previous_renderbuffer = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previous_framebuffer);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous_texture);
+	glGetIntegerv(GL_RENDERBUFFER_BINDING, &previous_renderbuffer);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_ptr->framebuffer);
 
 	glBindTexture(GL_TEXTURE_2D, framebuffer_ptr->texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (i32)size->x, (i32)size->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -99,12 +107,15 @@ void se_framebuffer_set_size(const se_framebuffer_handle framebuffer, const s_ve
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuffer_ptr->texture, 0);
 
 	glBindRenderbuffer(GL_RENDERBUFFER, framebuffer_ptr->depth_buffer);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, (i32)size->x, (i32)size->y);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebuffer_ptr->depth_buffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glBindRenderbuffer(GL_RENDERBUFFER, (GLuint)previous_renderbuffer);
+	glBindTexture(GL_TEXTURE_2D, (GLuint)previous_texture);
+	glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)previous_framebuffer);
 }
 
 void se_framebuffer_get_size(const se_framebuffer_handle framebuffer, s_vec2 *out_size) {

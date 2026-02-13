@@ -11,7 +11,7 @@
 #define SE_TEXT_HANDLE_DEFAULT_FONTS 4
 
 typedef struct se_font {
-	c8 path[SE_MAX_PATH_LENGTH];
+	s_array(c8, path);
 	u32 atlas_texture;
 	f32 size;
 	u16 atlas_width, atlas_height;

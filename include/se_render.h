@@ -55,6 +55,9 @@ typedef struct {
 
 // helper functions
 extern b8 se_render_init(void);
+extern void se_render_shutdown(void);
+extern b8 se_render_has_context(void);
+extern u64 se_render_get_generation(void);
 extern void se_render_set_blending(const b8 active);
 extern void se_render_unbind_framebuffer(void); // window framebuffer
 extern void se_render_clear(void);

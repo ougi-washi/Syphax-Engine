@@ -10,6 +10,7 @@
 #endif
 #include <GLFW/glfw3.h>
 #include <stddef.h>
+#include "syphax/s_types.h"
 
 typedef void(APIENTRY *PFNGLDELETEBUFFERS)(GLsizei n, const GLuint *buffers);
 typedef void(APIENTRY *PFNGLGENBUFFERS)(GLsizei n, GLuint *buffers);
@@ -241,6 +242,6 @@ extern PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer;
 #define glGenerateMipmap se_glGenerateMipmap
 #define glBlitFramebuffer se_glBlitFramebuffer
 
-extern void se_init_opengl();
+extern b8 se_init_opengl(void);
 
 #endif // SE_GL_H

@@ -5,6 +5,7 @@
 
 #include "syphax/s_types.h"
 #include "syphax/s_array.h"
+#include "se_camera.h"
 
 #define SE_SDF_MAX_STRING_LENGTH 4096
 
@@ -181,6 +182,8 @@ typedef struct {
 
 typedef struct se_sdf_object {
 	s_mat4 transform;
+	se_sdf_scene_handle source_scene;
+	se_sdf_node_handle source_node;
 	se_sdf_object_type type;
 	union {
 		struct { f32 radius; } sphere;
@@ -352,7 +355,7 @@ extern b8 se_sdf_scene_build_primitive_gallery_preset(
 	i32 rows,
 	f32 spacing,
 	se_sdf_node_handle* out_root,
-	se_sdf_node_handle* out_hero
+	se_sdf_node_handle* out_focus
 );
 extern b8 se_sdf_scene_build_orbit_showcase_preset(
 	se_sdf_scene_handle scene,
@@ -362,6 +365,53 @@ extern b8 se_sdf_scene_build_orbit_showcase_preset(
 	f32 orbit_radius,
 	se_sdf_node_handle* out_root,
 	se_sdf_node_handle* out_center
+);
+typedef struct {
+	s_vec3 min;
+	s_vec3 max;
+	s_vec3 center;
+	f32 radius;
+	b8 valid;
+	b8 has_unbounded_primitives;
+} se_sdf_scene_bounds;
+
+typedef struct {
+	s_vec3 view_direction;
+	s_vec3 up;
+	f32 padding;
+	f32 min_radius;
+	f32 min_distance;
+	f32 near_margin;
+	f32 far_margin;
+	b8 update_clip_planes;
+} se_sdf_camera_align_desc;
+
+#define SE_SDF_SCENE_BOUNDS_DEFAULTS ((se_sdf_scene_bounds){ \
+	.min = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
+	.max = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
+	.center = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
+	.radius = 0.0f, \
+	.valid = 0, \
+	.has_unbounded_primitives = 0 \
+})
+
+#define SE_SDF_CAMERA_ALIGN_DESC_DEFAULTS ((se_sdf_camera_align_desc){ \
+	.view_direction = (s_vec3){ .x = 1.35f, .y = 0.75f, .z = 1.35f }, \
+	.up = (s_vec3){ .x = 0.0f, .y = 1.0f, .z = 0.0f }, \
+	.padding = 1.20f, \
+	.min_radius = 0.50f, \
+	.min_distance = 1.00f, \
+	.near_margin = 0.10f, \
+	.far_margin = 8.00f, \
+	.update_clip_planes = 1 \
+})
+
+extern b8 se_sdf_scene_calculate_bounds(se_sdf_scene_handle scene, se_sdf_scene_bounds* out_bounds);
+extern b8 se_sdf_scene_align_camera(
+	se_sdf_scene_handle scene,
+	se_camera_handle camera,
+	const se_sdf_camera_align_desc* desc,
+	se_sdf_scene_bounds* out_bounds
 );
 
 typedef struct {
@@ -400,6 +450,7 @@ typedef struct {
 	s_vec3 camera_position;
 	s_vec3 camera_target;
 } se_sdf_frame_desc;
+extern b8 se_sdf_frame_set_camera(se_sdf_frame_desc* frame, se_camera_handle camera);
 
 typedef enum {
 	SE_SDF_SHADING_STYLIZED,
@@ -504,6 +555,7 @@ typedef enum {
 
 extern se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc);
 extern void se_sdf_renderer_destroy(se_sdf_renderer_handle renderer);
+extern void se_sdf_shutdown(void);
 extern b8 se_sdf_renderer_set_scene(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene);
 extern b8 se_sdf_renderer_set_quality(se_sdf_renderer_handle renderer, const se_sdf_raymarch_quality* quality);
 extern b8 se_sdf_renderer_set_debug(se_sdf_renderer_handle renderer, const se_sdf_renderer_debug* debug);
@@ -645,41 +697,5 @@ void se_sdf_object_to_string(se_sdf_string* out, se_sdf_object* obj, const char*
 
 // Helper to generate full distance function
 void se_sdf_generate_distance_function(se_sdf_string* out, se_sdf_object* root, const char* func_name);
-
-// Examples :
-
-static inline void test_sdf(void) {
-	se_sdf_object root = se_sdf_sphere(s_mat4_identity, .sphere.radius = 1.0f);
-	
-	s_vec3 a = {0, 0, 0}, b = {1, 0, 0}, c = {0, 1, 0};
-	se_sdf_object child1 = se_sdf_box(s_mat4_identity, .box.size = (s_vec3){1, 1, 1});
-	se_sdf_object child2 = se_sdf_tri(s_mat4_identity, .triangle.a = a, .triangle.b = b, .triangle.c = c);
-	
-	se_sdf_nodes(root, se_sdf_union, child1, child2);
-	
-	// Example using a group/container node:
-	se_sdf_object scene = se_sdf_group(s_mat4_identity);  // No shape, just a container
-	se_sdf_object sphere_a = se_sdf_sphere(s_mat4_identity, .sphere.radius = 1.0f);
-	se_sdf_object sphere_b = se_sdf_sphere(s_mat4_identity, .sphere.radius = 0.5f);
-	se_sdf_nodes(scene, se_sdf_union, sphere_a, sphere_b);
-}
-
-static inline void test_sdf_shader_generation(void) {
-	// Build scene
-	se_sdf_object root = se_sdf_group(s_mat4_identity);
-	se_sdf_object sphere = se_sdf_sphere(s_mat4_identity, .sphere.radius = 1.0f);
-	se_sdf_object box = se_sdf_box(s_mat4_identity, .box.size = (s_vec3){0.5f, 0.5f, 0.5f});
-	se_sdf_nodes(root, se_sdf_union, sphere, box);
-	
-	// Generate shader
-	se_sdf_string shader;
-	se_sdf_string_init(&shader, 8192);
-	se_sdf_generate_distance_function(&shader, &root, "map");
-	
-	// shader.data now contains the GLSL distance function
-	// printf("%s\n", shader.data);
-	
-	se_sdf_string_free(&shader);
-}
 
 #endif // SE_SDF_H
