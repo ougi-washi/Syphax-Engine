@@ -5,6 +5,7 @@
 #include "miniaudio/miniaudio.h"
 
 #include "se_defines.h"
+#include "se_debug.h"
 #include "syphax/s_array.h"
 #include "syphax/s_files.h"
 #include <math.h>
@@ -450,7 +451,7 @@ u32 se_audio_capture_list_devices(se_audio_engine* engine, se_audio_device_info*
 	ma_uint32 capture_count = 0;
 	ma_result result = ma_context_get_devices(&engine->context, NULL, NULL, &capture_infos, &capture_count);
 	if (result != MA_SUCCESS) {
-		fprintf(stderr, "se_audio_capture_list_devices :: failed to enumerate devices (%d)\n", result);
+		se_log("se_audio_capture_list_devices :: failed to enumerate devices (%d)", result);
 		return 0;
 	}
 	if (!out_devices || max_devices == 0) {
@@ -752,7 +753,7 @@ static char* se_audio_resolve_resource_path(const char* relative_path, char* out
 		return NULL;
 	}
 	if (!se_paths_resolve_resource_path(out_path, path_size, relative_path)) {
-		fprintf(stderr, "se_audio :: path too long for %s\n", relative_path);
+		se_log("se_audio_resolve_resource_path :: path too long for %s", relative_path);
 		return NULL;
 	}
 	return out_path;

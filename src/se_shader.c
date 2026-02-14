@@ -1,6 +1,7 @@
 // Syphax Engine - Ougi Washi
 
 #include "se_shader.h"
+#include "se_debug.h"
 #include "se_render.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
@@ -181,7 +182,7 @@ static GLuint se_shader_compile(const char *source, GLenum type) {
 	if (!success) {
 		char info_log[512] = {0};
 		glGetShaderInfoLog(shader, 512, NULL, info_log);
-		fprintf(stderr, "se_shader_compile :: shader compilation failed: %s\n", info_log);
+		se_log("se_shader_compile :: shader compilation failed: %s", info_log);
 		glDeleteShader(shader);
 		free(translated_source);
 		return 0;
@@ -214,7 +215,7 @@ static GLuint se_shader_create_program(const char *vertex_source, const char *fr
 	if (!success) {
 		char info_log[512] = {0};
 		glGetProgramInfoLog(program, 512, NULL, info_log);
-		fprintf(stderr, "se_shader_create_program :: shader program linking failed: %s\n", info_log);
+		se_log("se_shader_create_program :: shader program linking failed: %s", info_log);
 		glDeleteProgram(program);
 		program = 0;
 	}
@@ -255,7 +256,7 @@ b8 se_shader_load_internal(se_shader *shader) {
 	s_file_mtime(shader->vertex_path, &shader->vertex_mtime);
 	s_file_mtime(shader->fragment_path, &shader->fragment_mtime);
 	s_array_init(&shader->uniforms);
-	printf("se_shader_load_internal :: created program: %d, from %s, %s\n", shader->program, shader->vertex_path, shader->fragment_path);
+	se_log("se_shader_load_internal :: created program: %d, from %s, %s", shader->program, shader->vertex_path, shader->fragment_path);
 	return true;
 }
 
@@ -366,7 +367,7 @@ b8 se_shader_reload_if_changed(const se_shader_handle shader) {
 
 	if (vertex_mtime != shader_ptr->vertex_mtime ||
 		fragment_mtime != shader_ptr->fragment_mtime) {
-	printf("se_shader_reload_if_changed :: Reloading shader: %s, %s\n", shader_ptr->vertex_path, shader_ptr->fragment_path);
+	se_log("se_shader_reload_if_changed :: reloading shader: %s, %s", shader_ptr->vertex_path, shader_ptr->fragment_path);
 	return se_shader_load_internal(shader_ptr);
 	}
 
@@ -390,7 +391,7 @@ void se_shader_use(const se_shader_handle shader, const b8 update_uniforms, cons
 
 static void se_shader_cleanup(se_shader *shader) {
 	s_array_clear(&shader->uniforms);
-	printf("se_shader_cleanup :: shader: %p\n", shader);
+	se_log("se_shader_cleanup :: shader: %p", (void*)shader);
 	if (shader->program) {
 	glDeleteProgram(shader->program);
 	shader->program = 0;
@@ -556,7 +557,7 @@ se_uniforms *se_context_get_global_uniforms(void) {
 }
 
 //static void se_render_buffer_cleanup(se_render_buffer *buffer) {
-//	printf("se_render_buffer_cleanup :: buffer: %p\n", buffer);
+//	se_log("se_render_buffer_cleanup :: buffer: %p", (void*)buffer);
 //	if (buffer->framebuffer) {
 //	glDeleteFramebuffers(1, &buffer->framebuffer);
 //	buffer->framebuffer = 0;
@@ -711,7 +712,7 @@ void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 t
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_TEXTURE;
 	new_uniform->value.texture = texture;
-	printf("se_uniform_set_texture :: added texture uniform: %s, id: %d, ptr: %p\n", name, texture, new_uniform);
+	se_log("se_uniform_set_texture :: added texture uniform: %s, id: %u, ptr: %p", name, texture, (void*)new_uniform);
 }
 
 void se_uniform_apply(const se_shader_handle shader, const b8 update_global_uniforms) {

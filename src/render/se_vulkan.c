@@ -2,10 +2,10 @@
 
 #if defined(SE_RENDER_BACKEND_VULKAN)
 #include "se_render.h"
-#include <stdio.h>
+#include "se_debug.h"
 
 b8 se_render_init(void) {
-	printf("se_render_init :: Vulkan backend not implemented\n");
+	se_log("se_render_init :: Vulkan backend not implemented");
 	return false;
 }
 

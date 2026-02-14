@@ -322,11 +322,11 @@ void se_ui_element_render(const se_ui_element_handle ui) {
 		se_ui_element_handle child_entry = s_array_handle(&ui_ptr->children, (u32)i);
 		se_ui_element_handle *current_ui_ptr = s_array_get(&ui_ptr->children, child_entry);
 		if (!current_ui_ptr || *current_ui_ptr == S_HANDLE_NULL) {
-			printf("se_ui_element_render :: children index %zu is null\n", i);
+			se_log("se_ui_element_render :: children index %zu is null", i);
 			continue;
 		}
 		if (s_array_get(&ctx->ui_elements, *current_ui_ptr) == NULL) {
-			printf("se_ui_element_render :: children index %zu is invalid\n", i);
+			se_log("se_ui_element_render :: children index %zu is invalid", i);
 			continue;
 		}
 		se_ui_element_render(*current_ui_ptr);
@@ -375,11 +375,11 @@ void se_ui_element_render_to_screen(const se_ui_element_handle ui, const se_wind
 		se_ui_element_handle child_entry = s_array_handle(&ui_ptr->children, (u32)i);
 		se_ui_element_handle *current_ui_ptr = s_array_get(&ui_ptr->children, child_entry);
 		if (!current_ui_ptr || *current_ui_ptr == S_HANDLE_NULL) {
-			printf("se_ui_element_render_to_screen :: children index %zu is null\n", i);
+			se_log("se_ui_element_render_to_screen :: children index %zu is null", i);
 			continue;
 		}
 		if (s_array_get(&ctx->ui_elements, *current_ui_ptr) == NULL) {
-			printf("se_ui_element_render_to_screen :: children index %zu is invalid\n", i);
+			se_log("se_ui_element_render_to_screen :: children index %zu is invalid", i);
 			continue;
 		}
 		se_ui_element_render_to_screen(*current_ui_ptr, window);
@@ -594,7 +594,11 @@ b8 se_ui_element_dispatch_pointer(const se_ui_element_handle root, const s_vec2*
 			ui_ptr->slider_value = ui_ptr->slider_min + (ui_ptr->slider_max - ui_ptr->slider_min) * t;
 		}
 		if (ui_ptr->on_click) {
-			se_debug_log(SE_DEBUG_LEVEL_DEBUG, SE_DEBUG_CATEGORY_UI, "UI click widget=%d", ui_ptr->widget_type);
+			se_debug_log(
+				SE_DEBUG_LEVEL_DEBUG,
+				SE_DEBUG_CATEGORY_UI,
+				"se_ui_element_dispatch_pointer :: UI click widget=%d",
+				ui_ptr->widget_type);
 			ui_ptr->on_click(hit, ui_ptr->on_click_user_data);
 		}
 	}
@@ -611,7 +615,7 @@ void se_ui_element_set_text(const se_ui_element_handle ui, const c8 *text, const
 	const sz text_size = strlen(text) + 1;
 	const sz font_path_size = strlen(font_path) + 1;
 	if (text_size > SE_TEXT_CHAR_COUNT) {
-		printf("se_ui_element_set_text :: text is too long, max length is %d\n", SE_TEXT_CHAR_COUNT);
+		se_log("se_ui_element_set_text :: text is too long, max length is %d", SE_TEXT_CHAR_COUNT);
 		return;
 	}
 
@@ -684,12 +688,12 @@ void se_ui_element_update_objects(const se_ui_element_handle ui) {
 		se_object_2d_handle entry = s_array_handle(&scene_2d->objects, (u32)i);
 		se_object_2d_handle *current_object_2d_ptr = s_array_get(&scene_2d->objects, entry);
 		if (!current_object_2d_ptr || *current_object_2d_ptr == S_HANDLE_NULL) {
-			printf("se_ui_element_add_object :: one of the previous objects is null\n");
+			se_log("se_ui_element_add_object :: one of the previous objects is null");
 			continue;
 		}
 		se_object_2d *current_object_2d = s_array_get(&ctx->objects_2d, *current_object_2d_ptr);
 		if (!current_object_2d) {
-			printf("se_ui_element_add_object :: one of the previous objects is null\n");
+			se_log("se_ui_element_add_object :: one of the previous objects is null");
 			continue;
 		}
 		se_object_2d_set_position(*current_object_2d_ptr, &position);
@@ -717,12 +721,12 @@ void se_ui_element_update_children(const se_ui_element_handle ui) {
 	    se_ui_element_handle child_entry = s_array_handle(&ui_ptr->children, i);
 	    se_ui_element_handle *current_ui_ptr = s_array_get(&ui_ptr->children, child_entry);
 	    if (!current_ui_ptr || *current_ui_ptr == S_HANDLE_NULL) {
-	    	printf("se_ui_element_update_children :: ui %p, children index %d is null\n", ui_ptr, i);
+	    	se_log("se_ui_element_update_children :: ui %p, children index %u is null", (void*)ui_ptr, i);
 	    	continue;
 	    }
 	    se_ui_element *current_ui = s_array_get(&ctx->ui_elements, *current_ui_ptr);
 	    if (!current_ui) {
-	    	printf("se_ui_element_update_children :: ui %p children index %d is null\n", ui_ptr, i);
+	    	se_log("se_ui_element_update_children :: ui %p children index %u is null", (void*)ui_ptr, i);
 	    	continue;
 	    }
 	    se_ui_element_apply_layout_rules(current_ui, ui_ptr);

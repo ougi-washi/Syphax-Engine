@@ -147,7 +147,13 @@ s_vec3 se_camera_get_up_vector(const se_camera_handle camera) {
 void se_camera_set_perspective(const se_camera_handle camera, const f32 fov_degrees, const f32 near_plane, const f32 far_plane) {
 	se_camera* camera_ptr = se_camera_require(camera);
 	if (!camera_ptr || near_plane <= 0.0f || far_plane <= near_plane || fov_degrees <= 1.0f || fov_degrees >= 179.0f) {
-		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_CAMERA, "Invalid perspective params fov=%.2f near=%.3f far=%.3f", fov_degrees, near_plane, far_plane);
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CAMERA,
+			"se_camera_set_perspective :: invalid params fov=%.2f near=%.3f far=%.3f",
+			fov_degrees,
+			near_plane,
+			far_plane);
 		return;
 	}
 	camera_ptr->fov = fov_degrees;
@@ -159,7 +165,13 @@ void se_camera_set_perspective(const se_camera_handle camera, const f32 fov_degr
 void se_camera_set_orthographic(const se_camera_handle camera, const f32 ortho_height, const f32 near_plane, const f32 far_plane) {
 	se_camera* camera_ptr = se_camera_require(camera);
 	if (!camera_ptr || near_plane <= 0.0f || far_plane <= near_plane || ortho_height <= SE_CAMERA_EPSILON) {
-		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_CAMERA, "Invalid orthographic params height=%.2f near=%.3f far=%.3f", ortho_height, near_plane, far_plane);
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CAMERA,
+			"se_camera_set_orthographic :: invalid params height=%.2f near=%.3f far=%.3f",
+			ortho_height,
+			near_plane,
+			far_plane);
 		return;
 	}
 	camera_ptr->ortho_height = ortho_height;

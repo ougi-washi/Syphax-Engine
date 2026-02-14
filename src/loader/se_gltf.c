@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "loader/se_gltf.h"
+#include "se_debug.h"
 
 #include "syphax/s_files.h"
 #include "syphax/s_json.h"
@@ -492,11 +493,11 @@ static b8 se_gltf_parse_attribute_set(const s_json *obj, se_gltf_attribute_set *
 static b8 se_gltf_parse_asset_info(const s_json *root, se_gltf_asset_info *asset) {
 	s_json *asset_obj = s_json_get(root, "asset");
 	if (asset_obj == NULL || asset_obj->type != S_JSON_OBJECT) {
-		printf("se_gltf_load :: missing asset object\n");
+		se_log("se_gltf_load :: missing asset object");
 		return false;
 	}
 	if (!se_gltf_json_get_string_dup(asset_obj, "version", &asset->version)) {
-		printf("se_gltf_load :: asset.version missing\n");
+		se_log("se_gltf_load :: asset.version missing");
 		return false;
 	}
 	se_gltf_json_get_string_dup(asset_obj, "generator", &asset->generator);

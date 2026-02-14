@@ -3,6 +3,7 @@
 #if defined(SE_RENDER_BACKEND_OPENGL) || defined(SE_RENDER_BACKEND_GLES)
 
 #include "se_gl.h"
+#include "se_debug.h"
 #include "se_render.h"
 #include "syphax/s_files.h"
 #if defined(SE_RENDER_BACKEND_GLES)
@@ -102,7 +103,7 @@ PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer = NULL;
 		func = (func_type)(fallback); \
 	} \
 	if (!func) { \
-		fprintf(stderr, "Failed to load OpenGL function: %s\n", name); \
+		se_log("se_init_opengl :: failed to load OpenGL function: %s", name); \
 		return false; \
 	}
 
@@ -226,7 +227,7 @@ b8 se_init_opengl(void) {
 b8 se_render_init(void) {
 #if defined(SE_WINDOW_BACKEND_GLFW)
 	if (!glfwGetCurrentContext()) {
-		printf("se_render_init :: no active OpenGL context\n");
+		se_log("se_render_init :: no active OpenGL context");
 		se_render_initialized = false;
 		return false;
 	}
@@ -235,7 +236,7 @@ b8 se_render_init(void) {
 		return true;
 	}
 	if (!se_init_opengl()) {
-		fprintf(stderr, "se_render_init :: failed to load required OpenGL symbols\n");
+		se_log("se_render_init :: failed to load required OpenGL symbols");
 		se_render_initialized = false;
 		return false;
 	}
@@ -433,7 +434,7 @@ void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const s
 
 	quad->instance_buffers_dirty = true;
 
-	printf("se_quad_2d_add_instance_buffer :: buffer: %p\n", buffer);
+	se_log("se_quad_2d_add_instance_buffer :: buffer: %p", (const void*)buffer);
 }
 
 void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, const sz instance_count) {
@@ -464,7 +465,7 @@ void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, co
 
 	quad->instance_buffers_dirty = true;
 
-	printf("se_quad_2d_add_instance_buffer_mat3 :: buffer: %p\n", buffer);
+	se_log("se_quad_2d_add_instance_buffer_mat3 :: buffer: %p", (const void*)buffer);
 }
 
 void se_quad_render(se_quad *quad, const sz instance_count) {

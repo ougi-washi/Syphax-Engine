@@ -2,10 +2,11 @@
 
 #include "se_framebuffer.h"
 #include "render/se_gl.h"
+#include "se_debug.h"
 #include "se_defines.h"
 
 static void se_framebuffer_cleanup_raw(se_framebuffer *framebuffer) {
-	printf("se_framebuffer_cleanup :: framebuffer: %p\n", framebuffer);
+	se_log("se_framebuffer_cleanup :: framebuffer: %p", (void*)framebuffer);
 	if (framebuffer->framebuffer) {
 		glDeleteFramebuffers(1, &framebuffer->framebuffer);
 		framebuffer->framebuffer = 0;
@@ -71,7 +72,7 @@ se_framebuffer_handle se_framebuffer_create(const s_vec2 *size) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	printf("se_framebuffer_create :: created framebuffer %p\n", framebuffer);
+	se_log("se_framebuffer_create :: created framebuffer %p", (void*)framebuffer);
 	se_set_last_error(SE_RESULT_OK);
 	return framebuffer_handle;
 }

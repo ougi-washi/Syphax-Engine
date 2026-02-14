@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_defines.h"
+#include "se_debug.h"
 
 #include "syphax/s_files.h"
 
@@ -36,7 +37,7 @@ void se_paths_set_resource_root(const char* path) {
 
 	const sz path_len = strlen(path);
 	if (path_len >= SE_MAX_PATH_LENGTH) {
-		fprintf(stderr, "se_paths_set_resource_root :: path too long\n");
+		se_log("se_paths_set_resource_root :: path too long");
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return;
 	}

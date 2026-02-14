@@ -451,7 +451,7 @@ b8 se_navigation_find_path(const se_navigation_grid* grid, const se_navigation_c
 	se_debug_log(
 		found ? SE_DEBUG_LEVEL_DEBUG : SE_DEBUG_LEVEL_INFO,
 		SE_DEBUG_CATEGORY_NAVIGATION,
-		"A* %s start=(%d,%d) goal=(%d,%d) nodes=%zu",
+		"se_navigation_find_path :: A* %s start=(%d,%d) goal=(%d,%d) nodes=%zu",
 		found ? "found" : "failed",
 		start.x,
 		start.y,

@@ -35,7 +35,7 @@
 #define RTS_CAMERA_DEFAULT_PITCH 1.0f
 #define RTS_CAMERA_DEFAULT_DISTANCE 24.0f
 
-#define RTS_LOG_PREFIX "[99_game] "
+#define RTS_LOG_PREFIX "99_game :: "
 
 typedef enum {
 	RTS_TEAM_ALLY = 0,

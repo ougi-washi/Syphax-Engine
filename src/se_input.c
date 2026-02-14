@@ -488,7 +488,7 @@ b8 se_input_action_create(se_input_handle* input_handle, const i32 action_id, co
 		return false;
 	}
 	if (se_input_find_action(input_handle, action_id)) {
-		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_INPUT, "Action id %d already exists", action_id);
+		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_INPUT, "se_input_action_create :: action id %d already exists", action_id);
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return false;
 	}
@@ -750,8 +750,10 @@ b8 se_input_save_mappings(se_input_handle* input_handle, const c8* path) {
 		if (!action || !action->valid) {
 			continue;
 		}
-		fprintf(
-			fp,
+		c8 line[512] = {0};
+		const i32 line_len = snprintf(
+			line,
+			sizeof(line),
 			"%d,%s,%d,%d,%d,%d,%u,%d,%d,%d,%d,%.6f,%.6f,%.6f,%.6f\n",
 			action->action_id,
 			action->name,
@@ -768,6 +770,9 @@ b8 se_input_save_mappings(se_input_handle* input_handle, const c8* path) {
 			action->binding.axis.sensitivity,
 			action->binding.axis.exponent,
 			action->binding.axis.smoothing);
+		if (line_len > 0) {
+			fputs(line, fp);
+		}
 	}
 	fclose(fp);
 	se_set_last_error(SE_RESULT_OK);

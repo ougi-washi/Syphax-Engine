@@ -786,7 +786,7 @@ static void se_window_terminal_mirror_begin_frame(void) {
 	}
 	if (!g_terminal_mirror.ansi_initialized) {
 		FILE* out = se_window_terminal_mirror_output_stream();
-		fprintf(out, "\033[?1049h\033[2J\033[H\033[?25l");
+		fputs("\033[?1049h\033[2J\033[H\033[?25l", out);
 		fflush(out);
 		g_terminal_mirror.ansi_initialized = true;
 	}
@@ -847,7 +847,7 @@ static void se_window_terminal_mirror_present(se_window* window_ptr) {
 			se_debug_log(
 				SE_DEBUG_LEVEL_INFO,
 				SE_DEBUG_CATEGORY_WINDOW,
-				"Terminal mirror enabled (fps=%u, cols=%u, rows=%u, hide_window=%d)",
+				"se_window_terminal_mirror_present :: terminal mirror enabled (fps=%u, cols=%u, rows=%u, hide_window=%d)",
 				g_terminal_mirror.target_fps,
 				g_terminal_mirror.columns,
 				g_terminal_mirror.rows,
@@ -862,7 +862,7 @@ static void se_window_terminal_mirror_present(se_window* window_ptr) {
 
 	static const c8 block_glyph[] = "\xE2\x96\x88";
 	FILE* out = se_window_terminal_mirror_output_stream();
-	fprintf(out, "\033[H");
+	fputs("\033[H", out);
 
 	u8 current_fg[3] = {255, 255, 255};
 	b8 has_color = false;
@@ -881,7 +881,17 @@ static void se_window_terminal_mirror_present(se_window* window_ptr) {
 			const u8 g = g_terminal_mirror.pixel_buffer[pixel_index + 1];
 			const u8 b = g_terminal_mirror.pixel_buffer[pixel_index + 2];
 			if (!has_color || r != current_fg[0] || g != current_fg[1] || b != current_fg[2]) {
-				fprintf(out, "\033[38;2;%u;%u;%um", (unsigned)r, (unsigned)g, (unsigned)b);
+				c8 color_ansi[48] = {0};
+				const i32 color_ansi_len = snprintf(
+					color_ansi,
+					sizeof(color_ansi),
+					"\033[38;2;%u;%u;%um",
+					(unsigned)r,
+					(unsigned)g,
+					(unsigned)b);
+				if (color_ansi_len > 0) {
+					fputs(color_ansi, out);
+				}
 				current_fg[0] = r;
 				current_fg[1] = g;
 				current_fg[2] = b;
@@ -894,7 +904,7 @@ static void se_window_terminal_mirror_present(se_window* window_ptr) {
 		}
 	}
 	// Return cursor to home so periodic logs do not cause terminal scroll/jitter.
-	fprintf(out, "\033[0m\033[H");
+	fputs("\033[0m\033[H", out);
 	fflush(out);
 }
 
@@ -1065,9 +1075,14 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
 	se_window* window = s_array_get(&user_ptr->ctx->windows, user_ptr->window);
 	window->width = width;
 	window->height = height;
-	se_debug_log(SE_DEBUG_LEVEL_DEBUG, SE_DEBUG_CATEGORY_WINDOW, "Framebuffer resized: %d x %d", width, height);
+	se_debug_log(
+		SE_DEBUG_LEVEL_DEBUG,
+		SE_DEBUG_CATEGORY_WINDOW,
+		"framebuffer_size_callback :: framebuffer resized: %d x %d",
+		width,
+		height);
 	glViewport(0, 0, width, height);
-	printf("frambuffer_size_change_fallback\n");
+	se_log("framebuffer_size_callback :: fallback resize handler");
 	for (sz i = 0; i < s_array_get_size(&window->resize_handles); ++i) {
 		se_resize_handle* current_event_ptr = s_array_get(&window->resize_handles, s_array_handle(&window->resize_handles, (u32)i));
 		if (current_event_ptr && current_event_ptr->callback) {
@@ -1077,7 +1092,7 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
 }
 
 void gl_error_callback(i32 error, const c8* description) {
-	printf("GLFW Error %d: %s\n", error, description);
+	se_log("gl_error_callback :: GLFW Error %d: %s", error, description ? description : "");
 }
 
 se_window_handle se_window_create(const char* title, const u32 width, const u32 height) {
@@ -1877,7 +1892,7 @@ void se_window_set_target_fps(const se_window_handle window, const u16 fps) {
 	se_window* window_ptr = se_window_from_handle(context, window);
 	s_assertf(window_ptr, "se_window_set_target_fps :: window is null");
 	if (fps == 0) {
-		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_WINDOW, "Ignored target_fps=0");
+		se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_WINDOW, "se_window_set_target_fps :: ignored target_fps=0");
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return;
 	}
@@ -1945,7 +1960,7 @@ void se_window_update_input_event(const i32 input_event_id, const se_window_hand
 		found_event->on_stop_interact_callback = on_stop_interact_callback;
 		found_event->callback_data = callback_data;
 	} else {
-		printf("se_window_update_input_event :: failed to find event with id: %d\n", input_event_id);
+		se_log("se_window_update_input_event :: failed to find event with id: %d", input_event_id);
 	}
 }
 
@@ -2008,7 +2023,7 @@ void se_window_destroy(const se_window_handle window) {
 		se_debug_log(
 			SE_DEBUG_LEVEL_WARN,
 			SE_DEBUG_CATEGORY_WINDOW,
-			"Refusing to destroy last window while context resources are still alive; call se_context_destroy() instead.");
+			"se_window_destroy :: refusing to destroy last window while context resources are still alive; call se_context_destroy() instead.");
 		se_set_last_error(SE_RESULT_UNSUPPORTED);
 		return;
 	}
@@ -2058,7 +2073,10 @@ void se_window_destroy_all(void){
 		const sz windows_before = s_array_get_size(&windows_registry);
 		se_window_destroy(entry->window);
 		if (s_array_get_size(&windows_registry) == windows_before) {
-			se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_WINDOW, "se_window_destroy_all stopped because teardown made no progress");
+			se_debug_log(
+				SE_DEBUG_LEVEL_WARN,
+				SE_DEBUG_CATEGORY_WINDOW,
+				"se_window_destroy_all :: stopped because teardown made no progress");
 			break;
 		}
 	}

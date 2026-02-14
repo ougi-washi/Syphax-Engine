@@ -55,29 +55,16 @@ static void se_debug_format_timestamp(c8* out_timestamp, const sz out_timestamp_
 	}
 }
 
-static const c8* se_debug_level_name(const se_debug_level level) {
-	switch (level) {
-		case SE_DEBUG_LEVEL_TRACE: return "TRACE";
-		case SE_DEBUG_LEVEL_DEBUG: return "DEBUG";
-		case SE_DEBUG_LEVEL_INFO: return "INFO";
-		case SE_DEBUG_LEVEL_WARN: return "WARN";
-		case SE_DEBUG_LEVEL_ERROR: return "ERROR";
-		default: return "UNKNOWN";
+static void se_debug_write_line(FILE* stream, const c8* line) {
+	if (!stream || !line) {
+		return;
 	}
-}
-
-static const c8* se_debug_category_name(const se_debug_category category) {
-	switch (category) {
-		case SE_DEBUG_CATEGORY_WINDOW: return "WINDOW";
-		case SE_DEBUG_CATEGORY_INPUT: return "INPUT";
-		case SE_DEBUG_CATEGORY_CAMERA: return "CAMERA";
-		case SE_DEBUG_CATEGORY_UI: return "UI";
-		case SE_DEBUG_CATEGORY_RENDER: return "RENDER";
-		case SE_DEBUG_CATEGORY_NAVIGATION: return "NAVIGATION";
-		case SE_DEBUG_CATEGORY_SCENE: return "SCENE";
-		case SE_DEBUG_CATEGORY_CORE: return "CORE";
-		default: return "GENERIC";
+	const sz line_size = strlen(line);
+	if (line_size > 0) {
+		fwrite(line, 1, line_size, stream);
 	}
+	fputc('\n', stream);
+	fflush(stream);
 }
 
 static void se_debug_trace_events_init(void) {
@@ -160,10 +147,14 @@ static void se_debug_frame_timing_finalize(const f64 now_seconds) {
 }
 
 static void se_debug_log_default(const se_debug_level level, const se_debug_category category, const c8* message, void* user_data) {
+	(void)level;
+	(void)category;
 	(void)user_data;
 	c8 timestamp[32] = {0};
+	c8 line[1152] = {0};
 	se_debug_format_timestamp(timestamp, sizeof(timestamp));
-	fprintf(stderr, "[%s][%s][%s] %s\n", timestamp, se_debug_level_name(level), se_debug_category_name(category), message ? message : "");
+	snprintf(line, sizeof(line), "[%s] %s", timestamp, message ? message : "");
+	se_debug_write_line(stderr, line);
 }
 
 void se_debug_set_level(const se_debug_level level) {
@@ -210,10 +201,11 @@ void se_log(const c8* fmt, ...) {
 	vsnprintf(message, sizeof(message), fmt, args);
 	va_end(args);
 	se_debug_format_timestamp(timestamp, sizeof(timestamp));
+	c8 line[1152] = {0};
+	snprintf(line, sizeof(line), "[%s] %s", timestamp, message);
 
 	pthread_mutex_lock(&g_log_mutex);
-	fprintf(stdout, "[%s] %s\n", timestamp, message);
-	fflush(stdout);
+	se_debug_write_line(stdout, line);
 	pthread_mutex_unlock(&g_log_mutex);
 }
 
@@ -250,7 +242,14 @@ b8 se_debug_validate(const b8 condition, const se_result error_code, const c8* e
 		return true;
 	}
 	se_set_last_error(error_code);
-	se_debug_log(SE_DEBUG_LEVEL_ERROR, SE_DEBUG_CATEGORY_CORE, "Validation failed: `%s` at %s:%d -> %s", expression, file, line, se_result_str(error_code));
+	se_debug_log(
+		SE_DEBUG_LEVEL_ERROR,
+		SE_DEBUG_CATEGORY_CORE,
+		"se_debug_validate :: validation failed: `%s` at %s:%d -> %s",
+		expression,
+		file,
+		line,
+		se_result_str(error_code));
 	return false;
 }
 

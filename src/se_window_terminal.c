@@ -158,7 +158,7 @@ static void se_window_terminal_input_enable(void) {
 	}
 
 	// Enable UTF-8 SGR mouse tracking for button, drag and scroll events.
-	printf("\033[?1000h\033[?1002h\033[?1006h");
+	fputs("\033[?1000h\033[?1002h\033[?1006h", stdout);
 	fflush(stdout);
 }
 
@@ -281,10 +281,10 @@ static void se_window_terminal_present(se_window* window_ptr) {
 		return;
 	}
 	if (!surface->present_initialized) {
-		printf("\033[2J");
+		fputs("\033[2J", stdout);
 		surface->present_initialized = true;
 	}
-	printf("\033[H\033[?25l");
+	fputs("\033[H\033[?25l", stdout);
 
 	u8 current_fg[3] = {255, 255, 255};
 	u8 current_bg[3] = {0, 0, 0};
@@ -308,7 +308,10 @@ static void se_window_terminal_present(se_window* window_ptr) {
 			if (!has_color ||
 				fg[0] != current_fg[0] || fg[1] != current_fg[1] || fg[2] != current_fg[2] ||
 				bg[0] != current_bg[0] || bg[1] != current_bg[1] || bg[2] != current_bg[2]) {
-				printf(
+				c8 color_ansi[72] = {0};
+				const i32 color_ansi_len = snprintf(
+					color_ansi,
+					sizeof(color_ansi),
 					"\033[38;2;%u;%u;%um\033[48;2;%u;%u;%um",
 					(unsigned)fg[0],
 					(unsigned)fg[1],
@@ -316,6 +319,9 @@ static void se_window_terminal_present(se_window* window_ptr) {
 					(unsigned)bg[0],
 					(unsigned)bg[1],
 					(unsigned)bg[2]);
+				if (color_ansi_len > 0) {
+					fputs(color_ansi, stdout);
+				}
 				current_fg[0] = fg[0];
 				current_fg[1] = fg[1];
 				current_fg[2] = fg[2];
@@ -331,7 +337,7 @@ static void se_window_terminal_present(se_window* window_ptr) {
 			putchar('\n');
 		}
 	}
-	printf("\033[0m");
+	fputs("\033[0m", stdout);
 	fflush(stdout);
 }
 
@@ -343,7 +349,7 @@ static void se_window_terminal_shutdown_surface(se_window* window_ptr) {
 	s_array_clear(&surface->cells);
 	free(surface);
 	window_ptr->handle = NULL;
-	printf("\033[0m\033[?25h");
+	fputs("\033[0m\033[?25h", stdout);
 	fflush(stdout);
 }
 
@@ -693,7 +699,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	s_array_add(&windows_registry, window_handle);
 	se_window_terminal_input_enable();
 
-	printf("[terminal] window: %s (%u x %u)\n", title, new_window->width, new_window->height);
+	se_log("se_window_create :: [terminal] window: %s (%u x %u)", title, new_window->width, new_window->height);
 	se_set_last_error(SE_RESULT_OK);
 	return window_handle;
 }

@@ -46,7 +46,7 @@ b8 se_ext_require(const se_ext_feature feature) {
 	se_debug_log(
 		SE_DEBUG_LEVEL_WARN,
 		SE_DEBUG_CATEGORY_RENDER,
-		"Extension '%s' is not supported by the active backend/profile",
+		"se_ext_require :: extension '%s' is not supported by the active backend/profile",
 		se_ext_feature_name(feature));
 	return false;
 }

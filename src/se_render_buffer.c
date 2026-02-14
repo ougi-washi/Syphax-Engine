@@ -2,13 +2,14 @@
 
 #include "se_render_buffer.h"
 #include "render/se_gl.h"
+#include "se_debug.h"
 
 static se_render_buffer* se_render_buffer_from_handle(se_context *ctx, const se_render_buffer_handle buffer) {
 	return s_array_get(&ctx->render_buffers, buffer);
 }
 
 static void se_render_buffer_cleanup_raw(se_render_buffer *buffer) {
-	printf("se_render_buffer_cleanup :: buffer: %p\n", buffer);
+	se_log("se_render_buffer_cleanup :: buffer: %p", (void*)buffer);
 	if (buffer->framebuffer) {
 		glDeleteFramebuffers(1, &buffer->framebuffer);
 		buffer->framebuffer = 0;

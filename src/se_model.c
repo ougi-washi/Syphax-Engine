@@ -1,6 +1,7 @@
 // Syphax Engine - Ougi Washi
 
 #include "se_model.h"
+#include "se_debug.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
 
@@ -256,7 +257,7 @@ static b8 se_ensure_capacity(void **data, u32 *capacity, u32 needed, sz elem_siz
 
 	void *new_data = realloc(*data, (sz)new_capacity * elem_size);
 	if (!new_data) {
-		fprintf(stderr, "se_model_load_obj :: out of memory for %s\n", label);
+		se_log("se_model_load_obj :: out of memory for %s", label ? label : "unknown");
 		return false;
 	}
 
@@ -455,7 +456,7 @@ se_model_handle se_model_load_obj_ex(const char *path, const se_shaders_ptr *sha
 				u32 ti = (i == 0) ? t1 - 1 : (i == 1) ? t2 - 1 : t3 - 1;
 
 				if (vi >= vertex_count || ni >= normal_count || ti >= uv_count) {
-					fprintf(stderr, "OBJ file contains invalid face indices\n");
+					se_log("se_model_load_obj :: OBJ file contains invalid face indices");
 					continue;
 				}
 
@@ -485,7 +486,7 @@ se_model_handle se_model_load_obj_ex(const char *path, const se_shaders_ptr *sha
 					u32 ni = (i == 0) ? n1 - 1 : (i == 1) ? n2 - 1 : n3 - 1;
 
 					if (vi >= vertex_count || ni >= normal_count) {
-						fprintf(stderr, "OBJ file contains invalid face indices\n");
+						se_log("se_model_load_obj :: OBJ file contains invalid face indices");
 						continue;
 					}
 
