@@ -358,13 +358,12 @@ static rts_unit_kind rts_pick_unit_kind_from_object(const rts_game *game, const 
 }
 
 static void rts_log(const c8 *fmt, ...) {
+	c8 message[1024] = {0};
 	va_list args;
 	va_start(args, fmt);
-	printf(RTS_LOG_PREFIX);
-	vprintf(fmt, args);
-	printf("\n");
-	fflush(stdout);
+	vsnprintf(message, sizeof(message), fmt, args);
 	va_end(args);
+	se_log("%s%s", RTS_LOG_PREFIX, message);
 }
 
 static b8 rts_env_flag_enabled(const c8 *key) {

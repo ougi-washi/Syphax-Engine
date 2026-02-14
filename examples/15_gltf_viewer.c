@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "loader/se_loader.h"
-#include "se_camera_controller.h"
+#include "se_camera.h"
 
 #include <stdio.h>
 

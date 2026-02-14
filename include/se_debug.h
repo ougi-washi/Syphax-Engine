@@ -69,6 +69,7 @@ extern se_debug_level se_debug_get_level(void);
 extern void se_debug_set_category_mask(const u32 category_mask);
 extern u32 se_debug_get_category_mask(void);
 extern void se_debug_set_log_callback(se_debug_log_callback callback, void* user_data);
+extern void se_log(const c8* fmt, ...);
 extern void se_debug_log(const se_debug_level level, const se_debug_category category, const c8* fmt, ...);
 
 extern b8 se_debug_validate(const b8 condition, const se_result error_code, const c8* expression, const c8* file, const i32 line);

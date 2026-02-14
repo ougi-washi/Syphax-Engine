@@ -4,7 +4,6 @@
 #include "se_window.h"
 #include "se_render.h"
 #include "se_camera.h"
-#include "se_camera_controller.h"
 #include "se_sdf.h"
 
 int main(void) {

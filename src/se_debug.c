@@ -3,6 +3,7 @@
 #include "se_debug.h"
 #include "se_text.h"
 
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,11 +24,35 @@ static se_debug_frame_timing g_frame_timing_last = {0};
 static b8 g_frame_active = false;
 static f64 g_frame_begin_time = 0.0;
 static u64 g_frame_counter = 0;
+static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static f64 se_debug_now_seconds(void) {
 	struct timespec ts = {0};
 	timespec_get(&ts, TIME_UTC);
 	return (f64)ts.tv_sec + (f64)ts.tv_nsec / 1000000000.0;
+}
+
+static void se_debug_format_timestamp(c8* out_timestamp, const sz out_timestamp_size) {
+	if (!out_timestamp || out_timestamp_size == 0) {
+		return;
+	}
+	out_timestamp[0] = '\0';
+	const time_t now_seconds = time(NULL);
+	struct tm local_time = {0};
+#if defined(_WIN32)
+	if (localtime_s(&local_time, &now_seconds) != 0) {
+		snprintf(out_timestamp, out_timestamp_size, "0000-00-00|00:00:00");
+		return;
+	}
+#else
+	if (localtime_r(&now_seconds, &local_time) == NULL) {
+		snprintf(out_timestamp, out_timestamp_size, "0000-00-00|00:00:00");
+		return;
+	}
+#endif
+	if (strftime(out_timestamp, out_timestamp_size, "%Y-%m-%d|%H:%M:%S", &local_time) == 0) {
+		snprintf(out_timestamp, out_timestamp_size, "0000-00-00|00:00:00");
+	}
 }
 
 static const c8* se_debug_level_name(const se_debug_level level) {
@@ -136,32 +161,64 @@ static void se_debug_frame_timing_finalize(const f64 now_seconds) {
 
 static void se_debug_log_default(const se_debug_level level, const se_debug_category category, const c8* message, void* user_data) {
 	(void)user_data;
-	fprintf(stderr, "[%s][%s] %s\n", se_debug_level_name(level), se_debug_category_name(category), message ? message : "");
+	c8 timestamp[32] = {0};
+	se_debug_format_timestamp(timestamp, sizeof(timestamp));
+	fprintf(stderr, "[%s][%s][%s] %s\n", timestamp, se_debug_level_name(level), se_debug_category_name(category), message ? message : "");
 }
 
 void se_debug_set_level(const se_debug_level level) {
+	pthread_mutex_lock(&g_log_mutex);
 	g_debug_level = level;
+	pthread_mutex_unlock(&g_log_mutex);
 }
 
 se_debug_level se_debug_get_level(void) {
-	return g_debug_level;
+	pthread_mutex_lock(&g_log_mutex);
+	const se_debug_level level = g_debug_level;
+	pthread_mutex_unlock(&g_log_mutex);
+	return level;
 }
 
 void se_debug_set_category_mask(const u32 category_mask) {
+	pthread_mutex_lock(&g_log_mutex);
 	g_debug_category_mask = category_mask;
+	pthread_mutex_unlock(&g_log_mutex);
 }
 
 u32 se_debug_get_category_mask(void) {
-	return g_debug_category_mask;
+	pthread_mutex_lock(&g_log_mutex);
+	const u32 category_mask = g_debug_category_mask;
+	pthread_mutex_unlock(&g_log_mutex);
+	return category_mask;
 }
 
 void se_debug_set_log_callback(se_debug_log_callback callback, void* user_data) {
+	pthread_mutex_lock(&g_log_mutex);
 	g_log_callback = callback;
 	g_log_user_data = user_data;
+	pthread_mutex_unlock(&g_log_mutex);
+}
+
+void se_log(const c8* fmt, ...) {
+	if (!fmt) {
+		return;
+	}
+	c8 message[1024] = {0};
+	c8 timestamp[32] = {0};
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(message, sizeof(message), fmt, args);
+	va_end(args);
+	se_debug_format_timestamp(timestamp, sizeof(timestamp));
+
+	pthread_mutex_lock(&g_log_mutex);
+	fprintf(stdout, "[%s] %s\n", timestamp, message);
+	fflush(stdout);
+	pthread_mutex_unlock(&g_log_mutex);
 }
 
 void se_debug_log(const se_debug_level level, const se_debug_category category, const c8* fmt, ...) {
-	if (level < g_debug_level || ((u32)category & g_debug_category_mask) == 0u) {
+	if (!fmt) {
 		return;
 	}
 	c8 message[1024] = {0};
@@ -169,11 +226,23 @@ void se_debug_log(const se_debug_level level, const se_debug_category category, 
 	va_start(args, fmt);
 	vsnprintf(message, sizeof(message), fmt, args);
 	va_end(args);
-	if (g_log_callback) {
-		g_log_callback(level, category, message, g_log_user_data);
-	} else {
-		se_debug_log_default(level, category, message, NULL);
+
+	se_debug_log_callback callback = NULL;
+	void* callback_user_data = NULL;
+	pthread_mutex_lock(&g_log_mutex);
+	if (level < g_debug_level || ((u32)category & g_debug_category_mask) == 0u) {
+		pthread_mutex_unlock(&g_log_mutex);
+		return;
 	}
+	callback = g_log_callback;
+	callback_user_data = g_log_user_data;
+	if (callback == NULL) {
+		se_debug_log_default(level, category, message, NULL);
+		pthread_mutex_unlock(&g_log_mutex);
+		return;
+	}
+	pthread_mutex_unlock(&g_log_mutex);
+	callback(level, category, message, callback_user_data);
 }
 
 b8 se_debug_validate(const b8 condition, const se_result error_code, const c8* expression, const c8* file, const i32 line) {
