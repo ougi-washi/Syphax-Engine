@@ -19,7 +19,6 @@ int main(void) {
 	);
 
 	se_text_handle_destroy(text_handle);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

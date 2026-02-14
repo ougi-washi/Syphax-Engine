@@ -32,6 +32,20 @@ static b8 se_font_set_path(se_font* font, const c8* path) {
 	return true;
 }
 
+static void se_font_cleanup(se_font* font) {
+	if (!font) {
+		return;
+	}
+	if (font->atlas_texture != 0) {
+		glDeleteTextures(1, &font->atlas_texture);
+		font->atlas_texture = 0;
+	}
+	s_array_clear(&font->path);
+	s_array_clear(&font->packed_characters);
+	s_array_clear(&font->aligned_quads);
+	memset(font, 0, sizeof(*font));
+}
+
 se_text_handle* se_text_handle_create(const u32 fonts_count) {
 	se_context *ctx = se_current_context();
 	if (!ctx) {
@@ -105,7 +119,7 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	memset(new_font, 0, sizeof(*new_font));
 	s_array_init(&new_font->path);
 	if (!se_font_set_path(new_font, path)) {
-		s_array_clear(&new_font->path);
+		se_font_cleanup(new_font);
 		s_array_remove(&ctx->fonts, font_handle);
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return S_HANDLE_NULL;
@@ -114,14 +128,14 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	c8 new_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!se_paths_resolve_resource_path(new_path, SE_MAX_PATH_LENGTH, path)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		s_array_clear(&new_font->path);
+		se_font_cleanup(new_font);
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
 	u8* font_file_data = NULL;
 	if (!s_file_read_binary(new_path, &font_file_data, NULL)) {
 		se_set_last_error(SE_RESULT_IO);
-		s_array_clear(&new_font->path);
+		se_font_cleanup(new_font);
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
@@ -132,7 +146,7 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	if (font_count == 0) {
 		free(font_file_data);
 		se_set_last_error(SE_RESULT_UNSUPPORTED);
-		s_array_clear(&new_font->path);
+		se_font_cleanup(new_font);
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
@@ -140,6 +154,13 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	new_font->atlas_width = 1024;
 	new_font->atlas_height = 1024;
 	u8* atlas_bitmap = malloc(new_font->atlas_width * new_font->atlas_height);
+	if (atlas_bitmap == NULL) {
+		free(font_file_data);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		se_font_cleanup(new_font);
+		s_array_remove(&ctx->fonts, font_handle);
+		return S_HANDLE_NULL;
+	}
 
 	// There are 95 ASCII characters from ASCII 32(Space) to ASCII 126(~)
 	// ASCII 32(Space) to ASCII 126(~) are the commonly used characters in text 
@@ -184,6 +205,15 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 
 	se_set_last_error(SE_RESULT_OK);
 	return font_handle;
+}
+
+void se_font_destroy(const se_font_handle font) {
+	se_context *ctx = se_current_context();
+	s_assertf(ctx, "se_font_destroy :: ctx is null");
+	se_font *font_ptr = s_array_get(&ctx->fonts, font);
+	s_assertf(font_ptr, "se_font_destroy :: font is null");
+	se_font_cleanup(font_ptr);
+	s_array_remove(&ctx->fonts, font);
 }
 
 void se_text_render(se_text_handle* text_handle, const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset) {

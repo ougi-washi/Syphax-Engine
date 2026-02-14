@@ -29,6 +29,18 @@ jobs:
     - name: Build
       run: ${{github.workspace}}/build.sh
 
+    - name: Test (context lifecycle teardown regression)
+      run: |
+            timeout 25s env \
+              SE_TERMINAL_RENDER=1 \
+              SE_TERMINAL_HIDE_WINDOW=1 \
+              ${{github.workspace}}/bin/21_context_lifecycle
+
+    - name: Test (GLTF GLB roundtrip)
+      run: |
+            timeout 15s \
+              ${{github.workspace}}/bin/14_gltf_load
+
     - name: Test (99_game terminal autotest)
       run: |
             timeout 25s env \
@@ -43,3 +55,60 @@ jobs:
       run: |
             timeout 25s \
               ${{github.workspace}}/bin/99_game --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05
+
+  gltf-portability-strict:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Install dependencies
+      run: |
+            sudo apt-get update
+            sudo apt-get install -y cmake build-essential pkg-config
+            sudo apt-get install -y libwayland-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev
+            sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
+            sudo apt-get install -y libpulse-dev libasound-dev libsndio-dev libjack-jackd2-dev
+
+    - name: Build (strict alias/alignment + UBSan, GLTF target)
+      run: |
+            cmake -S ${{github.workspace}} -B ${{github.workspace}}/build_strict \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              -DSE_BACKEND_RENDER=gl \
+              -DSE_BACKEND_PLATFORM=desktop_glfw \
+              -DCMAKE_C_FLAGS="-Wall -O0 -Wcast-align=strict -Wstrict-aliasing=2 -Werror=cast-align -Werror=strict-aliasing -fsanitize=undefined -fno-sanitize-recover=undefined" \
+              -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined"
+            cmake --build ${{github.workspace}}/build_strict --parallel "$(nproc)" --target 14_gltf_load
+
+    - name: Test (strict GLTF GLB roundtrip)
+      run: |
+            timeout 20s \
+              ${{github.workspace}}/bin/14_gltf_load
+
+  gltf-portability-arm64:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Install dependencies
+      run: |
+            sudo apt-get update
+            sudo apt-get install -y cmake build-essential pkg-config
+            sudo apt-get install -y libwayland-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev
+            sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
+            sudo apt-get install -y libpulse-dev libasound-dev libsndio-dev libjack-jackd2-dev
+
+    - name: Build (arm64 GLTF target)
+      run: |
+            ${{github.workspace}}/build.sh --clean 14_gltf_load
+
+    - name: Test (arm64 GLTF GLB roundtrip)
+      run: |
+            timeout 20s \
+              ${{github.workspace}}/bin/14_gltf_load

@@ -14,8 +14,6 @@
 #include "se_ui.h"
 #include "se_window.h"
 
-#include "render/se_gl.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -37,23 +35,16 @@
 
 se_context *se_global_context = NULL;
 SE_THREAD_LOCAL se_context *se_tls_context = NULL;
+static se_context_destroy_report se_last_destroy_report = {0};
 
-static void se_context_destroy_fonts(se_context *context) {
-	for (sz i = 0; i < s_array_get_size(&context->fonts); ++i) {
-		se_font *font = s_array_get(&context->fonts, s_array_handle(&context->fonts, (u32)i));
-		if (font == NULL) {
-			continue;
-		}
-		if (font->atlas_texture != 0) {
-			glDeleteTextures(1, &font->atlas_texture);
-			font->atlas_texture = 0;
-		}
-		s_array_clear(&font->path);
-		s_array_clear(&font->packed_characters);
-		s_array_clear(&font->aligned_quads);
-		memset(font, 0, sizeof(*font));
+b8 se_context_get_last_destroy_report(se_context_destroy_report *out_report) {
+	if (out_report == NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
 	}
-	s_array_clear(&context->fonts);
+	*out_report = se_last_destroy_report;
+	se_set_last_error(SE_RESULT_OK);
+	return true;
 }
 
 static void se_context_destroy_ui_storage(se_context *context) {
@@ -155,6 +146,7 @@ se_context *se_context_create(void) {
 void se_context_destroy(se_context *context) {
 	s_assertf(context, "se_context_destroy :: context is null");
 	se_context *prev_ctx = se_push_tls_context(context);
+	memset(&se_last_destroy_report, 0, sizeof(se_last_destroy_report));
 	se_context_log_leaks(context);
 
 	se_context_destroy_ui_storage(context);
@@ -183,49 +175,57 @@ void se_context_destroy(se_context *context) {
 		se_object_3d_destroy(object_handle);
 	}
 
-	for (sz i = 0; i < s_array_get_size(&context->models); ++i) {
-		se_model_handle model_handle = s_array_handle(&context->models, (u32)i);
+	while (s_array_get_size(&context->models) > 0) {
+		se_model_handle model_handle = s_array_handle(&context->models, (u32)(s_array_get_size(&context->models) - 1));
 		se_model_destroy(model_handle);
+		se_last_destroy_report.models++;
 	}
-	s_array_clear(&context->models);
 
-	for (sz i = 0; i < s_array_get_size(&context->cameras); ++i) {
-		se_camera_handle camera_handle = s_array_handle(&context->cameras, (u32)i);
+	while (s_array_get_size(&context->cameras) > 0) {
+		se_camera_handle camera_handle = s_array_handle(&context->cameras, (u32)(s_array_get_size(&context->cameras) - 1));
 		se_camera_destroy(camera_handle);
+		se_last_destroy_report.cameras++;
 	}
-	s_array_clear(&context->cameras);
 
-	for (sz i = 0; i < s_array_get_size(&context->framebuffers); ++i) {
-		se_framebuffer_handle framebuffer_handle = s_array_handle(&context->framebuffers, (u32)i);
+	while (s_array_get_size(&context->framebuffers) > 0) {
+		se_framebuffer_handle framebuffer_handle = s_array_handle(&context->framebuffers, (u32)(s_array_get_size(&context->framebuffers) - 1));
 		se_framebuffer_destroy(framebuffer_handle);
+		se_last_destroy_report.framebuffers++;
 	}
-	s_array_clear(&context->framebuffers);
 
-	for (sz i = 0; i < s_array_get_size(&context->render_buffers); ++i) {
-		se_render_buffer_handle buffer_handle = s_array_handle(&context->render_buffers, (u32)i);
+	while (s_array_get_size(&context->render_buffers) > 0) {
+		se_render_buffer_handle buffer_handle = s_array_handle(&context->render_buffers, (u32)(s_array_get_size(&context->render_buffers) - 1));
 		se_render_buffer_destroy(buffer_handle);
+		se_last_destroy_report.render_buffers++;
 	}
-	s_array_clear(&context->render_buffers);
 
-	for (sz i = 0; i < s_array_get_size(&context->shaders); ++i) {
-		se_shader_handle shader_handle = s_array_handle(&context->shaders, (u32)i);
+	while (s_array_get_size(&context->shaders) > 0) {
+		se_shader_handle shader_handle = s_array_handle(&context->shaders, (u32)(s_array_get_size(&context->shaders) - 1));
 		se_shader_destroy(shader_handle);
+		se_last_destroy_report.shaders++;
 	}
-	s_array_clear(&context->shaders);
 
-	for (sz i = 0; i < s_array_get_size(&context->textures); ++i) {
-		se_texture_handle texture_handle = s_array_handle(&context->textures, (u32)i);
+	while (s_array_get_size(&context->textures) > 0) {
+		se_texture_handle texture_handle = s_array_handle(&context->textures, (u32)(s_array_get_size(&context->textures) - 1));
 		se_texture_destroy(texture_handle);
+		se_last_destroy_report.textures++;
 	}
-	s_array_clear(&context->textures);
 
-	se_context_destroy_fonts(context);
+	while (s_array_get_size(&context->fonts) > 0) {
+		se_font_handle font_handle = s_array_handle(&context->fonts, (u32)(s_array_get_size(&context->fonts) - 1));
+		se_font_destroy(font_handle);
+		se_last_destroy_report.fonts++;
+	}
 
-	for (sz i = 0; i < s_array_get_size(&context->windows); ++i) {
-		se_window_handle window_handle = s_array_handle(&context->windows, (u32)i);
+	while (s_array_get_size(&context->windows) > 0) {
+		se_window_handle window_handle = s_array_handle(&context->windows, (u32)(s_array_get_size(&context->windows) - 1));
+		const sz windows_before = s_array_get_size(&context->windows);
 		se_window_destroy(window_handle);
+		if (s_array_get_size(&context->windows) == windows_before) {
+			s_array_remove(&context->windows, window_handle);
+		}
+		se_last_destroy_report.windows++;
 	}
-	s_array_clear(&context->windows);
 
 	s_array_clear(&context->global_uniforms);
 

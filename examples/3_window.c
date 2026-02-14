@@ -18,7 +18,6 @@ int main(void) {
 		se_window_tick(window);
 		se_window_present_frame(window, &clear_color);
 	}
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

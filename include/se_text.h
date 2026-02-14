@@ -33,6 +33,7 @@ typedef struct se_text_handle {
 extern se_text_handle* se_text_handle_create(const u32 fonts_count);
 extern void se_text_handle_destroy(se_text_handle* text_handle);
 extern se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const f32 size);
+extern void se_font_destroy(const se_font_handle font);
 extern void se_text_render(se_text_handle* text_handle, const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset);
 
 #endif // SE_TEXT_H

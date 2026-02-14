@@ -55,6 +55,17 @@ typedef struct se_context {
 	se_text_handle *ui_text_handle;
 } se_context;
 
+typedef struct {
+	u32 models;
+	u32 cameras;
+	u32 framebuffers;
+	u32 render_buffers;
+	u32 shaders;
+	u32 textures;
+	u32 fonts;
+	u32 windows;
+} se_context_destroy_report;
+
 extern se_context *se_global_context;
 extern SE_THREAD_LOCAL se_context *se_tls_context;
 
@@ -89,5 +100,9 @@ static inline void se_pop_tls_context(se_context *prev) {
 }
 
 extern se_context *se_context_create(void);
+// Canonical teardown entry-point. It destroys every resource owned by `context`,
+// including windows, then shuts down backend state when the last window is gone.
+// Prefer this over destroying the final window manually.
 extern void se_context_destroy(se_context *context);
+extern b8 se_context_get_last_destroy_report(se_context_destroy_report *out_report);
 #endif // SE_CONTEXT_H

@@ -74,7 +74,6 @@ int main(void) {
 		se_ui_element_destroy(button);
 		se_ui_element_destroy(slider);
 		se_ui_element_destroy(checkbox);
-		se_window_destroy(window);
 		se_context_destroy(ctx);
 		return 0;
 	}
@@ -110,10 +109,6 @@ int main(void) {
 		se_ui_element_render_to_screen(slider, window);
 		se_ui_element_render_to_screen(checkbox, window);
 		se_window_render_screen(window);
-
-		if (se_window_get_time(window) - start > 3.0) {
-			break;
-		}
 	}
 
 	printf(
@@ -125,7 +120,6 @@ int main(void) {
 	se_ui_element_destroy(button);
 	se_ui_element_destroy(slider);
 	se_ui_element_destroy(checkbox);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

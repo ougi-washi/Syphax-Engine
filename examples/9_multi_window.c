@@ -35,9 +35,6 @@ i32 main(void) {
 		se_window_present(window_2);
 	}
 
-	se_window_destroy(window_1);
-	se_window_destroy(window_2);
-	se_window_destroy(window_main);
 	se_context_destroy(ctx);
 	return 0;
 }

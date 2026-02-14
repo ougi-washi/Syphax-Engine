@@ -164,7 +164,6 @@ i32 main(void) {
 	}
 
 	se_ui_element_destroy(root);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

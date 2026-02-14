@@ -67,5 +67,5 @@ int main(void) {
 	if (camera_controller) se_camera_controller_destroy(camera_controller);
 	se_camera_destroy(camera);
 	se_sdf_renderer_destroy(renderer); se_sdf_scene_destroy(scene); se_sdf_shutdown();
-	se_window_destroy(window); se_context_destroy(context); return 0;
+	se_context_destroy(context); return 0;
 }

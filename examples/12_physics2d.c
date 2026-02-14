@@ -99,7 +99,6 @@ int main(void) {
 	}
 
 	se_physics_world_2d_destroy(world);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

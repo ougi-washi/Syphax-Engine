@@ -233,6 +233,8 @@ typedef struct se_window {
 
 typedef s_array(se_window, se_windows);
 
+// Window APIs currently support one active owning context at a time.
+// Creating windows in another context while any window is alive returns SE_RESULT_UNSUPPORTED.
 extern se_window_handle se_window_create(const char* title, const u32 width, const u32 height);
 extern void se_window_update(const se_window_handle window);
 extern void se_window_tick(const se_window_handle window);
@@ -290,6 +292,8 @@ extern void se_window_update_input_event(const i32 input_event_id, const se_wind
 extern void se_window_register_resize_event(const se_window_handle window, se_resize_event_callback callback, void* data);
 extern void se_window_set_text_callback(const se_window_handle window, se_window_text_callback callback, void* data);
 extern void se_window_emit_text(const se_window_handle window, const c8* utf8_text);
+// Prefer `se_context_destroy()` for final teardown. Destroying the last window
+// while a context still owns live resources is unsupported.
 extern void se_window_destroy(const se_window_handle window);
 extern void se_window_destroy_all(void);
 

@@ -53,7 +53,6 @@ New focused examples:
 - `18_input_actions`
 - `19_ui_widgets`
 - `20_debug_tools`
-- `21_scene_qol`
 
 ### Minimal Usage
 ```c

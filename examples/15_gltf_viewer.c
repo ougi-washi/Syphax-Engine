@@ -88,7 +88,6 @@ int main(void) {
 
 	se_camera_controller_destroy(camera_controller);
 	se_gltf_free(asset);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

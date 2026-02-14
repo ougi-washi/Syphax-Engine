@@ -3971,13 +3971,11 @@ int main(int argc, char **argv) {
 		fprintf(stderr, RTS_LOG_PREFIX "no graphics context available\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			se_window_destroy(game.window);
 			game.window = S_HANDLE_NULL;
 			se_context_destroy(game.ctx);
 			game.ctx = NULL;
 			return rts_run_headless_simulation(&game);
 		}
-		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
 		return 1;
 	}
@@ -3996,13 +3994,11 @@ int main(int argc, char **argv) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to create text handle\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			se_window_destroy(game.window);
 			game.window = S_HANDLE_NULL;
 			se_context_destroy(game.ctx);
 			game.ctx = NULL;
 			return rts_run_headless_simulation(&game);
 		}
-		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
 		return 1;
 	}
@@ -4013,14 +4009,12 @@ int main(int argc, char **argv) {
 			rts_log("falling back to headless simulation");
 			se_text_handle_destroy(game.text_handle);
 			game.text_handle = NULL;
-			se_window_destroy(game.window);
 			game.window = S_HANDLE_NULL;
 			se_context_destroy(game.ctx);
 			game.ctx = NULL;
 			return rts_run_headless_simulation(&game);
 		}
 		se_text_handle_destroy(game.text_handle);
-		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
 		return 1;
 	}
@@ -4032,14 +4026,12 @@ int main(int argc, char **argv) {
 			rts_log("falling back to headless simulation");
 			se_text_handle_destroy(game.text_handle);
 			game.text_handle = NULL;
-			se_window_destroy(game.window);
 			game.window = S_HANDLE_NULL;
 			se_context_destroy(game.ctx);
 			game.ctx = NULL;
 			return rts_run_headless_simulation(&game);
 		}
 		se_text_handle_destroy(game.text_handle);
-		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
 		return 1;
 	}
@@ -4049,14 +4041,12 @@ int main(int argc, char **argv) {
 			rts_log("falling back to headless simulation");
 			se_text_handle_destroy(game.text_handle);
 			game.text_handle = NULL;
-			se_window_destroy(game.window);
 			game.window = S_HANDLE_NULL;
 			se_context_destroy(game.ctx);
 			game.ctx = NULL;
 			return rts_run_headless_simulation(&game);
 		}
 		se_text_handle_destroy(game.text_handle);
-		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
 		return 1;
 	}
@@ -4204,7 +4194,6 @@ int main(int argc, char **argv) {
 	rts_log("finished, validations=%s", game.validations_failed ? "FAILED" : "OK");
 
 	se_text_handle_destroy(game.text_handle);
-	se_window_destroy(game.window);
 	se_context_destroy(game.ctx);
 	return game.validations_failed ? 2 : 0;
 }

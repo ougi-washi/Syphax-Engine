@@ -22,7 +22,6 @@ int main(void) {
 	se_debug_set_overlay_enabled(true);
 	se_debug_log(SE_DEBUG_LEVEL_INFO, SE_DEBUG_CATEGORY_CORE, "20_debug_tools started");
 
-	const f64 start = se_window_get_time(window);
 	while (!se_window_should_close(window)) {
 		se_window_tick(window);
 		se_context_reload_changed_shaders();
@@ -30,9 +29,6 @@ int main(void) {
 		se_render_clear();
 		se_debug_trace_end("20_debug_frame");
 		se_window_render_screen(window);
-		if (se_window_get_time(window) - start > 2.5) {
-			break;
-		}
 	}
 
 	const se_debug_trace_event* traces = NULL;
@@ -45,7 +41,6 @@ int main(void) {
 	printf("20_debug_tools :: frame timing ms per system:\n%s\n", timing_ms_text);
 
 	se_debug_set_overlay_enabled(false);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

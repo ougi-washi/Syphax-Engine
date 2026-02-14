@@ -21,6 +21,27 @@ typedef struct {
 	sz bin_size;
 } se_gltf_glb_data;
 
+static u32 se_gltf_read_u32_le(const u8 *bytes) {
+	if (bytes == NULL) {
+		return 0;
+	}
+	return
+		(u32)bytes[0] |
+		((u32)bytes[1] << 8u) |
+		((u32)bytes[2] << 16u) |
+		((u32)bytes[3] << 24u);
+}
+
+static void se_gltf_write_u32_le(u8 *bytes, const u32 value) {
+	if (bytes == NULL) {
+		return;
+	}
+	bytes[0] = (u8)(value & 0xFFu);
+	bytes[1] = (u8)((value >> 8u) & 0xFFu);
+	bytes[2] = (u8)((value >> 16u) & 0xFFu);
+	bytes[3] = (u8)((value >> 24u) & 0xFFu);
+}
+
 static se_gltf_buffer *se_gltf_buffer_at(const se_gltf_asset *asset, const sz index) {
 	se_gltf_buffers *buffers = (se_gltf_buffers *)&asset->buffers;
 	return s_array_get(buffers, s_array_handle(buffers, (u32)index));
@@ -369,17 +390,17 @@ static b8 se_gltf_read_glb(const char *path, se_gltf_glb_data *out) {
 		free(file_data);
 		return false;
 	}
-	u32 magic = *(u32 *)&file_data[0];
-	u32 version = *(u32 *)&file_data[4];
-	u32 length = *(u32 *)&file_data[8];
+	u32 magic = se_gltf_read_u32_le(&file_data[0]);
+	u32 version = se_gltf_read_u32_le(&file_data[4]);
+	u32 length = se_gltf_read_u32_le(&file_data[8]);
 	if (magic != SE_GLTF_GLTF_MAGIC || version != 2 || length > file_size) {
 		free(file_data);
 		return false;
 	}
 	sz offset = 12;
 	while (offset + 8 <= file_size) {
-		u32 chunk_length = *(u32 *)&file_data[offset];
-		u32 chunk_type = *(u32 *)&file_data[offset + 4];
+		u32 chunk_length = se_gltf_read_u32_le(&file_data[offset]);
+		u32 chunk_type = se_gltf_read_u32_le(&file_data[offset + 4]);
 		offset += 8;
 		if (offset + chunk_length > file_size) break;
 		if (chunk_type == SE_GLTF_CHUNK_JSON) {
@@ -1221,6 +1242,7 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 	char *json_text = NULL;
 	s_json *root = NULL;
 	se_gltf_glb_data glb = {0};
+	b8 json_text_owned_by_glb = false;
 	const u8 *bin_data = NULL;
 	sz bin_size = 0;
 	if (ext && strcmp(ext, ".glb") == 0) {
@@ -1230,6 +1252,7 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 			return NULL;
 		}
 		json_text = glb.json_text;
+		json_text_owned_by_glb = true;
 		bin_data = glb.bin_data;
 		bin_size = glb.bin_size;
 	} else {
@@ -1241,7 +1264,9 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 	}
 	root = s_json_parse(json_text);
 	if (root == NULL) {
-		free(json_text);
+		if (!json_text_owned_by_glb) {
+			free(json_text);
+		}
 		se_gltf_glb_data_free(&glb);
 		se_gltf_free(asset);
 		se_set_last_error(SE_RESULT_IO);
@@ -1263,14 +1288,18 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 		!se_gltf_parse_animations(root, asset) ||
 		!se_gltf_parse_cameras(root, asset)) {
 		s_json_free(root);
-		free(json_text);
+		if (!json_text_owned_by_glb) {
+			free(json_text);
+		}
 		se_gltf_glb_data_free(&glb);
 		se_gltf_free(asset);
 		se_set_last_error(SE_RESULT_IO);
 		return NULL;
 	}
 	s_json_free(root);
-	free(json_text);
+	if (!json_text_owned_by_glb) {
+		free(json_text);
+	}
 	se_gltf_glb_data_free(&glb);
 	se_set_last_error(SE_RESULT_OK);
 	return asset;
@@ -1928,17 +1957,17 @@ static b8 se_gltf_write_glb(const se_gltf_asset *asset, const char *path, const 
 	sz total_length = 12 + 8 + json_padded + (bin_size > 0 ? (8 + bin_padded) : 0);
 	u8 *out = (u8 *)malloc(total_length);
 	if (out == NULL) { free(json_text); return false; }
-	*(u32 *)&out[0] = SE_GLTF_GLTF_MAGIC;
-	*(u32 *)&out[4] = 2;
-	*(u32 *)&out[8] = (u32)total_length;
-	*(u32 *)&out[12] = (u32)json_padded;
-	*(u32 *)&out[16] = SE_GLTF_CHUNK_JSON;
+	se_gltf_write_u32_le(&out[0], SE_GLTF_GLTF_MAGIC);
+	se_gltf_write_u32_le(&out[4], 2u);
+	se_gltf_write_u32_le(&out[8], (u32)total_length);
+	se_gltf_write_u32_le(&out[12], (u32)json_padded);
+	se_gltf_write_u32_le(&out[16], SE_GLTF_CHUNK_JSON);
 	memcpy(out + 20, json_text, json_size);
 	for (sz i = json_size; i < json_padded; i++) out[20 + i] = ' ';
 	sz offset = 20 + json_padded;
 	if (bin_size > 0) {
-		*(u32 *)&out[offset] = (u32)bin_padded;
-		*(u32 *)&out[offset + 4] = SE_GLTF_CHUNK_BIN;
+		se_gltf_write_u32_le(&out[offset], (u32)bin_padded);
+		se_gltf_write_u32_le(&out[offset + 4], SE_GLTF_CHUNK_BIN);
 		memcpy(out + offset + 8, bin_data, bin_size);
 		for (sz i = bin_size; i < bin_padded; i++) out[offset + 8 + i] = 0;
 	}

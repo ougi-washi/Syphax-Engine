@@ -96,8 +96,17 @@ int main(void) {
 		diagnostics.recorded_count,
 		text_state.text_events);
 
+	while (!se_window_should_close(window)) {
+		se_window_tick(window);
+		se_render_clear();
+		se_input_tick(input);
+		if (se_input_action_is_pressed(input, 10)) {
+			printf("18_input_actions :: jump pressed\n");
+		}
+		se_window_render_screen(window);
+	}
+
 	se_input_destroy(input);
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

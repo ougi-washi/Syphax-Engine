@@ -81,7 +81,6 @@ i32 main(void) {
 		se_scene_2d_draw(scene_2d, window);
 	}
 
-	se_window_destroy(window);
 	se_context_destroy(ctx);
 	return 0;
 }

@@ -29,6 +29,7 @@ typedef struct {
 
 typedef s_array(se_window_registry_entry, se_windows_registry);
 static se_windows_registry windows_registry = {0};
+static se_context* windows_owner_context = NULL;
 static GLFWwindow* current_conext_window = NULL;
 
 typedef enum {
@@ -90,6 +91,85 @@ typedef struct {
 
 static se_window* se_window_from_handle(se_context* context, const se_window_handle window) {
 	return s_array_get(&context->windows, window);
+}
+
+static void se_window_terminal_mirror_shutdown(void);
+static void se_window_backend_shutdown_if_unused(void) {
+	if (s_array_get_size(&windows_registry) != 0) {
+		return;
+	}
+	s_array_clear(&windows_registry);
+	windows_owner_context = NULL;
+	current_conext_window = NULL;
+	glfwMakeContextCurrent(NULL);
+	se_window_terminal_mirror_shutdown();
+	se_render_shutdown();
+	glfwTerminate();
+}
+
+static void se_window_registry_refresh_owner_context(void) {
+	if (s_array_get_size(&windows_registry) == 0) {
+		windows_owner_context = NULL;
+		return;
+	}
+	if (windows_owner_context != NULL) {
+		return;
+	}
+	for (sz i = 0; i < s_array_get_size(&windows_registry); ++i) {
+		se_window_registry_entry* entry = s_array_get(&windows_registry, s_array_handle(&windows_registry, (u32)i));
+		if (entry && entry->ctx) {
+			windows_owner_context = entry->ctx;
+			return;
+		}
+	}
+}
+
+static se_window_registry_entry* se_window_registry_find(const se_context* preferred_ctx, const se_window_handle window, sz* out_index) {
+	if (out_index) {
+		*out_index = 0;
+	}
+	for (sz i = 0; i < s_array_get_size(&windows_registry); ++i) {
+		se_window_registry_entry* entry = s_array_get(&windows_registry, s_array_handle(&windows_registry, (u32)i));
+		if (!entry || entry->window != window || entry->ctx != preferred_ctx) {
+			continue;
+		}
+		if (out_index) {
+			*out_index = i;
+		}
+		return entry;
+	}
+	for (sz i = 0; i < s_array_get_size(&windows_registry); ++i) {
+		se_window_registry_entry* entry = s_array_get(&windows_registry, s_array_handle(&windows_registry, (u32)i));
+		if (!entry || entry->window != window) {
+			continue;
+		}
+		if (out_index) {
+			*out_index = i;
+		}
+		return entry;
+	}
+	return NULL;
+}
+
+static b8 se_window_context_has_live_resources(const se_context* context) {
+	if (context == NULL) {
+		return false;
+	}
+	return
+		context->ui_text_handle != NULL ||
+		s_array_get_size(&context->fonts) > 0 ||
+		s_array_get_size(&context->models) > 0 ||
+		s_array_get_size(&context->cameras) > 0 ||
+		s_array_get_size(&context->framebuffers) > 0 ||
+		s_array_get_size(&context->render_buffers) > 0 ||
+		s_array_get_size(&context->textures) > 0 ||
+		s_array_get_size(&context->shaders) > 0 ||
+		s_array_get_size(&context->objects_2d) > 0 ||
+		s_array_get_size(&context->scenes_2d) > 0 ||
+		s_array_get_size(&context->objects_3d) > 0 ||
+		s_array_get_size(&context->scenes_3d) > 0 ||
+		s_array_get_size(&context->ui_elements) > 0 ||
+		s_array_get_size(&context->ui_texts) > 0;
 }
 
 static void se_window_terminal_mirror_sync_size(void);
@@ -1006,6 +1086,17 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return S_HANDLE_NULL;
 	}
+	se_window_registry_refresh_owner_context();
+	if (windows_owner_context != NULL && windows_owner_context != context) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_ERROR,
+			SE_DEBUG_CATEGORY_WINDOW,
+			"se_window_create currently supports one active context at a time (owner=%p, requested=%p)",
+			(void*)windows_owner_context,
+			(void*)context);
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return S_HANDLE_NULL;
+	}
 
 	glfwSetErrorCallback(gl_error_callback);
 	se_window_terminal_mirror_configure();
@@ -1161,6 +1252,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	s_handle entry_handle = s_array_increment(&windows_registry);
 	se_window_registry_entry* entry_slot = s_array_get(&windows_registry, entry_handle);
 	*entry_slot = entry;
+	windows_owner_context = context;
 	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
 		se_window_terminal_mirror_input_enable();
 	}
@@ -1890,48 +1982,70 @@ void se_window_emit_text(const se_window_handle window, const c8* utf8_text) {
 }
 
 void se_window_destroy(const se_window_handle window) {
-	se_context* context = se_current_context();
-	se_window* window_ptr = se_window_from_handle(context, window);
-	if (window_ptr == NULL) {
+	if (window == S_HANDLE_NULL) {
+		return;
+	}
+	se_window_registry_refresh_owner_context();
+	se_context* current_context = se_current_context();
+	sz registry_index = 0;
+	se_window_registry_entry* registry_entry = se_window_registry_find(current_context, window, &registry_index);
+	if (registry_entry == NULL || registry_entry->ctx == NULL) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
 		return;
 	}
 
+	se_context* owner_context = registry_entry->ctx;
+	const se_window_handle owner_window = registry_entry->window;
+	se_window* window_ptr = s_array_get(&owner_context->windows, owner_window);
+	if (window_ptr == NULL) {
+		s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)registry_index));
+		se_window_backend_shutdown_if_unused();
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return;
+	}
+
+	if (s_array_get_size(&owner_context->windows) == 1 && se_window_context_has_live_resources(owner_context)) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_WINDOW,
+			"Refusing to destroy last window while context resources are still alive; call se_context_destroy() instead.");
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return;
+	}
+
+	se_context* previous_context = se_push_tls_context(owner_context);
+	GLFWwindow* glfw_window = (GLFWwindow*)window_ptr->handle;
 	if (window_ptr->quad.vao != 0) {
 		se_quad_destroy(&window_ptr->quad);
 	}
 	if (window_ptr->shader != S_HANDLE_NULL &&
-		s_array_get(&context->shaders, window_ptr->shader) != NULL) {
+		s_array_get(&owner_context->shaders, window_ptr->shader) != NULL) {
 		se_shader_destroy(window_ptr->shader);
 	}
 	window_ptr->shader = S_HANDLE_NULL;
 	s_array_clear(&window_ptr->input_events);
 	s_array_clear(&window_ptr->resize_handles);
 
-	if (window_ptr->handle) {
-		se_window_user_ptr* user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer((GLFWwindow*)window_ptr->handle);
+	if (glfw_window) {
+		se_window_user_ptr* user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer(glfw_window);
 		if (user_ptr) {
 			free(user_ptr);
 		}
-		glfwDestroyWindow((GLFWwindow*)window_ptr->handle);
+		glfwDestroyWindow(glfw_window);
 	}
 	window_ptr->handle = NULL;
 
-	for (sz i = 0; i < s_array_get_size(&windows_registry); i++) {
-		se_window_registry_entry* entry = s_array_get(&windows_registry, s_array_handle(&windows_registry, (u32)i));
-		if (entry && entry->window == window) {
-			s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)i));
-			break;
-		}
+	s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)registry_index));
+	s_array_remove(&owner_context->windows, owner_window);
+
+	if (current_conext_window == glfw_window) {
+		current_conext_window = NULL;
+		glfwMakeContextCurrent(NULL);
 	}
 
-	s_array_remove(&context->windows, window);
-
-	if (s_array_get_size(&windows_registry) == 0) {
-		s_array_clear(&windows_registry);
-		se_window_terminal_mirror_shutdown();
-		se_render_shutdown();
-		glfwTerminate();
-	}
+	se_pop_tls_context(previous_context);
+	se_window_backend_shutdown_if_unused();
+	se_set_last_error(SE_RESULT_OK);
 }
 
 void se_window_destroy_all(void){
@@ -1941,8 +2055,14 @@ void se_window_destroy_all(void){
 			s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)(s_array_get_size(&windows_registry) - 1)));
 			continue;
 		}
+		const sz windows_before = s_array_get_size(&windows_registry);
 		se_window_destroy(entry->window);
+		if (s_array_get_size(&windows_registry) == windows_before) {
+			se_debug_log(SE_DEBUG_LEVEL_WARN, SE_DEBUG_CATEGORY_WINDOW, "se_window_destroy_all stopped because teardown made no progress");
+			break;
+		}
 	}
+	se_window_backend_shutdown_if_unused();
 }
 
 #endif // SE_WINDOW_BACKEND_GLFW
