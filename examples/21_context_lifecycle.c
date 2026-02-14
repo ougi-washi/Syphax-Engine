@@ -45,11 +45,13 @@ static i32 se_expect_report(
 }
 
 i32 main(void) {
+	// Create the primary context that owns this lifecycle run.
 	se_context *context = se_context_create();
 	if (!context) {
 		return 1;
 	}
 
+	// Create multiple windows in one context to validate normal shared ownership.
 	se_window_handle window_a = se_window_create("Syphax-Engine - 21_context_lifecycle A", 320, 180);
 	if (se_expect_handle(window_a, "window_a") != 0) {
 		se_context_destroy(context);
@@ -62,6 +64,7 @@ i32 main(void) {
 		return 1;
 	}
 
+	// Ensure cross-context window creation is blocked while windows are alive elsewhere.
 	se_context *other_context = se_context_create();
 	if (!other_context) {
 		se_context_destroy(context);
@@ -79,6 +82,7 @@ i32 main(void) {
 	se_context_destroy(other_context);
 	se_set_tls_context(context);
 
+	// Populate the context with representative resources for teardown accounting.
 	se_camera_handle camera_a = se_camera_create();
 	se_camera_handle camera_b = se_camera_create();
 	if (se_expect_handle(camera_a, "camera_a") != 0 || se_expect_handle(camera_b, "camera_b") != 0) {
@@ -128,6 +132,7 @@ i32 main(void) {
 		return 1;
 	}
 
+	// Snapshot counts so the destroy report can be validated after teardown.
 	se_context_destroy_report expected = {0};
 	expected.models = (u32)s_array_get_size(&context->models);
 	expected.cameras = (u32)s_array_get_size(&context->cameras);
@@ -138,6 +143,7 @@ i32 main(void) {
 	expected.fonts = (u32)s_array_get_size(&context->fonts);
 	expected.windows = (u32)s_array_get_size(&context->windows);
 
+	// Destroy the context and compare reported cleanup totals with the snapshot.
 	se_context_destroy(context);
 
 	se_context_destroy_report actual = {0};
@@ -168,6 +174,7 @@ i32 main(void) {
 		return 1;
 	}
 
+	// Recreate context/window once more to verify the lifecycle resets correctly.
 	se_context *post_context = se_context_create();
 	if (!post_context) {
 		return 1;

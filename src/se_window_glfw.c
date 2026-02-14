@@ -31,6 +31,8 @@ typedef s_array(se_window_registry_entry, se_windows_registry);
 static se_windows_registry windows_registry = {0};
 static se_context* windows_owner_context = NULL;
 static GLFWwindow* current_conext_window = NULL;
+static b8 glfw_backend_initialized = false;
+static b8 glfw_backend_exit_hook_registered = false;
 
 typedef enum {
 	SE_WINDOW_TERMINAL_PARSE_NORMAL = 0,
@@ -93,7 +95,42 @@ static se_window* se_window_from_handle(se_context* context, const se_window_han
 	return s_array_get(&context->windows, window);
 }
 
+static void gl_error_callback(i32 error, const c8* description);
+static void se_window_terminal_mirror_configure(void);
 static void se_window_terminal_mirror_shutdown(void);
+static void se_window_backend_process_shutdown(void) {
+	if (!glfw_backend_initialized) {
+		return;
+	}
+	glfwMakeContextCurrent(NULL);
+	se_window_terminal_mirror_shutdown();
+	se_render_shutdown();
+	glfwTerminate();
+	glfw_backend_initialized = false;
+}
+
+static b8 se_window_backend_init(void) {
+	glfwSetErrorCallback(gl_error_callback);
+	se_window_terminal_mirror_configure();
+	if (glfw_backend_initialized) {
+		return true;
+	}
+	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
+		// Null platform lets GLFW create a context without a window system.
+		glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL);
+	}
+	if (!glfwInit()) {
+		se_window_terminal_mirror_shutdown();
+		return false;
+	}
+	glfw_backend_initialized = true;
+	if (!glfw_backend_exit_hook_registered) {
+		(void)atexit(se_window_backend_process_shutdown);
+		glfw_backend_exit_hook_registered = true;
+	}
+	return true;
+}
+
 static void se_window_backend_shutdown_if_unused(void) {
 	if (s_array_get_size(&windows_registry) != 0) {
 		return;
@@ -104,7 +141,6 @@ static void se_window_backend_shutdown_if_unused(void) {
 	glfwMakeContextCurrent(NULL);
 	se_window_terminal_mirror_shutdown();
 	se_render_shutdown();
-	glfwTerminate();
 }
 
 static void se_window_registry_refresh_owner_context(void) {
@@ -1091,7 +1127,7 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
 	}
 }
 
-void gl_error_callback(i32 error, const c8* description) {
+static void gl_error_callback(i32 error, const c8* description) {
 	se_log("gl_error_callback :: GLFW Error %d: %s", error, description ? description : "");
 }
 
@@ -1113,18 +1149,8 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		return S_HANDLE_NULL;
 	}
 
-	glfwSetErrorCallback(gl_error_callback);
-	se_window_terminal_mirror_configure();
-	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
-		// Null platform lets GLFW create a context without a window system.
-		glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL);
-	}
-	
-	if (!glfwInit()) {
+	if (!se_window_backend_init()) {
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
-		if (s_array_get_size(&windows_registry) == 0) {
-			se_window_terminal_mirror_shutdown();
-		}
 		return S_HANDLE_NULL;
 	}
 
@@ -1164,7 +1190,6 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_remove(&context->windows, window_handle);
 		if (s_array_get_size(&windows_registry) == 0) {
 			se_window_terminal_mirror_shutdown();
-			glfwTerminate();
 		}
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
@@ -1189,7 +1214,6 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_remove(&context->windows, window_handle);
 		if (s_array_get_size(&windows_registry) == 0) {
 			se_window_terminal_mirror_shutdown();
-			glfwTerminate();
 		}
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return S_HANDLE_NULL;
@@ -1220,7 +1244,6 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_remove(&context->windows, window_handle);
 		if (s_array_get_size(&windows_registry) == 0) {
 			se_window_terminal_mirror_shutdown();
-			glfwTerminate();
 		}
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
@@ -1246,7 +1269,6 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_remove(&context->windows, window_handle);
 		if (s_array_get_size(&windows_registry) == 0) {
 			se_window_terminal_mirror_shutdown();
-			glfwTerminate();
 		}
 		se_set_last_error(render_result);
 		return S_HANDLE_NULL;
@@ -2030,6 +2052,12 @@ void se_window_destroy(const se_window_handle window) {
 
 	se_context* previous_context = se_push_tls_context(owner_context);
 	GLFWwindow* glfw_window = (GLFWwindow*)window_ptr->handle;
+	GLFWwindow* previous_glfw_window = glfwGetCurrentContext();
+	const b8 switched_gl_context = glfw_window != NULL && previous_glfw_window != glfw_window;
+	if (switched_gl_context) {
+		glfwMakeContextCurrent(glfw_window);
+		current_conext_window = glfw_window;
+	}
 	if (window_ptr->quad.vao != 0) {
 		se_quad_destroy(&window_ptr->quad);
 	}
@@ -2053,9 +2081,17 @@ void se_window_destroy(const se_window_handle window) {
 	s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)registry_index));
 	s_array_remove(&owner_context->windows, owner_window);
 
-	if (current_conext_window == glfw_window) {
-		current_conext_window = NULL;
+	if (switched_gl_context) {
+		if (previous_glfw_window != NULL) {
+			glfwMakeContextCurrent(previous_glfw_window);
+			current_conext_window = previous_glfw_window;
+		} else {
+			glfwMakeContextCurrent(NULL);
+			current_conext_window = NULL;
+		}
+	} else if (current_conext_window == glfw_window) {
 		glfwMakeContextCurrent(NULL);
+		current_conext_window = NULL;
 	}
 
 	se_pop_tls_context(previous_context);
