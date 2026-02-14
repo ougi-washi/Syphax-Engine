@@ -1,5 +1,5 @@
 ## Syphax Engine - 𐤒𐤐𐤎
-Syphax is a C framework for interactive visuals, games, tools, and general real-time apps.
+Simple, fast, lightweight 2D/3D Engine in C.
 
 ### Highlights
 - Window and input handling
