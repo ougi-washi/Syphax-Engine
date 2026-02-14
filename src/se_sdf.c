@@ -138,6 +138,7 @@ typedef struct {
 } se_sdf_runtime_renderer;
 typedef s_array(se_sdf_runtime_renderer, se_sdf_runtime_renderers);
 
+// TODO: move from here, not thread safe. Maybe we should use se_context instead?
 static se_sdf_runtime_scenes se_sdf_runtime_scene_storage;
 static se_sdf_runtime_renderers se_sdf_runtime_renderer_storage;
 static b8 se_sdf_runtime_scene_storage_initialized = 0;
