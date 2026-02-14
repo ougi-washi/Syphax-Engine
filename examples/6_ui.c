@@ -59,6 +59,11 @@ void on_button_stop_hovered(se_window_handle window, void *data) {
 i32 main(void) {
 	se_context *ctx = se_context_create();
 	se_window_handle window = se_window_create("Syphax-Engine - UI Example", WIDTH, HEIGHT);
+	if (window == S_HANDLE_NULL) {
+		printf("6_ui :: window unavailable, skipping runtime\n");
+		se_context_destroy(ctx);
+		return 0;
+	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	se_ui_element_params ui_element_params = {0};
@@ -163,7 +168,7 @@ i32 main(void) {
 	    se_window_render_screen(window);
 	}
 
-	se_ui_element_destroy(root);
+	se_ui_element_destroy_full(root, true);
 	se_context_destroy(ctx);
 	return 0;
 }

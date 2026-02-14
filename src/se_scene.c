@@ -32,6 +32,102 @@ static se_model* se_model_from_handle(se_context *ctx, const se_model_handle mod
 	return s_array_get(&ctx->models, model);
 }
 
+static b8 se_object_2d_handle_exists(const se_context* ctx, const se_object_2d_handle handle) {
+	return ctx && handle != S_HANDLE_NULL && s_array_get((se_objects_2d*)&ctx->objects_2d, handle) != NULL;
+}
+
+static b8 se_object_3d_handle_exists(const se_context* ctx, const se_object_3d_handle handle) {
+	return ctx && handle != S_HANDLE_NULL && s_array_get((se_objects_3d*)&ctx->objects_3d, handle) != NULL;
+}
+
+static b8 se_model_handle_exists(const se_context* ctx, const se_model_handle handle) {
+	return ctx && handle != S_HANDLE_NULL && s_array_get((se_models*)&ctx->models, handle) != NULL;
+}
+
+static b8 se_shader_handle_exists(const se_context* ctx, const se_shader_handle handle) {
+	return ctx && handle != S_HANDLE_NULL && s_array_get((se_shaders*)&ctx->shaders, handle) != NULL;
+}
+
+static b8 se_object_2d_list_contains(const se_objects_2d_ptr* list, const se_object_2d_handle handle) {
+	if (!list || handle == S_HANDLE_NULL) {
+		return false;
+	}
+	for (sz i = 0; i < s_array_get_size((se_objects_2d_ptr*)list); ++i) {
+		se_object_2d_handle* current = s_array_get((se_objects_2d_ptr*)list, s_array_handle((se_objects_2d_ptr*)list, (u32)i));
+		if (current && *current == handle) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static b8 se_object_3d_list_contains(const se_objects_3d_ptr* list, const se_object_3d_handle handle) {
+	if (!list || handle == S_HANDLE_NULL) {
+		return false;
+	}
+	for (sz i = 0; i < s_array_get_size((se_objects_3d_ptr*)list); ++i) {
+		se_object_3d_handle* current = s_array_get((se_objects_3d_ptr*)list, s_array_handle((se_objects_3d_ptr*)list, (u32)i));
+		if (current && *current == handle) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static b8 se_model_list_contains(const se_models_ptr* list, const se_model_handle handle) {
+	if (!list || handle == S_HANDLE_NULL) {
+		return false;
+	}
+	for (sz i = 0; i < s_array_get_size((se_models_ptr*)list); ++i) {
+		se_model_handle* current = s_array_get((se_models_ptr*)list, s_array_handle((se_models_ptr*)list, (u32)i));
+		if (current && *current == handle) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static b8 se_shader_list_contains(const se_shaders_ptr* list, const se_shader_handle handle) {
+	if (!list || handle == S_HANDLE_NULL) {
+		return false;
+	}
+	for (sz i = 0; i < s_array_get_size((se_shaders_ptr*)list); ++i) {
+		se_shader_handle* current = s_array_get((se_shaders_ptr*)list, s_array_handle((se_shaders_ptr*)list, (u32)i));
+		if (current && *current == handle) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void se_object_2d_list_add_unique(se_objects_2d_ptr* list, const se_object_2d_handle handle) {
+	if (!list || handle == S_HANDLE_NULL || se_object_2d_list_contains(list, handle)) {
+		return;
+	}
+	s_array_add(list, handle);
+}
+
+static void se_object_3d_list_add_unique(se_objects_3d_ptr* list, const se_object_3d_handle handle) {
+	if (!list || handle == S_HANDLE_NULL || se_object_3d_list_contains(list, handle)) {
+		return;
+	}
+	s_array_add(list, handle);
+}
+
+static void se_model_list_add_unique(se_models_ptr* list, const se_model_handle handle) {
+	if (!list || handle == S_HANDLE_NULL || se_model_list_contains(list, handle)) {
+		return;
+	}
+	s_array_add(list, handle);
+}
+
+static void se_shader_list_add_unique(se_shaders_ptr* list, const se_shader_handle handle) {
+	if (!list || handle == S_HANDLE_NULL || se_shader_list_contains(list, handle)) {
+		return;
+	}
+	s_array_add(list, handle);
+}
+
 static void se_instance_ids_clear_keep_capacity(se_instance_ids* ids) {
 	if (!ids) {
 		return;
@@ -840,6 +936,56 @@ void se_scene_2d_destroy(const se_scene_2d_handle scene) {
 	s_array_remove(&ctx->scenes_2d, scene);
 }
 
+void se_scene_2d_destroy_full(const se_scene_2d_handle scene, const b8 destroy_object_shaders) {
+	se_context *ctx = se_current_context();
+	s_assertf(ctx, "se_scene_2d_destroy_full :: ctx is null");
+	se_scene_2d *scene_ptr = se_scene_2d_from_handle(ctx, scene);
+	s_assertf(scene_ptr, "se_scene_2d_destroy_full :: scene is null");
+
+	se_objects_2d_ptr object_handles = {0};
+	se_shaders_ptr shader_handles = {0};
+	s_array_init(&object_handles);
+	s_array_init(&shader_handles);
+
+	for (sz i = 0; i < s_array_get_size(&scene_ptr->objects); ++i) {
+		se_object_2d_handle* handle_ptr = s_array_get(&scene_ptr->objects, s_array_handle(&scene_ptr->objects, (u32)i));
+		if (!handle_ptr || *handle_ptr == S_HANDLE_NULL || !se_object_2d_handle_exists(ctx, *handle_ptr)) {
+			continue;
+		}
+		se_object_2d_list_add_unique(&object_handles, *handle_ptr);
+		if (!destroy_object_shaders) {
+			continue;
+		}
+		se_object_2d* object_ptr = se_object_2d_from_handle(ctx, *handle_ptr);
+		if (!object_ptr || object_ptr->is_custom || !se_shader_handle_exists(ctx, object_ptr->shader)) {
+			continue;
+		}
+		se_shader_list_add_unique(&shader_handles, object_ptr->shader);
+	}
+
+	for (sz i = 0; i < s_array_get_size(&object_handles); ++i) {
+		se_object_2d_handle* object_handle = s_array_get(&object_handles, s_array_handle(&object_handles, (u32)i));
+		if (!object_handle || !se_object_2d_handle_exists(ctx, *object_handle)) {
+			continue;
+		}
+		se_object_2d_destroy(*object_handle);
+	}
+
+	if (destroy_object_shaders) {
+		for (sz i = 0; i < s_array_get_size(&shader_handles); ++i) {
+			se_shader_handle* shader_handle = s_array_get(&shader_handles, s_array_handle(&shader_handles, (u32)i));
+			if (!shader_handle || !se_shader_handle_exists(ctx, *shader_handle)) {
+				continue;
+			}
+			se_shader_destroy(*shader_handle);
+		}
+	}
+
+	s_array_clear(&shader_handles);
+	s_array_clear(&object_handles);
+	se_scene_2d_destroy(scene);
+}
+
 void se_scene_2d_bind(const se_scene_2d_handle scene) {
 	se_context *ctx = se_current_context();
 	se_scene_2d *scene_ptr = se_scene_2d_from_handle(ctx, scene);
@@ -1077,7 +1223,6 @@ void se_scene_3d_set_auto_resize(const se_scene_3d_handle scene, const se_window
 void se_scene_3d_destroy(const se_scene_3d_handle scene) {
 	se_context *ctx = se_current_context();
 	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	printf("se_scene_3d_destroy :: scene: %p\n", scene_ptr);
 	if (scene_ptr->camera != S_HANDLE_NULL && ctx) {
 		se_camera_destroy(scene_ptr->camera);
 		scene_ptr->camera = S_HANDLE_NULL;
@@ -1090,6 +1235,97 @@ void se_scene_3d_destroy(const se_scene_3d_handle scene) {
 	s_array_clear(&scene_ptr->debug_markers);
 	s_array_clear(&scene_ptr->objects);
 	s_array_remove(&ctx->scenes_3d, scene);
+}
+
+void se_scene_3d_destroy_full(const se_scene_3d_handle scene, const b8 destroy_models, const b8 destroy_model_shaders) {
+	se_context *ctx = se_current_context();
+	s_assertf(ctx, "se_scene_3d_destroy_full :: ctx is null");
+	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
+	s_assertf(scene_ptr, "se_scene_3d_destroy_full :: scene is null");
+
+	const b8 destroy_shaders = destroy_models && destroy_model_shaders;
+	if (destroy_model_shaders && !destroy_models) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_SCENE,
+			"se_scene_3d_destroy_full ignored destroy_model_shaders because destroy_models is false");
+	}
+
+	se_objects_3d_ptr object_handles = {0};
+	se_models_ptr model_handles = {0};
+	se_shaders_ptr shader_handles = {0};
+	s_array_init(&object_handles);
+	s_array_init(&model_handles);
+	s_array_init(&shader_handles);
+
+	for (sz i = 0; i < s_array_get_size(&scene_ptr->objects); ++i) {
+		se_object_3d_handle* handle_ptr = s_array_get(&scene_ptr->objects, s_array_handle(&scene_ptr->objects, (u32)i));
+		if (!handle_ptr || *handle_ptr == S_HANDLE_NULL || !se_object_3d_handle_exists(ctx, *handle_ptr)) {
+			continue;
+		}
+		se_object_3d_list_add_unique(&object_handles, *handle_ptr);
+		if (!destroy_models) {
+			continue;
+		}
+		se_object_3d* object_ptr = se_object_3d_from_handle(ctx, *handle_ptr);
+		if (!object_ptr || !se_model_handle_exists(ctx, object_ptr->model)) {
+			continue;
+		}
+		se_model_list_add_unique(&model_handles, object_ptr->model);
+	}
+
+	if (destroy_shaders) {
+		for (sz i = 0; i < s_array_get_size(&model_handles); ++i) {
+			se_model_handle* model_handle = s_array_get(&model_handles, s_array_handle(&model_handles, (u32)i));
+			if (!model_handle || !se_model_handle_exists(ctx, *model_handle)) {
+				continue;
+			}
+			se_model* model_ptr = se_model_from_handle(ctx, *model_handle);
+			if (!model_ptr) {
+				continue;
+			}
+			for (sz mesh_index = 0; mesh_index < s_array_get_size(&model_ptr->meshes); ++mesh_index) {
+				se_mesh* mesh = s_array_get(&model_ptr->meshes, s_array_handle(&model_ptr->meshes, (u32)mesh_index));
+				if (!mesh || !se_shader_handle_exists(ctx, mesh->shader)) {
+					continue;
+				}
+				se_shader_list_add_unique(&shader_handles, mesh->shader);
+			}
+		}
+	}
+
+	for (sz i = 0; i < s_array_get_size(&object_handles); ++i) {
+		se_object_3d_handle* object_handle = s_array_get(&object_handles, s_array_handle(&object_handles, (u32)i));
+		if (!object_handle || !se_object_3d_handle_exists(ctx, *object_handle)) {
+			continue;
+		}
+		se_object_3d_destroy(*object_handle);
+	}
+
+	if (destroy_models) {
+		for (sz i = 0; i < s_array_get_size(&model_handles); ++i) {
+			se_model_handle* model_handle = s_array_get(&model_handles, s_array_handle(&model_handles, (u32)i));
+			if (!model_handle || !se_model_handle_exists(ctx, *model_handle)) {
+				continue;
+			}
+			se_model_destroy(*model_handle);
+		}
+	}
+
+	if (destroy_shaders) {
+		for (sz i = 0; i < s_array_get_size(&shader_handles); ++i) {
+			se_shader_handle* shader_handle = s_array_get(&shader_handles, s_array_handle(&shader_handles, (u32)i));
+			if (!shader_handle || !se_shader_handle_exists(ctx, *shader_handle)) {
+				continue;
+			}
+			se_shader_destroy(*shader_handle);
+		}
+	}
+
+	s_array_clear(&shader_handles);
+	s_array_clear(&model_handles);
+	s_array_clear(&object_handles);
+	se_scene_3d_destroy(scene);
 }
 
 void se_scene_3d_render_to_buffer(const se_scene_3d_handle scene) {

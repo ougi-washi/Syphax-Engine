@@ -100,6 +100,7 @@ int main(void) {
 	}
 
 	se_physics_world_3d_destroy(world);
+	se_scene_3d_destroy_full(scene, true, true);
 	se_context_destroy(ctx);
 	return 0;
 }

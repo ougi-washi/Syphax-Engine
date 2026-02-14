@@ -105,6 +105,9 @@ typedef s_array(se_ui_text, se_ui_texts);
 typedef se_ui_text_handle se_ui_text_ptr;
 
 extern void se_ui_element_destroy(const se_ui_element_handle ui);
+// Destroys the UI element tree and all scene-owned objects created by each node.
+// When enabled, object shaders are also destroyed.
+extern void se_ui_element_destroy_full(const se_ui_element_handle ui, const b8 destroy_object_shaders);
 extern se_ui_element_handle se_ui_element_create(const se_window_handle window, const se_ui_element_params* params);
 extern se_ui_element_handle se_ui_element_text_create(const se_window_handle window, const se_ui_element_params* params, const c8* text, const c8* font_path, const f32 font_size);
 extern void se_ui_element_render(const se_ui_element_handle ui);

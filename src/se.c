@@ -147,7 +147,6 @@ void se_context_destroy(se_context *context) {
 	s_assertf(context, "se_context_destroy :: context is null");
 	se_context *prev_ctx = se_push_tls_context(context);
 	memset(&se_last_destroy_report, 0, sizeof(se_last_destroy_report));
-	se_context_log_leaks(context);
 
 	se_context_destroy_ui_storage(context);
 	if (context->ui_text_handle) {
@@ -227,6 +226,7 @@ void se_context_destroy(se_context *context) {
 		se_last_destroy_report.windows++;
 	}
 
+	se_context_log_leaks(context);
 	s_array_clear(&context->global_uniforms);
 
 	if (se_global_context == context) {

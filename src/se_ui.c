@@ -27,6 +27,7 @@ static void se_ui_element_collect_hit(const se_ui_element_handle root, const s_v
 static void se_ui_element_sort_children(const se_ui_element_handle ui);
 static void se_ui_element_mark_dirty(void);
 static void se_ui_debug_collect(const se_ui_element_handle ui, u32* out_count, u32* out_hovered);
+static void se_ui_element_destroy_internal(const se_ui_element_handle ui, const b8 destroy_full, const b8 destroy_object_shaders);
 
 static se_ui_theme g_ui_theme = {0};
 static b8 g_ui_theme_initialized = false;
@@ -188,7 +189,7 @@ static void se_ui_debug_collect(const se_ui_element_handle ui, u32* out_count, u
 	}
 }
 
-void se_ui_element_destroy(const se_ui_element_handle ui) {
+static void se_ui_element_destroy_internal(const se_ui_element_handle ui, const b8 destroy_full, const b8 destroy_object_shaders) {
 	se_context *ctx = se_current_context();
 	se_ui_element *ui_ptr = s_array_get(&ctx->ui_elements, ui);
 	s_assertf(ui_ptr, "se_ui_element_destroy :: ui is null");
@@ -203,14 +204,18 @@ void se_ui_element_destroy(const se_ui_element_handle ui) {
 			s_array_remove(&ui_ptr->children, child_entry);
 			continue;
 		}
-		se_ui_element_destroy(*child_ptr);
+		se_ui_element_destroy_internal(*child_ptr, destroy_full, destroy_object_shaders);
 	}
 	if (ui_ptr->parent != S_HANDLE_NULL) {
 		se_ui_element_detach_child(ui_ptr->parent, ui);
 	}
 	s_array_clear(&ui_ptr->children);
 	if (ui_ptr->scene_2d != S_HANDLE_NULL) {
-		se_scene_2d_destroy(ui_ptr->scene_2d);
+		if (destroy_full) {
+			se_scene_2d_destroy_full(ui_ptr->scene_2d, destroy_object_shaders);
+		} else {
+			se_scene_2d_destroy(ui_ptr->scene_2d);
+		}
 	}
 	ui_ptr->scene_2d = S_HANDLE_NULL;
 	if (ui_ptr->text != S_HANDLE_NULL) {
@@ -224,6 +229,14 @@ void se_ui_element_destroy(const se_ui_element_handle ui) {
 	ui_ptr->text = S_HANDLE_NULL;
 	ui_ptr->parent = S_HANDLE_NULL;
 	s_array_remove(&ctx->ui_elements, ui);
+}
+
+void se_ui_element_destroy(const se_ui_element_handle ui) {
+	se_ui_element_destroy_internal(ui, false, false);
+}
+
+void se_ui_element_destroy_full(const se_ui_element_handle ui, const b8 destroy_object_shaders) {
+	se_ui_element_destroy_internal(ui, true, destroy_object_shaders);
 }
 
 se_ui_element_handle se_ui_element_create(const se_window_handle window, const se_ui_element_params *params) {

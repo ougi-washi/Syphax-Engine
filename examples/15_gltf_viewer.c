@@ -88,6 +88,13 @@ int main(void) {
 
 	se_camera_controller_destroy(camera_controller);
 	se_gltf_free(asset);
+	se_scene_3d_destroy_full(scene, true, false);
+	if (mesh_shader != S_HANDLE_NULL) {
+		se_shader_destroy(mesh_shader);
+	}
+	if (default_texture != S_HANDLE_NULL) {
+		se_texture_destroy(default_texture);
+	}
 	se_context_destroy(ctx);
 	return 0;
 }

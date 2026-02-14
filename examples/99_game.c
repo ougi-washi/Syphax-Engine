@@ -1036,6 +1036,35 @@ static void rts_reset_slots(rts_game *game) {
 	}
 }
 
+static void rts_shutdown_runtime(rts_game *game) {
+	if (!game) {
+		return;
+	}
+
+	if (game->text_handle) {
+		se_text_handle_destroy(game->text_handle);
+		game->text_handle = NULL;
+		game->font = S_HANDLE_NULL;
+	}
+
+	if (game->hud_scene != S_HANDLE_NULL) {
+		se_scene_2d_destroy_full(game->hud_scene, true);
+		game->hud_scene = S_HANDLE_NULL;
+	}
+
+	if (game->scene != S_HANDLE_NULL) {
+		se_scene_3d_destroy_full(game->scene, true, true);
+		game->scene = S_HANDLE_NULL;
+	}
+
+	game->window = S_HANDLE_NULL;
+
+	if (game->ctx) {
+		se_context_destroy(game->ctx);
+		game->ctx = NULL;
+	}
+}
+
 static b8 rts_init_rendering(rts_game *game) {
 	if (!game || !game->ctx) {
 		return false;
@@ -3960,23 +3989,20 @@ int main(int argc, char **argv) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to create window\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			se_context_destroy(game.ctx);
-			game.ctx = NULL;
+			rts_shutdown_runtime(&game);
 			return rts_run_headless_simulation(&game);
 		}
-		se_context_destroy(game.ctx);
+		rts_shutdown_runtime(&game);
 		return 1;
 	}
 	if (!se_render_has_context()) {
 		fprintf(stderr, RTS_LOG_PREFIX "no graphics context available\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			game.window = S_HANDLE_NULL;
-			se_context_destroy(game.ctx);
-			game.ctx = NULL;
+			rts_shutdown_runtime(&game);
 			return rts_run_headless_simulation(&game);
 		}
-		se_context_destroy(game.ctx);
+		rts_shutdown_runtime(&game);
 		return 1;
 	}
 
@@ -3994,12 +4020,10 @@ int main(int argc, char **argv) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to create text handle\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			game.window = S_HANDLE_NULL;
-			se_context_destroy(game.ctx);
-			game.ctx = NULL;
+			rts_shutdown_runtime(&game);
 			return rts_run_headless_simulation(&game);
 		}
-		se_context_destroy(game.ctx);
+		rts_shutdown_runtime(&game);
 		return 1;
 	}
 	game.font = se_font_load(game.text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 26.0f);
@@ -4007,15 +4031,10 @@ int main(int argc, char **argv) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to load font\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			se_text_handle_destroy(game.text_handle);
-			game.text_handle = NULL;
-			game.window = S_HANDLE_NULL;
-			se_context_destroy(game.ctx);
-			game.ctx = NULL;
+			rts_shutdown_runtime(&game);
 			return rts_run_headless_simulation(&game);
 		}
-		se_text_handle_destroy(game.text_handle);
-		se_context_destroy(game.ctx);
+		rts_shutdown_runtime(&game);
 		return 1;
 	}
 
@@ -4024,30 +4043,20 @@ int main(int argc, char **argv) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to initialize rendering assets\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			se_text_handle_destroy(game.text_handle);
-			game.text_handle = NULL;
-			game.window = S_HANDLE_NULL;
-			se_context_destroy(game.ctx);
-			game.ctx = NULL;
+			rts_shutdown_runtime(&game);
 			return rts_run_headless_simulation(&game);
 		}
-		se_text_handle_destroy(game.text_handle);
-		se_context_destroy(game.ctx);
+		rts_shutdown_runtime(&game);
 		return 1;
 	}
 	if (!rts_init_hud_scene(&game)) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to initialize HUD\n");
 		if (game.simulator.enabled) {
 			rts_log("falling back to headless simulation");
-			se_text_handle_destroy(game.text_handle);
-			game.text_handle = NULL;
-			game.window = S_HANDLE_NULL;
-			se_context_destroy(game.ctx);
-			game.ctx = NULL;
+			rts_shutdown_runtime(&game);
 			return rts_run_headless_simulation(&game);
 		}
-		se_text_handle_destroy(game.text_handle);
-		se_context_destroy(game.ctx);
+		rts_shutdown_runtime(&game);
 		return 1;
 	}
 
@@ -4193,7 +4202,6 @@ int main(int argc, char **argv) {
 	}
 	rts_log("finished, validations=%s", game.validations_failed ? "FAILED" : "OK");
 
-	se_text_handle_destroy(game.text_handle);
-	se_context_destroy(game.ctx);
+	rts_shutdown_runtime(&game);
 	return game.validations_failed ? 2 : 0;
 }

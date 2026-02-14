@@ -70,10 +70,18 @@ int main(void) {
 	se_ui_element_handle checkbox = se_ui_checkbox_create(window, &checkbox_params, true);
 	if (root == S_HANDLE_NULL || button == S_HANDLE_NULL || slider == S_HANDLE_NULL || checkbox == S_HANDLE_NULL) {
 		printf("19_ui_widgets :: ui creation failed, skipping runtime\n");
-		se_ui_element_destroy(root);
-		se_ui_element_destroy(button);
-		se_ui_element_destroy(slider);
-		se_ui_element_destroy(checkbox);
+		if (root != S_HANDLE_NULL) {
+			se_ui_element_destroy_full(root, true);
+		}
+		if (button != S_HANDLE_NULL) {
+			se_ui_element_destroy_full(button, true);
+		}
+		if (slider != S_HANDLE_NULL) {
+			se_ui_element_destroy_full(slider, true);
+		}
+		if (checkbox != S_HANDLE_NULL) {
+			se_ui_element_destroy_full(checkbox, true);
+		}
 		se_context_destroy(ctx);
 		return 0;
 	}
@@ -116,10 +124,10 @@ int main(void) {
 		se_ui_slider_get_value(slider),
 		se_ui_checkbox_is_checked(checkbox) ? 1 : 0);
 
-	se_ui_element_destroy(root);
-	se_ui_element_destroy(button);
-	se_ui_element_destroy(slider);
-	se_ui_element_destroy(checkbox);
+	se_ui_element_destroy_full(root, true);
+	se_ui_element_destroy_full(button, true);
+	se_ui_element_destroy_full(slider, true);
+	se_ui_element_destroy_full(checkbox, true);
 	se_context_destroy(ctx);
 	return 0;
 }

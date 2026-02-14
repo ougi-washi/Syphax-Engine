@@ -168,6 +168,9 @@ extern sz se_object_2d_get_instance_count(const se_object_2d_handle object);
 extern se_scene_2d_handle se_scene_2d_create(const s_vec2 *size, const u16 object_count);
 extern void se_scene_2d_set_auto_resize(const se_scene_2d_handle scene, const se_window_handle window, const s_vec2 *ratio);
 extern void se_scene_2d_destroy(const se_scene_2d_handle scene);
+// Destroys every object referenced by the scene, optionally destroys their shaders,
+// then destroys the scene itself.
+extern void se_scene_2d_destroy_full(const se_scene_2d_handle scene, const b8 destroy_object_shaders);
 extern void se_scene_2d_bind(const se_scene_2d_handle scene);
 extern void se_scene_2d_unbind(const se_scene_2d_handle scene);
 extern void se_scene_2d_render_raw(const se_scene_2d_handle scene);
@@ -183,6 +186,9 @@ extern se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 objec
 extern se_scene_3d_handle se_scene_3d_create_for_window(const se_window_handle window, const u16 object_count);
 extern void se_scene_3d_set_auto_resize(const se_scene_3d_handle scene, const se_window_handle window, const s_vec2 *ratio);
 extern void se_scene_3d_destroy(const se_scene_3d_handle scene);
+// Destroys every object referenced by the scene. Optional flags can also destroy
+// referenced models and their shaders before destroying the scene itself.
+extern void se_scene_3d_destroy_full(const se_scene_3d_handle scene, const b8 destroy_models, const b8 destroy_model_shaders);
 extern void se_scene_3d_render_to_buffer(const se_scene_3d_handle scene);
 extern void se_scene_3d_render_to_screen(const se_scene_3d_handle scene, const se_window_handle window);
 extern void se_scene_3d_draw(const se_scene_3d_handle scene, const se_window_handle window);

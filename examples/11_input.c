@@ -159,6 +159,7 @@ int main(void) {
 	}
 
 	se_input_destroy(input);
+	se_scene_3d_destroy_full(scene, true, true);
 	se_context_destroy(ctx);
 	return 0;
 }
