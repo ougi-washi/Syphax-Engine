@@ -8,6 +8,7 @@ Simple, fast, lightweight 2D/3D Engine in C.
 - UI layout and widgets
 - Navigation 
 - Debug
+- Simulations/Events 
 
 ### Requirements
 - C11 compiler
@@ -53,6 +54,7 @@ New focused examples:
 - `18_input_actions`
 - `19_ui_widgets`
 - `20_debug_tools`
+- `22_simulation`
 
 ### Minimal Usage
 ```c
@@ -83,7 +85,7 @@ int main(void) {
 
 ### API Docs
 - Public API headers: `include/se_*.h`
-- Core entry points: `include/se.h`, `include/se_window.h`, `include/se_render.h`, `include/se_scene.h`, `include/se_ui.h`
+- Core entry points: `include/se.h`, `include/se_window.h`, `include/se_render.h`, `include/se_scene.h`, `include/se_ui.h`, `include/se_simulation.h`
 - Resource layout details: `resources/README.md`
 
 ### Resource Scopes
