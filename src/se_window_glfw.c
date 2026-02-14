@@ -5,6 +5,14 @@
 #include "se_window.h"
 #include "se_debug.h"
 #include "render/se_gl.h"
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <termios.h>
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
@@ -23,6 +31,58 @@ typedef s_array(se_window_registry_entry, se_windows_registry);
 static se_windows_registry windows_registry = {0};
 static GLFWwindow* current_conext_window = NULL;
 
+typedef enum {
+	SE_WINDOW_TERMINAL_PARSE_NORMAL = 0,
+	SE_WINDOW_TERMINAL_PARSE_ESC,
+	SE_WINDOW_TERMINAL_PARSE_CSI,
+	SE_WINDOW_TERMINAL_PARSE_SS3
+} se_window_terminal_parse_state;
+
+typedef struct {
+	se_window_terminal_parse_state state;
+	c8 csi_buffer[64];
+	sz csi_len;
+} se_window_terminal_input_parser;
+
+typedef struct {
+	b8 configured;
+	b8 enabled;
+	b8 hide_window;
+	b8 interactive_stdout;
+	b8 ansi_initialized;
+	b8 emitted_header;
+	b8 restore_hooks_installed;
+	b8 input_initialized;
+	b8 input_raw_enabled;
+	u32 forced_columns;
+	u32 forced_rows;
+	u32 columns;
+	u32 rows;
+	u32 target_fps;
+	f64 frame_interval;
+	f64 next_present_time;
+	b8 stdout_muted;
+	i32 input_original_stdin_flags;
+	i32 stdout_original_fd;
+	i32 output_fd;
+	FILE* output_stream;
+	struct termios input_original_termios;
+	u8* pixel_buffer;
+	sz pixel_buffer_capacity;
+} se_window_terminal_mirror_state;
+
+static se_window_terminal_mirror_state g_terminal_mirror = {0};
+static se_window_terminal_input_parser g_terminal_input_parser = {0};
+static volatile sig_atomic_t g_terminal_restore_emitted = 0;
+
+static i32 se_window_terminal_mirror_output_fd(void) {
+	return g_terminal_mirror.output_fd >= 0 ? g_terminal_mirror.output_fd : STDOUT_FILENO;
+}
+
+static FILE* se_window_terminal_mirror_output_stream(void) {
+	return g_terminal_mirror.output_stream ? g_terminal_mirror.output_stream : stdout;
+}
+
 typedef struct {
 	se_context* ctx;
 	se_window_handle window;
@@ -30,6 +90,761 @@ typedef struct {
 
 static se_window* se_window_from_handle(se_context* context, const se_window_handle window) {
 	return s_array_get(&context->windows, window);
+}
+
+static void se_window_terminal_mirror_sync_size(void);
+
+static b8 se_window_terminal_mirror_get_primary_window(se_window_handle* out_handle, se_window** out_window) {
+	if (!out_handle || !out_window) {
+		return false;
+	}
+	*out_handle = S_HANDLE_NULL;
+	*out_window = NULL;
+	for (sz i = 0; i < s_array_get_size(&windows_registry); ++i) {
+		se_window_registry_entry* entry = s_array_get(&windows_registry, s_array_handle(&windows_registry, (u32)i));
+		if (!entry || !entry->ctx || entry->window == S_HANDLE_NULL) {
+			continue;
+		}
+		se_window* window_ptr = s_array_get(&entry->ctx->windows, entry->window);
+		if (!window_ptr || !window_ptr->handle) {
+			continue;
+		}
+		*out_handle = entry->window;
+		*out_window = window_ptr;
+		return true;
+	}
+	return false;
+}
+
+static se_key se_window_terminal_map_ascii_key(const c8 ch) {
+	if (ch >= 'a' && ch <= 'z') {
+		return (se_key)(SE_KEY_A + (ch - 'a'));
+	}
+	if (ch >= 'A' && ch <= 'Z') {
+		return (se_key)(SE_KEY_A + (ch - 'A'));
+	}
+	if (ch >= '0' && ch <= '9') {
+		return (se_key)(SE_KEY_0 + (ch - '0'));
+	}
+	switch (ch) {
+		case ' ':
+			return SE_KEY_SPACE;
+		case '\'':
+			return SE_KEY_APOSTROPHE;
+		case ',':
+			return SE_KEY_COMMA;
+		case '-':
+			return SE_KEY_MINUS;
+		case '.':
+			return SE_KEY_PERIOD;
+		case '/':
+			return SE_KEY_SLASH;
+		case ';':
+			return SE_KEY_SEMICOLON;
+		case '=':
+			return SE_KEY_EQUAL;
+		case '[':
+			return SE_KEY_LEFT_BRACKET;
+		case '\\':
+			return SE_KEY_BACKSLASH;
+		case ']':
+			return SE_KEY_RIGHT_BRACKET;
+		case '`':
+			return SE_KEY_GRAVE_ACCENT;
+		default:
+			return SE_KEY_UNKNOWN;
+	}
+}
+
+static void se_window_terminal_mirror_emit_key_press(se_window* window_ptr, const se_key key) {
+	if (!window_ptr || key < 0 || key >= SE_KEY_COUNT || key == SE_KEY_UNKNOWN) {
+		return;
+	}
+	window_ptr->keys[key] = true;
+	window_ptr->diagnostics.key_events++;
+}
+
+static void se_window_terminal_mirror_emit_text_char(const se_window_handle window, se_window* window_ptr, const c8 ch) {
+	if (!window_ptr || !window_ptr->text_callback || !isprint((unsigned char)ch)) {
+		return;
+	}
+	c8 utf8[2] = {ch, '\0'};
+	window_ptr->text_callback(window, utf8, window_ptr->text_callback_data);
+}
+
+static i32 se_window_terminal_map_mouse_button(const i32 terminal_button_code) {
+	switch (terminal_button_code) {
+		case 0:
+			return SE_MOUSE_LEFT;
+		case 1:
+			return SE_MOUSE_MIDDLE;
+		case 2:
+			return SE_MOUSE_RIGHT;
+		default:
+			return -1;
+	}
+}
+
+static void se_window_terminal_mirror_handle_mouse_sgr(
+	se_window* window_ptr,
+	const c8* csi_data,
+	const c8 final_char) {
+	if (!window_ptr || !csi_data) {
+		return;
+	}
+	i32 code = 0;
+	i32 x = 0;
+	i32 y = 0;
+	if (sscanf(csi_data, "<%d;%d;%d", &code, &x, &y) != 3) {
+		return;
+	}
+
+	const f64 grid_x = (f64)s_max(0, x - 1);
+	const f64 grid_y = (f64)s_max(0, y - 1);
+	const f64 denom_x = (f64)s_max((u32)1, g_terminal_mirror.columns - 1u);
+	const f64 denom_y = (f64)s_max((u32)1, g_terminal_mirror.rows - 1u);
+	const f64 scale_x = (f64)s_max((u32)1, window_ptr->width - 1u);
+	const f64 scale_y = (f64)s_max((u32)1, window_ptr->height - 1u);
+	const f64 next_x = s_max(0.0, s_min((grid_x / denom_x) * scale_x, (f64)window_ptr->width));
+	const f64 next_y = s_max(0.0, s_min((grid_y / denom_y) * scale_y, (f64)window_ptr->height));
+
+	window_ptr->mouse_dx = next_x - window_ptr->mouse_x;
+	window_ptr->mouse_dy = next_y - window_ptr->mouse_y;
+	window_ptr->mouse_x = next_x;
+	window_ptr->mouse_y = next_y;
+	window_ptr->diagnostics.mouse_move_events++;
+
+	if ((code & 64) != 0) {
+		const i32 wheel_code = code & 0x3;
+		if (wheel_code == 0) {
+			window_ptr->scroll_dy += 1.0;
+		} else if (wheel_code == 1) {
+			window_ptr->scroll_dy -= 1.0;
+		} else if (wheel_code == 2) {
+			window_ptr->scroll_dx -= 1.0;
+		} else if (wheel_code == 3) {
+			window_ptr->scroll_dx += 1.0;
+		}
+		window_ptr->diagnostics.scroll_events++;
+		return;
+	}
+
+	const i32 terminal_button_code = code & 0x3;
+	const i32 button_code = se_window_terminal_map_mouse_button(terminal_button_code);
+	if (button_code < 0 || button_code >= SE_MOUSE_BUTTON_COUNT) {
+		return;
+	}
+	const b8 is_release = (final_char == 'm');
+	window_ptr->mouse_buttons[button_code] = !is_release;
+	window_ptr->diagnostics.mouse_button_events++;
+}
+
+static void se_window_terminal_mirror_handle_csi(
+	const se_window_handle window,
+	se_window* window_ptr,
+	const c8* csi_data,
+	const c8 final_char) {
+	if (!window_ptr || !csi_data) {
+		return;
+	}
+	if (csi_data[0] == '<' && (final_char == 'M' || final_char == 'm')) {
+		se_window_terminal_mirror_handle_mouse_sgr(window_ptr, csi_data, final_char);
+		return;
+	}
+
+	if (final_char == 'A') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_UP);
+		return;
+	}
+	if (final_char == 'B') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_DOWN);
+		return;
+	}
+	if (final_char == 'C') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_RIGHT);
+		return;
+	}
+	if (final_char == 'D') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_LEFT);
+		return;
+	}
+	if (final_char == 'H') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_HOME);
+		return;
+	}
+	if (final_char == 'F') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_END);
+		return;
+	}
+	if (final_char == 'Z') {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_TAB);
+		return;
+	}
+	if (final_char != '~') {
+		return;
+	}
+	const i32 code = atoi(csi_data);
+	switch (code) {
+		case 1:
+		case 7:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_HOME);
+			break;
+		case 2:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_INSERT);
+			break;
+		case 3:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_DELETE);
+			break;
+		case 4:
+		case 8:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_END);
+			break;
+		case 5:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_PAGE_UP);
+			break;
+		case 6:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_PAGE_DOWN);
+			break;
+		case 15:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F5);
+			break;
+		case 17:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F6);
+			break;
+		case 18:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F7);
+			break;
+		case 19:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F8);
+			break;
+		case 20:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F9);
+			break;
+		case 21:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F10);
+			break;
+		case 23:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F11);
+			break;
+		case 24:
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F12);
+			break;
+		default:
+			break;
+	}
+}
+
+static void se_window_terminal_mirror_handle_input_byte(const se_window_handle window, se_window* window_ptr, const u8 byte) {
+	if (!window_ptr) {
+		return;
+	}
+	switch (g_terminal_input_parser.state) {
+		case SE_WINDOW_TERMINAL_PARSE_NORMAL: {
+			if (byte == 0x1B) {
+				g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_ESC;
+				return;
+			}
+			if (byte >= 1 && byte <= 26) {
+				se_window_terminal_mirror_emit_key_press(window_ptr, (se_key)(SE_KEY_A + (byte - 1)));
+				return;
+			}
+			if (byte == '\r' || byte == '\n') {
+				se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_ENTER);
+				return;
+			}
+			if (byte == '\t') {
+				se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_TAB);
+				return;
+			}
+			if (byte == 0x7F || byte == 0x08) {
+				se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_BACKSPACE);
+				return;
+			}
+			const c8 ch = (c8)byte;
+			const se_key mapped_key = se_window_terminal_map_ascii_key(ch);
+			if (mapped_key != SE_KEY_UNKNOWN) {
+				se_window_terminal_mirror_emit_key_press(window_ptr, mapped_key);
+			}
+			se_window_terminal_mirror_emit_text_char(window, window_ptr, ch);
+			return;
+		}
+		case SE_WINDOW_TERMINAL_PARSE_ESC: {
+			if (byte == '[') {
+				g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_CSI;
+				g_terminal_input_parser.csi_len = 0;
+				g_terminal_input_parser.csi_buffer[0] = '\0';
+				return;
+			}
+			if (byte == 'O') {
+				g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_SS3;
+				return;
+			}
+			se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_ESCAPE);
+			g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_NORMAL;
+			se_window_terminal_mirror_handle_input_byte(window, window_ptr, byte);
+			return;
+		}
+		case SE_WINDOW_TERMINAL_PARSE_CSI: {
+			if (g_terminal_input_parser.csi_len + 1 < sizeof(g_terminal_input_parser.csi_buffer)) {
+				g_terminal_input_parser.csi_buffer[g_terminal_input_parser.csi_len++] = (c8)byte;
+				g_terminal_input_parser.csi_buffer[g_terminal_input_parser.csi_len] = '\0';
+			}
+			if (byte >= 0x40 && byte <= 0x7E) {
+				if (g_terminal_input_parser.csi_len > 0) {
+					g_terminal_input_parser.csi_buffer[g_terminal_input_parser.csi_len - 1] = '\0';
+					se_window_terminal_mirror_handle_csi(
+						window,
+						window_ptr,
+						g_terminal_input_parser.csi_buffer,
+						(c8)byte);
+				}
+				g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_NORMAL;
+				g_terminal_input_parser.csi_len = 0;
+				g_terminal_input_parser.csi_buffer[0] = '\0';
+			}
+			return;
+		}
+		case SE_WINDOW_TERMINAL_PARSE_SS3: {
+			switch (byte) {
+				case 'P':
+					se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F1);
+					break;
+				case 'Q':
+					se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F2);
+					break;
+				case 'R':
+					se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F3);
+					break;
+				case 'S':
+					se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_F4);
+					break;
+				case 'H':
+					se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_HOME);
+					break;
+				case 'F':
+					se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_END);
+					break;
+				default:
+					break;
+			}
+			g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_NORMAL;
+			return;
+		}
+		default:
+			g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_NORMAL;
+			return;
+	}
+}
+
+static b8 se_window_terminal_mirror_should_use_terminal_input(void) {
+	return g_terminal_mirror.enabled && g_terminal_mirror.hide_window && isatty(STDIN_FILENO);
+}
+
+static void se_window_terminal_mirror_input_enable(void) {
+	if (g_terminal_mirror.input_initialized) {
+		return;
+	}
+	g_terminal_mirror.input_initialized = true;
+	g_terminal_mirror.input_original_stdin_flags = -1;
+	memset(&g_terminal_input_parser, 0, sizeof(g_terminal_input_parser));
+
+	if (!se_window_terminal_mirror_should_use_terminal_input()) {
+		return;
+	}
+
+	if (tcgetattr(STDIN_FILENO, &g_terminal_mirror.input_original_termios) != 0) {
+		return;
+	}
+	struct termios raw = g_terminal_mirror.input_original_termios;
+	raw.c_iflag &= (tcflag_t) ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+	raw.c_oflag &= (tcflag_t) ~(OPOST);
+	raw.c_cflag |= (tcflag_t)(CS8);
+	raw.c_lflag &= (tcflag_t) ~(ECHO | ICANON | IEXTEN);
+	raw.c_cc[VMIN] = 0;
+	raw.c_cc[VTIME] = 0;
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) != 0) {
+		return;
+	}
+
+	g_terminal_mirror.input_original_stdin_flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+	if (g_terminal_mirror.input_original_stdin_flags >= 0) {
+		(void)fcntl(STDIN_FILENO, F_SETFL, g_terminal_mirror.input_original_stdin_flags | O_NONBLOCK);
+	}
+	static const c8 enable_mouse_sequence[] = "\033[?1000h\033[?1002h\033[?1006h";
+	(void)write(se_window_terminal_mirror_output_fd(), enable_mouse_sequence, sizeof(enable_mouse_sequence) - 1);
+	g_terminal_mirror.input_raw_enabled = true;
+}
+
+static void se_window_terminal_mirror_input_disable(void) {
+	if (!g_terminal_mirror.input_initialized) {
+		return;
+	}
+	if (g_terminal_mirror.input_raw_enabled) {
+		if (g_terminal_mirror.input_original_stdin_flags >= 0) {
+			(void)fcntl(STDIN_FILENO, F_SETFL, g_terminal_mirror.input_original_stdin_flags);
+		}
+		(void)tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_terminal_mirror.input_original_termios);
+	}
+	g_terminal_mirror.input_raw_enabled = false;
+	g_terminal_mirror.input_initialized = false;
+	g_terminal_mirror.input_original_stdin_flags = -1;
+	memset(&g_terminal_input_parser, 0, sizeof(g_terminal_input_parser));
+}
+
+static void se_window_terminal_mirror_poll_input(void) {
+	if (!g_terminal_mirror.input_raw_enabled) {
+		return;
+	}
+	se_window_terminal_mirror_sync_size();
+	se_window_handle window = S_HANDLE_NULL;
+	se_window* window_ptr = NULL;
+	if (!se_window_terminal_mirror_get_primary_window(&window, &window_ptr)) {
+		return;
+	}
+	memset(window_ptr->keys, 0, sizeof(window_ptr->keys));
+
+	u8 buffer[256] = {0};
+	for (;;) {
+		const ssize_t read_count = read(STDIN_FILENO, buffer, sizeof(buffer));
+		if (read_count <= 0) {
+			if (read_count < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+				break;
+			}
+			break;
+		}
+		for (ssize_t i = 0; i < read_count; ++i) {
+			se_window_terminal_mirror_handle_input_byte(window, window_ptr, buffer[i]);
+		}
+	}
+
+	if (g_terminal_input_parser.state == SE_WINDOW_TERMINAL_PARSE_ESC) {
+		se_window_terminal_mirror_emit_key_press(window_ptr, SE_KEY_ESCAPE);
+		g_terminal_input_parser.state = SE_WINDOW_TERMINAL_PARSE_NORMAL;
+	}
+}
+
+static void se_window_terminal_mirror_write_restore_sequence(void) {
+	if (g_terminal_restore_emitted) {
+		return;
+	}
+	g_terminal_restore_emitted = 1;
+	static const c8 restore_sequence[] = "\033[?1000l\033[?1002l\033[?1006l\033[0m\033[?25h\033[?1049l";
+	(void)write(se_window_terminal_mirror_output_fd(), restore_sequence, sizeof(restore_sequence) - 1);
+}
+
+static void se_window_terminal_mirror_restore_on_exit(void) {
+	se_window_terminal_mirror_input_disable();
+	se_window_terminal_mirror_write_restore_sequence();
+}
+
+static void se_window_terminal_mirror_restore_on_signal(const i32 signal_id) {
+	se_window_terminal_mirror_input_disable();
+	se_window_terminal_mirror_write_restore_sequence();
+	_exit(128 + signal_id);
+}
+
+static void se_window_terminal_mirror_install_restore_hooks(void) {
+	if (g_terminal_mirror.restore_hooks_installed ||
+		!g_terminal_mirror.enabled ||
+		!g_terminal_mirror.interactive_stdout) {
+		return;
+	}
+	(void)atexit(se_window_terminal_mirror_restore_on_exit);
+	(void)signal(SIGINT, se_window_terminal_mirror_restore_on_signal);
+	(void)signal(SIGTERM, se_window_terminal_mirror_restore_on_signal);
+#ifdef SIGHUP
+	(void)signal(SIGHUP, se_window_terminal_mirror_restore_on_signal);
+#endif
+#ifdef SIGABRT
+	(void)signal(SIGABRT, se_window_terminal_mirror_restore_on_signal);
+#endif
+	g_terminal_mirror.restore_hooks_installed = true;
+}
+
+static b8 se_window_string_equal_ci(const c8* lhs, const c8* rhs) {
+	if (!lhs || !rhs) {
+		return false;
+	}
+	while (*lhs && *rhs) {
+		if (tolower((unsigned char)*lhs) != tolower((unsigned char)*rhs)) {
+			return false;
+		}
+		++lhs;
+		++rhs;
+	}
+	return *lhs == '\0' && *rhs == '\0';
+}
+
+static b8 se_window_env_flag_enabled(const c8* key) {
+	const c8* value = getenv(key);
+	if (!value || value[0] == '\0') {
+		return false;
+	}
+	if (strcmp(value, "0") == 0 ||
+		se_window_string_equal_ci(value, "false") ||
+		se_window_string_equal_ci(value, "off") ||
+		se_window_string_equal_ci(value, "no")) {
+		return false;
+	}
+	return true;
+}
+
+static b8 se_window_terminal_allow_logs(void) {
+	return
+		se_window_env_flag_enabled("SE_TERMINAL_ALLOW_LOGS") ||
+		se_window_env_flag_enabled("SE_TERMINAL_ALLOW_STDOUT_LOGS");
+}
+
+static u32 se_window_env_u32(const c8* key, const u32 fallback, const u32 min_value, const u32 max_value) {
+	const c8* value = getenv(key);
+	if (!value || value[0] == '\0') {
+		return fallback;
+	}
+	errno = 0;
+	c8* end_ptr = NULL;
+	unsigned long parsed = strtoul(value, &end_ptr, 10);
+	if (errno != 0 || end_ptr == value || (end_ptr && *end_ptr != '\0')) {
+		return fallback;
+	}
+	if (parsed < min_value) {
+		return min_value;
+	}
+	if (parsed > max_value) {
+		return max_value;
+	}
+	return (u32)parsed;
+}
+
+static void se_window_terminal_mirror_configure(void) {
+	if (g_terminal_mirror.configured) {
+		return;
+	}
+	memset(&g_terminal_mirror, 0, sizeof(g_terminal_mirror));
+	g_terminal_restore_emitted = 0;
+	g_terminal_mirror.configured = true;
+	g_terminal_mirror.enabled =
+		se_window_env_flag_enabled("SE_TERMINAL_RENDER") ||
+		se_window_env_flag_enabled("SE_TERMINAL_MIRROR") ||
+		se_window_env_flag_enabled("SE_WINDOW_TERMINAL");
+	if (!g_terminal_mirror.enabled) {
+		return;
+	}
+	g_terminal_mirror.hide_window = se_window_env_flag_enabled("SE_TERMINAL_HIDE_WINDOW");
+	g_terminal_mirror.target_fps = se_window_env_u32("SE_TERMINAL_FPS", 12, 1, 60);
+	g_terminal_mirror.frame_interval = 1.0 / (f64)g_terminal_mirror.target_fps;
+	g_terminal_mirror.forced_columns = se_window_env_u32("SE_TERMINAL_COLS", 0, 0, 240);
+	g_terminal_mirror.forced_rows = se_window_env_u32("SE_TERMINAL_ROWS", 0, 0, 120);
+	g_terminal_mirror.interactive_stdout = isatty(STDOUT_FILENO);
+	g_terminal_mirror.output_fd = -1;
+	g_terminal_mirror.stdout_original_fd = -1;
+	g_terminal_mirror.output_stream = NULL;
+	g_terminal_mirror.stdout_muted = false;
+	if (g_terminal_mirror.interactive_stdout) {
+		const b8 allow_stdout_logs = se_window_terminal_allow_logs();
+		const i32 output_fd = dup(STDOUT_FILENO);
+		if (output_fd >= 0) {
+			g_terminal_mirror.output_fd = output_fd;
+			const i32 stream_fd = dup(output_fd);
+			if (stream_fd >= 0) {
+				g_terminal_mirror.output_stream = fdopen(stream_fd, "w");
+				if (!g_terminal_mirror.output_stream) {
+					(void)close(stream_fd);
+				}
+			}
+		}
+		if (!allow_stdout_logs) {
+			const i32 null_fd = open("/dev/null", O_WRONLY);
+			if (null_fd >= 0) {
+				g_terminal_mirror.stdout_original_fd = dup(STDOUT_FILENO);
+				if (g_terminal_mirror.stdout_original_fd >= 0) {
+					fflush(stdout);
+					if (dup2(null_fd, STDOUT_FILENO) >= 0) {
+						g_terminal_mirror.stdout_muted = true;
+					} else {
+						(void)close(g_terminal_mirror.stdout_original_fd);
+						g_terminal_mirror.stdout_original_fd = -1;
+					}
+				}
+				(void)close(null_fd);
+			}
+		}
+	}
+	se_window_terminal_mirror_install_restore_hooks();
+}
+
+static void se_window_terminal_mirror_sync_size(void) {
+	if (!g_terminal_mirror.enabled) {
+		return;
+	}
+	u32 next_columns = g_terminal_mirror.forced_columns;
+	u32 next_rows = g_terminal_mirror.forced_rows;
+	if (next_columns == 0 || next_rows == 0) {
+		struct winsize ws = {0};
+		if (ioctl(se_window_terminal_mirror_output_fd(), TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 && ws.ws_row > 0) {
+			next_columns = (u32)ws.ws_col;
+			next_rows = (u32)ws.ws_row;
+		}
+	}
+	if (next_columns == 0) {
+		next_columns = 120;
+	}
+	if (next_rows == 0) {
+		next_rows = 40;
+	}
+	next_columns = s_max(16, s_min(next_columns, 240));
+	next_rows = s_max(8, s_min(next_rows, 120));
+	if (next_columns != g_terminal_mirror.columns || next_rows != g_terminal_mirror.rows) {
+		g_terminal_mirror.columns = next_columns;
+		g_terminal_mirror.rows = next_rows;
+		g_terminal_mirror.ansi_initialized = false;
+	}
+}
+
+static void se_window_terminal_mirror_begin_frame(void) {
+	if (!g_terminal_mirror.enabled || !g_terminal_mirror.interactive_stdout) {
+		return;
+	}
+	if (!g_terminal_mirror.ansi_initialized) {
+		FILE* out = se_window_terminal_mirror_output_stream();
+		fprintf(out, "\033[?1049h\033[2J\033[H\033[?25l");
+		fflush(out);
+		g_terminal_mirror.ansi_initialized = true;
+	}
+}
+
+static b8 se_window_terminal_mirror_reserve_pixels(const u32 width, const u32 height) {
+	if (!g_terminal_mirror.enabled) {
+		return false;
+	}
+	const sz required = (sz)width * (sz)height * 3;
+	if (required == 0) {
+		return false;
+	}
+	if (required <= g_terminal_mirror.pixel_buffer_capacity && g_terminal_mirror.pixel_buffer) {
+		return true;
+	}
+	u8* resized = realloc(g_terminal_mirror.pixel_buffer, required);
+	if (!resized) {
+		return false;
+	}
+	g_terminal_mirror.pixel_buffer = resized;
+	g_terminal_mirror.pixel_buffer_capacity = required;
+	return true;
+}
+
+static void se_window_terminal_mirror_present(se_window* window_ptr) {
+	if (!window_ptr || !window_ptr->handle) {
+		return;
+	}
+	se_window_terminal_mirror_configure();
+	if (!g_terminal_mirror.enabled || !g_terminal_mirror.interactive_stdout) {
+		return;
+	}
+	const f64 now = glfwGetTime();
+	if (now < g_terminal_mirror.next_present_time) {
+		return;
+	}
+	g_terminal_mirror.next_present_time = now + g_terminal_mirror.frame_interval;
+
+	se_window_terminal_mirror_sync_size();
+	se_window_terminal_mirror_begin_frame();
+	if (g_terminal_mirror.columns == 0 || g_terminal_mirror.rows == 0) {
+		return;
+	}
+
+	i32 fb_width = 0;
+	i32 fb_height = 0;
+	glfwGetFramebufferSize((GLFWwindow*)window_ptr->handle, &fb_width, &fb_height);
+	if (fb_width <= 0 || fb_height <= 0) {
+		return;
+	}
+	if (!se_window_terminal_mirror_reserve_pixels((u32)fb_width, (u32)fb_height)) {
+		return;
+	}
+
+	if (!g_terminal_mirror.emitted_header) {
+		if (se_window_terminal_allow_logs()) {
+			se_debug_log(
+				SE_DEBUG_LEVEL_INFO,
+				SE_DEBUG_CATEGORY_WINDOW,
+				"Terminal mirror enabled (fps=%u, cols=%u, rows=%u, hide_window=%d)",
+				g_terminal_mirror.target_fps,
+				g_terminal_mirror.columns,
+				g_terminal_mirror.rows,
+				g_terminal_mirror.hide_window ? 1 : 0);
+		}
+		g_terminal_mirror.emitted_header = true;
+	}
+
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadBuffer(GL_BACK);
+	glReadPixels(0, 0, fb_width, fb_height, GL_RGB, GL_UNSIGNED_BYTE, g_terminal_mirror.pixel_buffer);
+
+	static const c8 block_glyph[] = "\xE2\x96\x88";
+	FILE* out = se_window_terminal_mirror_output_stream();
+	fprintf(out, "\033[H");
+
+	u8 current_fg[3] = {255, 255, 255};
+	b8 has_color = false;
+
+	for (u32 row = 0; row < g_terminal_mirror.rows; ++row) {
+		for (u32 column = 0; column < g_terminal_mirror.columns; ++column) {
+			const u32 src_x = s_min(
+				(u32)(((column * (u64)fb_width) + (g_terminal_mirror.columns / 2u)) / g_terminal_mirror.columns),
+				(u32)(fb_width - 1));
+			const u32 src_y_unflipped = s_min(
+				(u32)(((row * (u64)fb_height) + (g_terminal_mirror.rows / 2u)) / g_terminal_mirror.rows),
+				(u32)(fb_height - 1));
+			const u32 src_y = (u32)(fb_height - 1) - src_y_unflipped;
+			const sz pixel_index = ((sz)src_y * (sz)fb_width + (sz)src_x) * 3;
+			const u8 r = g_terminal_mirror.pixel_buffer[pixel_index + 0];
+			const u8 g = g_terminal_mirror.pixel_buffer[pixel_index + 1];
+			const u8 b = g_terminal_mirror.pixel_buffer[pixel_index + 2];
+			if (!has_color || r != current_fg[0] || g != current_fg[1] || b != current_fg[2]) {
+				fprintf(out, "\033[38;2;%u;%u;%um", (unsigned)r, (unsigned)g, (unsigned)b);
+				current_fg[0] = r;
+				current_fg[1] = g;
+				current_fg[2] = b;
+				has_color = true;
+			}
+			fputs(block_glyph, out);
+		}
+		if (row + 1 < g_terminal_mirror.rows) {
+			fputc('\n', out);
+		}
+	}
+	// Return cursor to home so periodic logs do not cause terminal scroll/jitter.
+	fprintf(out, "\033[0m\033[H");
+	fflush(out);
+}
+
+static void se_window_terminal_mirror_shutdown(void) {
+	if (!g_terminal_mirror.configured) {
+		return;
+	}
+	se_window_terminal_mirror_input_disable();
+	if (g_terminal_mirror.enabled && g_terminal_mirror.interactive_stdout) {
+		se_window_terminal_mirror_write_restore_sequence();
+	}
+	if (g_terminal_mirror.output_stream) {
+		fflush(g_terminal_mirror.output_stream);
+		fclose(g_terminal_mirror.output_stream);
+		g_terminal_mirror.output_stream = NULL;
+	}
+	if (g_terminal_mirror.output_fd >= 0) {
+		(void)close(g_terminal_mirror.output_fd);
+		g_terminal_mirror.output_fd = -1;
+	}
+	if (g_terminal_mirror.stdout_muted && g_terminal_mirror.stdout_original_fd >= 0) {
+		fflush(stdout);
+		(void)dup2(g_terminal_mirror.stdout_original_fd, STDOUT_FILENO);
+	}
+	if (g_terminal_mirror.stdout_original_fd >= 0) {
+		(void)close(g_terminal_mirror.stdout_original_fd);
+		g_terminal_mirror.stdout_original_fd = -1;
+	}
+	free(g_terminal_mirror.pixel_buffer);
+	memset(&g_terminal_mirror, 0, sizeof(g_terminal_mirror));
 }
 
 static se_window* se_window_from_glfw(GLFWwindow* glfw_handle) {
@@ -193,9 +1008,17 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	}
 
 	glfwSetErrorCallback(gl_error_callback);
+	se_window_terminal_mirror_configure();
+	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
+		// Null platform lets GLFW create a context without a window system.
+		glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_NULL);
+	}
 	
 	if (!glfwInit()) {
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		if (s_array_get_size(&windows_registry) == 0) {
+			se_window_terminal_mirror_shutdown();
+		}
 		return S_HANDLE_NULL;
 	}
 
@@ -209,19 +1032,34 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	s_array_init(&new_window->input_events);
 	s_array_init(&new_window->resize_handles);
 
-	// Set OpenGL version
+	// Set graphics context version based on selected render backend.
+#if defined(SE_RENDER_BACKEND_GLES)
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#else
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
+#endif
+	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
+		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+	}
 	 
 	new_window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
 	if (!new_window->handle) {
 		s_array_clear(&new_window->input_events);
 		s_array_clear(&new_window->resize_handles);
 		s_array_remove(&context->windows, window_handle);
+		if (s_array_get_size(&windows_registry) == 0) {
+			se_window_terminal_mirror_shutdown();
+			glfwTerminate();
+		}
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
 	}
@@ -243,6 +1081,10 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_clear(&new_window->input_events);
 		s_array_clear(&new_window->resize_handles);
 		s_array_remove(&context->windows, window_handle);
+		if (s_array_get_size(&windows_registry) == 0) {
+			se_window_terminal_mirror_shutdown();
+			glfwTerminate();
+		}
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return S_HANDLE_NULL;
 	}
@@ -270,6 +1112,10 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_clear(&new_window->input_events);
 		s_array_clear(&new_window->resize_handles);
 		s_array_remove(&context->windows, window_handle);
+		if (s_array_get_size(&windows_registry) == 0) {
+			se_window_terminal_mirror_shutdown();
+			glfwTerminate();
+		}
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
 	}
@@ -292,6 +1138,10 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_clear(&new_window->input_events);
 		s_array_clear(&new_window->resize_handles);
 		s_array_remove(&context->windows, window_handle);
+		if (s_array_get_size(&windows_registry) == 0) {
+			se_window_terminal_mirror_shutdown();
+			glfwTerminate();
+		}
 		se_set_last_error(render_result);
 		return S_HANDLE_NULL;
 	}
@@ -311,6 +1161,9 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	s_handle entry_handle = s_array_increment(&windows_registry);
 	se_window_registry_entry* entry_slot = s_array_get(&windows_registry, entry_handle);
 	*entry_slot = entry;
+	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
+		se_window_terminal_mirror_input_enable();
+	}
 
 	se_set_last_error(SE_RESULT_OK);
 	return window_handle;
@@ -400,6 +1253,7 @@ void se_window_render_screen(const se_window_handle window) {
 		}
 	}
 	se_debug_render_overlay(window, NULL);
+	se_window_terminal_mirror_present(window_ptr);
 	glfwSwapBuffers((GLFWwindow*)window_ptr->handle);
 	window_ptr->diagnostics.frames_presented++;
 	window_ptr->diagnostics.last_present_duration = glfwGetTime() - present_begin;
@@ -437,6 +1291,7 @@ void se_window_present_frame(const se_window_handle window, const s_vec4* clear_
 
 void se_window_poll_events(){
 	glfwPollEvents();
+	se_window_terminal_mirror_poll_input();
 	for (sz i = 0; i < s_array_get_size(&windows_registry); ++i) {
 		se_window_registry_entry* entry = s_array_get(&windows_registry, s_array_handle(&windows_registry, (u32)i));
 		if (!entry || entry->window == S_HANDLE_NULL || !entry->ctx) {
@@ -1073,6 +1928,7 @@ void se_window_destroy(const se_window_handle window) {
 
 	if (s_array_get_size(&windows_registry) == 0) {
 		s_array_clear(&windows_registry);
+		se_window_terminal_mirror_shutdown();
 		se_render_shutdown();
 		glfwTerminate();
 	}

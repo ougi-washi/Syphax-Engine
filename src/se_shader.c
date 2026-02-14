@@ -1,6 +1,7 @@
 // Syphax Engine - Ougi Washi
 
 #include "se_shader.h"
+#include "se_render.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
 
@@ -9,8 +10,158 @@
 static GLuint se_shader_compile(const char *source, GLenum type);
 static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source);
 static void se_shader_cleanup(se_shader *shader);
+static char *se_shader_prepare_source(const char *source, GLenum type);
+static const char *se_shader_skip_bom(const char *source);
+static const char *se_shader_get_line_end(const char *line_start);
+static const char *se_shader_get_body_after_version(const char *source);
+static b8 se_shader_line_is_precision(const char *line_start, const char *line_end);
+#if defined(SE_RENDER_BACKEND_GLES)
+static b8 se_shader_has_precision_decl(const char *source);
+static char *se_shader_translate_gl330_to_es300(const char *source, const GLenum type);
+#else
+static char *se_shader_translate_es300_to_gl330(const char *source);
+#endif
 static se_shader* se_shader_from_handle(se_context *ctx, const se_shader_handle shader) {
 	return s_array_get(&ctx->shaders, shader);
+}
+
+static const char *se_shader_skip_bom(const char *source) {
+	if (!source) {
+		return source;
+	}
+	if ((u8)source[0] == 0xEF && (u8)source[1] == 0xBB && (u8)source[2] == 0xBF) {
+		return source + 3;
+	}
+	return source;
+}
+
+static const char *se_shader_get_line_end(const char *line_start) {
+	const char *line_end = strchr(line_start, '\n');
+	if (line_end) {
+		return line_end;
+	}
+	return line_start + strlen(line_start);
+}
+
+static const char *se_shader_get_body_after_version(const char *source) {
+	const char *line_end = se_shader_get_line_end(source);
+	if (*line_end == '\n') {
+		return line_end + 1;
+	}
+	return line_end;
+}
+
+static b8 se_shader_line_is_precision(const char *line_start, const char *line_end) {
+	const char *cursor = line_start;
+	while (cursor < line_end && (*cursor == ' ' || *cursor == '\t' || *cursor == '\r')) {
+		cursor++;
+	}
+	return (sz)(line_end - cursor) >= 9 && strncmp(cursor, "precision", 9) == 0;
+}
+
+#if defined(SE_RENDER_BACKEND_GLES)
+static b8 se_shader_has_precision_decl(const char *source) {
+	const char *cursor = source;
+	while (cursor && *cursor) {
+		const char *line_end = se_shader_get_line_end(cursor);
+		if (se_shader_line_is_precision(cursor, line_end)) {
+			return true;
+		}
+		if (*line_end == '\n') {
+			cursor = line_end + 1;
+		} else {
+			break;
+		}
+	}
+	return false;
+}
+#endif
+
+#if !defined(SE_RENDER_BACKEND_GLES)
+static char *se_shader_translate_es300_to_gl330(const char *source) {
+	static const char *gl_header = "#version 330 core\n";
+	const char *body = se_shader_get_body_after_version(source);
+	const sz source_size = strlen(source);
+	const sz header_size = strlen(gl_header);
+	char *translated = malloc(source_size + header_size + 1);
+	if (!translated) {
+		return NULL;
+	}
+	sz write = 0;
+	memcpy(translated + write, gl_header, header_size);
+	write += header_size;
+
+	const char *cursor = body;
+	while (cursor && *cursor) {
+		const char *line_end = se_shader_get_line_end(cursor);
+		const sz line_size = (sz)(line_end - cursor);
+		if (!se_shader_line_is_precision(cursor, line_end)) {
+			memcpy(translated + write, cursor, line_size);
+			write += line_size;
+			if (*line_end == '\n') {
+				translated[write++] = '\n';
+			}
+		}
+		if (*line_end == '\n') {
+			cursor = line_end + 1;
+		} else {
+			break;
+		}
+	}
+	translated[write] = '\0';
+	return translated;
+}
+#endif
+
+#if defined(SE_RENDER_BACKEND_GLES)
+static char *se_shader_translate_gl330_to_es300(const char *source, const GLenum type) {
+	static const char *es_header = "#version 300 es\n";
+	static const char *frag_precision = "precision mediump float;\nprecision mediump int;\n";
+	const char *body = se_shader_get_body_after_version(source);
+	const b8 needs_precision =
+		(type == GL_FRAGMENT_SHADER) && !se_shader_has_precision_decl(body);
+	const sz source_size = strlen(source);
+	const sz header_size = strlen(es_header);
+	const sz precision_size = needs_precision ? strlen(frag_precision) : 0;
+	char *translated = malloc(source_size + header_size + precision_size + 1);
+	if (!translated) {
+		return NULL;
+	}
+	sz write = 0;
+	memcpy(translated + write, es_header, header_size);
+	write += header_size;
+	if (needs_precision) {
+		memcpy(translated + write, frag_precision, precision_size);
+		write += precision_size;
+	}
+	memcpy(translated + write, body, strlen(body));
+	write += strlen(body);
+	translated[write] = '\0';
+	return translated;
+}
+#endif
+
+static char *se_shader_prepare_source(const char *source, GLenum type) {
+	const char *clean_source = se_shader_skip_bom(source);
+	if (!clean_source || clean_source[0] == '\0') {
+		return NULL;
+	}
+#if defined(SE_RENDER_BACKEND_GLES)
+	if (strncmp(clean_source, "#version 330 core", 17) == 0) {
+		return se_shader_translate_gl330_to_es300(clean_source, type);
+	}
+	if (type == GL_FRAGMENT_SHADER && strncmp(clean_source, "#version 300 es", 15) == 0) {
+		const char *body = se_shader_get_body_after_version(clean_source);
+		if (!se_shader_has_precision_decl(body)) {
+			return se_shader_translate_gl330_to_es300(clean_source, type);
+		}
+	}
+#else
+	if (strncmp(clean_source, "#version 300 es", 15) == 0) {
+		return se_shader_translate_es300_to_gl330(clean_source);
+	}
+#endif
+	return NULL;
 }
 
 static GLuint se_shader_compile(const char *source, GLenum type) {
@@ -18,8 +169,11 @@ static GLuint se_shader_compile(const char *source, GLenum type) {
 		return 0;
 	}
 
+	char *translated_source = se_shader_prepare_source(source, type);
+	const char *compile_source = translated_source ? translated_source : source;
+
 	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &source, NULL);
+	glShaderSource(shader, 1, &compile_source, NULL);
 	glCompileShader(shader);
 
 	GLint success = 0;
@@ -29,8 +183,10 @@ static GLuint se_shader_compile(const char *source, GLenum type) {
 		glGetShaderInfoLog(shader, 512, NULL, info_log);
 		fprintf(stderr, "se_shader_compile :: shader compilation failed: %s\n", info_log);
 		glDeleteShader(shader);
+		free(translated_source);
 		return 0;
 	}
+	free(translated_source);
 
 	return shader;
 }
@@ -71,6 +227,9 @@ static GLuint se_shader_create_program(const char *vertex_source, const char *fr
 b8 se_shader_load_internal(se_shader *shader) {
 
 	assert(shader);
+	if (!se_render_has_context()) {
+		return false;
+	}
 
 	se_shader_cleanup(shader);
 
@@ -104,6 +263,10 @@ se_shader_handle se_shader_load(const char *vertex_file_path, const char *fragme
 	se_context *ctx = se_current_context();
 	if (!ctx || !vertex_file_path || !fragment_file_path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	if (!se_render_has_context()) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
 	}
 	if (s_array_get_capacity(&ctx->shaders) == 0) {
@@ -147,6 +310,10 @@ se_shader_handle se_shader_load_from_memory(const char *vertex_source, const cha
 	se_context *ctx = se_current_context();
 	if (!ctx || !vertex_source || !fragment_source) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	if (!se_render_has_context()) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
 	}
 	if (s_array_get_capacity(&ctx->shaders) == 0) {
@@ -208,7 +375,13 @@ b8 se_shader_reload_if_changed(const se_shader_handle shader) {
 
 void se_shader_use(const se_shader_handle shader, const b8 update_uniforms, const b8 update_global_uniforms) {
 	se_context *ctx = se_current_context();
+	if (!ctx || !se_render_has_context()) {
+		return;
+	}
 	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	if (!shader_ptr || shader_ptr->program == 0) {
+		return;
+	}
 	glUseProgram(shader_ptr->program);
 	if (update_uniforms) {
 		se_uniform_apply(shader, update_global_uniforms);

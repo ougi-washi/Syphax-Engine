@@ -30,6 +30,16 @@ static b8 se_render_initialized = false;
 static b8 se_is_blending = false;
 static u64 se_render_generation = 0;
 
+static b8 se_render_ready_for_gl_calls(void) {
+	if (se_render_initialized) {
+		return true;
+	}
+	if (!se_render_has_context()) {
+		return false;
+	}
+	return se_render_init();
+}
+
 PFNGLDELETEBUFFERS se_glDeleteBuffers = NULL;
 PFNGLGENBUFFERS se_glGenBuffers = NULL;
 PFNGLBINDBUFFER se_glBindBuffer = NULL;
@@ -331,6 +341,9 @@ void se_quad_3d_create(se_quad *out_quad) {
 	out_quad->last_attribute = 0;
 	s_array_init(&out_quad->instance_buffers);
 	out_quad->instance_buffers_dirty = false;
+	if (!se_render_ready_for_gl_calls()) {
+		return;
+	}
 
 	glGenVertexArrays(1, &out_quad->vao);
 	glGenBuffers(1, &out_quad->vbo);
@@ -364,6 +377,9 @@ void se_quad_2d_create(se_quad *out_quad, const u32 instance_count) {
 	out_quad->last_attribute = 0;
 	s_array_init(&out_quad->instance_buffers);
 	out_quad->instance_buffers_dirty = false;
+	if (!se_render_ready_for_gl_calls()) {
+		return;
+	}
 
 	glGenVertexArrays(1, &out_quad->vao);
 	glGenBuffers(1, &out_quad->vbo);
@@ -391,6 +407,9 @@ void se_quad_2d_create(se_quad *out_quad, const u32 instance_count) {
 void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const sz instance_count) {
 	s_assertf(quad, "se_quad_2d_add_instance_buffer :: quad is null");
 	s_assertf(buffer, "se_quad_2d_add_instance_buffer :: buffer is null");
+	if (!se_render_ready_for_gl_calls() || quad->vao == 0) {
+		return;
+	}
 
 	glBindVertexArray(quad->vao);
 
@@ -420,6 +439,9 @@ void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, const s
 void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, const sz instance_count) {
 	s_assertf(quad, "se_quad_2d_add_instance_buffer_mat3 :: quad is null");
 	s_assertf(buffer, "se_quad_2d_add_instance_buffer_mat3 :: buffer is null");
+	if (!se_render_ready_for_gl_calls() || quad->vao == 0) {
+		return;
+	}
 
 	glBindVertexArray(quad->vao);
 
@@ -446,6 +468,9 @@ void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, co
 }
 
 void se_quad_render(se_quad *quad, const sz instance_count) {
+	if (!quad || !se_render_ready_for_gl_calls() || quad->vao == 0) {
+		return;
+	}
 	glBindVertexArray(quad->vao);
 	if (instance_count > 0) {
 		if (quad->instance_buffers_dirty) {
@@ -465,6 +490,18 @@ void se_quad_render(se_quad *quad, const sz instance_count) {
 }
 
 void se_quad_destroy(se_quad *quad) {
+	if (!quad) {
+		return;
+	}
+	if (!se_render_ready_for_gl_calls()) {
+		s_array_clear(&quad->instance_buffers);
+		quad->vao = 0;
+		quad->vbo = 0;
+		quad->ebo = 0;
+		quad->last_attribute = 0;
+		quad->instance_buffers_dirty = false;
+		return;
+	}
 	se_instance_buffer *current_buffer = NULL;
 	s_foreach(&quad->instance_buffers, current_buffer) {
 		glDeleteBuffers(1, &current_buffer->vbo);
@@ -473,6 +510,11 @@ void se_quad_destroy(se_quad *quad) {
 	glDeleteVertexArrays(1, &quad->vao);
 	glDeleteBuffers(1, &quad->vbo);
 	glDeleteBuffers(1, &quad->ebo);
+	quad->vao = 0;
+	quad->vbo = 0;
+	quad->ebo = 0;
+	quad->last_attribute = 0;
+	quad->instance_buffers_dirty = false;
 }
 
 #endif // SE_RENDER_BACKEND_OPENGL || SE_RENDER_BACKEND_GLES

@@ -2,6 +2,7 @@
 
 #include "se_text.h"
 #include "se_debug.h"
+#include "se_render.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
 
@@ -35,6 +36,10 @@ se_text_handle* se_text_handle_create(const u32 fonts_count) {
 	se_context *ctx = se_current_context();
 	if (!ctx) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	if (!se_render_has_context()) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return NULL;
 	}
 	u32 resolved_fonts = fonts_count > 0 ? fonts_count : SE_TEXT_HANDLE_DEFAULT_FONTS;
@@ -79,6 +84,10 @@ se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const
 	se_context* ctx = text_handle->ctx;
 	if (!ctx) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	if (!se_render_has_context()) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
 		return S_HANDLE_NULL;
 	}
 	

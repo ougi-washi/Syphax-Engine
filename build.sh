@@ -2,18 +2,24 @@
 
 # Syphax-Engine - Ougi Washi
 
+set -euo pipefail
+
 BUILD_DIR="build"
 CLEAN=false
 TARGET=""
-RENDER="opengl"
+RENDER="gl"
+PLATFORM="desktop_glfw"
 
 show_help() {
-    echo "Usage: ./build.sh [--clean] [-target=name] [-render=opengl|gles|vulkan] [target]"
+    echo "Usage: ./build.sh [--clean] [-target=name] [-render=gl|gles] [-platform=desktop_glfw|terminal] [target]"
     echo ""
     echo "Options:"
     echo "  --clean          Regenerate CMake files before building"
     echo "  -target=name     Specific target to build (e.g., hello)"
-    echo "  -render=backend  Render backend: opengl (default), gles, vulkan"
+    echo "  -render=backend  Render backend: gl (default), gles"
+    echo "                   Planned (not implemented yet): webgl, metal, vulkan, software"
+    echo "  -platform=kind   Platform backend: desktop_glfw (default), terminal (experimental)"
+    echo "                   Planned (not implemented yet): android, ios, web"
     echo "  target           Specific target to build (e.g., example_a)"
     echo ""
     echo "Examples:"
@@ -22,6 +28,7 @@ show_help() {
     echo "  ./build.sh --clean            Regenerate CMake files and build everything"
     echo "  ./build.sh --clean example_a  Regenerate CMake files and build only example_a"
     echo "  ./build.sh -target=hello -render=gles"
+    echo "  ./build.sh -platform=terminal 2_array"
     exit 1
 }
 
@@ -46,6 +53,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -render=*)
             RENDER="${1#-render=}"
+            shift
+            ;;
+        -platform=*)
+            PLATFORM="${1#-platform=}"
             shift
             ;;
         -*)
@@ -73,17 +84,14 @@ fi
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-# Resolve render backend flags
-RENDER_FLAG=""
 case "$RENDER" in
-    opengl)
-        RENDER_FLAG="-DSE_RENDER_BACKEND_OPENGL"
-        ;;
+    opengl|gl)
+        RENDER="gl"
+		;;
     gles)
-        RENDER_FLAG="-DSE_RENDER_BACKEND_GLES"
+        RENDER="gles"
         ;;
-    vulkan)
-        RENDER_FLAG="-DSE_RENDER_BACKEND_VULKAN"
+    webgl|metal|vulkan|software)
         ;;
     *)
         echo "Error: Unknown render backend: $RENDER"
@@ -92,28 +100,40 @@ case "$RENDER" in
         ;;
 esac
 
-WINDOW_FLAG="-DSE_WINDOW_BACKEND_GLFW"
-CMAKE_C_FLAGS_VALUE="$RENDER_FLAG $WINDOW_FLAG"
+case "$PLATFORM" in
+    desktop|desktop_glfw|glfw)
+        PLATFORM="desktop_glfw"
+        ;;
+    terminal|android|ios|web)
+        ;;
+    *)
+        echo "Error: Unknown platform backend: $PLATFORM"
+        echo ""
+        show_help
+        ;;
+esac
 
 # Run cmake only if it's a clean build or if CMakeCache doesn't exist
 RECONFIGURE=false
 if [ "$CLEAN" = true ] || [ ! -f "CMakeCache.txt" ]; then
     RECONFIGURE=true
-elif ! grep -q "CMAKE_C_FLAGS:STRING=$CMAKE_C_FLAGS_VALUE" CMakeCache.txt; then
+elif ! grep -q "^SE_BACKEND_RENDER:STRING=$RENDER$" CMakeCache.txt; then
+    RECONFIGURE=true
+elif ! grep -q "^SE_BACKEND_PLATFORM:STRING=$PLATFORM$" CMakeCache.txt; then
     RECONFIGURE=true
 fi
 
 if [ "$RECONFIGURE" = true ]; then
-    echo "Generating CMake files..."
-    cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_FLAGS="$CMAKE_C_FLAGS_VALUE" ..
+    echo "Generating CMake files (render=$RENDER, platform=$PLATFORM)..."
+    cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSE_BACKEND_RENDER="$RENDER" -DSE_BACKEND_PLATFORM="$PLATFORM" ..
 fi
 
 if [ -z "$TARGET" ]; then
     echo "Building all targets..."
-    make -j $(nproc)
+    cmake --build . --parallel "$(nproc)"
 else
     echo "Building target: $TARGET"
-    make -j $(nproc) "$TARGET"
+    cmake --build . --parallel "$(nproc)" --target "$TARGET"
 fi
 
 cd ..

@@ -35,5 +35,17 @@ jobs:
     - name: Build
       run: ${{github.workspace}}/build.sh
 
-    - name: Test
-      run: ${{github.workspace}}/bin/2_array
+    - name: Test (99_game terminal autotest)
+      run: |
+            timeout 25s env \
+              SE_TERMINAL_RENDER=1 \
+              SE_TERMINAL_HIDE_WINDOW=1 \
+              ${{github.workspace}}/bin/99_game --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05
+
+    - name: Build (terminal platform 99_game)
+      run: ${{github.workspace}}/build.sh -platform=terminal 99_game
+
+    - name: Test (99_game terminal platform autotest)
+      run: |
+            timeout 25s \
+              ${{github.workspace}}/bin/99_game --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05

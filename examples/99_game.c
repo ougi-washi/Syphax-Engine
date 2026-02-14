@@ -367,6 +367,29 @@ static void rts_log(const c8 *fmt, ...) {
 	va_end(args);
 }
 
+static b8 rts_env_flag_enabled(const c8 *key) {
+	if (!key) {
+		return false;
+	}
+	const c8 *value = getenv(key);
+	if (!value || value[0] == '\0') {
+		return false;
+	}
+	if (strcmp(value, "0") == 0 ||
+		strcmp(value, "false") == 0 ||
+		strcmp(value, "off") == 0 ||
+		strcmp(value, "no") == 0) {
+		return false;
+	}
+	return true;
+}
+
+static b8 rts_terminal_allow_logs(void) {
+	return
+		rts_env_flag_enabled("SE_TERMINAL_ALLOW_LOGS") ||
+		rts_env_flag_enabled("SE_TERMINAL_ALLOW_STDOUT_LOGS");
+}
+
 static void rts_set_command_line(rts_game *game, const c8 *fmt, ...) {
 	if (!game || !fmt) {
 		return;
@@ -3897,6 +3920,16 @@ int main(int argc, char **argv) {
 			game.autotest.fixed_dt = rts_clampf(parsed_dt, 0.001f, 0.05f);
 		}
 	}
+	const b8 terminal_render_active =
+		rts_env_flag_enabled("SE_TERMINAL_RENDER") ||
+		rts_env_flag_enabled("SE_TERMINAL_MIRROR") ||
+		rts_env_flag_enabled("SE_WINDOW_TERMINAL");
+	const b8 terminal_allow_logs = rts_terminal_allow_logs();
+	if (terminal_render_active && !terminal_allow_logs) {
+		// In terminal render mode, periodic stdout logs cause visible scene jitter.
+		game.track_system_timing = false;
+		game.simulator.next_status_print = 999999.0f;
+	}
 	if (game.autotest.enabled) {
 		game.autotest.full_systems_required = !headless_requested;
 		if (!perf_flag_explicit) {
@@ -3934,6 +3967,20 @@ int main(int argc, char **argv) {
 		se_context_destroy(game.ctx);
 		return 1;
 	}
+	if (!se_render_has_context()) {
+		fprintf(stderr, RTS_LOG_PREFIX "no graphics context available\n");
+		if (game.simulator.enabled) {
+			rts_log("falling back to headless simulation");
+			se_window_destroy(game.window);
+			game.window = S_HANDLE_NULL;
+			se_context_destroy(game.ctx);
+			game.ctx = NULL;
+			return rts_run_headless_simulation(&game);
+		}
+		se_window_destroy(game.window);
+		se_context_destroy(game.ctx);
+		return 1;
+	}
 
 	se_window_set_exit_key(game.window, SE_KEY_ESCAPE);
 	se_window_set_vsync(game.window, false);
@@ -3947,6 +3994,14 @@ int main(int argc, char **argv) {
 	game.text_handle = se_text_handle_create(0);
 	if (!game.text_handle) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to create text handle\n");
+		if (game.simulator.enabled) {
+			rts_log("falling back to headless simulation");
+			se_window_destroy(game.window);
+			game.window = S_HANDLE_NULL;
+			se_context_destroy(game.ctx);
+			game.ctx = NULL;
+			return rts_run_headless_simulation(&game);
+		}
 		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
 		return 1;
@@ -3954,6 +4009,16 @@ int main(int argc, char **argv) {
 	game.font = se_font_load(game.text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 26.0f);
 	if (game.font == S_HANDLE_NULL) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to load font\n");
+		if (game.simulator.enabled) {
+			rts_log("falling back to headless simulation");
+			se_text_handle_destroy(game.text_handle);
+			game.text_handle = NULL;
+			se_window_destroy(game.window);
+			game.window = S_HANDLE_NULL;
+			se_context_destroy(game.ctx);
+			game.ctx = NULL;
+			return rts_run_headless_simulation(&game);
+		}
 		se_text_handle_destroy(game.text_handle);
 		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
@@ -3963,6 +4028,16 @@ int main(int argc, char **argv) {
 	rts_reset_slots(&game);
 	if (!rts_init_rendering(&game)) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to initialize rendering assets\n");
+		if (game.simulator.enabled) {
+			rts_log("falling back to headless simulation");
+			se_text_handle_destroy(game.text_handle);
+			game.text_handle = NULL;
+			se_window_destroy(game.window);
+			game.window = S_HANDLE_NULL;
+			se_context_destroy(game.ctx);
+			game.ctx = NULL;
+			return rts_run_headless_simulation(&game);
+		}
 		se_text_handle_destroy(game.text_handle);
 		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
@@ -3970,6 +4045,16 @@ int main(int argc, char **argv) {
 	}
 	if (!rts_init_hud_scene(&game)) {
 		fprintf(stderr, RTS_LOG_PREFIX "failed to initialize HUD\n");
+		if (game.simulator.enabled) {
+			rts_log("falling back to headless simulation");
+			se_text_handle_destroy(game.text_handle);
+			game.text_handle = NULL;
+			se_window_destroy(game.window);
+			game.window = S_HANDLE_NULL;
+			se_context_destroy(game.ctx);
+			game.ctx = NULL;
+			return rts_run_headless_simulation(&game);
+		}
 		se_text_handle_destroy(game.text_handle);
 		se_window_destroy(game.window);
 		se_context_destroy(game.ctx);
