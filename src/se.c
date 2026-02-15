@@ -9,6 +9,7 @@
 #include "se_render_buffer.h"
 #include "se_scene.h"
 #include "se_shader.h"
+#include "se_simulation.h"
 #include "se_text.h"
 #include "se_texture.h"
 #include "se_ui.h"
@@ -108,6 +109,13 @@ static void se_context_log_leaks(se_context *context) {
 			s_array_get_size(&context->textures),
 			s_array_get_size(&context->shaders));
 	}
+	if (s_array_get_size(&context->simulations) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+			"se_context_log_leaks :: context teardown with simulations alive (%zu)",
+			s_array_get_size(&context->simulations));
+	}
 }
 
 se_context *se_context_create(void) {
@@ -134,6 +142,7 @@ se_context *se_context_create(void) {
 	s_array_init(&context->scenes_3d);
 	s_array_init(&context->ui_elements);
 	s_array_init(&context->ui_texts);
+	s_array_init(&context->simulations);
 	context->ui_text_handle = NULL;
 
 	if (se_global_context == NULL) {
@@ -218,6 +227,11 @@ void se_context_destroy(se_context *context) {
 		se_font_handle font_handle = s_array_handle(&context->fonts, (u32)(s_array_get_size(&context->fonts) - 1));
 		se_font_destroy(font_handle);
 		se_last_destroy_report.fonts++;
+	}
+
+	while (s_array_get_size(&context->simulations) > 0) {
+		se_simulation_handle simulation_handle = s_array_handle(&context->simulations, (u32)(s_array_get_size(&context->simulations) - 1));
+		se_simulation_destroy(simulation_handle);
 	}
 
 	while (s_array_get_size(&context->windows) > 0) {

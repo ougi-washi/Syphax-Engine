@@ -35,6 +35,9 @@ typedef s_handle se_object_3d_handle;
 typedef s_handle se_scene_3d_handle;
 typedef s_handle se_ui_element_handle;
 typedef s_handle se_ui_text_handle;
+typedef s_handle se_simulation_handle;
+
+struct se_simulation;
 
 typedef struct se_context {
 	s_array(struct se_window, windows);
@@ -52,6 +55,7 @@ typedef struct se_context {
 	s_array(struct se_scene_3d, scenes_3d);
 	s_array(struct se_ui_element, ui_elements);
 	s_array(struct se_ui_text, ui_texts);
+	s_array(struct se_simulation, simulations);
 	se_text_handle *ui_text_handle;
 } se_context;
 

@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct se_simulation se_simulation;
+
 typedef s_array(u8, se_sim_bytes);
 typedef s_array(u32, se_sim_u32s);
 
@@ -55,6 +57,7 @@ typedef struct {
 typedef s_array(se_sim_system_entry, se_sim_system_entries);
 
 struct se_simulation {
+	se_simulation_handle self_handle;
 	se_simulation_config config;
 	se_sim_tick current_tick;
 	u64 next_sequence;
@@ -69,6 +72,42 @@ struct se_simulation {
 	se_sim_event_records ready_events;
 	se_sim_system_entries systems;
 };
+
+static se_simulation* se_simulation_from_handle_mut(const se_simulation_handle handle) {
+	if (handle == SE_SIMULATION_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	se_simulation* sim = s_array_get(&ctx->simulations, handle);
+	if (!sim) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return NULL;
+	}
+	return sim;
+}
+
+static const se_simulation* se_simulation_from_handle_const(const se_simulation_handle handle) {
+	if (handle == SE_SIMULATION_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+	const se_simulation* sim = s_array_get(&ctx->simulations, handle);
+	if (!sim) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return NULL;
+	}
+	return sim;
+}
 
 typedef struct {
 	const u8* data;
@@ -135,7 +174,7 @@ static b8 se_simulation_config_validate(const se_simulation_config* config) {
 	return true;
 }
 
-static void se_sim_bytes_copy_from_raw(se_sim_bytes* out, const void* data, const u32 size) {
+static void se_sim_bytes_copy_from_internal(se_sim_bytes* out, const void* data, const u32 size) {
 	s_array_init(out);
 	if (size == 0u) {
 		return;
@@ -862,17 +901,29 @@ static void se_simulation_snapshot_sections_clear(se_sim_snapshot_sections* sect
 	s_array_init(sections);
 }
 
-se_simulation* se_simulation_create(const se_simulation_config* config) {
+static se_simulation* se_simulation_create_internal(const se_simulation_config* config) {
 	if (!se_simulation_config_validate(config)) {
 		return NULL;
 	}
 
-	se_simulation* sim = calloc(1, sizeof(*sim));
-	if (!sim) {
-		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
 	}
 
+	se_simulation_handle sim_handle = s_array_increment(&ctx->simulations);
+	se_simulation* sim = s_array_get(&ctx->simulations, sim_handle);
+	if (!sim) {
+		if (sim_handle != SE_SIMULATION_HANDLE_NULL) {
+			s_array_remove(&ctx->simulations, sim_handle);
+		}
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return NULL;
+	}
+
+	memset(sim, 0, sizeof(*sim));
+	sim->self_handle = sim_handle;
 	sim->config = *config;
 	sim->current_tick = 0u;
 	sim->next_sequence = 1u;
@@ -897,18 +948,30 @@ se_simulation* se_simulation_create(const se_simulation_config* config) {
 	return sim;
 }
 
-void se_simulation_destroy(se_simulation* sim) {
+static void se_simulation_destroy_internal(se_simulation* sim) {
 	if (!sim) {
 		return;
 	}
+
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	const se_simulation_handle handle = sim->self_handle;
+
 	se_simulation_entities_clear(sim);
 	se_simulation_events_clear(sim);
 	se_simulation_registries_clear(sim);
 	s_array_clear(&sim->systems);
-	free(sim);
+	memset(sim, 0, sizeof(*sim));
+	if (handle != SE_SIMULATION_HANDLE_NULL) {
+		s_array_remove(&ctx->simulations, handle);
+	}
+	se_set_last_error(SE_RESULT_OK);
 }
 
-void se_simulation_reset(se_simulation* sim) {
+static void se_simulation_reset_internal(se_simulation* sim) {
 	if (!sim) {
 		return;
 	}
@@ -919,7 +982,7 @@ void se_simulation_reset(se_simulation* sim) {
 	se_set_last_error(SE_RESULT_OK);
 }
 
-se_entity_id se_simulation_entity_create(se_simulation* sim) {
+static se_entity_id se_simulation_entity_create_internal(se_simulation* sim) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return SE_SIM_ENTITY_ID_INVALID;
@@ -970,7 +1033,7 @@ se_entity_id se_simulation_entity_create(se_simulation* sim) {
 	return se_sim_entity_id_make(slot_index, slot->generation);
 }
 
-b8 se_simulation_entity_destroy(se_simulation* sim, const se_entity_id entity) {
+static b8 se_simulation_entity_destroy_internal(se_simulation* sim, const se_entity_id entity) {
 	if (!sim || entity == SE_SIM_ENTITY_ID_INVALID) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -995,7 +1058,7 @@ b8 se_simulation_entity_destroy(se_simulation* sim, const se_entity_id entity) {
 	return true;
 }
 
-b8 se_simulation_entity_alive(const se_simulation* sim, const se_entity_id entity) {
+static b8 se_simulation_entity_alive_internal(const se_simulation* sim, const se_entity_id entity) {
 	if (!sim || entity == SE_SIM_ENTITY_ID_INVALID) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1009,7 +1072,7 @@ b8 se_simulation_entity_alive(const se_simulation* sim, const se_entity_id entit
 	return true;
 }
 
-u32 se_simulation_entity_count(const se_simulation* sim) {
+static u32 se_simulation_entity_count_internal(const se_simulation* sim) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return 0u;
@@ -1018,7 +1081,7 @@ u32 se_simulation_entity_count(const se_simulation* sim) {
 	return sim->alive_entities;
 }
 
-void se_simulation_for_each_entity(se_simulation* sim, se_sim_entity_iterator_fn fn, void* user_data) {
+static void se_simulation_for_each_entity_internal(se_simulation* sim, se_sim_entity_iterator_fn fn, void* user_data) {
 	if (!sim || !fn) {
 		return;
 	}
@@ -1027,11 +1090,11 @@ void se_simulation_for_each_entity(se_simulation* sim, se_sim_entity_iterator_fn
 		if (!slot || !slot->alive) {
 			continue;
 		}
-		fn(sim, se_sim_entity_id_make((u32)i, slot->generation), user_data);
+		fn(sim->self_handle, se_sim_entity_id_make((u32)i, slot->generation), user_data);
 	}
 }
 
-b8 se_simulation_component_register(se_simulation* sim, const se_sim_component_desc* desc) {
+static b8 se_simulation_component_register_internal(se_simulation* sim, const se_sim_component_desc* desc) {
 	if (!sim || !se_simulation_component_desc_valid(desc)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1050,7 +1113,7 @@ b8 se_simulation_component_register(se_simulation* sim, const se_sim_component_d
 	return true;
 }
 
-b8 se_simulation_component_set(se_simulation* sim, const se_entity_id entity, const se_sim_component_type type, const void* data, const sz size) {
+static b8 se_simulation_component_set_internal(se_simulation* sim, const se_entity_id entity, const se_sim_component_type type, const void* data, const sz size) {
 	if (!sim || !data || size == 0u || size > UINT32_MAX) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1090,7 +1153,7 @@ b8 se_simulation_component_set(se_simulation* sim, const se_entity_id entity, co
 	return true;
 }
 
-b8 se_simulation_component_get(const se_simulation* sim, const se_entity_id entity, const se_sim_component_type type, void* out_data, const sz out_size) {
+static b8 se_simulation_component_get_internal(const se_simulation* sim, const se_entity_id entity, const se_sim_component_type type, void* out_data, const sz out_size) {
 	if (!sim || !out_data || out_size == 0u || out_size > UINT32_MAX) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1120,7 +1183,7 @@ b8 se_simulation_component_get(const se_simulation* sim, const se_entity_id enti
 	return true;
 }
 
-void* se_simulation_component_get_ptr(se_simulation* sim, const se_entity_id entity, const se_sim_component_type type) {
+static void* se_simulation_component_get_ptr_internal(se_simulation* sim, const se_entity_id entity, const se_sim_component_type type) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
@@ -1147,7 +1210,7 @@ void* se_simulation_component_get_ptr(se_simulation* sim, const se_entity_id ent
 	return s_array_get_data(&blob->data);
 }
 
-const void* se_simulation_component_get_const_ptr(const se_simulation* sim, const se_entity_id entity, const se_sim_component_type type) {
+static const void* se_simulation_component_get_const_ptr_internal(const se_simulation* sim, const se_entity_id entity, const se_sim_component_type type) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
@@ -1170,7 +1233,7 @@ const void* se_simulation_component_get_const_ptr(const se_simulation* sim, cons
 	return s_array_get_data((se_sim_bytes*)&blob->data);
 }
 
-b8 se_simulation_component_remove(se_simulation* sim, const se_entity_id entity, const se_sim_component_type type) {
+static b8 se_simulation_component_remove_internal(se_simulation* sim, const se_entity_id entity, const se_sim_component_type type) {
 	if (!sim || type == 0u) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1195,7 +1258,7 @@ b8 se_simulation_component_remove(se_simulation* sim, const se_entity_id entity,
 	return false;
 }
 
-b8 se_simulation_event_register(se_simulation* sim, const se_sim_event_desc* desc) {
+static b8 se_simulation_event_register_internal(se_simulation* sim, const se_sim_event_desc* desc) {
 	if (!sim || !se_simulation_event_desc_valid(desc)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1213,7 +1276,7 @@ b8 se_simulation_event_register(se_simulation* sim, const se_sim_event_desc* des
 	return true;
 }
 
-b8 se_simulation_event_emit(
+static b8 se_simulation_event_emit_internal(
 	se_simulation* sim,
 	const se_entity_id target,
 	const se_sim_event_type type,
@@ -1263,7 +1326,7 @@ b8 se_simulation_event_emit(
 	return true;
 }
 
-b8 se_simulation_event_poll(
+static b8 se_simulation_event_poll_internal(
 	se_simulation* sim,
 	const se_entity_id target,
 	const se_sim_event_type type,
@@ -1319,7 +1382,7 @@ b8 se_simulation_event_poll(
 	return false;
 }
 
-b8 se_simulation_register_system(se_simulation* sim, se_sim_system_fn fn, void* user_data, const i32 order) {
+static b8 se_simulation_register_system_internal(se_simulation* sim, se_sim_system_fn fn, void* user_data, const i32 order) {
 	if (!sim || !fn) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1335,7 +1398,7 @@ b8 se_simulation_register_system(se_simulation* sim, se_sim_system_fn fn, void* 
 	return true;
 }
 
-b8 se_simulation_step(se_simulation* sim, const u32 tick_count) {
+static b8 se_simulation_step_internal(se_simulation* sim, const u32 tick_count) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1352,14 +1415,14 @@ b8 se_simulation_step(se_simulation* sim, const u32 tick_count) {
 			if (!system_entry || !system_entry->fn) {
 				continue;
 			}
-			system_entry->fn(sim, sim->current_tick, system_entry->user_data);
+			system_entry->fn(sim->self_handle, sim->current_tick, system_entry->user_data);
 		}
 	}
 	se_set_last_error(SE_RESULT_OK);
 	return true;
 }
 
-se_sim_tick se_simulation_get_tick(const se_simulation* sim) {
+static se_sim_tick se_simulation_get_tick_internal(const se_simulation* sim) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return 0u;
@@ -1368,7 +1431,7 @@ se_sim_tick se_simulation_get_tick(const se_simulation* sim) {
 	return sim->current_tick;
 }
 
-f32 se_simulation_get_fixed_dt(const se_simulation* sim) {
+static f32 se_simulation_get_fixed_dt_internal(const se_simulation* sim) {
 	if (!sim) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return 0.0f;
@@ -1377,7 +1440,7 @@ f32 se_simulation_get_fixed_dt(const se_simulation* sim) {
 	return sim->config.fixed_dt;
 }
 
-void se_simulation_get_diagnostics(const se_simulation* sim, se_simulation_diagnostics* out_diag) {
+static void se_simulation_get_diagnostics_internal(const se_simulation* sim, se_simulation_diagnostics* out_diag) {
 	if (!sim || !out_diag) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return;
@@ -1397,7 +1460,7 @@ void se_simulation_get_diagnostics(const se_simulation* sim, se_simulation_diagn
 	se_set_last_error(SE_RESULT_OK);
 }
 
-b8 se_simulation_snapshot_save_memory(const se_simulation* sim, u8** out_data, sz* out_size) {
+static b8 se_simulation_snapshot_save_memory_internal(const se_simulation* sim, u8** out_data, sz* out_size) {
 	if (!sim || !out_data || !out_size) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -1573,14 +1636,14 @@ void se_simulation_snapshot_free(void* data) {
 	free(data);
 }
 
-b8 se_simulation_snapshot_save_file(const se_simulation* sim, const c8* path) {
+static b8 se_simulation_snapshot_save_file_internal(const se_simulation* sim, const c8* path) {
 	if (!sim || !path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	u8* memory = NULL;
 	sz size = 0u;
-	if (!se_simulation_snapshot_save_memory(sim, &memory, &size)) {
+	if (!se_simulation_snapshot_save_memory_internal(sim, &memory, &size)) {
 		return false;
 	}
 	FILE* file = fopen(path, "wb");
@@ -1652,7 +1715,7 @@ static b8 se_simulation_snapshot_parse_component_registry_section(se_simulation*
 			return false;
 		}
 		desc.name[SE_MAX_NAME_LENGTH - 1] = '\0';
-		if (!se_simulation_component_register(sim, &desc)) {
+		if (!se_simulation_component_register_internal(sim, &desc)) {
 			return false;
 		}
 	}
@@ -1679,7 +1742,7 @@ static b8 se_simulation_snapshot_parse_event_registry_section(se_simulation* sim
 			return false;
 		}
 		desc.name[SE_MAX_NAME_LENGTH - 1] = '\0';
-		if (!se_simulation_event_register(sim, &desc)) {
+		if (!se_simulation_event_register_internal(sim, &desc)) {
 			return false;
 		}
 	}
@@ -1797,7 +1860,7 @@ static b8 se_simulation_snapshot_parse_component_payloads_section(
 		}
 		se_sim_component_blob blob = {0};
 		blob.type = type;
-		se_sim_bytes_copy_from_raw(&blob.data, data_ptr, data_size);
+		se_sim_bytes_copy_from_internal(&blob.data, data_ptr, data_size);
 		s_array_add(&slot->components, blob);
 	}
 	if (reader.cursor != reader.size) {
@@ -1920,6 +1983,7 @@ static b8 se_simulation_snapshot_parse_tick_section(se_simulation* sim, const se
 
 static void se_simulation_snapshot_load_staging_init(se_simulation* staging, const se_simulation* source) {
 	memset(staging, 0, sizeof(*staging));
+	staging->self_handle = source->self_handle;
 	staging->config = source->config;
 	staging->current_tick = 0u;
 	staging->next_sequence = 1u;
@@ -1967,7 +2031,7 @@ static void se_simulation_snapshot_load_commit(se_simulation* sim, se_simulation
 	s_array_init(&staging->ready_events);
 }
 
-b8 se_simulation_snapshot_load_memory(se_simulation* sim, const u8* data, const sz size) {
+static b8 se_simulation_snapshot_load_memory_internal(se_simulation* sim, const u8* data, const sz size) {
 	if (!sim || !data || size < SE_SIM_SNAPSHOT_HEADER_SIZE) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -2154,7 +2218,7 @@ b8 se_simulation_snapshot_load_memory(se_simulation* sim, const u8* data, const 
 	return true;
 }
 
-b8 se_simulation_snapshot_load_file(se_simulation* sim, const c8* path) {
+static b8 se_simulation_snapshot_load_file_internal(se_simulation* sim, const c8* path) {
 	if (!sim || !path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -2193,7 +2257,253 @@ b8 se_simulation_snapshot_load_file(se_simulation* sim, const c8* path) {
 		se_set_last_error(SE_RESULT_IO);
 		return false;
 	}
-	const b8 ok = se_simulation_snapshot_load_memory(sim, bytes, (sz)file_size);
+	const b8 ok = se_simulation_snapshot_load_memory_internal(sim, bytes, (sz)file_size);
 	free(bytes);
 	return ok;
+}
+
+se_simulation_handle se_simulation_create(const se_simulation_config* config) {
+	se_simulation* sim = se_simulation_create_internal(config);
+	if (!sim) {
+		return SE_SIMULATION_HANDLE_NULL;
+	}
+	return sim->self_handle;
+}
+
+void se_simulation_destroy(const se_simulation_handle sim) {
+	if (sim == SE_SIMULATION_HANDLE_NULL) {
+		return;
+	}
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return;
+	}
+	se_simulation_destroy_internal(sim_ptr);
+}
+
+void se_simulation_reset(const se_simulation_handle sim) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return;
+	}
+	se_simulation_reset_internal(sim_ptr);
+}
+
+se_entity_id se_simulation_entity_create(const se_simulation_handle sim) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return SE_SIM_ENTITY_ID_INVALID;
+	}
+	return se_simulation_entity_create_internal(sim_ptr);
+}
+
+b8 se_simulation_entity_destroy(const se_simulation_handle sim, const se_entity_id entity) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_entity_destroy_internal(sim_ptr, entity);
+}
+
+b8 se_simulation_entity_alive(const se_simulation_handle sim, const se_entity_id entity) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_entity_alive_internal(sim_ptr, entity);
+}
+
+u32 se_simulation_entity_count(const se_simulation_handle sim) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return 0u;
+	}
+	return se_simulation_entity_count_internal(sim_ptr);
+}
+
+void se_simulation_for_each_entity(const se_simulation_handle sim, se_sim_entity_iterator_fn fn, void* user_data) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return;
+	}
+	se_simulation_for_each_entity_internal(sim_ptr, fn, user_data);
+}
+
+b8 se_simulation_component_register(const se_simulation_handle sim, const se_sim_component_desc* desc) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_component_register_internal(sim_ptr, desc);
+}
+
+b8 se_simulation_component_set(
+	const se_simulation_handle sim,
+	const se_entity_id entity,
+	const se_sim_component_type type,
+	const void* data,
+	const sz size) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_component_set_internal(sim_ptr, entity, type, data, size);
+}
+
+b8 se_simulation_component_get(
+	const se_simulation_handle sim,
+	const se_entity_id entity,
+	const se_sim_component_type type,
+	void* out_data,
+	const sz out_size) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_component_get_internal(sim_ptr, entity, type, out_data, out_size);
+}
+
+void* se_simulation_component_get_ptr(
+	const se_simulation_handle sim,
+	const se_entity_id entity,
+	const se_sim_component_type type) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return NULL;
+	}
+	return se_simulation_component_get_ptr_internal(sim_ptr, entity, type);
+}
+
+const void* se_simulation_component_get_const_ptr(
+	const se_simulation_handle sim,
+	const se_entity_id entity,
+	const se_sim_component_type type) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return NULL;
+	}
+	return se_simulation_component_get_const_ptr_internal(sim_ptr, entity, type);
+}
+
+b8 se_simulation_component_remove(
+	const se_simulation_handle sim,
+	const se_entity_id entity,
+	const se_sim_component_type type) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_component_remove_internal(sim_ptr, entity, type);
+}
+
+b8 se_simulation_event_register(const se_simulation_handle sim, const se_sim_event_desc* desc) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_event_register_internal(sim_ptr, desc);
+}
+
+b8 se_simulation_event_emit(
+	const se_simulation_handle sim,
+	const se_entity_id target,
+	const se_sim_event_type type,
+	const void* payload,
+	const sz size,
+	const se_sim_tick deliver_at_tick) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_event_emit_internal(sim_ptr, target, type, payload, size, deliver_at_tick);
+}
+
+b8 se_simulation_event_poll(
+	const se_simulation_handle sim,
+	const se_entity_id target,
+	const se_sim_event_type type,
+	void* out_payload,
+	const sz out_size,
+	se_sim_tick* out_tick) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_event_poll_internal(sim_ptr, target, type, out_payload, out_size, out_tick);
+}
+
+b8 se_simulation_register_system(
+	const se_simulation_handle sim,
+	se_sim_system_fn fn,
+	void* user_data,
+	const i32 order) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_register_system_internal(sim_ptr, fn, user_data, order);
+}
+
+b8 se_simulation_step(const se_simulation_handle sim, const u32 tick_count) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_step_internal(sim_ptr, tick_count);
+}
+
+se_sim_tick se_simulation_get_tick(const se_simulation_handle sim) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return 0u;
+	}
+	return se_simulation_get_tick_internal(sim_ptr);
+}
+
+f32 se_simulation_get_fixed_dt(const se_simulation_handle sim) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return 0.0f;
+	}
+	return se_simulation_get_fixed_dt_internal(sim_ptr);
+}
+
+void se_simulation_get_diagnostics(const se_simulation_handle sim, se_simulation_diagnostics* out_diag) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return;
+	}
+	se_simulation_get_diagnostics_internal(sim_ptr, out_diag);
+}
+
+b8 se_simulation_snapshot_save_file(const se_simulation_handle sim, const c8* path) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_snapshot_save_file_internal(sim_ptr, path);
+}
+
+b8 se_simulation_snapshot_load_file(const se_simulation_handle sim, const c8* path) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_snapshot_load_file_internal(sim_ptr, path);
+}
+
+b8 se_simulation_snapshot_save_memory(const se_simulation_handle sim, u8** out_data, sz* out_size) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_snapshot_save_memory_internal(sim_ptr, out_data, out_size);
+}
+
+b8 se_simulation_snapshot_load_memory(const se_simulation_handle sim, const u8* data, const sz size) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_snapshot_load_memory_internal(sim_ptr, data, size);
 }
