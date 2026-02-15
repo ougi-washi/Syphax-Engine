@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum {
@@ -37,6 +38,18 @@ typedef struct {
 
 static b8 sim_near_equal_f32(const f32 a, const f32 b, const f32 epsilon) {
 	return fabsf(a - b) <= epsilon;
+}
+
+static b8 sim_transform_near_equal(const sim_transform* a, const sim_transform* b, const f32 epsilon) {
+	if (!a || !b) {
+		return false;
+	}
+	return sim_near_equal_f32(a->position.x, b->position.x, epsilon) &&
+		sim_near_equal_f32(a->position.y, b->position.y, epsilon) &&
+		sim_near_equal_f32(a->position.z, b->position.z, epsilon) &&
+		sim_near_equal_f32(a->velocity.x, b->velocity.x, epsilon) &&
+		sim_near_equal_f32(a->velocity.y, b->velocity.y, epsilon) &&
+		sim_near_equal_f32(a->velocity.z, b->velocity.z, epsilon);
 }
 
 static void sim_apply_events_entity(se_simulation* sim, const se_entity_id entity, void* user_data) {
@@ -157,6 +170,19 @@ int main(void) {
 		.amount = 12.5f
 	};
 
+	const se_entity_id stale_unit = se_simulation_entity_create(sim);
+	if (stale_unit == 0u || !se_simulation_entity_destroy(sim, stale_unit)) {
+		printf("22_simulation :: failed to create stale entity id for validation\n");
+		se_simulation_destroy(sim);
+		return 1;
+	}
+	if (se_simulation_event_emit(sim, stale_unit, SIM_EVENT_DAMAGE, &damage, sizeof(damage), 2u) ||
+		se_get_last_error() != SE_RESULT_NOT_FOUND) {
+		printf("22_simulation :: stale target event emit should fail with not_found\n");
+		se_simulation_destroy(sim);
+		return 1;
+	}
+
 	if (!se_simulation_event_emit(sim, unit, SIM_EVENT_IMPULSE, &impulse, sizeof(impulse), 1u) ||
 		!se_simulation_event_emit(sim, unit, SIM_EVENT_DAMAGE, &damage, sizeof(damage), 2u)) {
 		printf("22_simulation :: failed to emit events\n");
@@ -197,6 +223,46 @@ int main(void) {
 	const char* snapshot_path = "/tmp/syphax_simulation_snapshot.bin";
 	if (!se_simulation_snapshot_save_file(sim, snapshot_path)) {
 		printf("22_simulation :: save file snapshot failed\n");
+		se_simulation_snapshot_free(snapshot_data);
+		se_simulation_destroy(sim);
+		return 1;
+	}
+
+	if (snapshot_size == 0u) {
+		printf("22_simulation :: snapshot size should not be zero\n");
+		se_simulation_snapshot_free(snapshot_data);
+		se_simulation_destroy(sim);
+		return 1;
+	}
+
+	u8* corrupted_snapshot_data = malloc(snapshot_size);
+	if (!corrupted_snapshot_data) {
+		printf("22_simulation :: failed to allocate corrupted snapshot buffer\n");
+		se_simulation_snapshot_free(snapshot_data);
+		se_simulation_destroy(sim);
+		return 1;
+	}
+	memcpy(corrupted_snapshot_data, snapshot_data, snapshot_size);
+	corrupted_snapshot_data[snapshot_size - 1u] ^= 0xFFu;
+	if (se_simulation_snapshot_load_memory(sim, corrupted_snapshot_data, snapshot_size)) {
+		printf("22_simulation :: corrupted snapshot load should fail\n");
+		free(corrupted_snapshot_data);
+		se_simulation_snapshot_free(snapshot_data);
+		se_simulation_destroy(sim);
+		return 1;
+	}
+	free(corrupted_snapshot_data);
+
+	sim_transform after_failed_load_transform = {0};
+	sim_health after_failed_load_health = {0};
+	se_simulation_component_get(sim, unit, SIM_COMPONENT_TRANSFORM, &after_failed_load_transform, sizeof(after_failed_load_transform));
+	se_simulation_component_get(sim, unit, SIM_COMPONENT_HEALTH, &after_failed_load_health, sizeof(after_failed_load_health));
+	const b8 failed_load_preserved_state =
+		sim_transform_near_equal(&after_failed_load_transform, &after_step, 0.0001f) &&
+		sim_near_equal_f32(after_failed_load_health.hp, after_step_health.hp, 0.0001f) &&
+		se_simulation_get_tick(sim) == 3u;
+	if (!failed_load_preserved_state) {
+		printf("22_simulation :: failed snapshot load should keep simulation state unchanged\n");
 		se_simulation_snapshot_free(snapshot_data);
 		se_simulation_destroy(sim);
 		return 1;

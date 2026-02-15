@@ -1224,6 +1224,10 @@ b8 se_simulation_event_emit(
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
+	if (!se_simulation_entity_slot_from_id_const(sim, target, NULL)) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
 	const se_sim_event_meta* meta = se_simulation_find_event_meta_const(sim, type);
 	if (!meta) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -1914,6 +1918,55 @@ static b8 se_simulation_snapshot_parse_tick_section(se_simulation* sim, const se
 	return true;
 }
 
+static void se_simulation_snapshot_load_staging_init(se_simulation* staging, const se_simulation* source) {
+	memset(staging, 0, sizeof(*staging));
+	staging->config = source->config;
+	staging->current_tick = 0u;
+	staging->next_sequence = 1u;
+	staging->alive_entities = 0u;
+	staging->used_event_payload_bytes = 0u;
+	s_array_init(&staging->entity_slots);
+	s_array_init(&staging->free_slots);
+	s_array_init(&staging->component_registry);
+	s_array_init(&staging->event_registry);
+	s_array_init(&staging->pending_events);
+	s_array_init(&staging->ready_events);
+	s_array_reserve(&staging->entity_slots, source->config.max_entities);
+	s_array_reserve(&staging->free_slots, source->config.max_entities);
+	s_array_reserve(&staging->pending_events, source->config.max_events);
+	s_array_reserve(&staging->ready_events, source->config.max_events);
+}
+
+static void se_simulation_snapshot_load_staging_clear(se_simulation* staging) {
+	if (!staging) {
+		return;
+	}
+	se_simulation_entities_clear(staging);
+	se_simulation_events_clear(staging);
+	se_simulation_registries_clear(staging);
+}
+
+static void se_simulation_snapshot_load_commit(se_simulation* sim, se_simulation* staging) {
+	se_simulation_clear_runtime_state_for_load(sim);
+	sim->config.fixed_dt = staging->config.fixed_dt;
+	sim->current_tick = staging->current_tick;
+	sim->next_sequence = staging->next_sequence;
+	sim->alive_entities = staging->alive_entities;
+	sim->used_event_payload_bytes = staging->used_event_payload_bytes;
+	sim->entity_slots = staging->entity_slots;
+	sim->free_slots = staging->free_slots;
+	sim->component_registry = staging->component_registry;
+	sim->event_registry = staging->event_registry;
+	sim->pending_events = staging->pending_events;
+	sim->ready_events = staging->ready_events;
+	s_array_init(&staging->entity_slots);
+	s_array_init(&staging->free_slots);
+	s_array_init(&staging->component_registry);
+	s_array_init(&staging->event_registry);
+	s_array_init(&staging->pending_events);
+	s_array_init(&staging->ready_events);
+}
+
 b8 se_simulation_snapshot_load_memory(se_simulation* sim, const u8* data, const sz size) {
 	if (!sim || !data || size < SE_SIM_SNAPSHOT_HEADER_SIZE) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
@@ -1995,7 +2048,9 @@ b8 se_simulation_snapshot_load_memory(se_simulation* sim, const u8* data, const 
 			return false;
 		}
 		(void)section_reserved;
-		if (section_offset + section_size > (u64)size) {
+		if (section_offset < payload_offset ||
+			section_offset > (u64)size ||
+			section_size > (u64)size - section_offset) {
 			se_set_last_error(SE_RESULT_IO);
 			return false;
 		}
@@ -2045,54 +2100,56 @@ b8 se_simulation_snapshot_load_memory(se_simulation* sim, const u8* data, const 
 		return false;
 	}
 
-	se_simulation_clear_runtime_state_for_load(sim);
+	se_simulation staged = {0};
+	se_simulation_snapshot_load_staging_init(&staged, sim);
 
-	if (!se_simulation_snapshot_parse_config_section(sim, &section_config)) {
-		se_simulation_clear_runtime_state_for_load(sim);
+	if (!se_simulation_snapshot_parse_config_section(&staged, &section_config)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
-	if (!se_simulation_snapshot_parse_component_registry_section(sim, &section_component_registry)) {
-		se_simulation_clear_runtime_state_for_load(sim);
+	if (!se_simulation_snapshot_parse_component_registry_section(&staged, &section_component_registry)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
-	if (!se_simulation_snapshot_parse_event_registry_section(sim, &section_event_registry)) {
-		se_simulation_clear_runtime_state_for_load(sim);
+	if (!se_simulation_snapshot_parse_event_registry_section(&staged, &section_event_registry)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
 
 	se_sim_u32s expected_component_counts = {0};
 	s_array_init(&expected_component_counts);
-	if (!se_simulation_snapshot_parse_entity_table_section(sim, &section_entity_table, &expected_component_counts)) {
+	if (!se_simulation_snapshot_parse_entity_table_section(&staged, &section_entity_table, &expected_component_counts)) {
 		s_array_clear(&expected_component_counts);
-		se_simulation_clear_runtime_state_for_load(sim);
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
-	if (!se_simulation_snapshot_parse_component_payloads_section(sim, &section_component_payloads, &expected_component_counts)) {
+	if (!se_simulation_snapshot_parse_component_payloads_section(&staged, &section_component_payloads, &expected_component_counts)) {
 		s_array_clear(&expected_component_counts);
-		se_simulation_clear_runtime_state_for_load(sim);
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
 	s_array_clear(&expected_component_counts);
 
-	if (!se_simulation_snapshot_parse_tick_section(sim, &section_tick)) {
-		se_simulation_clear_runtime_state_for_load(sim);
+	if (!se_simulation_snapshot_parse_tick_section(&staged, &section_tick)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
-	if (!se_simulation_snapshot_parse_event_queues_section(sim, &section_event_queues)) {
-		se_simulation_clear_runtime_state_for_load(sim);
+	if (!se_simulation_snapshot_parse_event_queues_section(&staged, &section_event_queues)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
 		return false;
 	}
 
 	const u32 queue_payload_bytes =
-		se_simulation_event_queue_payload_bytes(&sim->pending_events) +
-		se_simulation_event_queue_payload_bytes(&sim->ready_events);
-	sim->used_event_payload_bytes = queue_payload_bytes;
-	if (sim->used_event_payload_bytes > sim->config.max_event_payload_bytes) {
-		se_simulation_clear_runtime_state_for_load(sim);
+		se_simulation_event_queue_payload_bytes(&staged.pending_events) +
+		se_simulation_event_queue_payload_bytes(&staged.ready_events);
+	staged.used_event_payload_bytes = queue_payload_bytes;
+	if (staged.used_event_payload_bytes > staged.config.max_event_payload_bytes) {
+		se_simulation_snapshot_load_staging_clear(&staged);
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
 		return false;
 	}
 
+	se_simulation_snapshot_load_commit(sim, &staged);
 	se_set_last_error(SE_RESULT_OK);
 	return true;
 }
