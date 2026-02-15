@@ -2,6 +2,10 @@
 
 #include "se_simulation.h"
 
+#include "syphax/s_files.h"
+#include "syphax/s_json.h"
+
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,6 +147,13 @@ enum {
 	SE_SIM_SNAPSHOT_SECTION_EVENT_REGISTRY = 6u,
 	SE_SIM_SNAPSHOT_SECTION_EVENT_QUEUES = 7u
 };
+
+enum {
+	SE_SIM_JSON_VERSION = 1u
+};
+
+#define SE_SIM_JSON_FORMAT "se_simulation_json"
+#define SE_SIM_JSON_MAX_SAFE_INTEGER_U64 9007199254740991ULL
 
 #define SE_SIM_ENTITY_ID_INVALID ((se_entity_id)0)
 
@@ -703,6 +714,344 @@ static u32 se_simulation_event_queue_payload_bytes(const se_sim_event_records* q
 		bytes += (u32)s_array_get_size((se_sim_bytes*)&event_record->payload);
 	}
 	return bytes;
+}
+
+static i32 se_simulation_base64_value(const c8 c) {
+	if (c >= 'A' && c <= 'Z') {
+		return (i32)(c - 'A');
+	}
+	if (c >= 'a' && c <= 'z') {
+		return (i32)(c - 'a' + 26);
+	}
+	if (c >= '0' && c <= '9') {
+		return (i32)(c - '0' + 52);
+	}
+	if (c == '+') {
+		return 62;
+	}
+	if (c == '/') {
+		return 63;
+	}
+	return -1;
+}
+
+static b8 se_simulation_json_can_store_u64(const u64 value) {
+	return value <= SE_SIM_JSON_MAX_SAFE_INTEGER_U64;
+}
+
+static c8* se_simulation_base64_encode(const u8* data, const sz size) {
+	static const c8 table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	if (!data && size > 0u) {
+		return NULL;
+	}
+	if (size == 0u) {
+		c8* out = malloc(1u);
+		if (!out) {
+			return NULL;
+		}
+		out[0] = '\0';
+		return out;
+	}
+	const sz encoded_len = ((size + 2u) / 3u) * 4u;
+	c8* out = malloc(encoded_len + 1u);
+	if (!out) {
+		return NULL;
+	}
+	sz j = 0u;
+	for (sz i = 0u; i < size; i += 3u) {
+		const u32 octet_a = i < size ? data[i] : 0u;
+		const u32 octet_b = (i + 1u) < size ? data[i + 1u] : 0u;
+		const u32 octet_c = (i + 2u) < size ? data[i + 2u] : 0u;
+		const u32 triple = (octet_a << 16u) | (octet_b << 8u) | octet_c;
+		out[j++] = table[(triple >> 18u) & 0x3Fu];
+		out[j++] = table[(triple >> 12u) & 0x3Fu];
+		out[j++] = (i + 1u) < size ? table[(triple >> 6u) & 0x3Fu] : '=';
+		out[j++] = (i + 2u) < size ? table[triple & 0x3Fu] : '=';
+	}
+	out[j] = '\0';
+	return out;
+}
+
+static b8 se_simulation_base64_decode(const c8* in, u8** out_data, sz* out_size) {
+	if (!in || !out_data || !out_size) {
+		return false;
+	}
+	const sz len = strlen(in);
+	if ((len % 4u) != 0u) {
+		return false;
+	}
+	if (len == 0u) {
+		u8* empty = malloc(1u);
+		if (!empty) {
+			return false;
+		}
+		*out_data = empty;
+		*out_size = 0u;
+		return true;
+	}
+	sz padding = 0u;
+	if (in[len - 1u] == '=') {
+		padding++;
+	}
+	if (in[len - 2u] == '=') {
+		padding++;
+	}
+	const sz max_out_size = (len / 4u) * 3u - padding;
+	u8* out = malloc(max_out_size > 0u ? max_out_size : 1u);
+	if (!out) {
+		return false;
+	}
+	sz out_pos = 0u;
+	for (sz i = 0u; i < len; i += 4u) {
+		const c8 c0 = in[i + 0u];
+		const c8 c1 = in[i + 1u];
+		const c8 c2 = in[i + 2u];
+		const c8 c3 = in[i + 3u];
+		const b8 c2_pad = (c2 == '=');
+		const b8 c3_pad = (c3 == '=');
+		if (c0 == '=' || c1 == '=') {
+			free(out);
+			return false;
+		}
+		if (c2_pad && !c3_pad) {
+			free(out);
+			return false;
+		}
+		if ((c2_pad || c3_pad) && (i + 4u) != len) {
+			free(out);
+			return false;
+		}
+		const i32 v0 = se_simulation_base64_value(c0);
+		const i32 v1 = se_simulation_base64_value(c1);
+		const i32 v2 = c2_pad ? 0 : se_simulation_base64_value(c2);
+		const i32 v3 = c3_pad ? 0 : se_simulation_base64_value(c3);
+		if (v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0) {
+			free(out);
+			return false;
+		}
+		const u32 triple =
+			((u32)v0 << 18u) |
+			((u32)v1 << 12u) |
+			((u32)v2 << 6u) |
+			(u32)v3;
+		if (out_pos < max_out_size) {
+			out[out_pos++] = (u8)((triple >> 16u) & 0xFFu);
+		}
+		if (!c2_pad && out_pos < max_out_size) {
+			out[out_pos++] = (u8)((triple >> 8u) & 0xFFu);
+		}
+		if (!c3_pad && out_pos < max_out_size) {
+			out[out_pos++] = (u8)(triple & 0xFFu);
+		}
+	}
+	*out_data = out;
+	*out_size = out_pos;
+	return true;
+}
+
+static b8 se_simulation_json_add_child(s_json* parent, s_json* child) {
+	if (!parent || !child) {
+		s_json_free(child);
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!s_json_add(parent, child)) {
+		s_json_free(child);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	return true;
+}
+
+static s_json* se_simulation_json_add_object(s_json* parent, const c8* name) {
+	s_json* object = s_json_object_empty(name);
+	if (!object) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+	if (!se_simulation_json_add_child(parent, object)) {
+		return NULL;
+	}
+	return object;
+}
+
+static s_json* se_simulation_json_add_array(s_json* parent, const c8* name) {
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+	if (!se_simulation_json_add_child(parent, array)) {
+		return NULL;
+	}
+	return array;
+}
+
+static b8 se_simulation_json_add_u32(s_json* parent, const c8* name, const u32 value) {
+	s_json* node = s_json_num(name, (f64)value);
+	if (!node) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	return se_simulation_json_add_child(parent, node);
+}
+
+static b8 se_simulation_json_add_u64(s_json* parent, const c8* name, const u64 value) {
+	if (!se_simulation_json_can_store_u64(value)) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return false;
+	}
+	s_json* node = s_json_num(name, (f64)value);
+	if (!node) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	return se_simulation_json_add_child(parent, node);
+}
+
+static b8 se_simulation_json_add_f32(s_json* parent, const c8* name, const f32 value) {
+	if (!isfinite((f64)value)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	s_json* node = s_json_num(name, (f64)value);
+	if (!node) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	return se_simulation_json_add_child(parent, node);
+}
+
+static b8 se_simulation_json_add_bool(s_json* parent, const c8* name, const b8 value) {
+	s_json* node = s_json_bool(name, value);
+	if (!node) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	return se_simulation_json_add_child(parent, node);
+}
+
+static b8 se_simulation_json_add_string(s_json* parent, const c8* name, const c8* value) {
+	s_json* node = s_json_str(name, value ? value : "");
+	if (!node) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	return se_simulation_json_add_child(parent, node);
+}
+
+static b8 se_simulation_json_number_to_u32(const s_json* node, u32* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return false;
+	}
+	const f64 value = node->as.number;
+	if (!isfinite(value) || value < 0.0 || value > 4294967295.0) {
+		return false;
+	}
+	const u64 integer = (u64)value;
+	if ((f64)integer != value) {
+		return false;
+	}
+	*out_value = (u32)integer;
+	return true;
+}
+
+static b8 se_simulation_json_number_to_u64(const s_json* node, u64* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return false;
+	}
+	const f64 value = node->as.number;
+	if (!isfinite(value) || value < 0.0 || value > (f64)SE_SIM_JSON_MAX_SAFE_INTEGER_U64) {
+		return false;
+	}
+	const u64 integer = (u64)value;
+	if ((f64)integer != value) {
+		return false;
+	}
+	*out_value = integer;
+	return true;
+}
+
+static b8 se_simulation_json_number_to_f32(const s_json* node, f32* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return false;
+	}
+	if (!isfinite(node->as.number)) {
+		return false;
+	}
+	*out_value = (f32)node->as.number;
+	return true;
+}
+
+static const s_json* se_simulation_json_get_required(const s_json* object, const c8* key, const s_json_type type) {
+	if (!object || object->type != S_JSON_OBJECT || !key) {
+		se_set_last_error(SE_RESULT_IO);
+		return NULL;
+	}
+	const s_json* child = s_json_get(object, key);
+	if (!child || child->type != type) {
+		se_set_last_error(SE_RESULT_IO);
+		return NULL;
+	}
+	return child;
+}
+
+static b8 se_simulation_json_get_u32(const s_json* object, const c8* key, u32* out_value) {
+	const s_json* node = se_simulation_json_get_required(object, key, S_JSON_NUMBER);
+	if (!node || !se_simulation_json_number_to_u32(node, out_value)) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	return true;
+}
+
+static b8 se_simulation_json_get_u64(const s_json* object, const c8* key, u64* out_value) {
+	const s_json* node = se_simulation_json_get_required(object, key, S_JSON_NUMBER);
+	if (!node || !se_simulation_json_number_to_u64(node, out_value)) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	return true;
+}
+
+static b8 se_simulation_json_get_f32(const s_json* object, const c8* key, f32* out_value) {
+	const s_json* node = se_simulation_json_get_required(object, key, S_JSON_NUMBER);
+	if (!node || !se_simulation_json_number_to_f32(node, out_value)) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	return true;
+}
+
+static b8 se_simulation_json_get_bool(const s_json* object, const c8* key, b8* out_value) {
+	const s_json* node = se_simulation_json_get_required(object, key, S_JSON_BOOL);
+	if (!node || !out_value) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	*out_value = node->as.boolean;
+	return true;
+}
+
+static b8 se_simulation_json_get_string(const s_json* object, const c8* key, const c8** out_value) {
+	const s_json* node = se_simulation_json_get_required(object, key, S_JSON_STRING);
+	if (!node || !out_value) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	*out_value = node->as.string ? node->as.string : "";
+	return true;
+}
+
+static void se_simulation_copy_name(c8* out_name, const c8* source) {
+	if (!out_name) {
+		return;
+	}
+	memset(out_name, 0, SE_MAX_NAME_LENGTH);
+	if (!source) {
+		return;
+	}
+	strncpy(out_name, source, SE_MAX_NAME_LENGTH - 1u);
 }
 
 static b8 se_simulation_snapshot_build_config_section(const se_simulation* sim, se_sim_bytes* out) {
@@ -2262,6 +2611,688 @@ static b8 se_simulation_snapshot_load_file_internal(se_simulation* sim, const c8
 	return ok;
 }
 
+static s_json* se_simulation_to_json_internal(const se_simulation* sim) {
+	if (!sim) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+
+	s_json* root = s_json_object_empty(NULL);
+	if (!root) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+
+	if (!se_simulation_json_add_string(root, "format", SE_SIM_JSON_FORMAT) ||
+		!se_simulation_json_add_u32(root, "version", SE_SIM_JSON_VERSION)) {
+		s_json_free(root);
+		return NULL;
+	}
+
+	s_json* config = se_simulation_json_add_object(root, "config");
+	if (!config ||
+		!se_simulation_json_add_u32(config, "max_entities", sim->config.max_entities) ||
+		!se_simulation_json_add_u32(config, "max_components_per_entity", sim->config.max_components_per_entity) ||
+		!se_simulation_json_add_u32(config, "max_events", sim->config.max_events) ||
+		!se_simulation_json_add_u32(config, "max_event_payload_bytes", sim->config.max_event_payload_bytes) ||
+		!se_simulation_json_add_f32(config, "fixed_dt", sim->config.fixed_dt)) {
+		s_json_free(root);
+		return NULL;
+	}
+
+	s_json* tick = se_simulation_json_add_object(root, "tick");
+	if (!tick ||
+		!se_simulation_json_add_u64(tick, "current_tick", sim->current_tick) ||
+		!se_simulation_json_add_u64(tick, "next_sequence", sim->next_sequence)) {
+		s_json_free(root);
+		return NULL;
+	}
+
+	s_json* entities = se_simulation_json_add_object(root, "entities");
+	if (!entities ||
+		!se_simulation_json_add_u32(entities, "slot_count", (u32)s_array_get_size((se_sim_entity_slots*)&sim->entity_slots)) ||
+		!se_simulation_json_add_u32(entities, "alive_count", sim->alive_entities)) {
+		s_json_free(root);
+		return NULL;
+	}
+	s_json* slots_array = se_simulation_json_add_array(entities, "slots");
+	if (!slots_array) {
+		s_json_free(root);
+		return NULL;
+	}
+	for (sz i = 0u; i < s_array_get_size((se_sim_entity_slots*)&sim->entity_slots); ++i) {
+		const se_sim_entity_slot* slot = s_array_get((se_sim_entity_slots*)&sim->entity_slots, s_array_handle((se_sim_entity_slots*)&sim->entity_slots, (u32)i));
+		const u32 component_count = (slot && slot->alive) ? (u32)s_array_get_size((se_sim_component_blobs*)&slot->components) : 0u;
+		s_json* slot_object = se_simulation_json_add_object(slots_array, NULL);
+		if (!slot_object ||
+			!se_simulation_json_add_u32(slot_object, "generation", slot ? slot->generation : 1u) ||
+			!se_simulation_json_add_bool(slot_object, "alive", slot && slot->alive) ||
+			!se_simulation_json_add_u32(slot_object, "component_count", component_count)) {
+			s_json_free(root);
+			return NULL;
+		}
+	}
+
+	s_json* component_registry = se_simulation_json_add_array(root, "component_registry");
+	if (!component_registry) {
+		s_json_free(root);
+		return NULL;
+	}
+	for (sz i = 0u; i < s_array_get_size((se_sim_component_metas*)&sim->component_registry); ++i) {
+		const se_sim_component_meta* meta = s_array_get((se_sim_component_metas*)&sim->component_registry, s_array_handle((se_sim_component_metas*)&sim->component_registry, (u32)i));
+		if (!meta) {
+			continue;
+		}
+		s_json* item = se_simulation_json_add_object(component_registry, NULL);
+		if (!item ||
+			!se_simulation_json_add_u32(item, "type", meta->type) ||
+			!se_simulation_json_add_u32(item, "size", meta->size) ||
+			!se_simulation_json_add_u32(item, "alignment", meta->alignment) ||
+			!se_simulation_json_add_string(item, "name", meta->name)) {
+			s_json_free(root);
+			return NULL;
+		}
+	}
+
+	s_json* component_payloads = se_simulation_json_add_array(root, "component_payloads");
+	if (!component_payloads) {
+		s_json_free(root);
+		return NULL;
+	}
+	for (sz slot_index = 0u; slot_index < s_array_get_size((se_sim_entity_slots*)&sim->entity_slots); ++slot_index) {
+		const se_sim_entity_slot* slot = s_array_get((se_sim_entity_slots*)&sim->entity_slots, s_array_handle((se_sim_entity_slots*)&sim->entity_slots, (u32)slot_index));
+		if (!slot || !slot->alive) {
+			continue;
+		}
+		for (sz i = 0u; i < s_array_get_size((se_sim_component_blobs*)&slot->components); ++i) {
+			const se_sim_component_blob* blob = s_array_get((se_sim_component_blobs*)&slot->components, s_array_handle((se_sim_component_blobs*)&slot->components, (u32)i));
+			if (!blob) {
+				continue;
+			}
+			const u32 payload_size = (u32)s_array_get_size((se_sim_bytes*)&blob->data);
+			const u8* payload_data = s_array_get_data((se_sim_bytes*)&blob->data);
+			c8* payload_b64 = se_simulation_base64_encode(payload_data, payload_size);
+			if (!payload_b64) {
+				se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+				s_json_free(root);
+				return NULL;
+			}
+			s_json* item = se_simulation_json_add_object(component_payloads, NULL);
+			const b8 item_ok = item &&
+				se_simulation_json_add_u32(item, "slot", (u32)slot_index) &&
+				se_simulation_json_add_u32(item, "type", blob->type) &&
+				se_simulation_json_add_u32(item, "size", payload_size) &&
+				se_simulation_json_add_string(item, "data_b64", payload_b64);
+			free(payload_b64);
+			if (!item_ok) {
+				s_json_free(root);
+				return NULL;
+			}
+		}
+	}
+
+	s_json* event_registry = se_simulation_json_add_array(root, "event_registry");
+	if (!event_registry) {
+		s_json_free(root);
+		return NULL;
+	}
+	for (sz i = 0u; i < s_array_get_size((se_sim_event_metas*)&sim->event_registry); ++i) {
+		const se_sim_event_meta* meta = s_array_get((se_sim_event_metas*)&sim->event_registry, s_array_handle((se_sim_event_metas*)&sim->event_registry, (u32)i));
+		if (!meta) {
+			continue;
+		}
+		s_json* item = se_simulation_json_add_object(event_registry, NULL);
+		if (!item ||
+			!se_simulation_json_add_u32(item, "type", meta->type) ||
+			!se_simulation_json_add_u32(item, "payload_size", meta->payload_size) ||
+			!se_simulation_json_add_string(item, "name", meta->name)) {
+			s_json_free(root);
+			return NULL;
+		}
+	}
+
+	s_json* event_queues = se_simulation_json_add_object(root, "event_queues");
+	if (!event_queues) {
+		s_json_free(root);
+		return NULL;
+	}
+	s_json* pending_array = se_simulation_json_add_array(event_queues, "pending");
+	s_json* ready_array = se_simulation_json_add_array(event_queues, "ready");
+	if (!pending_array || !ready_array) {
+		s_json_free(root);
+		return NULL;
+	}
+
+	for (u32 queue_index = 0u; queue_index < 2u; ++queue_index) {
+		const se_sim_event_records* queue = queue_index == 0u ?
+			(se_sim_event_records*)&sim->pending_events :
+			(se_sim_event_records*)&sim->ready_events;
+		s_json* queue_array = queue_index == 0u ? pending_array : ready_array;
+		for (sz i = 0u; i < s_array_get_size((se_sim_event_records*)queue); ++i) {
+			const se_sim_event_record* event_record = s_array_get((se_sim_event_records*)queue, s_array_handle((se_sim_event_records*)queue, (u32)i));
+			if (!event_record) {
+				continue;
+			}
+			const u32 payload_size = (u32)s_array_get_size((se_sim_bytes*)&event_record->payload);
+			const u8* payload_data = s_array_get_data((se_sim_bytes*)&event_record->payload);
+			c8* payload_b64 = se_simulation_base64_encode(payload_data, payload_size);
+			if (!payload_b64) {
+				se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+				s_json_free(root);
+				return NULL;
+			}
+			s_json* item = se_simulation_json_add_object(queue_array, NULL);
+			const b8 item_ok = item &&
+				se_simulation_json_add_u64(item, "target", event_record->target) &&
+				se_simulation_json_add_u32(item, "type", event_record->type) &&
+				se_simulation_json_add_u64(item, "deliver_at_tick", event_record->deliver_at_tick) &&
+				se_simulation_json_add_u64(item, "sequence", event_record->sequence) &&
+				se_simulation_json_add_u32(item, "payload_size", payload_size) &&
+				se_simulation_json_add_string(item, "payload_b64", payload_b64);
+			free(payload_b64);
+			if (!item_ok) {
+				s_json_free(root);
+				return NULL;
+			}
+		}
+	}
+
+	se_set_last_error(SE_RESULT_OK);
+	return root;
+}
+
+static b8 se_simulation_json_parse_config(const s_json* config_object, se_simulation* sim) {
+	u32 max_entities = 0u;
+	u32 max_components_per_entity = 0u;
+	u32 max_events = 0u;
+	u32 max_event_payload_bytes = 0u;
+	f32 fixed_dt = 0.0f;
+	if (!se_simulation_json_get_u32(config_object, "max_entities", &max_entities) ||
+		!se_simulation_json_get_u32(config_object, "max_components_per_entity", &max_components_per_entity) ||
+		!se_simulation_json_get_u32(config_object, "max_events", &max_events) ||
+		!se_simulation_json_get_u32(config_object, "max_event_payload_bytes", &max_event_payload_bytes) ||
+		!se_simulation_json_get_f32(config_object, "fixed_dt", &fixed_dt)) {
+		return false;
+	}
+	if (max_entities == 0u ||
+		max_components_per_entity == 0u ||
+		max_events == 0u ||
+		max_event_payload_bytes == 0u ||
+		fixed_dt <= 0.0f) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (max_entities > sim->config.max_entities ||
+		max_components_per_entity > sim->config.max_components_per_entity ||
+		max_events > sim->config.max_events ||
+		max_event_payload_bytes > sim->config.max_event_payload_bytes) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return false;
+	}
+	sim->config.fixed_dt = fixed_dt;
+	return true;
+}
+
+static b8 se_simulation_json_parse_component_registry(const s_json* component_registry, se_simulation* sim) {
+	if (!component_registry || component_registry->type != S_JSON_ARRAY) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	for (sz i = 0u; i < component_registry->as.children.count; ++i) {
+		const s_json* item = s_json_at(component_registry, i);
+		if (!item || item->type != S_JSON_OBJECT) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		u32 type = 0u;
+		u32 size = 0u;
+		u32 alignment = 0u;
+		const c8* name = NULL;
+		if (!se_simulation_json_get_u32(item, "type", &type) ||
+			!se_simulation_json_get_u32(item, "size", &size) ||
+			!se_simulation_json_get_u32(item, "alignment", &alignment) ||
+			!se_simulation_json_get_string(item, "name", &name)) {
+			return false;
+		}
+		se_sim_component_desc desc = {0};
+		desc.type = type;
+		desc.size = size;
+		desc.alignment = alignment;
+		se_simulation_copy_name(desc.name, name);
+		if (!se_simulation_component_register_internal(sim, &desc)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static b8 se_simulation_json_parse_event_registry(const s_json* event_registry, se_simulation* sim) {
+	if (!event_registry || event_registry->type != S_JSON_ARRAY) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	for (sz i = 0u; i < event_registry->as.children.count; ++i) {
+		const s_json* item = s_json_at(event_registry, i);
+		if (!item || item->type != S_JSON_OBJECT) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		u32 type = 0u;
+		u32 payload_size = 0u;
+		const c8* name = NULL;
+		if (!se_simulation_json_get_u32(item, "type", &type) ||
+			!se_simulation_json_get_u32(item, "payload_size", &payload_size) ||
+			!se_simulation_json_get_string(item, "name", &name)) {
+			return false;
+		}
+		se_sim_event_desc desc = {0};
+		desc.type = type;
+		desc.payload_size = payload_size;
+		se_simulation_copy_name(desc.name, name);
+		if (!se_simulation_event_register_internal(sim, &desc)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static b8 se_simulation_json_parse_entities(
+	const s_json* entities_object,
+	se_simulation* sim,
+	se_sim_u32s* out_expected_component_counts) {
+	if (!entities_object || entities_object->type != S_JSON_OBJECT || !out_expected_component_counts) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	u32 slot_count = 0u;
+	u32 alive_count = 0u;
+	if (!se_simulation_json_get_u32(entities_object, "slot_count", &slot_count) ||
+		!se_simulation_json_get_u32(entities_object, "alive_count", &alive_count)) {
+		return false;
+	}
+	const s_json* slots_array = se_simulation_json_get_required(entities_object, "slots", S_JSON_ARRAY);
+	if (!slots_array) {
+		return false;
+	}
+	if (slot_count != (u32)slots_array->as.children.count) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	if (slot_count > sim->config.max_entities) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return false;
+	}
+	s_array_reserve(&sim->entity_slots, slot_count);
+	s_array_reserve(&sim->free_slots, slot_count);
+	s_array_reserve(out_expected_component_counts, slot_count);
+	u32 computed_alive = 0u;
+	for (u32 i = 0u; i < slot_count; ++i) {
+		const s_json* slot_object = s_json_at(slots_array, (sz)i);
+		if (!slot_object || slot_object->type != S_JSON_OBJECT) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		u32 generation = 0u;
+		b8 alive = false;
+		u32 expected_component_count = 0u;
+		if (!se_simulation_json_get_u32(slot_object, "generation", &generation) ||
+			!se_simulation_json_get_bool(slot_object, "alive", &alive) ||
+			!se_simulation_json_get_u32(slot_object, "component_count", &expected_component_count)) {
+			return false;
+		}
+		if (alive && expected_component_count > sim->config.max_components_per_entity) {
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+			return false;
+		}
+		if (!alive && expected_component_count != 0u) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		s_handle slot_handle = s_array_increment(&sim->entity_slots);
+		se_sim_entity_slot* slot = s_array_get(&sim->entity_slots, slot_handle);
+		if (!slot) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		memset(slot, 0, sizeof(*slot));
+		s_array_init(&slot->components);
+		s_array_reserve(&slot->components, sim->config.max_components_per_entity);
+		slot->generation = generation == 0u ? 1u : generation;
+		slot->alive = alive;
+		s_array_add(out_expected_component_counts, expected_component_count);
+		if (alive) {
+			computed_alive++;
+		} else {
+			s_array_add(&sim->free_slots, i);
+		}
+	}
+	if (computed_alive != alive_count) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	sim->alive_entities = computed_alive;
+	return true;
+}
+
+static b8 se_simulation_json_parse_component_payloads(
+	const s_json* component_payloads,
+	se_simulation* sim,
+	const se_sim_u32s* expected_component_counts) {
+	if (!component_payloads || component_payloads->type != S_JSON_ARRAY || !expected_component_counts) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	for (sz i = 0u; i < component_payloads->as.children.count; ++i) {
+		const s_json* item = s_json_at(component_payloads, i);
+		if (!item || item->type != S_JSON_OBJECT) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		u32 slot_index = 0u;
+		u32 type = 0u;
+		u32 data_size = 0u;
+		const c8* data_b64 = NULL;
+		if (!se_simulation_json_get_u32(item, "slot", &slot_index) ||
+			!se_simulation_json_get_u32(item, "type", &type) ||
+			!se_simulation_json_get_u32(item, "size", &data_size) ||
+			!se_simulation_json_get_string(item, "data_b64", &data_b64)) {
+			return false;
+		}
+		if ((sz)slot_index >= s_array_get_size(&sim->entity_slots)) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		se_sim_entity_slot* slot = s_array_get(&sim->entity_slots, s_array_handle(&sim->entity_slots, slot_index));
+		if (!slot || !slot->alive) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		if (se_simulation_find_component_blob(slot, type) != NULL) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		if (s_array_get_size(&slot->components) >= sim->config.max_components_per_entity) {
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+			return false;
+		}
+		const se_sim_component_meta* meta = se_simulation_find_component_meta_const(sim, type);
+		if (!meta || meta->size != data_size) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		u8* decoded = NULL;
+		sz decoded_size = 0u;
+		if (!se_simulation_base64_decode(data_b64, &decoded, &decoded_size)) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		if (decoded_size != (sz)data_size) {
+			free(decoded);
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+		se_sim_component_blob blob = {0};
+		blob.type = type;
+		se_sim_bytes_copy_from_internal(&blob.data, decoded, data_size);
+		free(decoded);
+		s_array_add(&slot->components, blob);
+	}
+	for (sz i = 0u; i < s_array_get_size(&sim->entity_slots); ++i) {
+		const se_sim_entity_slot* slot = s_array_get(&sim->entity_slots, s_array_handle(&sim->entity_slots, (u32)i));
+		if (!slot || !slot->alive) {
+			continue;
+		}
+		const u32* expected_count_ptr = s_array_get((se_sim_u32s*)expected_component_counts, s_array_handle((se_sim_u32s*)expected_component_counts, (u32)i));
+		const u32 expected_count = expected_count_ptr ? *expected_count_ptr : 0u;
+		if ((u32)s_array_get_size((se_sim_component_blobs*)&slot->components) != expected_count) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+	}
+	return true;
+}
+
+static b8 se_simulation_json_parse_tick(const s_json* tick_object, se_simulation* sim) {
+	u64 current_tick = 0u;
+	u64 next_sequence = 0u;
+	if (!se_simulation_json_get_u64(tick_object, "current_tick", &current_tick) ||
+		!se_simulation_json_get_u64(tick_object, "next_sequence", &next_sequence)) {
+		return false;
+	}
+	sim->current_tick = current_tick;
+	sim->next_sequence = next_sequence == 0u ? 1u : next_sequence;
+	return true;
+}
+
+static b8 se_simulation_json_parse_event_record(
+	const s_json* event_object,
+	se_simulation* sim,
+	se_sim_event_record* out_event,
+	u64* in_out_max_sequence) {
+	if (!event_object || event_object->type != S_JSON_OBJECT || !sim || !out_event) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	u64 target = 0u;
+	u32 type = 0u;
+	u64 deliver_at_tick = 0u;
+	u64 sequence = 0u;
+	u32 payload_size = 0u;
+	const c8* payload_b64 = NULL;
+	if (!se_simulation_json_get_u64(event_object, "target", &target) ||
+		!se_simulation_json_get_u32(event_object, "type", &type) ||
+		!se_simulation_json_get_u64(event_object, "deliver_at_tick", &deliver_at_tick) ||
+		!se_simulation_json_get_u64(event_object, "sequence", &sequence) ||
+		!se_simulation_json_get_u32(event_object, "payload_size", &payload_size) ||
+		!se_simulation_json_get_string(event_object, "payload_b64", &payload_b64)) {
+		return false;
+	}
+	const se_sim_event_meta* meta = se_simulation_find_event_meta_const(sim, type);
+	if (!meta || meta->payload_size != payload_size) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	if ((u64)sim->used_event_payload_bytes + payload_size > sim->config.max_event_payload_bytes) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return false;
+	}
+	u8* decoded = NULL;
+	sz decoded_size = 0u;
+	if (!se_simulation_base64_decode(payload_b64, &decoded, &decoded_size)) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	if (decoded_size != (sz)payload_size) {
+		free(decoded);
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	if (!se_simulation_event_record_init(out_event, target, type, deliver_at_tick, sequence, decoded, payload_size)) {
+		free(decoded);
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	free(decoded);
+	sim->used_event_payload_bytes += payload_size;
+	if (in_out_max_sequence && sequence > *in_out_max_sequence) {
+		*in_out_max_sequence = sequence;
+	}
+	return true;
+}
+
+static b8 se_simulation_json_parse_event_queues(const s_json* event_queues_object, se_simulation* sim) {
+	if (!event_queues_object || event_queues_object->type != S_JSON_OBJECT) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	const s_json* pending = se_simulation_json_get_required(event_queues_object, "pending", S_JSON_ARRAY);
+	const s_json* ready = se_simulation_json_get_required(event_queues_object, "ready", S_JSON_ARRAY);
+	if (!pending || !ready) {
+		return false;
+	}
+	const u64 total_events = (u64)pending->as.children.count + (u64)ready->as.children.count;
+	if (total_events > sim->config.max_events) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return false;
+	}
+	s_array_reserve(&sim->pending_events, pending->as.children.count);
+	s_array_reserve(&sim->ready_events, ready->as.children.count);
+	u64 max_sequence = 0u;
+	for (sz i = 0u; i < pending->as.children.count; ++i) {
+		const s_json* item = s_json_at(pending, i);
+		se_sim_event_record event_record = {0};
+		if (!se_simulation_json_parse_event_record(item, sim, &event_record, &max_sequence)) {
+			se_sim_event_record_clear(&event_record);
+			return false;
+		}
+		se_simulation_pending_insert_sorted(sim, &event_record);
+	}
+	for (sz i = 0u; i < ready->as.children.count; ++i) {
+		const s_json* item = s_json_at(ready, i);
+		se_sim_event_record event_record = {0};
+		if (!se_simulation_json_parse_event_record(item, sim, &event_record, &max_sequence)) {
+			se_sim_event_record_clear(&event_record);
+			return false;
+		}
+		s_array_add(&sim->ready_events, event_record);
+	}
+	if (sim->next_sequence <= max_sequence) {
+		sim->next_sequence = max_sequence + 1u;
+	}
+	return true;
+}
+
+static b8 se_simulation_from_json_internal(se_simulation* sim, const s_json* root) {
+	if (!sim || !root || root->type != S_JSON_OBJECT) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	const c8* format = NULL;
+	u32 version = 0u;
+	if (!se_simulation_json_get_string(root, "format", &format) ||
+		!se_simulation_json_get_u32(root, "version", &version)) {
+		return false;
+	}
+	if (strcmp(format, SE_SIM_JSON_FORMAT) != 0) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return false;
+	}
+	if (version != SE_SIM_JSON_VERSION) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return false;
+	}
+
+	const s_json* config = se_simulation_json_get_required(root, "config", S_JSON_OBJECT);
+	const s_json* tick = se_simulation_json_get_required(root, "tick", S_JSON_OBJECT);
+	const s_json* entities = se_simulation_json_get_required(root, "entities", S_JSON_OBJECT);
+	const s_json* component_registry = se_simulation_json_get_required(root, "component_registry", S_JSON_ARRAY);
+	const s_json* component_payloads = se_simulation_json_get_required(root, "component_payloads", S_JSON_ARRAY);
+	const s_json* event_registry = se_simulation_json_get_required(root, "event_registry", S_JSON_ARRAY);
+	const s_json* event_queues = se_simulation_json_get_required(root, "event_queues", S_JSON_OBJECT);
+	if (!config || !tick || !entities || !component_registry || !component_payloads || !event_registry || !event_queues) {
+		return false;
+	}
+
+	se_simulation staged = {0};
+	se_simulation_snapshot_load_staging_init(&staged, sim);
+
+	if (!se_simulation_json_parse_config(config, &staged)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+	if (!se_simulation_json_parse_component_registry(component_registry, &staged)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+	if (!se_simulation_json_parse_event_registry(event_registry, &staged)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+
+	se_sim_u32s expected_component_counts = {0};
+	s_array_init(&expected_component_counts);
+	if (!se_simulation_json_parse_entities(entities, &staged, &expected_component_counts)) {
+		s_array_clear(&expected_component_counts);
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+	if (!se_simulation_json_parse_component_payloads(component_payloads, &staged, &expected_component_counts)) {
+		s_array_clear(&expected_component_counts);
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+	s_array_clear(&expected_component_counts);
+
+	if (!se_simulation_json_parse_tick(tick, &staged)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+	if (!se_simulation_json_parse_event_queues(event_queues, &staged)) {
+		se_simulation_snapshot_load_staging_clear(&staged);
+		return false;
+	}
+
+	const u32 queue_payload_bytes =
+		se_simulation_event_queue_payload_bytes(&staged.pending_events) +
+		se_simulation_event_queue_payload_bytes(&staged.ready_events);
+	staged.used_event_payload_bytes = queue_payload_bytes;
+	if (staged.used_event_payload_bytes > staged.config.max_event_payload_bytes) {
+		se_simulation_snapshot_load_staging_clear(&staged);
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return false;
+	}
+
+	se_simulation_snapshot_load_commit(sim, &staged);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+static b8 se_simulation_json_save_file_internal(const se_simulation* sim, const c8* path) {
+	if (!sim || !path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	s_json* root = se_simulation_to_json_internal(sim);
+	if (!root) {
+		return false;
+	}
+	c8* text = s_json_stringify(root);
+	s_json_free(root);
+	if (!text) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	const b8 ok = s_file_write(path, text, strlen(text));
+	free(text);
+	if (!ok) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+static b8 se_simulation_json_load_file_internal(se_simulation* sim, const c8* path) {
+	if (!sim || !path) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	c8* text = NULL;
+	if (!s_file_read(path, &text, NULL)) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	s_json* root = s_json_parse(text);
+	free(text);
+	if (!root) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	const b8 ok = se_simulation_from_json_internal(sim, root);
+	s_json_free(root);
+	return ok;
+}
+
 se_simulation_handle se_simulation_create(const se_simulation_config* config) {
 	se_simulation* sim = se_simulation_create_internal(config);
 	if (!sim) {
@@ -2474,6 +3505,38 @@ void se_simulation_get_diagnostics(const se_simulation_handle sim, se_simulation
 		return;
 	}
 	se_simulation_get_diagnostics_internal(sim_ptr, out_diag);
+}
+
+s_json* se_simulation_to_json(const se_simulation_handle sim) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return NULL;
+	}
+	return se_simulation_to_json_internal(sim_ptr);
+}
+
+b8 se_simulation_from_json(const se_simulation_handle sim, const s_json* root) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_from_json_internal(sim_ptr, root);
+}
+
+b8 se_simulation_json_save_file(const se_simulation_handle sim, const c8* path) {
+	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_json_save_file_internal(sim_ptr, path);
+}
+
+b8 se_simulation_json_load_file(const se_simulation_handle sim, const c8* path) {
+	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
+	if (!sim_ptr) {
+		return false;
+	}
+	return se_simulation_json_load_file_internal(sim_ptr, path);
 }
 
 b8 se_simulation_snapshot_save_file(const se_simulation_handle sim, const c8* path) {

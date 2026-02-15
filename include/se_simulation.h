@@ -6,6 +6,8 @@
 #include "se.h"
 #include "se_defines.h"
 
+typedef struct s_json s_json;
+
 typedef u64 se_entity_id;
 typedef u64 se_sim_tick;
 typedef u32 se_sim_component_type;
@@ -90,6 +92,11 @@ extern b8 se_simulation_step(se_simulation_handle sim, u32 tick_count);
 extern se_sim_tick se_simulation_get_tick(se_simulation_handle sim);
 extern f32 se_simulation_get_fixed_dt(se_simulation_handle sim);
 extern void se_simulation_get_diagnostics(se_simulation_handle sim, se_simulation_diagnostics* out_diag);
+
+extern s_json* se_simulation_to_json(se_simulation_handle sim);
+extern b8 se_simulation_from_json(se_simulation_handle sim, const s_json* root);
+extern b8 se_simulation_json_save_file(se_simulation_handle sim, const c8* path);
+extern b8 se_simulation_json_load_file(se_simulation_handle sim, const c8* path);
 
 extern b8 se_simulation_snapshot_save_file(se_simulation_handle sim, const c8* path);
 extern b8 se_simulation_snapshot_load_file(se_simulation_handle sim, const c8* path);
