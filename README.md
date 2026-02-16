@@ -7,7 +7,7 @@ Simple, fast, lightweight framework for interactive visuals, games, and tools in
 - Audio, UI, navigation, simulation, debug, and VFX
 - Public APIs in `include/se_*.h`
 
-## [Documentation here](https://syphax-engine.github.io/syphax-engine/)
+[Documentation here](https://ougi-washi.github.io/Syphax-Engine/)
 
 ### Requirements
 - C11 compiler
