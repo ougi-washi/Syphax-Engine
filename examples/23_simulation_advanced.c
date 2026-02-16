@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define EPS 0.0001f
+
 // Component ids used by this advanced scenario.
 enum {
 	SIM_COMPONENT_TRANSFORM = 1,
@@ -339,8 +341,8 @@ int main(void) {
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_TRANSFORM, &after_failed_load_transform, sizeof(after_failed_load_transform));
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_HEALTH, &after_failed_load_health, sizeof(after_failed_load_health));
 	const b8 failed_load_preserved_state =
-		sim_transform_equal(&after_failed_load_transform, &after_step, 0.0001f) &&
-		s_f32_equal(after_failed_load_health.hp, after_step_health.hp, 0.0001f) &&
+		sim_transform_equal(&after_failed_load_transform, &after_step, EPS) &&
+		s_f32_equal(after_failed_load_health.hp, after_step_health.hp, EPS) &&
 		se_simulation_get_tick(sim) == 3u;
 	if (!failed_load_preserved_state) {
 		se_log("23_simulation_advanced :: failed snapshot load should keep simulation state unchanged");
@@ -377,9 +379,9 @@ int main(void) {
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_HEALTH, &restored_health, sizeof(restored_health));
 
 	const b8 memory_roundtrip_ok =
-		s_f32_equal(restored_transform.position.x, 0.2f, 0.0001f) &&
-		s_f32_equal(restored_transform.velocity.x, 2.0f, 0.0001f) &&
-		s_f32_equal(restored_health.hp, 87.5f, 0.0001f) &&
+		s_f32_equal(restored_transform.position.x, 0.2f, EPS) &&
+		s_f32_equal(restored_transform.velocity.x, 2.0f, EPS) &&
+		s_f32_equal(restored_health.hp, 87.5f, EPS) &&
 		se_simulation_get_tick(sim) == 3u;
 
 	if (!memory_roundtrip_ok) {
@@ -446,8 +448,8 @@ int main(void) {
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_TRANSFORM, &after_failed_json_load_transform, sizeof(after_failed_json_load_transform));
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_HEALTH, &after_failed_json_load_health, sizeof(after_failed_json_load_health));
 	const b8 failed_json_load_preserved_state =
-		sim_transform_equal(&after_failed_json_load_transform, &restored_transform, 0.0001f) &&
-		s_f32_equal(after_failed_json_load_health.hp, restored_health.hp, 0.0001f) &&
+		sim_transform_equal(&after_failed_json_load_transform, &restored_transform, EPS) &&
+		s_f32_equal(after_failed_json_load_health.hp, restored_health.hp, EPS) &&
 		se_simulation_get_tick(sim) == 3u;
 	if (!failed_json_load_preserved_state) {
 		se_log("23_simulation_advanced :: failed json load should keep simulation state unchanged");
@@ -481,9 +483,9 @@ int main(void) {
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_TRANSFORM, &json_restored_transform, sizeof(json_restored_transform));
 	se_simulation_component_get(sim, unit, SIM_COMPONENT_HEALTH, &json_restored_health, sizeof(json_restored_health));
 	const b8 json_roundtrip_ok =
-		s_f32_equal(json_restored_transform.position.x, 0.2f, 0.0001f) &&
-		s_f32_equal(json_restored_transform.velocity.x, 2.0f, 0.0001f) &&
-		s_f32_equal(json_restored_health.hp, 87.5f, 0.0001f) &&
+		s_f32_equal(json_restored_transform.position.x, 0.2f, EPS) &&
+		s_f32_equal(json_restored_transform.velocity.x, 2.0f, EPS) &&
+		s_f32_equal(json_restored_health.hp, 87.5f, EPS) &&
 		se_simulation_get_tick(sim) == 3u;
 	if (!json_roundtrip_ok) {
 		se_log("23_simulation_advanced :: json roundtrip failed");
@@ -695,12 +697,12 @@ int main(void) {
 
 	const b8 advanced_baseline_expected =
 		advanced_baseline_tick == 7u &&
-		s_f32_equal(advanced_baseline_unit_transform.velocity.x, 4.0f, 0.0001f) &&
-		s_f32_equal(advanced_baseline_unit_transform.position.x, 0.733333f, 0.0002f) &&
-		s_f32_equal(advanced_baseline_unit_health.hp, 81.0f, 0.0001f) &&
-		s_f32_equal(advanced_baseline_support_transform.velocity.x, 7.0f, 0.0001f) &&
-		s_f32_equal(advanced_baseline_support_transform.position.x, -0.066666f, 0.0002f) &&
-		s_f32_equal(advanced_baseline_support_health.hp, 42.0f, 0.0001f);
+		s_f32_equal(advanced_baseline_unit_transform.velocity.x, 4.0f, EPS) &&
+		s_f32_equal(advanced_baseline_unit_transform.position.x, 0.733333f, 2.0f * EPS) &&
+		s_f32_equal(advanced_baseline_unit_health.hp, 81.0f, EPS) &&
+		s_f32_equal(advanced_baseline_support_transform.velocity.x, 7.0f, EPS) &&
+		s_f32_equal(advanced_baseline_support_transform.position.x, -0.066666f, 2.0f * EPS) &&
+		s_f32_equal(advanced_baseline_support_health.hp, 42.0f, EPS);
 	if (!advanced_baseline_expected) {
 		se_log("23_simulation_advanced :: advanced baseline expected values mismatch");
 		s_json_free(advanced_snapshot_json);
@@ -755,10 +757,10 @@ int main(void) {
 
 	const b8 advanced_binary_matches_baseline =
 		se_simulation_get_tick(sim) == advanced_baseline_tick &&
-		sim_transform_equal(&advanced_binary_unit_transform, &advanced_baseline_unit_transform, 0.0001f) &&
-		s_f32_equal(advanced_binary_unit_health.hp, advanced_baseline_unit_health.hp, 0.0001f) &&
-		sim_transform_equal(&advanced_binary_support_transform, &advanced_baseline_support_transform, 0.0001f) &&
-		s_f32_equal(advanced_binary_support_health.hp, advanced_baseline_support_health.hp, 0.0001f);
+		sim_transform_equal(&advanced_binary_unit_transform, &advanced_baseline_unit_transform, EPS) &&
+		s_f32_equal(advanced_binary_unit_health.hp, advanced_baseline_unit_health.hp, EPS) &&
+		sim_transform_equal(&advanced_binary_support_transform, &advanced_baseline_support_transform, EPS) &&
+		s_f32_equal(advanced_binary_support_health.hp, advanced_baseline_support_health.hp, EPS);
 	if (!advanced_binary_matches_baseline) {
 		se_log("23_simulation_advanced :: advanced binary mismatch vs baseline");
 		s_json_free(advanced_snapshot_json);
@@ -813,10 +815,10 @@ int main(void) {
 
 	const b8 advanced_json_matches_baseline =
 		se_simulation_get_tick(sim) == advanced_baseline_tick &&
-		sim_transform_equal(&advanced_json_unit_transform, &advanced_baseline_unit_transform, 0.0001f) &&
-		s_f32_equal(advanced_json_unit_health.hp, advanced_baseline_unit_health.hp, 0.0001f) &&
-		sim_transform_equal(&advanced_json_support_transform, &advanced_baseline_support_transform, 0.0001f) &&
-		s_f32_equal(advanced_json_support_health.hp, advanced_baseline_support_health.hp, 0.0001f);
+		sim_transform_equal(&advanced_json_unit_transform, &advanced_baseline_unit_transform, EPS) &&
+		s_f32_equal(advanced_json_unit_health.hp, advanced_baseline_unit_health.hp, EPS) &&
+		sim_transform_equal(&advanced_json_support_transform, &advanced_baseline_support_transform, EPS) &&
+		s_f32_equal(advanced_json_support_health.hp, advanced_baseline_support_health.hp, EPS);
 	if (!advanced_json_matches_baseline) {
 		se_log("23_simulation_advanced :: advanced json mismatch vs baseline");
 		s_json_free(advanced_snapshot_json);
