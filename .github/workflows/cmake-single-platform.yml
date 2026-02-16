@@ -13,49 +13,57 @@ jobs:
   linux-build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
 
-    - name: Install dependencies
-      run: |
-            sudo apt-get update
-            sudo apt-get install -y cmake build-essential pkg-config
-            sudo apt-get install -y libwayland-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev
-            sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
-            sudo apt-get install -y libpulse-dev libasound-dev libsndio-dev libjack-jackd2-dev
-            
-    - name: Build
-      run: ${{github.workspace}}/build.sh
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential pkg-config
+          sudo apt-get install -y libwayland-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev
+          sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
+          sudo apt-get install -y libpulse-dev libasound-dev libsndio-dev libjack-jackd2-dev
 
-    - name: Check example line budget
-      run: ${{github.workspace}}/scripts/check_example_line_budget.sh
+      - name: Build
+        run: ./build.sh
 
-    - name: Test (context lifecycle teardown regression)
-      run: |
-            timeout 25s env \
-              SE_TERMINAL_RENDER=1 \
-              SE_TERMINAL_HIDE_WINDOW=1 \
-              ${{github.workspace}}/bin/context_lifecycle
+      - name: Validate expected test binaries exist
+        run: |
+          test -x ./bin/context_lifecycle
+          test -x ./bin/gltf_roundtrip
+          test -x ./bin/rts_integration
 
-    - name: Test (GLTF GLB roundtrip)
-      run: |
-            timeout 15s \
-              ${{github.workspace}}/bin/gltf_roundtrip
+      - name: Check example line budget
+        run: ./scripts/check_example_line_budget.sh
 
-    - name: Test (rts_integration terminal autotest)
-      run: |
-            timeout 25s env \
-              SE_TERMINAL_RENDER=1 \
-              SE_TERMINAL_HIDE_WINDOW=1 \
-              ${{github.workspace}}/bin/rts_integration --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05
+      - name: Test (context lifecycle teardown regression)
+        run: |
+          timeout 25s env \
+            SE_TERMINAL_RENDER=1 \
+            SE_TERMINAL_HIDE_WINDOW=1 \
+            ./bin/context_lifecycle
 
-    - name: Build (terminal platform rts_integration)
-      run: ${{github.workspace}}/build.sh -platform=terminal rts_integration
+      - name: Test (GLTF GLB roundtrip)
+        run: |
+          timeout 15s ./bin/gltf_roundtrip
 
-    - name: Test (rts_integration terminal platform autotest)
-      run: |
-            timeout 25s \
-              ${{github.workspace}}/bin/rts_integration --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05
+      - name: Test (rts_integration terminal autotest)
+        run: |
+          timeout 25s env \
+            SE_TERMINAL_RENDER=1 \
+            SE_TERMINAL_HIDE_WINDOW=1 \
+            ./bin/rts_integration --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05
+
+      - name: Build (terminal platform rts_integration)
+        run: ./build.sh -platform=terminal rts_integration
+
+      - name: Test (rts_integration terminal platform autotest)
+        run: |
+          timeout 25s ./bin/rts_integration --autotest --seconds=2 --autotest-steps=20 --autotest-dt=0.05
