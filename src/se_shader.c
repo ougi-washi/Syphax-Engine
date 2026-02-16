@@ -2,7 +2,7 @@
 
 #include "se_shader.h"
 #include "se_debug.h"
-#include "se_render.h"
+#include "se_graphics.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
 

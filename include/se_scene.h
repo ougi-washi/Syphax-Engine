@@ -5,7 +5,7 @@
 #ifndef SE_SCENE_H
 #define SE_SCENE_H
 
-#include "se_render.h"
+#include "se_quad.h"
 #include "se_window.h"
 #include "se_camera.h"
 #include "se_model.h"

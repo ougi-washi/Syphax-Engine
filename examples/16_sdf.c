@@ -2,7 +2,7 @@
 
 #include "se.h"
 #include "se_window.h"
-#include "se_render.h"
+#include "se_graphics.h"
 #include "se_camera.h"
 #include "se_sdf.h"
 

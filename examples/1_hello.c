@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_window.h"
-#include "se_render.h"
+#include "se_graphics.h"
 #include "se_text.h"
 
 int main(void) {

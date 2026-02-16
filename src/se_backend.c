@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_backend.h"
-#include "se_render.h"
+#include "se_graphics.h"
 
 #if defined(SE_RENDER_BACKEND_OPENGL) || defined(SE_RENDER_BACKEND_GLES)
 #include "render/se_gl.h"

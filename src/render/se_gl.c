@@ -4,7 +4,8 @@
 
 #include "se_gl.h"
 #include "se_debug.h"
-#include "se_render.h"
+#include "se_graphics.h"
+#include "se_quad.h"
 #include "syphax/s_files.h"
 #if defined(SE_RENDER_BACKEND_GLES)
 #include <EGL/egl.h>
@@ -30,6 +31,22 @@ static void *se_gl_get_proc_address(const char *name) {
 static b8 se_render_initialized = false;
 static b8 se_is_blending = false;
 static u64 se_render_generation = 0;
+
+static const se_vertex_2d se_quad_2d_vertices[4] = {
+	{{-1.0f, 1.0f}, {0.0f, 0.0f}},
+	{{-1.0f, -1.0f}, {0.0f, 1.0f}},
+	{{1.0f, -1.0f}, {1.0f, 1.0f}},
+	{{1.0f, 1.0f}, {1.0f, 0.0f}}
+};
+
+static const se_vertex_3d se_quad_3d_vertices[4] = {
+	{{-1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+	{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+	{{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+	{{1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}
+};
+
+static const u32 se_quad_indices[6] = {0, 1, 2, 0, 2, 3};
 
 static b8 se_render_ready_for_gl_calls(void) {
 	if (se_render_initialized) {

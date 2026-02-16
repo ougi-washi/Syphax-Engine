@@ -1,6 +1,6 @@
 // Syphax-Engine - Ougi Washi
 
-#include "se_render.h"
+#include "se_graphics.h"
 #include "se_debug.h"
 
 void se_render_print_mat4(const s_mat4 *mat) {

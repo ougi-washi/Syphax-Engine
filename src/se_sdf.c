@@ -2,7 +2,8 @@
 
 #include "se_sdf.h"
 #include "se_camera.h"
-#include "se_render.h"
+#include "se_graphics.h"
+#include "se_quad.h"
 #include "se_shader.h"
 #include <string.h>
 #include <stdio.h>

@@ -2,7 +2,7 @@
 
 #include "se_camera.h"
 #include "se_model.h"
-#include "se_render.h"
+#include "se_graphics.h"
 #include "se_shader.h"
 #include "se_texture.h"
 #include "se_vfx.h"

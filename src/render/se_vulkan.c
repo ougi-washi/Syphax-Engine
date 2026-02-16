@@ -1,7 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #if defined(SE_RENDER_BACKEND_VULKAN)
-#include "se_render.h"
+#include "se_graphics.h"
 #include "se_debug.h"
 
 b8 se_render_init(void) {

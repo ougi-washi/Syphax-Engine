@@ -571,8 +571,8 @@ extern b8 se_ui_world_to_ndc(const se_camera_handle camera, const s_vec3* world,
 extern b8 se_ui_minimap_world_to_ui(const se_box_2d* world_rect, const se_box_2d* ui_rect, const s_vec2* world_point, s_vec2* out_ui_point);
 extern b8 se_ui_minimap_ui_to_world(const se_box_2d* world_rect, const se_box_2d* ui_rect, const s_vec2* ui_point, s_vec2* out_world_point);
 
-#define se_ui_create_root(ui) se_ui_panel_create((ui), S_HANDLE_NULL, s_vec2(1.0f, 1.0f))
-#define se_ui_label(ui, parent, text) se_ui_text_create((ui), (parent), (text))
+#define se_ui_create_root(ui) se_ui_add_root_impl((ui), (se_ui_panel_args){ .size = s_vec2(1.0f, 1.0f) })
+#define se_ui_label(ui, parent, text) ((void)(ui), se_ui_add_text_impl((parent), (se_ui_text_args){ .text = (text) }))
 #define se_ui_add_root(ui, ...) se_ui_add_root_impl((ui), (se_ui_panel_args)__VA_ARGS__)
 #define se_ui_add_panel(parent, ...) se_ui_add_panel_impl((parent), (se_ui_panel_args)__VA_ARGS__)
 #define se_ui_add_button(parent, ...) se_ui_add_button_impl((parent), (se_ui_button_args)__VA_ARGS__)
@@ -589,44 +589,10 @@ static inline b8 se_ui_widget_apply_hstack(se_ui_handle ui, se_ui_widget_handle 
 	return se_ui_widget_set_stack_horizontal(ui, widget, spacing) && se_ui_widget_set_padding(ui, widget, padding);
 }
 
-static inline se_ui_widget_handle se_ui_button_create_with_click(
-	se_ui_handle ui, se_ui_widget_handle parent, const c8* label, se_ui_click_callback on_click, void* user_data) {
-	const se_ui_widget_handle button = se_ui_button_create(ui, parent, label);
-	if (button != S_HANDLE_NULL && on_click) {
-		(void)se_ui_widget_on_click(ui, button, on_click, user_data);
-	}
-	return button;
-}
-
-static inline se_ui_widget_handle se_ui_textbox_create_with_callbacks(
-	se_ui_handle ui, se_ui_widget_handle parent, const c8* placeholder,
-	se_ui_change_callback on_change, se_ui_submit_callback on_submit, void* user_data) {
-	const se_ui_widget_handle textbox = se_ui_textbox_create(ui, parent, placeholder);
-	if (textbox == S_HANDLE_NULL) {
-		return S_HANDLE_NULL;
-	}
-	if (on_change) {
-		(void)se_ui_widget_on_change(ui, textbox, on_change, user_data);
-	}
-	if (on_submit) {
-		(void)se_ui_widget_on_submit(ui, textbox, on_submit, user_data);
-	}
-	return textbox;
-}
-
-static inline se_ui_widget_handle se_ui_scrollbox_create_with_scroll(
-	se_ui_handle ui, se_ui_widget_handle parent, s_vec2 size, se_ui_scroll_callback on_scroll, void* user_data) {
-	const se_ui_widget_handle scrollbox = se_ui_scrollbox_create(ui, parent, size);
-	if (scrollbox != S_HANDLE_NULL && on_scroll) {
-		(void)se_ui_widget_on_scroll(ui, scrollbox, on_scroll, user_data);
-	}
-	return scrollbox;
-}
-
 #define se_ui_vstack(ui, widget, spacing, padding) se_ui_widget_apply_vstack((ui), (widget), (spacing), (padding))
 #define se_ui_hstack(ui, widget, spacing, padding) se_ui_widget_apply_hstack((ui), (widget), (spacing), (padding))
-#define se_ui_button(ui, parent, label, on_click, user_data) se_ui_button_create_with_click((ui), (parent), (label), (on_click), (user_data))
-#define se_ui_textbox(ui, parent, placeholder, on_change, on_submit, user_data) se_ui_textbox_create_with_callbacks((ui), (parent), (placeholder), (on_change), (on_submit), (user_data))
-#define se_ui_scrollbox(ui, parent, size, on_scroll, user_data) se_ui_scrollbox_create_with_scroll((ui), (parent), (size), (on_scroll), (user_data))
+#define se_ui_button(ui, parent, label, on_click, user_data) ((void)(ui), se_ui_add_button_impl((parent), (se_ui_button_args){ .text = (label), .on_click_fn = (on_click), .on_click_data = (user_data) }))
+#define se_ui_textbox(ui, parent, placeholder, on_change, on_submit, user_data) ((void)(ui), se_ui_add_textbox_impl((parent), (se_ui_textbox_args){ .placeholder = (placeholder), .on_change_fn = (on_change), .on_change_data = (user_data), .on_submit_fn = (on_submit), .on_submit_data = (user_data) }))
+#define se_ui_scrollbox(ui, parent, size, on_scroll, user_data) ((void)(ui), se_ui_add_scrollbox_impl((parent), (se_ui_scrollbox_args){ .size = (size), .on_scroll_fn = (on_scroll), .on_scroll_data = (user_data) }))
 
 #endif // SE_UI_H

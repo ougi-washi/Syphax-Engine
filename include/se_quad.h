@@ -1,10 +1,9 @@
 // Syphax-Engine - Ougi Washi
 
-#ifndef SE_RENDER_H
-#define SE_RENDER_H
+#ifndef SE_QUAD_H
+#define SE_QUAD_H
 
 #include "syphax/s_array.h"
-#include <assert.h>
 
 typedef struct {
 	s_vec2 position;
@@ -16,20 +15,6 @@ typedef struct {
 	s_vec3 normal;
 	s_vec2 uv;
 } se_vertex_3d;
-
-static const se_vertex_2d se_quad_2d_vertices[4] = {
-	{{-1.0f, 1.0f}, {0.0f, 0.0f}},
-	{{-1.0f, -1.0f}, {0.0f, 1.0f}},
-	{{1.0f, -1.0f}, {1.0f, 1.0f}},
-	{{1.0f, 1.0f}, {1.0f, 0.0f}}};
-
-static const se_vertex_3d se_quad_3d_vertices[4] = {
-	{{-1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-	{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-	{{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-	{{1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}};
-
-static const u32 se_quad_indices[6] = {0, 1, 2, 0, 2, 3};
 
 typedef struct {
 	u32 vbo;
@@ -53,16 +38,6 @@ typedef struct {
 	u32 last_attribute;
 } se_quad;
 
-// helper functions
-extern b8 se_render_init(void);
-extern void se_render_shutdown(void);
-extern b8 se_render_has_context(void);
-extern u64 se_render_get_generation(void);
-extern void se_render_set_blending(const b8 active);
-extern void se_render_unbind_framebuffer(void); // window framebuffer
-extern void se_render_clear(void);
-extern void se_render_set_background_color(const s_vec4 color);
-
 // Quad functions
 extern void se_quad_3d_create(se_quad *out_quad);
 extern void se_quad_2d_create(se_quad *out_quad, const u32 instance_count);
@@ -70,7 +45,5 @@ extern void se_quad_2d_add_instance_buffer(se_quad *quad, const s_mat4 *buffer, 
 extern void se_quad_2d_add_instance_buffer_mat3(se_quad *quad, const s_mat3 *buffer, const sz instance_count);
 extern void se_quad_render(se_quad *quad, const sz instance_count);
 extern void se_quad_destroy(se_quad *quad);
-// Utility functions
-extern void se_render_print_mat4(const s_mat4 *mat);
 
-#endif // SE_RENDER_H
+#endif // SE_QUAD_H

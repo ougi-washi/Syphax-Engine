@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_input.h"
+#include "se_graphics.h"
 #include "se_scene.h"
 
 #include <math.h>

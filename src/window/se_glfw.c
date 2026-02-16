@@ -4,6 +4,7 @@
 
 #include "se_window.h"
 #include "se_debug.h"
+#include "se_graphics.h"
 #include "render/se_gl.h"
 #include <ctype.h>
 #include <errno.h>

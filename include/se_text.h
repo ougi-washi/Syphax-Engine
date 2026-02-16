@@ -3,7 +3,7 @@
 #ifndef SE_TEXT_H
 #define SE_TEXT_H
 
-#include "se_render.h"
+#include "se_quad.h"
 #include "se_shader.h"
 #include "stb_truetype.h"
 

@@ -2,6 +2,7 @@
 
 #include "se_input.h"
 #include "se_debug.h"
+#include "se_graphics.h"
 
 #include <stdio.h>
 

@@ -2,6 +2,7 @@
 
 #include "se_scene.h"
 #include "se_debug.h"
+#include "se_graphics.h"
 #include "render/se_gl.h"
 #include <float.h>
 #include <math.h>

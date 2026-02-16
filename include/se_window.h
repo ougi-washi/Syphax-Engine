@@ -5,7 +5,7 @@
 
 #include "se.h"
 #include "se_math.h"
-#include "se_render.h"
+#include "se_quad.h"
 #include "se_shader.h"
 
 typedef enum {
