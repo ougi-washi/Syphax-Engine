@@ -961,6 +961,7 @@ static void ui_remove_scroll_item(ui_example_state* state) {
 }
 
 i32 main(void) {
+	printf("advanced/ui_showcase :: Advanced example (reference)\n");
 	se_context* ctx = se_context_create();
 	se_window_handle window = se_window_create("Syphax-Engine - UI Full Showcase", WIDTH, HEIGHT);
 	if (window == S_HANDLE_NULL) {

@@ -64,6 +64,7 @@ static void se_vfx_uniform_callback_3d(
 }
 
 i32 main(void) {
+	printf("advanced/vfx_emitters :: Advanced example (reference)\n");
 	se_context* context = se_context_create();
 	if (!context) {
 		return 1;

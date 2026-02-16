@@ -245,6 +245,29 @@ extern void se_window_set_vsync(const se_window_handle window, const b8 enabled)
 extern b8 se_window_is_vsync_enabled(const se_window_handle window);
 extern void se_window_present(const se_window_handle window);
 extern void se_window_present_frame(const se_window_handle window, const s_vec4* clear_color);
+
+/*
+ * Canonical beginner frame loop:
+ *
+ * while (!se_window_should_close(window)) {
+ *     se_window_begin_frame(window);
+ *     // update + render your scene here
+ *     se_window_end_frame(window);
+ * }
+ *
+ * Invalid handle behavior:
+ * - If `window` is invalid, these functions set `se_get_last_error()` to
+ *   `SE_RESULT_INVALID_ARGUMENT` and do nothing.
+ */
+extern void se_window_begin_frame(const se_window_handle window);
+extern void se_window_end_frame(const se_window_handle window);
+
+/*
+ * Legacy per-frame calls kept for compatibility:
+ * - `se_window_tick(window)` is equivalent to begin-frame input/update prep.
+ * - `se_window_present(window)` / `se_window_render_screen(window)` complete present.
+ * New code should prefer `se_window_begin_frame` + `se_window_end_frame`.
+ */
 extern void se_window_poll_events();
 extern b8 se_window_is_key_down(const se_window_handle window, se_key key);
 extern b8 se_window_is_key_pressed(const se_window_handle window, se_key key);
@@ -297,11 +320,12 @@ extern void se_window_emit_text(const se_window_handle window, const c8* utf8_te
 extern void se_window_destroy(const se_window_handle window);
 extern void se_window_destroy_all(void);
 
+// Helper loop macro that mirrors the canonical frame flow.
 #define se_window_loop(_window, ...) do { \
 	while (!se_window_should_close((_window))) { \
-		se_window_tick((_window)); \
+		se_window_begin_frame((_window)); \
 		__VA_ARGS__ \
-		se_window_present((_window)); \
+		se_window_end_frame((_window)); \
 	} \
 } while (0)
 

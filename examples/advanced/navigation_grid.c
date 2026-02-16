@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 int main(void) {
+	printf("advanced/navigation_grid :: Advanced example (reference)\n");
 	se_navigation_grid grid = {0};
 	se_navigation_path path = {0};
 	se_navigation_path ray = {0};

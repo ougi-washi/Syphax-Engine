@@ -2,11 +2,13 @@
 
 #include "se_window.h"
 #include "se_graphics.h"
+#include <stdio.h>
 
 #define WIDTH 1920
 #define HEIGHT 1080
 
 i32 main(void) {
+	printf("advanced/multi_window :: Advanced example (reference)\n");
 	se_context *ctx = se_context_create();
 	se_window_handle window_main = se_window_create("Syphax-Engine - Multi Window Example - Window Main", WIDTH, HEIGHT);
 	se_window_handle window_1 = se_window_create("Syphax-Engine - Multi Window Example - Window 1", WIDTH, HEIGHT);

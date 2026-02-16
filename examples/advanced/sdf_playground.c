@@ -5,8 +5,10 @@
 #include "se_graphics.h"
 #include "se_camera.h"
 #include "se_sdf.h"
+#include <stdio.h>
 
 int main(void) {
+	printf("advanced/sdf_playground :: Advanced example (reference)\n");
 	se_context* context = se_context_create();
 	if (!context) {
 		return 1;

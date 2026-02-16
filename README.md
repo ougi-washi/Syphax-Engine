@@ -1,15 +1,11 @@
 ## Syphax Engine - 𐤒𐤐𐤎
-Simple, fast, lightweight 2D/3D Engine in C.
+Simple, fast, lightweight framework for interactive visuals, games, and tools in C.
 
 ### Highlights
-- Window and input handling
-- 2D/3D scenes with instancing and physics 
-- Audio
-- UI layout and widgets
-- Navigation 
-- Debug
-- Simulations/Events 
-- VFX 
+- Window + input handling
+- 2D/3D scenes with instancing and physics
+- Audio, UI, navigation, simulation, debug, and VFX
+- Public APIs in `include/se_*.h`
 
 ### Requirements
 - C11 compiler
@@ -29,7 +25,7 @@ git submodule update --init --recursive
 
 Build one target:
 ```bash
-./build.sh 1_hello
+./build.sh hello_text
 ```
 
 Manual build:
@@ -38,44 +34,39 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
 cmake --build build -j
 ```
 
-### Run Examples
-```bash
-./build.sh 1_hello
-./bin/1_hello
-```
-
-Integration example:
-```bash
-./build.sh 99_game
-./bin/99_game --autotest --seconds=6
-```
-
 ### Minimal Usage
 ```c
-#include "se_window.h"
-#include "se_render.h"
+#include "se_graphics.h"
 #include "se_text.h"
+#include "se_window.h"
 
 int main(void) {
-	se_context *ctx = se_context_create();
-	se_window_handle window = se_window_create("Syphax Hello", 1280, 720);
-	se_text_handle *text_handle = se_text_handle_create(0);
-	se_font_handle font = se_font_load(text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
+	se_context* ctx = se_context_create();
+	se_window_handle window = se_window_create("Hello", 1280, 720);
+	if (window == S_HANDLE_NULL) {
+		return 1;
+	}
 
+	se_text_handle* text = se_text_handle_create(0);
+	se_font_handle font = se_font_load(text, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-	se_render_set_background_color(s_vec4(0.08f, 0.08f, 0.1f, 1.0f));
 
-	se_window_loop(window,
+	while (!se_window_should_close(window)) {
+		se_window_begin_frame(window);
 		se_render_clear();
-		se_text_render(text_handle, font, "Hello Syphax", &s_vec2(0.0f, 0.0f), &s_vec2(1.0f, 1.0f), 0.03f);
-	);
+		se_text_render(text, font, "Hello Syphax", &s_vec2(0.0f, 0.0f), &s_vec2(1.0f, 1.0f), 0.03f);
+		se_window_end_frame(window);
+	}
 
-	se_text_handle_destroy(text_handle);
-	se_window_destroy(window);
-	se_context_destroy(ctx);
+	se_text_handle_destroy(text);
+	se_context_destroy(ctx); // canonical final teardown
 	return 0;
 }
 ```
+
+### Error Handling
+- Check `se_get_last_error()` + `se_result_str(...)` when creation calls fail.
+- `se_window_begin_frame` / `se_window_end_frame` no-op and set `SE_RESULT_INVALID_ARGUMENT` for invalid handles.
 
 ### Resource Scopes
 - `SE_RESOURCE_INTERNAL("...")`: engine implementation assets
@@ -84,17 +75,12 @@ int main(void) {
 
 ### Project Layout
 - `include/`: public headers
-- `src/`: framework modules (`se_*.c`)
-- `examples/`: runnable samples (output in `bin/`)
+- `src/`: engine modules
+- `examples/`: beginner examples
+- `examples/advanced/`: advanced examples
 - `resources/`: `internal/`, `public/`, `examples/`
 - `lib/`: vendored dependencies
 - `build/` and `bin/`: generated artifacts
-
-### Submodules
-- [Syphax](https://github.com/ougi-washi/syphax)
-- [GLFW](https://github.com/glfw/glfw)
-- [STB](https://github.com/nothings/stb)
-- [miniaudio](https://github.com/mackron/miniaudio)
 
 ### License
 MIT

@@ -139,6 +139,7 @@ static b8 sim_emit_replay_inputs(se_simulation_handle sim, const se_entity_id pl
 }
 
 int main(void) {
+	se_log("advanced/simulation_intro :: Advanced example (reference)");
 	// Declare and initialize resources.
 	se_context* ctx = se_context_create();
 	u8* replay_snapshot_data = NULL;

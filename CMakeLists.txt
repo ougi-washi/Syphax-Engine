@@ -113,21 +113,31 @@ target_compile_definitions(
 message(STATUS "Configured render backend: ${SE_BACKEND_RENDER}")
 message(STATUS "Configured platform backend: ${SE_BACKEND_PLATFORM}")
 
-macro(setup_executable arg_exec_dir arg_exec_name modules)
+macro(setup_executable arg_exec_file arg_exec_name modules)
     message(STATUS "Generating executable ${arg_exec_name}")
-    add_executable(${arg_exec_name} "${arg_exec_dir}/${arg_exec_name}.c")
+    add_executable(${arg_exec_name} "${arg_exec_file}")
     target_link_libraries(${arg_exec_name} PUBLIC MAIN)
     target_compile_definitions(${arg_exec_name} PUBLIC RESOURCES_DIR="${RESOURCES_DIR}/")
     set_target_properties(${arg_exec_name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR})
 endmacro()
 
-file(GLOB EXAMPLES CONFIGURE_DEPENDS 	"${EXAMPLES_DIR}/*.c" 
-			"${EXAMPLES_DIR}/*.cpp"
-			"${EXAMPLES_DIR}/**/*.c" 
-			"${EXAMPLES_DIR}/**/*.cpp")
+set(EXAMPLES_ADVANCED_DIR "${EXAMPLES_DIR}/advanced")
+file(GLOB EXAMPLES_BEGINNER CONFIGURE_DEPENDS
+	"${EXAMPLES_DIR}/*.c"
+	"${EXAMPLES_DIR}/*.cpp")
+file(GLOB EXAMPLES_ADVANCED CONFIGURE_DEPENDS
+	"${EXAMPLES_ADVANCED_DIR}/*.c"
+	"${EXAMPLES_ADVANCED_DIR}/*.cpp")
+
+list(SORT EXAMPLES_BEGINNER)
+list(SORT EXAMPLES_ADVANCED)
+set(EXAMPLES ${EXAMPLES_BEGINNER} ${EXAMPLES_ADVANCED})
 
 foreach(EXAMPLE ${EXAMPLES})
-   	get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE)
-   	message(STATUS "Adding example ${EXAMPLE_NAME}")
-    setup_executable(${EXAMPLES_DIR} ${EXAMPLE_NAME} MAIN)
+	get_filename_component(EXAMPLE_NAME ${EXAMPLE} NAME_WE)
+	if(TARGET ${EXAMPLE_NAME})
+		message(FATAL_ERROR "Duplicate example target '${EXAMPLE_NAME}' from ${EXAMPLE}")
+	endif()
+	message(STATUS "Adding example ${EXAMPLE_NAME} (${EXAMPLE})")
+	setup_executable(${EXAMPLE} ${EXAMPLE_NAME} MAIN)
 endforeach()

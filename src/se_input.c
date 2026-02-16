@@ -570,6 +570,78 @@ b8 se_input_action_is_released(se_input_handle* input_handle, const i32 action_i
 	return action ? action->released : false;
 }
 
+b8 se_input_bind_wasd_mouse_look(
+	se_input_handle* input_handle,
+	const i32 context_id,
+	const i32 action_forward,
+	const i32 action_backward,
+	const i32 action_left,
+	const i32 action_right,
+	const i32 action_look_x,
+	const i32 action_look_y,
+	const f32 look_sensitivity) {
+	if (!input_handle) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	const f32 sensitivity = look_sensitivity > 0.0f ? look_sensitivity : 0.01f;
+
+	const b8 ok =
+		se_input_action_create(input_handle, action_forward, "move_forward", context_id) &&
+		se_input_action_create(input_handle, action_backward, "move_backward", context_id) &&
+		se_input_action_create(input_handle, action_left, "move_left", context_id) &&
+		se_input_action_create(input_handle, action_right, "move_right", context_id) &&
+		se_input_action_create(input_handle, action_look_x, "look_x", context_id) &&
+		se_input_action_create(input_handle, action_look_y, "look_y", context_id) &&
+		se_input_action_bind(input_handle, action_forward, &(se_input_action_binding){
+			.source_id = SE_KEY_W,
+			.source_type = SE_INPUT_SOURCE_KEY,
+			.state = SE_INPUT_DOWN
+		}) &&
+		se_input_action_bind(input_handle, action_backward, &(se_input_action_binding){
+			.source_id = SE_KEY_S,
+			.source_type = SE_INPUT_SOURCE_KEY,
+			.state = SE_INPUT_DOWN
+		}) &&
+		se_input_action_bind(input_handle, action_left, &(se_input_action_binding){
+			.source_id = SE_KEY_A,
+			.source_type = SE_INPUT_SOURCE_KEY,
+			.state = SE_INPUT_DOWN
+		}) &&
+		se_input_action_bind(input_handle, action_right, &(se_input_action_binding){
+			.source_id = SE_KEY_D,
+			.source_type = SE_INPUT_SOURCE_KEY,
+			.state = SE_INPUT_DOWN
+		}) &&
+		se_input_action_bind(input_handle, action_look_x, &(se_input_action_binding){
+			.source_id = SE_INPUT_MOUSE_DELTA_X,
+			.source_type = SE_INPUT_SOURCE_AXIS,
+			.state = SE_INPUT_AXIS,
+			.axis = {
+				.deadzone = 0.0f,
+				.sensitivity = sensitivity,
+				.exponent = 1.0f,
+				.smoothing = 0.0f
+			}
+		}) &&
+		se_input_action_bind(input_handle, action_look_y, &(se_input_action_binding){
+			.source_id = SE_INPUT_MOUSE_DELTA_Y,
+			.source_type = SE_INPUT_SOURCE_AXIS,
+			.state = SE_INPUT_AXIS,
+			.axis = {
+				.deadzone = 0.0f,
+				.sensitivity = sensitivity,
+				.exponent = 1.0f,
+				.smoothing = 0.0f
+			}
+		});
+	if (!ok) {
+		return false;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 b8 se_input_context_create(se_input_handle* input_handle, const i32 context_id, const c8* name, const b8 enabled) {
 	if (!input_handle || !input_handle->runtime || !name) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);

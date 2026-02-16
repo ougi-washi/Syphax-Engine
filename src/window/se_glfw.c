@@ -1422,6 +1422,37 @@ void se_window_present_frame(const se_window_handle window, const s_vec4* clear_
 	se_window_render_screen(window);
 }
 
+void se_window_begin_frame(const se_window_handle window) {
+	se_context* context = se_current_context();
+	if (!context) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || window_ptr->handle == NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_window_set_current_context(window);
+	se_window_tick(window);
+	se_set_last_error(SE_RESULT_OK);
+}
+
+void se_window_end_frame(const se_window_handle window) {
+	se_context* context = se_current_context();
+	if (!context) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || window_ptr->handle == NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_window_present(window);
+	se_set_last_error(SE_RESULT_OK);
+}
+
 void se_window_poll_events(){
 	glfwPollEvents();
 	se_window_terminal_mirror_poll_input();

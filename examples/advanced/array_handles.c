@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "syphax/s_array.h"
+#include <stdio.h>
 
 #define ARRAY_SIZE 8
 
@@ -16,6 +17,7 @@ void display_array(ints* array) {
 }
 
 i32 main(void) {
+	printf("advanced/array_handles :: Advanced example (reference)\n");
 	ints my_ints = {0};
 	s_array_init(&my_ints);
 	s_array_reserve(&my_ints, ARRAY_SIZE);

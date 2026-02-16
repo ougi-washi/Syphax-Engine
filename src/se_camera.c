@@ -200,6 +200,25 @@ void se_camera_set_aspect_from_window(const se_camera_handle camera, const se_wi
 	camera_ptr->aspect = aspect;
 }
 
+void se_camera_set_orbit_defaults(const se_camera_handle camera, const se_window_handle window, const s_vec3* pivot, const f32 distance) {
+	se_camera* camera_ptr = se_camera_require(camera);
+	if (!camera_ptr) {
+		return;
+	}
+	const s_vec3 target = pivot ? *pivot : s_vec3(0.0f, 0.0f, 0.0f);
+	const f32 safe_distance = s_max(distance, 0.1f);
+	camera_ptr->position = s_vec3(
+		target.x + safe_distance * 0.75f,
+		target.y + safe_distance * 0.45f,
+		target.z + safe_distance);
+	camera_ptr->target = target;
+	camera_ptr->up = s_vec3(0.0f, 1.0f, 0.0f);
+	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
+	if (window != S_HANDLE_NULL) {
+		se_camera_set_aspect_from_window(camera, window);
+	}
+}
+
 void se_camera_orbit(const se_camera_handle camera, const s_vec3 *pivot, const f32 yaw_delta, const f32 pitch_delta, const f32 min_pitch, const f32 max_pitch) {
 	se_camera* camera_ptr = se_camera_require(camera);
 	if (!camera_ptr || !pivot) {

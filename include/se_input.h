@@ -139,6 +139,16 @@ extern f32 se_input_action_get_value(se_input_handle* input_handle, const i32 ac
 extern b8 se_input_action_is_down(se_input_handle* input_handle, const i32 action_id);
 extern b8 se_input_action_is_pressed(se_input_handle* input_handle, const i32 action_id);
 extern b8 se_input_action_is_released(se_input_handle* input_handle, const i32 action_id);
+extern b8 se_input_bind_wasd_mouse_look(
+	se_input_handle* input_handle,
+	const i32 context_id,
+	const i32 action_forward,
+	const i32 action_backward,
+	const i32 action_left,
+	const i32 action_right,
+	const i32 action_look_x,
+	const i32 action_look_y,
+	const f32 look_sensitivity);
 
 extern b8 se_input_context_create(se_input_handle* input_handle, const i32 context_id, const c8* name, const b8 enabled);
 extern b8 se_input_context_set_enabled(se_input_handle* input_handle, const i32 context_id, const b8 enabled);

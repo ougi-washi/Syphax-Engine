@@ -48,6 +48,7 @@ static i32 se_expect_report(
 }
 
 i32 main(void) {
+	printf("advanced/context_lifecycle :: Advanced example (reference)\n");
 	// Create the primary context that owns this lifecycle run.
 	se_context *context = se_context_create();
 	if (!context) {

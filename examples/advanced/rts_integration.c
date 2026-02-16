@@ -3880,6 +3880,7 @@ static int rts_run_headless_simulation(rts_game *game) {
 }
 
 int main(int argc, char **argv) {
+	printf("advanced/rts_integration :: Advanced example (reference)\n");
 	rts_game game = {0};
 	game.camera_target = s_vec3(0.0f, 0.0f, 0.0f);
 	game.camera_yaw = RTS_CAMERA_DEFAULT_YAW;

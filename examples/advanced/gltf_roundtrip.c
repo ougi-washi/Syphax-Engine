@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 int main(void) {
+	printf("advanced/gltf_roundtrip :: Advanced example (reference)\n");
 	char gltf_path[SE_MAX_PATH_LENGTH] = {0};
 	se_paths_resolve_resource_path(gltf_path, SE_MAX_PATH_LENGTH, SE_RESOURCE_EXAMPLE("gltf/triangle.gltf"));
 

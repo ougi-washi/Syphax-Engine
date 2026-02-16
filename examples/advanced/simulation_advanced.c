@@ -148,6 +148,7 @@ static void sim_system_integrate(se_simulation_handle sim, const se_sim_tick tic
 }
 
 int main(void) {
+	se_log("advanced/simulation_advanced :: Advanced example (reference)");
 	// Configure a constrained simulation for repeatable advanced tests.
 	se_simulation_config config = SE_SIMULATION_CONFIG_DEFAULTS;
 	config.max_entities = 64u;

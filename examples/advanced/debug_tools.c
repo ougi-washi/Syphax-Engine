@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 int main(void) {
+	printf("advanced/debug_tools :: Advanced example (reference)\n");
 	se_context* ctx = se_context_create();
 	se_window_handle window = se_window_create("Syphax-Engine - Debug Tools", 960, 540);
 	if (window == S_HANDLE_NULL) {

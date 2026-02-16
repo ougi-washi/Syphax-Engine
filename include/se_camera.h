@@ -34,6 +34,7 @@ extern void se_camera_set_perspective(const se_camera_handle camera, const f32 f
 extern void se_camera_set_orthographic(const se_camera_handle camera, const f32 ortho_height, const f32 near_plane, const f32 far_plane);
 extern void se_camera_set_aspect(const se_camera_handle camera, const f32 width, const f32 height);
 extern void se_camera_set_aspect_from_window(const se_camera_handle camera, const se_window_handle window);
+extern void se_camera_set_orbit_defaults(const se_camera_handle camera, const se_window_handle window, const s_vec3* pivot, const f32 distance);
 extern void se_camera_orbit(const se_camera_handle camera, const s_vec3 *pivot, const f32 yaw_delta, const f32 pitch_delta, const f32 min_pitch, const f32 max_pitch);
 extern void se_camera_pan_world(const se_camera_handle camera, const s_vec3 *delta);
 extern void se_camera_pan_local(const se_camera_handle camera, const f32 right_delta, const f32 up_delta, const f32 forward_delta);

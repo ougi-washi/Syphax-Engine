@@ -86,7 +86,6 @@ typedef struct se_ui_widget {
 	se_ui_style scroll_item_style_selected;
 
 	se_object_2d_handle background_object;
-	se_object_2d_handle border_object;
 	se_object_2d_handle text_object;
 	se_object_2d_handle caret_object;
 	se_object_2d_handle selection_object;
@@ -442,15 +441,19 @@ static void se_ui_object_set_visible(se_context* ctx, const se_object_2d_handle 
 	object_ptr->is_visible = visible;
 }
 
-static void se_ui_object_set_rect_color(
+static void se_ui_object_set_rect_style(
 	se_context* ctx,
 	const se_object_2d_handle object,
 	const se_box_2d* bounds,
-	const s_vec4* color,
+	const s_vec4* fill_color,
+	const s_vec4* border_color,
+	const f32 border_width,
 	const b8 visible) {
-	if (!ctx || object == S_HANDLE_NULL || !bounds || !color) {
+	if (!ctx || object == S_HANDLE_NULL || !bounds) {
 		return;
 	}
+	const s_vec4 fill = fill_color ? *fill_color : s_vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	const s_vec4 border = border_color ? *border_color : s_vec4(0.0f, 0.0f, 0.0f, 0.0f);
 	const s_vec2 position = s_vec2((bounds->min.x + bounds->max.x) * 0.5f, (bounds->min.y + bounds->max.y) * 0.5f);
 	const s_vec2 scale = s_vec2(
 		s_max(0.00001f, (bounds->max.x - bounds->min.x) * 0.5f),
@@ -458,12 +461,32 @@ static void se_ui_object_set_rect_color(
 	se_object_2d_set_position(object, &position);
 	se_object_2d_set_scale(object, &scale);
 	s_mat4 buffer = s_mat4_identity;
-	buffer.m[0][0] = color->x;
-	buffer.m[0][1] = color->y;
-	buffer.m[0][2] = color->z;
-	buffer.m[0][3] = color->w;
+	buffer.m[0][0] = fill.x;
+	buffer.m[0][1] = fill.y;
+	buffer.m[0][2] = fill.z;
+	buffer.m[0][3] = fill.w;
+	buffer.m[1][0] = border.x;
+	buffer.m[1][1] = border.y;
+	buffer.m[1][2] = border.z;
+	buffer.m[1][3] = border.w;
+	buffer.m[2][0] = scale.x;
+	buffer.m[2][1] = scale.y;
+	buffer.m[2][2] = s_max(0.0f, border_width);
+	buffer.m[2][3] = 0.0f;
 	se_object_2d_set_instance_buffer(object, 0, &buffer);
 	se_ui_object_set_visible(ctx, object, visible);
+}
+
+static void se_ui_object_set_rect_color(
+	se_context* ctx,
+	const se_object_2d_handle object,
+	const se_box_2d* bounds,
+	const s_vec4* color,
+	const b8 visible) {
+	if (!color) {
+		return;
+	}
+	se_ui_object_set_rect_style(ctx, object, bounds, color, &s_vec4(0.0f, 0.0f, 0.0f, 0.0f), 0.0f, visible);
 }
 
 static void se_ui_destroy_object(se_context* ctx, se_ui_root* root, se_object_2d_handle* object) {
@@ -900,7 +923,6 @@ static void se_ui_widget_destroy_proxies(se_context* ctx, se_ui_root* root, se_u
 		return;
 	}
 	se_ui_destroy_object(ctx, root, &widget->background_object);
-	se_ui_destroy_object(ctx, root, &widget->border_object);
 	se_ui_destroy_object(ctx, root, &widget->text_object);
 	se_ui_destroy_object(ctx, root, &widget->caret_object);
 	se_ui_destroy_object(ctx, root, &widget->selection_object);
@@ -963,10 +985,7 @@ static se_ui_widget_handle se_ui_widget_create_internal(se_ui_root* root, const 
 	widget->scroll_item_style_selected.hovered.border_color = s_vec4(0.34f, 0.70f, 0.95f, 1.0f);
 	widget->scroll_item_style_selected.pressed.border_color = s_vec4(0.22f, 0.56f, 0.84f, 1.0f);
 
-	if (type != SE_UI_WIDGET_TEXT) {
-		widget->background_object = se_ui_create_color_object(root);
-		widget->border_object = se_ui_create_color_object(root);
-	}
+	widget->background_object = se_ui_create_color_object(root);
 	if (type == SE_UI_WIDGET_BUTTON || type == SE_UI_WIDGET_TEXT || type == SE_UI_WIDGET_TEXTBOX) {
 		widget->text_object = se_ui_create_text_object(root, ctx);
 	}
@@ -1587,7 +1606,6 @@ static void se_ui_rebuild_scene_draw_list(se_ui_root* root) {
 		if (!widget) {
 			continue;
 		}
-		if (widget->border_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->border_object);
 		if (widget->background_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->background_object);
 		if (widget->selection_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->selection_object);
 		if (widget->text_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->text_object);
@@ -1616,16 +1634,16 @@ static void se_ui_widget_update_visual_recursive(se_ui_root* root, const se_ui_w
 	b8 has_area = se_ui_box_width(&draw_bounds) > 0.00001f && se_ui_box_height(&draw_bounds) > 0.00001f;
 
 	if (widget->background_object != S_HANDLE_NULL) {
-		se_ui_object_set_rect_color(ctx, widget->background_object, &widget->bounds, &state.background_color, visible && has_area && state.background_color.w > 0.001f);
-	}
-	if (widget->border_object != S_HANDLE_NULL) {
-		const f32 border = s_max(0.0005f, state.border_width);
-		const se_box_2d border_bounds = se_ui_make_box(
-			widget->bounds.min.x - border,
-			widget->bounds.min.y - border,
-			widget->bounds.max.x + border,
-			widget->bounds.max.y + border);
-		se_ui_object_set_rect_color(ctx, widget->border_object, &border_bounds, &state.border_color, visible && state.border_width > 0.00001f);
+		const b8 has_fill = state.background_color.w > 0.001f;
+		const b8 has_border = state.border_width > 0.00001f && state.border_color.w > 0.001f;
+		se_ui_object_set_rect_style(
+			ctx,
+			widget->background_object,
+			&widget->bounds,
+			&state.background_color,
+			&state.border_color,
+			state.border_width,
+			visible && has_area && (has_fill || has_border));
 	}
 
 	if (widget->text_object != S_HANDLE_NULL) {
@@ -2709,6 +2727,19 @@ se_ui_widget_handle se_ui_text_add(const se_ui_handle ui, const se_ui_widget_han
 	const se_ui_text_desc* cfg = desc ? desc : &defaults;
 	se_ui_widget_desc base = cfg->widget;
 	base.interactable = false;
+	const se_ui_style default_style = SE_UI_STYLE_DEFAULT;
+	if (se_ui_style_equal(&base.style, &default_style)) {
+		base.style.normal.background_color.w = 0.0f;
+		base.style.hovered.background_color.w = 0.0f;
+		base.style.pressed.background_color.w = 0.0f;
+		base.style.disabled.background_color.w = 0.0f;
+		base.style.focused.background_color.w = 0.0f;
+		base.style.normal.border_width = 0.0f;
+		base.style.hovered.border_width = 0.0f;
+		base.style.pressed.border_width = 0.0f;
+		base.style.disabled.border_width = 0.0f;
+		base.style.focused.border_width = 0.0f;
+	}
 	se_ui_widget_handle widget = se_ui_add_widget_common(ui, parent, SE_UI_WIDGET_TEXT, &base);
 	se_context* ctx = se_current_context();
 	se_ui_widget* widget_ptr = se_ui_widget_from_handle(ctx, widget);
