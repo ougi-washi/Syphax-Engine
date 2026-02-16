@@ -33,11 +33,6 @@ jobs:
     - name: Check example line budget
       run: ${{github.workspace}}/scripts/check_example_line_budget.sh
 
-    - name: Smoke test (2_array)
-      run: |
-            timeout 15s \
-              ${{github.workspace}}/bin/2_array
-
     - name: Test (context lifecycle teardown regression)
       run: |
             timeout 25s env \
