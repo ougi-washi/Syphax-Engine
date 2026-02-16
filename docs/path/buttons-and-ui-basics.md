@@ -26,11 +26,11 @@ se_ui_add_button(root, { .text = "Apply", .size = s_vec2(0.2f, 0.08f) });
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Add Sound](add-sound.md).
+1. Next: [Add Sound](add-sound.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

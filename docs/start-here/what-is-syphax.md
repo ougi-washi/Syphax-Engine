@@ -29,11 +29,11 @@ Read first, before implementing app-level architecture on top of the engine.
 1. Pull in only required modules.
 1. Keep domain logic outside engine core.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Install and build](install-and-build.md).
+1. Next: [Install and build](install-and-build.md).
 1. Open [Module guides](../module-guides/index.md) after first run.
 
 </div>

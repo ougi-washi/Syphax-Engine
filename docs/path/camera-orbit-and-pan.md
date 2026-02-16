@@ -26,11 +26,11 @@ se_camera_dolly(camera, &pivot, wheel, 3.0f, 26.0f);
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Load A Model](load-a-model.md).
+1. Next: [Load A Model](load-a-model.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

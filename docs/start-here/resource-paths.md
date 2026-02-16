@@ -26,11 +26,11 @@ SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl");
 1. Keep paths relative inside each scope.
 1. Avoid absolute host paths.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [First run checklist](first-run-checklist.md).
+1. Next: [First run checklist](first-run-checklist.md).
 1. Apply scope checks in [load a model](../path/load-a-model.md).
 
 </div>

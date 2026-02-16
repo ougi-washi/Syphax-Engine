@@ -26,9 +26,9 @@ se_window_end_frame(window);
 1. Call per-frame functions in your frame loop where needed.
 1. Destroy resources before context teardown.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
 1. Open [API declarations](../api-reference/modules/se_window.md).
 1. Run one linked example and change one parameter.

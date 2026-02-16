@@ -25,9 +25,9 @@ se_render_buffer_create(640, 360, shader_path);
 1. Call per-frame functions in your frame loop where needed.
 1. Destroy resources before context teardown.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
 1. Open [API declarations](../api-reference/modules/se_render_buffer.md).
 1. Run one linked example and change one parameter.

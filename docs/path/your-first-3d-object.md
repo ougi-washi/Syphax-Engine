@@ -26,11 +26,11 @@ se_scene_3d_add_model(scene, model, &s_mat4_identity);
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Camera Orbit And Pan](camera-orbit-and-pan.md).
+1. Next: [Camera Orbit And Pan](camera-orbit-and-pan.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

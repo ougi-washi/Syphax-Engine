@@ -27,11 +27,11 @@ Use after setup or after large environment changes.
 1. Confirm exit-key behavior.
 1. Capture command + error on failure.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Path](../path/index.md).
+1. Next: [Path](../path/index.md).
 1. Start with [Colors and clear](../path/colors-and-clear.md).
 
 </div>

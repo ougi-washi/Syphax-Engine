@@ -25,11 +25,11 @@ se_render_clear();
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Draw Your First Text](draw-your-first-text.md).
+1. Next: [Draw Your First Text](draw-your-first-text.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

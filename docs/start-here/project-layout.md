@@ -29,11 +29,11 @@ docs/
 1. Treat `src/` as module implementation.
 1. Keep generated output in `build/` and `bin/`.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [First window](first-window.md).
+1. Next: [First window](first-window.md).
 1. Cross-check with [Resource paths](resource-paths.md).
 
 </div>

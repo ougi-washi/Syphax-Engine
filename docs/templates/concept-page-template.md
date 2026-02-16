@@ -14,7 +14,7 @@ Describe the use case.
 
 1. Step
 
-## Try this next
+## Next
 
 1. Next action
 

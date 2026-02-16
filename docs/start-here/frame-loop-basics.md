@@ -30,11 +30,11 @@ while (!se_window_should_close(window)) {
 1. Update state and process input.
 1. Draw and present.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Error handling](error-handling.md).
+1. Next: [Error handling](error-handling.md).
 1. Review [frame loop diagram](../assets/img/frame-loop.svg).
 
 </div>

@@ -26,11 +26,11 @@ se_debug_trace_end("frame");
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Export And Share](export-and-share.md).
+1. Next: [Export And Share](export-and-share.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

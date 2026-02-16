@@ -28,11 +28,11 @@ if (window == S_HANDLE_NULL) {
 1. Print result string with context.
 1. Perform explicit cleanup before return.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Resource paths](resource-paths.md).
+1. Next: [Resource paths](resource-paths.md).
 1. Inspect failure paths in [audio_basics](../examples/default/audio_basics.md).
 
 </div>

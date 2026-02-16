@@ -28,11 +28,11 @@ git submodule update --init --recursive
 1. Run full build once.
 1. Use single-target build for iteration.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Project layout](project-layout.md).
+1. Next: [Project layout](project-layout.md).
 1. Run [First run checklist](first-run-checklist.md).
 
 </div>

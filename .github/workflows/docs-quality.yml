@@ -8,15 +8,6 @@ on:
       - scripts/docs/**
       - mkdocs.yml
       - .github/workflows/docs-quality.yml
-  push:
-    branches:
-      - main
-    paths:
-      - docs/**
-      - include/**
-      - scripts/docs/**
-      - mkdocs.yml
-      - .github/workflows/docs-quality.yml
 
 permissions:
   contents: read

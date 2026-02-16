@@ -26,11 +26,11 @@ se_vfx_2d_add_emitter(vfx, &params);
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Physics As Motion](physics-as-motion.md).
+1. Next: [Physics As Motion](physics-as-motion.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

@@ -26,11 +26,11 @@ se_scene_2d_add_object(scene, object);
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Motion With Time](motion-with-time.md).
+1. Next: [Motion With Time](motion-with-time.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

@@ -30,11 +30,11 @@ se_window_set_exit_key(window, SE_KEY_ESCAPE);
 1. Check handle right after creation.
 1. Destroy context last.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Frame loop basics](frame-loop-basics.md).
+1. Next: [Frame loop basics](frame-loop-basics.md).
 1. Compare with [hello_text](../examples/default/hello_text.md).
 
 </div>

@@ -26,11 +26,11 @@ Use this concept when implementing `export-and-share` behavior in a runtime targ
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [../Examples/Index](../examples/index.md).
+1. Next: [../Examples/Index](../examples/index.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

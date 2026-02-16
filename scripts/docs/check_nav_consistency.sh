@@ -77,7 +77,7 @@ required_sections = {
     "when to use this",
     "minimal working snippet",
     "step-by-step explanation",
-    "try this next",
+    "next",
     "common mistakes",
     "related pages",
 }

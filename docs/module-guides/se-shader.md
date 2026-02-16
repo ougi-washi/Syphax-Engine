@@ -25,9 +25,9 @@ se_shader_set_float(shader, "u_value", 1.0f);
 1. Call per-frame functions in your frame loop where needed.
 1. Destroy resources before context teardown.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
 1. Open [API declarations](../api-reference/modules/se_shader.md).
 1. Run one linked example and change one parameter.

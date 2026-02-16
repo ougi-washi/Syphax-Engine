@@ -26,11 +26,11 @@ se_input_tick(input);
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Buttons And Ui Basics](buttons-and-ui-basics.md).
+1. Next: [Buttons And Ui Basics](buttons-and-ui-basics.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

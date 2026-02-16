@@ -26,11 +26,11 @@ se_text_render(text, font, "Hello", &s_vec2(0.0f, 0.0f), &s_vec2(1.0f, 1.0f), 0.
 1. Apply the snippet with your current handles.
 1. Verify behavior using one example target.
 
-<div class="next-block" markdown>
+<div class="next-block" markdown="1">
 
-## Try this next
+## Next
 
-1. Next page: [Basic Shapes And Scene2D](basic-shapes-and-scene2d.md).
+1. Next: [Basic Shapes And Scene2D](basic-shapes-and-scene2d.md).
 1. Try one small parameter edit and observe runtime changes.
 
 </div>

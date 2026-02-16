@@ -7,7 +7,7 @@ prerequisites:
 
 # Syphax Engine Documentation
 
-<div class="hero-card" markdown>
+<div class="hero-card" markdown="1">
 
 Syphax Engine is a C framework for interactive visuals, games, and tools.
 
