@@ -9,6 +9,10 @@ Source header: `include/se_scene.h`
 
 This page is generated from `include/se_scene.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-scene.md)
+
 ## Functions
 
 ### `se_object_2d_add_instance`

@@ -41,6 +41,7 @@ se_simulation_step(sim, 1u);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-simulation.md)
+- [API module page](../api-reference/modules/se_simulation.md)
+- [Example: simulation_intro](../examples/advanced/simulation_intro.md)
+- [Example: simulation_advanced](../examples/advanced/simulation_advanced.md)

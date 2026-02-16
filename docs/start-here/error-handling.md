@@ -47,3 +47,4 @@ if (window == S_HANDLE_NULL) {
 - [First run checklist](first-run-checklist.md)
 - [Troubleshooting](../troubleshooting/docs-build.md)
 - [API: se_defines.h](../api-reference/modules/se_defines.md)
+- [Next Playbook](../playbooks/se-math-defines-ext-quad.md)

@@ -9,6 +9,10 @@ Texture loading from files or memory and texture parameter control.
 
 This page is generated from `include/se_texture.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-texture.md)
+
 ## Functions
 
 ### `se_texture_destroy`

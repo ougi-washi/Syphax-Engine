@@ -15,6 +15,11 @@ prerequisites:
 
 Create multiple 2D instances and animate them with a wave function.
 
+
+## Learning path
+
+- This example corresponds to [se_scene Playbook](../../playbooks/se-scene.md) Step 3.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Space: pause or resume wave motion
@@ -40,6 +45,7 @@ Create multiple 2D instances and animate them with a wave function.
 
 ## Related API links
 
+- [Playbook: se_scene Playbook](../../playbooks/se-scene.md)
 - [Path: motion with time](../../path/motion-with-time.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [API: se_scene.h](../../api-reference/modules/se_scene.md)

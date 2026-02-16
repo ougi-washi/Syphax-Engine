@@ -12,11 +12,16 @@
     window.__md_set("__palette", darkPalette);
   }
 
-  if (document.body) {
-    document.body.setAttribute("data-md-color-scheme", "slate");
-    document.body.setAttribute("data-md-color-primary", "teal");
-    document.body.setAttribute("data-md-color-accent", "lime");
+  try {
+    localStorage.setItem("__palette", JSON.stringify(darkPalette));
+  } catch (_err) {
+    // Ignore storage write failures (private mode, blocked storage, etc.).
   }
+
+  const root = document.documentElement;
+  root.setAttribute("data-md-color-scheme", "slate");
+  root.setAttribute("data-md-color-primary", "teal");
+  root.setAttribute("data-md-color-accent", "lime");
 })();
 
 document.addEventListener("DOMContentLoaded", () => {

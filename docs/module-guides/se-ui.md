@@ -42,6 +42,7 @@ se_ui_draw(ui);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-ui.md)
+- [API module page](../api-reference/modules/se_ui.md)
+- [Example: ui_basics](../examples/default/ui_basics.md)
+- [Example: ui_showcase](../examples/advanced/ui_showcase.md)

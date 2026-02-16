@@ -25,6 +25,7 @@ Syphax Engine is a C framework for interactive visuals, games, and tools.
 - [Install and build](start-here/install-and-build.md)
 - [First window](start-here/first-window.md)
 - [Path overview](path/index.md)
+- [Playbooks](playbooks/index.md)
 - [Examples index](examples/index.md)
 - [Module guides](module-guides/index.md)
 - [API reference](api-reference/index.md)
@@ -36,6 +37,7 @@ Syphax Engine is a C framework for interactive visuals, games, and tools.
 - `Path`: ordered pages that each explain one concept.
 - `Examples`: one page per runnable target.
 - `Module Guides`: usage-oriented pages mapped to API modules.
+- `Playbooks`: four-step progressive tutorials with compileable snippets.
 - `API Reference`: generated declaration pages from public headers.
 
 ## Build this docs site locally

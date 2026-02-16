@@ -17,6 +17,11 @@ prerequisites:
 
 Run pathfinding and raycast queries over a blocked grid.
 
+
+## Learning path
+
+- This example corresponds to [se_navigation Playbook](../../playbooks/se-navigation.md) Step 3.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - No runtime controls. Inspect console output.
@@ -41,6 +46,7 @@ Run pathfinding and raycast queries over a blocked grid.
 
 ## Related API links
 
+- [Playbook: se_navigation Playbook](../../playbooks/se-navigation.md)
 - [Module guide: se_navigation](../../module-guides/se-navigation.md)
 - [Glossary: raycast](../../glossary/terms.md#raycast)
 - [API: se_navigation.h](../../api-reference/modules/se_navigation.md)

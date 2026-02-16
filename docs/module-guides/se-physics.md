@@ -41,6 +41,7 @@ se_physics_world_3d_step(world, dt);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-physics.md)
+- [API module page](../api-reference/modules/se_physics.md)
+- [Example: physics2d_playground](../examples/default/physics2d_playground.md)
+- [Example: physics3d_playground](../examples/default/physics3d_playground.md)

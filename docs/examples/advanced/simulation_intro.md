@@ -17,6 +17,11 @@ prerequisites:
 
 Deterministic simulation starter with component and event registration.
 
+
+## Learning path
+
+- This example corresponds to [se_simulation Playbook](../../playbooks/se-simulation.md) Step 2.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - No runtime controls. Observe log output for replay checks.
@@ -41,6 +46,7 @@ Deterministic simulation starter with component and event registration.
 
 ## Related API links
 
+- [Playbook: se_simulation Playbook](../../playbooks/se-simulation.md)
 - [Module guide: se_simulation](../../module-guides/se-simulation.md)
 - [API: se_simulation.h](../../api-reference/modules/se_simulation.md)
 - [Glossary: deterministic step](../../glossary/terms.md#deterministic-step)

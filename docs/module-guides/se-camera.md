@@ -41,6 +41,6 @@ se_camera_set_aspect_from_window(camera, window);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-camera.md)
+- [API module page](../api-reference/modules/se_camera.md)
+- [Example: scene3d_orbit](../examples/default/scene3d_orbit.md)

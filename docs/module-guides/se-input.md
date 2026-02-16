@@ -41,6 +41,6 @@ se_input_tick(input);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-input.md)
+- [API module page](../api-reference/modules/se_input.md)
+- [Example: input_actions](../examples/default/input_actions.md)

@@ -45,3 +45,4 @@ se_scene_3d_add_model(scene, model, &s_mat4_identity);
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
+- [Deep dive Playbook](../playbooks/se-scene.md)

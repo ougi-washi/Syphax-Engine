@@ -47,6 +47,12 @@ jobs:
       - name: Content quality checks
         run: ./scripts/docs/check_content_quality.sh
 
+      - name: Playbook coverage checks
+        run: ./scripts/docs/check_playbook_coverage.sh
+
+      - name: Snippet compile checks
+        run: ./scripts/docs/verify_snippets.sh
+
       - name: Strict docs build
         run: mkdocs build --strict --config-file mkdocs.yml
 

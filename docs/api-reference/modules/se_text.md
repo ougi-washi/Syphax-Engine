@@ -9,6 +9,10 @@ Font loading and text drawing APIs.
 
 This page is generated from `include/se_text.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-text.md)
+
 ## Functions
 
 ### `se_font_destroy`

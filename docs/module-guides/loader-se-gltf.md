@@ -41,6 +41,6 @@ se_gltf_asset* asset = se_gltf_load(path, NULL);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/loader-se-gltf.md)
+- [API module page](../api-reference/modules/loader_se_gltf.md)
+- [Example: gltf_roundtrip](../examples/advanced/gltf_roundtrip.md)

@@ -15,6 +15,12 @@ prerequisites:
 
 Create a window, render text, and toggle the background palette.
 
+
+## Learning path
+
+- This example corresponds to [se_window Playbook](../../playbooks/se-window.md) Step 1.
+- This example corresponds to [se_text Playbook](../../playbooks/se-text.md) Step 2.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Esc: quit
@@ -40,6 +46,7 @@ Create a window, render text, and toggle the background palette.
 
 ## Related API links
 
+- [Playbook: se_window Playbook](../../playbooks/se-window.md)
 - [Path: draw your first text](../../path/draw-your-first-text.md)
 - [Module guide: se_text](../../module-guides/se-text.md)
 - [API: se_window.h](../../api-reference/modules/se_window.md)

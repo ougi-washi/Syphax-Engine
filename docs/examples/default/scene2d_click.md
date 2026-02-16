@@ -15,6 +15,11 @@ prerequisites:
 
 Pick an object with pointer input and update shader color on click.
 
+
+## Learning path
+
+- This example corresponds to [se_scene Playbook](../../playbooks/se-scene.md) Step 2.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Left click center button: toggle color
@@ -40,6 +45,7 @@ Pick an object with pointer input and update shader color on click.
 
 ## Related API links
 
+- [Playbook: se_scene Playbook](../../playbooks/se-scene.md)
 - [Path: basic shapes and Scene2D](../../path/basic-shapes-and-scene2d.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [API: se_scene.h](../../api-reference/modules/se_scene.md)

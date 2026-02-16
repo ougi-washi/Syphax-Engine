@@ -41,6 +41,6 @@ se_vfx_2d_add_emitter(vfx, &params);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-vfx.md)
+- [API module page](../api-reference/modules/se_vfx.md)
+- [Example: vfx_emitters](../examples/advanced/vfx_emitters.md)

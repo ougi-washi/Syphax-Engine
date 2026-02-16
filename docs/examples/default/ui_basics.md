@@ -15,6 +15,11 @@ prerequisites:
 
 Build a small UI with two buttons and text updates from callbacks.
 
+
+## Learning path
+
+- This example corresponds to [se_ui Playbook](../../playbooks/se-ui.md) Step 2.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Click buttons: update/reset counter
@@ -41,6 +46,7 @@ Build a small UI with two buttons and text updates from callbacks.
 
 ## Related API links
 
+- [Playbook: se_ui Playbook](../../playbooks/se-ui.md)
 - [Path: buttons and UI basics](../../path/buttons-and-ui-basics.md)
 - [Module guide: se_ui](../../module-guides/se-ui.md)
 - [API: se_ui.h](../../api-reference/modules/se_ui.md)

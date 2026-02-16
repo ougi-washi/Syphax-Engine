@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - docs/**
+      - include/**
+      - scripts/docs/**
+      - mkdocs.yml
+      - .github/workflows/docs-pages.yml
   workflow_dispatch:
 
 permissions:
@@ -46,6 +52,12 @@ jobs:
 
       - name: Check content quality
         run: ./scripts/docs/check_content_quality.sh
+
+      - name: Check playbook coverage
+        run: ./scripts/docs/check_playbook_coverage.sh
+
+      - name: Verify snippets compile
+        run: ./scripts/docs/verify_snippets.sh
 
       - name: Build docs (strict)
         run: mkdocs build --strict --config-file mkdocs.yml

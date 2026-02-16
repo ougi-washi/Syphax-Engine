@@ -45,3 +45,4 @@ se_ui_add_button(root, { .text = "Apply", .size = s_vec2(0.2f, 0.08f) });
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
+- [Deep dive Playbook](../playbooks/se-ui.md)

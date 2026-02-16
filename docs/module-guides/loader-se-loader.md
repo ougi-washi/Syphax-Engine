@@ -41,6 +41,6 @@ Use `loader/se_loader` for features that map directly to its module boundary.
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/loader-se-loader.md)
+- [API module page](../api-reference/modules/loader_se_loader.md)
+- [Example: gltf_roundtrip](../examples/advanced/gltf_roundtrip.md)

@@ -9,6 +9,10 @@ Audio engine setup, clips, streams, buses, and capture APIs.
 
 This page is generated from `include/se_audio.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-audio.md)
+
 ## Functions
 
 ### `se_audio_buffer_analyze_bands`

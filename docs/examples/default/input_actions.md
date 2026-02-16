@@ -15,6 +15,11 @@ prerequisites:
 
 Bind keyboard and mouse inputs to actions and move a 2D actor.
 
+
+## Learning path
+
+- This example corresponds to [se_input Playbook](../../playbooks/se-input.md) Step 3.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - W A S D: move square
@@ -42,6 +47,7 @@ Bind keyboard and mouse inputs to actions and move a 2D actor.
 
 ## Related API links
 
+- [Playbook: se_input Playbook](../../playbooks/se-input.md)
 - [Path: mouse and keyboard input](../../path/mouse-and-keyboard-input.md)
 - [Module guide: se_input](../../module-guides/se-input.md)
 - [API: se_input.h](../../api-reference/modules/se_input.md)

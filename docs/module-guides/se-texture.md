@@ -41,6 +41,6 @@ se_texture_load_from_memory(bytes, size, SE_CLAMP);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-texture.md)
+- [API module page](../api-reference/modules/se_texture.md)
+- [Example: model_viewer](../examples/default/model_viewer.md)

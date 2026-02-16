@@ -1,13 +1,13 @@
 ## Syphax Engine - 𐤒𐤐𐤎
 Simple, fast, lightweight framework for interactive visuals, games, and tools in C.
 
-Documentation: [Syphax Engine Docs](https://syphax-engine.github.io/syphax-engine/)
-
 ### Highlights
 - Window + input handling
 - 2D/3D scenes with instancing and physics
 - Audio, UI, navigation, simulation, debug, and VFX
 - Public APIs in `include/se_*.h`
+
+## [Documentation here](https://syphax-engine.github.io/syphax-engine/)
 
 ### Requirements
 - C11 compiler
@@ -34,6 +34,18 @@ Manual build:
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSE_BACKEND_RENDER=gl -DSE_BACKEND_PLATFORM=desktop_glfw
 cmake --build build -j
+```
+
+### Docs Checks
+```bash
+./scripts/docs/generate_api_reference.sh
+./scripts/docs/check_nav_consistency.sh
+./scripts/docs/check_links.sh
+./scripts/docs/check_content_quality.sh
+./scripts/docs/check_playbook_coverage.sh
+./scripts/docs/verify_snippets.sh
+mkdocs build --strict --config-file mkdocs.yml
+./scripts/docs/check_site_size.sh
 ```
 
 ### Minimal Usage

@@ -41,6 +41,7 @@ se_render_clear();
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-graphics.md)
+- [API module page](../api-reference/modules/se_graphics.md)
+- [Example: hello_text](../examples/default/hello_text.md)
+- [Example: scene2d_click](../examples/default/scene2d_click.md)

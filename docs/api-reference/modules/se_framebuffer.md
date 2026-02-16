@@ -9,6 +9,10 @@ Framebuffer creation, binding, and resize lifecycle.
 
 This page is generated from `include/se_framebuffer.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-framebuffer.md)
+
 ## Functions
 
 ### `se_framebuffer_bind`

@@ -42,6 +42,7 @@ se_window_end_frame(window);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-window.md)
+- [API module page](../api-reference/modules/se_window.md)
+- [Example: hello_text](../examples/default/hello_text.md)
+- [Example: input_actions](../examples/default/input_actions.md)

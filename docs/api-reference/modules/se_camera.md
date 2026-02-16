@@ -9,6 +9,10 @@ Camera data, projection setup, and camera-controller helpers.
 
 This page is generated from `include/se_camera.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-camera.md)
+
 ## Functions
 
 ### `se_camera_clamp_target`

@@ -53,3 +53,4 @@ while (!se_window_should_close(window)) {
 ![Frame loop flow diagram](../assets/img/frame-loop.svg)
 
 *Caption: one frame cycle from begin to present, then loop.*
+- [Next Playbook](../playbooks/se-window.md)

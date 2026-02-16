@@ -9,6 +9,10 @@ Geometry utility structs and math helpers used by engine modules.
 
 This page is generated from `include/se_math.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-math-defines-ext-quad.md)
+
 ## Functions
 
 ### `se_box_2d_intersects`

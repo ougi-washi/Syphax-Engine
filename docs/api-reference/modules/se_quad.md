@@ -9,6 +9,10 @@ Quad and mesh instance utility structs.
 
 This page is generated from `include/se_quad.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-math-defines-ext-quad.md)
+
 ## Functions
 
 ### `se_quad_2d_add_instance_buffer`

@@ -41,6 +41,6 @@ se_text_render(text, font, "Label", &pos, &scale, 0.03f);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-text.md)
+- [API module page](../api-reference/modules/se_text.md)
+- [Example: hello_text](../examples/default/hello_text.md)

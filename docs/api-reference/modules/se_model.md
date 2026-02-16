@@ -9,6 +9,10 @@ Model loading, model handles, and mesh composition APIs.
 
 This page is generated from `include/se_model.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-model.md)
+
 ## Functions
 
 ### `se_mesh_discard_cpu_data`

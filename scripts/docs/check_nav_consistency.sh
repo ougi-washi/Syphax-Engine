@@ -72,8 +72,8 @@ for header in headers:
     if page_rel not in nav_paths:
         raise SystemExit(f"Generated API page missing in nav: {page_rel}")
 
-# Required concept sections
-required_sections = {
+# Required concept sections for start-here/path/module-guides pages.
+required_concept_sections = {
     "when to use this",
     "minimal working snippet",
     "step-by-step explanation",
@@ -102,10 +102,42 @@ for concept in sorted(concept_files):
                 heading = heading.replace("`", "")
                 found.add(heading)
 
-    missing = sorted(required_sections - found)
+    missing = sorted(required_concept_sections - found)
     if missing:
         rel = os.path.relpath(concept, docs_dir).replace("\\", "/")
         print(f"Missing required sections in concept page: {rel}")
+        for heading in missing:
+            print(f" - {heading}")
+        raise SystemExit(1)
+
+# Required sections for Playbook pages.
+required_playbook_sections = {
+    "when to use this",
+    "step 1: minimal working project",
+    "step 2: add core feature",
+    "step 3: interactive / tunable",
+    "step 4: complete practical demo",
+    "common mistakes",
+    "next",
+    "related pages",
+}
+
+playbook_files = sorted(glob.glob(os.path.join(docs_dir, "playbooks", "*.md")))
+for playbook in playbook_files:
+    if os.path.basename(playbook) == "index.md":
+        continue
+    found = set()
+    with open(playbook, "r", encoding="utf-8") as f:
+        for line in f:
+            m = heading_re.match(line.strip())
+            if m:
+                heading = m.group(1).strip().lower().replace("`", "")
+                found.add(heading)
+
+    missing = sorted(required_playbook_sections - found)
+    if missing:
+        rel = os.path.relpath(playbook, docs_dir).replace("\\", "/")
+        print(f"Missing required sections in playbook page: {rel}")
         for heading in missing:
             print(f" - {heading}")
         raise SystemExit(1)

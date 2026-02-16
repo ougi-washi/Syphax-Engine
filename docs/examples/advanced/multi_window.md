@@ -17,6 +17,12 @@ prerequisites:
 
 Render three windows in one context with per-window clear colors.
 
+
+## Learning path
+
+- This example corresponds to [se_window Playbook](../../playbooks/se-window.md) Step 3.
+- This example corresponds to [se_render_buffer Playbook](../../playbooks/se-render-buffer.md) Step 2.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Esc on main window: quit all
@@ -41,6 +47,7 @@ Render three windows in one context with per-window clear colors.
 
 ## Related API links
 
+- [Playbook: se_window Playbook](../../playbooks/se-window.md)
 - [Module guide: se_window](../../module-guides/se-window.md)
 - [Module guide: se_graphics](../../module-guides/se-graphics.md)
 - [API: se_window.h](../../api-reference/modules/se_window.md)

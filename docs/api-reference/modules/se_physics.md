@@ -9,6 +9,10 @@ Source header: `include/se_physics.h`
 
 This page is generated from `include/se_physics.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-physics.md)
+
 ## Functions
 
 ### `se_physics_body_2d_add_aabb`

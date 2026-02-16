@@ -41,6 +41,6 @@ se_render_buffer_create(640, 360, shader_path);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-render-buffer.md)
+- [API module page](../api-reference/modules/se_render_buffer.md)
+- [Example: multi_window](../examples/advanced/multi_window.md)

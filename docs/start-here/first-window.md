@@ -49,3 +49,4 @@ se_window_set_exit_key(window, SE_KEY_ESCAPE);
 - [Frame loop basics](frame-loop-basics.md)
 - [Error handling](error-handling.md)
 - [se_window guide](../module-guides/se-window.md)
+- [Next Playbook](../playbooks/se-window.md)

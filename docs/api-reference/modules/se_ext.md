@@ -9,6 +9,10 @@ Optional extension capability checks.
 
 This page is generated from `include/se_ext.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-math-defines-ext-quad.md)
+
 ## Functions
 
 ### `se_ext_feature_name`

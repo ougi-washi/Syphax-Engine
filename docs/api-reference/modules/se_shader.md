@@ -9,6 +9,10 @@ Shader loading, uniform access, and shader handle lifecycle.
 
 This page is generated from `include/se_shader.h` and is deterministic.
 
+## Read the Playbook
+
+- [Deep dive Playbook](../../playbooks/se-shader.md)
+
 ## Functions
 
 ### `se_context_get_global_uniforms`

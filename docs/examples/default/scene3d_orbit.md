@@ -15,6 +15,11 @@ prerequisites:
 
 Render a 3D grid of cubes and navigate with orbit camera controls.
 
+
+## Learning path
+
+- This example corresponds to [se_camera Playbook](../../playbooks/se-camera.md) Step 3.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Hold left mouse + move: orbit
@@ -42,6 +47,7 @@ Render a 3D grid of cubes and navigate with orbit camera controls.
 
 ## Related API links
 
+- [Playbook: se_camera Playbook](../../playbooks/se-camera.md)
 - [Path: camera orbit and pan](../../path/camera-orbit-and-pan.md)
 - [Module guide: se_camera](../../module-guides/se-camera.md)
 - [API: se_camera.h](../../api-reference/modules/se_camera.md)

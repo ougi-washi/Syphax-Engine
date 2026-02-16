@@ -43,3 +43,4 @@ se_model_handle m = se_model_load_obj_simple(SE_RESOURCE_PUBLIC("models/sphere.o
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
+- [Deep dive Playbook](../playbooks/se-model.md)

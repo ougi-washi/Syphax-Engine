@@ -17,6 +17,11 @@ prerequisites:
 
 Advanced UI interactions with dynamic layout and widget states.
 
+
+## Learning path
+
+- This example corresponds to [se_ui Playbook](../../playbooks/se-ui.md) Step 3.
+- Next: apply one change from the linked Playbook step and rerun this target.
 ## Controls
 
 - Use startup control list printed by target
@@ -42,6 +47,7 @@ Advanced UI interactions with dynamic layout and widget states.
 
 ## Related API links
 
+- [Playbook: se_ui Playbook](../../playbooks/se-ui.md)
 - [Module guide: se_ui](../../module-guides/se-ui.md)
 - [Default example: ui_basics](../default/ui_basics.md)
 - [API: se_ui.h](../../api-reference/modules/se_ui.md)

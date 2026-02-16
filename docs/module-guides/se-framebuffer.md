@@ -41,6 +41,6 @@ se_framebuffer_create(&size);
 
 ## Related pages
 
-- [Examples index](../examples/index.md)
-- [API module index](../api-reference/modules/index.md)
-- [Glossary terms](../glossary/terms.md)
+- [Deep dive Playbook](../playbooks/se-framebuffer.md)
+- [API module page](../api-reference/modules/se_framebuffer.md)
+- [Example: context_lifecycle](../examples/advanced/context_lifecycle.md)

@@ -46,3 +46,4 @@ Use after setup or after large environment changes.
 - [Install and build](install-and-build.md)
 - [Examples index](../examples/index.md)
 - [Troubleshooting](../troubleshooting/docs-build.md)
+- [Next Playbook](../playbooks/index.md)

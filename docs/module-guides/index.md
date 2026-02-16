@@ -9,6 +9,8 @@ prerequisites:
 
 Each page focuses on one module.
 
+Deep dive progression pages live in [Playbooks](../playbooks/index.md).
+
 ## Module list
 
 - [se_window](se-window.md)
