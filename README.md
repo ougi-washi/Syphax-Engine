@@ -34,6 +34,36 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
 cmake --build build -j
 ```
 
+### Documentation Website
+- Live docs (GitHub Pages): `https://syphax-engine.github.io/syphax-engine/`
+- Docs source root: `docs/`
+- Main config: `mkdocs.yml`
+
+Docs local setup:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r docs/requirements.txt
+```
+
+Docs commands:
+```bash
+./scripts/docs/generate_api_reference.sh
+./scripts/docs/check_api_sync.sh
+./scripts/docs/check_nav_consistency.sh
+./scripts/docs/check_links.sh
+./scripts/docs/check_content_quality.sh
+./scripts/docs/build.sh
+./scripts/docs/serve.sh
+```
+
+Docs troubleshooting:
+```bash
+./scripts/docs/check_nav_consistency.sh
+./scripts/docs/check_links.sh
+```
+See `docs/troubleshooting/docs-build.md` for common failures.
+
 ### Minimal Usage
 ```c
 #include "se_graphics.h"
@@ -76,7 +106,7 @@ int main(void) {
 ### Project Layout
 - `include/`: public headers
 - `src/`: engine modules
-- `examples/`: beginner examples
+- `examples/`: default examples
 - `examples/advanced/`: advanced examples
 - `resources/`: `internal/`, `public/`, `examples/`
 - `lib/`: vendored dependencies

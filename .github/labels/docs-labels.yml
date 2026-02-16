@@ -1,0 +1,7 @@
+labels:
+  - name: docs:bug
+    color: "B60205"
+    description: Documentation bug or broken docs behavior.
+  - name: docs:content
+    color: "1D76DB"
+    description: Documentation content request or improvement.

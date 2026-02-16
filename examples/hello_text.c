@@ -40,7 +40,7 @@ int main(void) {
 		}
 
 		se_render_clear();
-		se_text_render(text, font, "Hello, artist friend!", &s_vec2(-0.30f, 0.16f), &s_vec2(1.0f, 1.0f), 0.03f);
+		se_text_render(text, font, "Ahlan!", &s_vec2(-0.30f, 0.16f), &s_vec2(1.0f, 1.0f), 0.03f);
 		se_text_render(text, font, "Press Space to paint the mood.", &s_vec2(-0.36f, 0.04f), &s_vec2(1.0f, 1.0f), 0.024f);
 		se_text_render(text, font, "Press Esc to close.", &s_vec2(-0.22f, -0.08f), &s_vec2(1.0f, 1.0f), 0.022f);
 

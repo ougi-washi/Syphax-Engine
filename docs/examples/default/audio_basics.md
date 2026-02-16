@@ -1,0 +1,47 @@
+---
+title: audio_basics
+summary: Walkthrough page for audio_basics.
+prerequisites:
+  - Build toolchain and resources available.
+---
+
+# audio_basics
+
+![audio_basics preview](../../assets/img/examples/default/audio_basics.svg)
+
+*Caption: representative preview panel for `audio_basics`.*
+
+## Goal
+
+Play clips and stream looped audio with bus-level volume control.
+
+## Controls
+
+- Space: play chime
+- M: mute or unmute loop
+- Up/Down: master volume
+- Esc: quit
+
+## Build command
+
+```bash
+./build.sh audio_basics
+```
+
+## Run command
+
+```bash
+./bin/audio_basics
+```
+
+## Edits to try
+
+1. Swap to another clip.
+1. Change default loop volume.
+1. Map volume control to alternate keys.
+
+## Related API links
+
+- [Path: add sound](../../path/add-sound.md)
+- [Module guide: se_audio](../../module-guides/se-audio.md)
+- [API: se_audio.h](../../api-reference/modules/se_audio.md)

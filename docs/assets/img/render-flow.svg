@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 320" role="img" aria-label="Render flow steps">
+  <rect width="980" height="320" fill="#f6fbff" />
+  <text x="40" y="45" font-size="28" font-family="sans-serif" fill="#123a4f">Render Flow</text>
+  <g font-family="sans-serif" font-size="18" fill="#102027">
+    <circle cx="120" cy="160" r="62" fill="#d8f0ff" stroke="#0d7ea3" stroke-width="3" />
+    <text x="85" y="166">Input</text>
+
+    <circle cx="300" cy="160" r="62" fill="#eaf7ff" stroke="#0d7ea3" stroke-width="3" />
+    <text x="259" y="166">Simulation</text>
+
+    <circle cx="480" cy="160" r="62" fill="#fdf4df" stroke="#dd8b14" stroke-width="3" />
+    <text x="452" y="166">Scene</text>
+
+    <circle cx="660" cy="160" r="62" fill="#f7efe0" stroke="#dd8b14" stroke-width="3" />
+    <text x="628" y="166">Shading</text>
+
+    <circle cx="840" cy="160" r="62" fill="#dff7ee" stroke="#2f9461" stroke-width="3" />
+    <text x="811" y="166">Present</text>
+  </g>
+  <g stroke="#365264" stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M182 160 H236" />
+    <path d="M362 160 H416" />
+    <path d="M542 160 H596" />
+    <path d="M722 160 H778" />
+  </g>
+</svg>

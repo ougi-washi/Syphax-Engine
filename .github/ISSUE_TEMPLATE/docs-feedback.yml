@@ -1,0 +1,50 @@
+name: Docs Feedback
+description: Report documentation issues or request clarification.
+title: "docs: "
+labels:
+  - docs:content
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the docs issue clearly.
+      placeholder: The page is missing...
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Page path or URL
+      description: Add the docs page path (for example docs/path/load-a-model.md).
+      placeholder: docs/path/load-a-model.md
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      options:
+        - Incorrect content
+        - Missing content
+        - Broken link
+        - Accessibility concern
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested fix
+      description: Explain what should change.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Validation
+      options:
+        - label: I verified the issue on the latest docs site.
+          required: true

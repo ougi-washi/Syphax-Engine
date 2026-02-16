@@ -1,0 +1,63 @@
+name: docs-quality
+
+on:
+  pull_request:
+    paths:
+      - docs/**
+      - include/**
+      - scripts/docs/**
+      - mkdocs.yml
+      - .github/workflows/docs-quality.yml
+  push:
+    branches:
+      - main
+    paths:
+      - docs/**
+      - include/**
+      - scripts/docs/**
+      - mkdocs.yml
+      - .github/workflows/docs-quality.yml
+
+permissions:
+  contents: read
+
+jobs:
+  docs-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r docs/requirements.txt
+
+      - name: Regenerate API reference
+        run: ./scripts/docs/generate_api_reference.sh
+
+      - name: Ensure API docs are in sync
+        run: ./scripts/docs/check_api_sync.sh
+
+      - name: Nav and template checks
+        run: ./scripts/docs/check_nav_consistency.sh
+
+      - name: Link checks
+        run: ./scripts/docs/check_links.sh
+
+      - name: Content quality checks
+        run: ./scripts/docs/check_content_quality.sh
+
+      - name: Strict docs build
+        run: mkdocs build --strict --config-file mkdocs.yml
+
+      - name: Site budget checks
+        run: ./scripts/docs/check_site_size.sh

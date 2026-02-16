@@ -1,0 +1,41 @@
+name: docs-drift-audit
+
+on:
+  schedule:
+    - cron: "0 8 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r docs/requirements.txt
+
+      - name: Verify API docs sync
+        run: ./scripts/docs/check_api_sync.sh
+
+      - name: Check nav and links
+        run: |
+          ./scripts/docs/check_nav_consistency.sh
+          ./scripts/docs/check_links.sh
+          ./scripts/docs/check_content_quality.sh
+
+      - name: Strict docs build
+        run: mkdocs build --strict --config-file mkdocs.yml

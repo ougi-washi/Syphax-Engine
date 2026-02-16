@@ -56,3 +56,5 @@ dkms.conf
 **/build/*
 **/bin/*
 **/.cache/*
+site/
+.venv/

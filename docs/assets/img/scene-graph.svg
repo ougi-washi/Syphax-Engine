@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" role="img" aria-label="Scene graph view">
+  <rect width="980" height="360" fill="#f7fcff" />
+  <text x="40" y="48" font-size="28" font-family="sans-serif" fill="#123a4f">Scene Structure</text>
+  <g font-family="sans-serif" font-size="19" fill="#102027">
+    <rect x="420" y="78" width="150" height="58" rx="12" fill="#d8f0ff" stroke="#0d7ea3" />
+    <text x="470" y="114">Scene</text>
+
+    <rect x="210" y="188" width="150" height="58" rx="12" fill="#eaf7ff" stroke="#0d7ea3" />
+    <text x="241" y="224">Object 2D</text>
+
+    <rect x="420" y="188" width="150" height="58" rx="12" fill="#fdf4df" stroke="#dd8b14" />
+    <text x="451" y="224">Object 3D</text>
+
+    <rect x="630" y="188" width="150" height="58" rx="12" fill="#dff7ee" stroke="#2f9461" />
+    <text x="654" y="224">UI Tree</text>
+
+    <rect x="120" y="282" width="120" height="48" rx="10" fill="#ffffff" stroke="#6b8ca0" />
+    <text x="148" y="312">Instance</text>
+    <rect x="270" y="282" width="120" height="48" rx="10" fill="#ffffff" stroke="#6b8ca0" />
+    <text x="298" y="312">Shader</text>
+
+    <rect x="390" y="282" width="120" height="48" rx="10" fill="#ffffff" stroke="#6b8ca0" />
+    <text x="416" y="312">Model</text>
+    <rect x="540" y="282" width="120" height="48" rx="10" fill="#ffffff" stroke="#6b8ca0" />
+    <text x="569" y="312">Camera</text>
+
+    <rect x="690" y="282" width="120" height="48" rx="10" fill="#ffffff" stroke="#6b8ca0" />
+    <text x="719" y="312">Widget</text>
+  </g>
+  <g stroke="#365264" stroke-width="3" fill="none">
+    <path d="M495 136 V182" />
+    <path d="M495 182 H285" />
+    <path d="M495 182 H705" />
+
+    <path d="M285 246 V282" />
+    <path d="M285 282 H180" />
+    <path d="M285 282 H330" />
+
+    <path d="M495 246 V282" />
+    <path d="M495 282 H450" />
+    <path d="M495 282 H600" />
+
+    <path d="M705 246 V282" />
+    <path d="M705 282 H750" />
+  </g>
+</svg>

@@ -1,0 +1,2 @@
+# file|max_lines|reason
+# Keep this list small. At most 2 beginner files may use a limit >150.

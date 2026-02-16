@@ -1,0 +1,212 @@
+site_name: Syphax Engine Docs
+site_description: Clear, task-focused documentation for the Syphax Engine framework.
+site_url: https://syphax-engine.github.io/syphax-engine/
+repo_url: https://github.com/syphax-engine/syphax-engine
+repo_name: syphax-engine/syphax-engine
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+strict: true
+
+theme:
+  name: material
+  language: en
+  logo: assets/img/syphax-mark.svg
+  favicon: assets/img/syphax-mark.svg
+  font:
+    text: Space Grotesk
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: lime
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - assets/css/custom.css
+
+extra_javascript:
+  - assets/js/site.js
+
+extra:
+  homepage: https://github.com/syphax-engine/syphax-engine
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/syphax-engine/syphax-engine
+      name: GitHub Repository
+    - icon: material/file-document-edit-outline
+      link: contributing-docs/
+      name: Contributing Docs
+
+nav:
+  - Home: index.md
+  - Start Here:
+      - start-here/index.md
+      - What Is Syphax: start-here/what-is-syphax.md
+      - Install And Build: start-here/install-and-build.md
+      - Project Layout: start-here/project-layout.md
+      - First Window: start-here/first-window.md
+      - Frame Loop Basics: start-here/frame-loop-basics.md
+      - Error Handling: start-here/error-handling.md
+      - Resource Paths: start-here/resource-paths.md
+      - First Run Checklist: start-here/first-run-checklist.md
+  - Path:
+      - path/index.md
+      - Colors And Clear: path/colors-and-clear.md
+      - Draw Your First Text: path/draw-your-first-text.md
+      - Basic Shapes And Scene2D: path/basic-shapes-and-scene2d.md
+      - Motion With Time: path/motion-with-time.md
+      - Mouse And Keyboard Input: path/mouse-and-keyboard-input.md
+      - Buttons And UI Basics: path/buttons-and-ui-basics.md
+      - Add Sound: path/add-sound.md
+      - Your First 3D Object: path/your-first-3d-object.md
+      - Camera Orbit And Pan: path/camera-orbit-and-pan.md
+      - Load A Model: path/load-a-model.md
+      - Particles And VFX: path/particles-and-vfx.md
+      - Physics As Motion: path/physics-as-motion.md
+      - Debug Overlay And Traces: path/debug-overlay-and-traces.md
+      - Export And Share: path/export-and-share.md
+  - Visual Building Blocks:
+      - visual-building-blocks/index.md
+  - Interaction:
+      - interaction/index.md
+  - 3D And Camera:
+      - three-d-and-camera/index.md
+  - Audio:
+      - audio/index.md
+  - UI:
+      - ui/index.md
+  - VFX:
+      - vfx/index.md
+  - Physics:
+      - physics/index.md
+  - Simulation And Advanced:
+      - simulation-and-advanced/index.md
+  - Debug And Performance:
+      - debug-and-performance/index.md
+  - Examples:
+      - examples/index.md
+      - Default:
+          - hello_text: examples/default/hello_text.md
+          - input_actions: examples/default/input_actions.md
+          - scene2d_click: examples/default/scene2d_click.md
+          - scene2d_instancing: examples/default/scene2d_instancing.md
+          - scene3d_orbit: examples/default/scene3d_orbit.md
+          - physics2d_playground: examples/default/physics2d_playground.md
+          - physics3d_playground: examples/default/physics3d_playground.md
+          - ui_basics: examples/default/ui_basics.md
+          - audio_basics: examples/default/audio_basics.md
+          - model_viewer: examples/default/model_viewer.md
+      - Advanced:
+          - array_handles: examples/advanced/array_handles.md
+          - context_lifecycle: examples/advanced/context_lifecycle.md
+          - debug_tools: examples/advanced/debug_tools.md
+          - gltf_roundtrip: examples/advanced/gltf_roundtrip.md
+          - multi_window: examples/advanced/multi_window.md
+          - navigation_grid: examples/advanced/navigation_grid.md
+          - rts_integration: examples/advanced/rts_integration.md
+          - sdf_playground: examples/advanced/sdf_playground.md
+          - simulation_intro: examples/advanced/simulation_intro.md
+          - simulation_advanced: examples/advanced/simulation_advanced.md
+          - ui_showcase: examples/advanced/ui_showcase.md
+          - vfx_emitters: examples/advanced/vfx_emitters.md
+  - Module Guides:
+      - module-guides/index.md
+      - se_window: module-guides/se-window.md
+      - se_input: module-guides/se-input.md
+      - se_camera: module-guides/se-camera.md
+      - se_scene: module-guides/se-scene.md
+      - se_ui: module-guides/se-ui.md
+      - se_audio: module-guides/se-audio.md
+      - se_vfx: module-guides/se-vfx.md
+      - se_physics: module-guides/se-physics.md
+      - se_navigation: module-guides/se-navigation.md
+      - se_simulation: module-guides/se-simulation.md
+      - se_debug: module-guides/se-debug.md
+      - se_graphics: module-guides/se-graphics.md
+      - se_model: module-guides/se-model.md
+      - se_shader: module-guides/se-shader.md
+      - se_texture: module-guides/se-texture.md
+      - se_text: module-guides/se-text.md
+      - se_render_buffer: module-guides/se-render-buffer.md
+      - se_framebuffer: module-guides/se-framebuffer.md
+      - se_backend: module-guides/se-backend.md
+      - se_curve: module-guides/se-curve.md
+      - loader/se_loader: module-guides/loader-se-loader.md
+      - loader/se_gltf: module-guides/loader-se-gltf.md
+  - API Reference:
+      - api-reference/index.md
+      - Module Index: api-reference/modules/index.md
+      - se_audio.h: api-reference/modules/se_audio.md
+      - se_backend.h: api-reference/modules/se_backend.md
+      - se_camera.h: api-reference/modules/se_camera.md
+      - se_curve.h: api-reference/modules/se_curve.md
+      - se_debug.h: api-reference/modules/se_debug.md
+      - se_defines.h: api-reference/modules/se_defines.md
+      - se_ext.h: api-reference/modules/se_ext.md
+      - se_framebuffer.h: api-reference/modules/se_framebuffer.md
+      - se_graphics.h: api-reference/modules/se_graphics.md
+      - se_input.h: api-reference/modules/se_input.md
+      - se_math.h: api-reference/modules/se_math.md
+      - se_model.h: api-reference/modules/se_model.md
+      - se_navigation.h: api-reference/modules/se_navigation.md
+      - se_physics.h: api-reference/modules/se_physics.md
+      - se_quad.h: api-reference/modules/se_quad.md
+      - se_render_buffer.h: api-reference/modules/se_render_buffer.md
+      - se_scene.h: api-reference/modules/se_scene.md
+      - se_sdf.h: api-reference/modules/se_sdf.md
+      - se_shader.h: api-reference/modules/se_shader.md
+      - se_simulation.h: api-reference/modules/se_simulation.md
+      - se_text.h: api-reference/modules/se_text.md
+      - se_texture.h: api-reference/modules/se_texture.md
+      - se_ui.h: api-reference/modules/se_ui.md
+      - se_vfx.h: api-reference/modules/se_vfx.md
+      - se_window.h: api-reference/modules/se_window.md
+      - loader/se_gltf.h: api-reference/modules/loader_se_gltf.md
+      - loader/se_loader.h: api-reference/modules/loader_se_loader.md
+  - Glossary:
+      - glossary/index.md
+      - Terms: glossary/terms.md
+  - Contributing Docs: contributing-docs.md
+  - Troubleshooting:
+      - Build And Links: troubleshooting/docs-build.md

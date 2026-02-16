@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Docs Contribution Guide
+    url: https://github.com/syphax-engine/syphax-engine/blob/main/docs/contributing-docs.md
+    about: Follow docs process and quality gates.
