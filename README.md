@@ -36,18 +36,6 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
 cmake --build build -j
 ```
 
-### Docs Checks
-```bash
-./scripts/docs/generate_api_reference.sh
-./scripts/docs/check_nav_consistency.sh
-./scripts/docs/check_links.sh
-./scripts/docs/check_content_quality.sh
-./scripts/docs/check_playbook_coverage.sh
-./scripts/docs/verify_snippets.sh
-mkdocs build --strict --config-file mkdocs.yml
-./scripts/docs/check_site_size.sh
-```
-
 ### Minimal Usage
 ```c
 #include "se_graphics.h"
@@ -95,6 +83,18 @@ int main(void) {
 - `resources/`: `internal/`, `public/`, `examples/`
 - `lib/`: vendored dependencies
 - `build/` and `bin/`: generated artifacts
+
+### Docs Checks
+```bash
+./scripts/docs/generate_api_reference.sh
+./scripts/docs/check_nav_consistency.sh
+./scripts/docs/check_links.sh
+./scripts/docs/check_content_quality.sh
+./scripts/docs/check_playbook_coverage.sh
+./scripts/docs/verify_snippets.sh
+mkdocs build --strict --config-file mkdocs.yml
+./scripts/docs/check_site_size.sh
+```
 
 ### License
 MIT
