@@ -24,6 +24,8 @@ typedef s_array(b8, se_instance_actives);
 
 typedef b8 (*se_scene_pick_filter_2d)(se_object_2d_handle object, void* user_data);
 typedef b8 (*se_scene_pick_filter_3d)(se_object_3d_handle object, void* user_data);
+typedef s_handle se_scene_3d_custom_render_handle;
+typedef void (*se_scene_3d_custom_render_callback)(se_scene_3d_handle scene, void* user_data);
 
 typedef enum {
 	SE_SCENE_DEBUG_MARKER_LINE = 0,
@@ -106,6 +108,12 @@ typedef s_array(se_object_3d, se_objects_3d);
 typedef se_object_3d_handle se_object_3d_ptr;
 typedef s_array(se_object_3d_handle, se_objects_3d_ptr);
 
+typedef struct {
+	se_scene_3d_custom_render_callback callback;
+	void* user_data;
+} se_scene_3d_custom_render_entry;
+typedef s_array(se_scene_3d_custom_render_entry, se_scene_3d_custom_render_entries);
+
 typedef struct se_scene_2d {
 	se_objects_2d_ptr objects;
 	se_framebuffer_handle output;
@@ -122,6 +130,7 @@ typedef struct se_scene_3d {
 	se_shader_handle output_shader;
 	se_framebuffer_handle output;
 	se_scene_debug_markers debug_markers;
+	se_scene_3d_custom_render_entries custom_renders;
 	s_mat4 last_vp;
 	b8 enable_culling : 1;
 	b8 has_last_vp : 1;
@@ -207,6 +216,8 @@ extern void se_scene_3d_debug_sphere(const se_scene_3d_handle scene, const s_vec
 extern void se_scene_3d_debug_text(const se_scene_3d_handle scene, const s_vec3* position, const c8* text, const s_vec4* color);
 extern b8 se_scene_3d_get_debug_markers(const se_scene_3d_handle scene, const se_scene_debug_marker** out_markers, sz* out_count);
 extern void se_scene_3d_clear_debug_markers(const se_scene_3d_handle scene);
+extern se_scene_3d_custom_render_handle se_scene_3d_register_custom_render(const se_scene_3d_handle scene, se_scene_3d_custom_render_callback callback, void* user_data);
+extern b8 se_scene_3d_unregister_custom_render(const se_scene_3d_handle scene, const se_scene_3d_custom_render_handle callback_handle);
 
 // 3D objects functions
 extern se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat4 *transform, const sz max_instances_count);

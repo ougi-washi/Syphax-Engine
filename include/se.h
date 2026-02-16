@@ -33,9 +33,15 @@ typedef s_handle se_object_2d_handle;
 typedef s_handle se_scene_2d_handle;
 typedef s_handle se_object_3d_handle;
 typedef s_handle se_scene_3d_handle;
+typedef s_handle se_ui_handle;
+typedef s_handle se_ui_widget_handle;
 typedef s_handle se_ui_element_handle;
 typedef s_handle se_ui_text_handle;
 typedef s_handle se_simulation_handle;
+typedef s_handle se_vfx_2d_handle;
+typedef s_handle se_vfx_3d_handle;
+typedef s_handle se_vfx_emitter_2d_handle;
+typedef s_handle se_vfx_emitter_3d_handle;
 
 struct se_simulation;
 
@@ -53,8 +59,11 @@ typedef struct se_context {
 	s_array(struct se_scene_2d, scenes_2d);
 	s_array(struct se_object_3d, objects_3d);
 	s_array(struct se_scene_3d, scenes_3d);
-	s_array(struct se_ui_element, ui_elements);
-	s_array(struct se_ui_text, ui_texts);
+	s_array(struct se_vfx_2d, vfx_2ds);
+	s_array(struct se_vfx_3d, vfx_3ds);
+	s_array(struct se_ui_root, ui_roots);
+	s_array(struct se_ui_widget, ui_elements);
+	s_array(struct se_ui_text_cache, ui_texts);
 	s_array(struct se_simulation, simulations);
 	se_text_handle *ui_text_handle;
 } se_context;
@@ -68,6 +77,8 @@ typedef struct {
 	u32 textures;
 	u32 fonts;
 	u32 windows;
+	u32 vfx_2ds;
+	u32 vfx_3ds;
 } se_context_destroy_report;
 
 extern se_context *se_global_context;

@@ -127,6 +127,22 @@ void se_framebuffer_get_size(const se_framebuffer_handle framebuffer, s_vec2 *ou
 	*out_size = framebuffer_ptr->size;
 }
 
+b8 se_framebuffer_get_texture_id(const se_framebuffer_handle framebuffer, u32 *out_texture) {
+	se_context *ctx = se_current_context();
+	if (!ctx || framebuffer == S_HANDLE_NULL || !out_texture) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_framebuffer *framebuffer_ptr = se_framebuffer_from_handle(ctx, framebuffer);
+	if (!framebuffer_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	*out_texture = framebuffer_ptr->texture;
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 void se_framebuffer_bind(const se_framebuffer_handle framebuffer) {
 	se_context *ctx = se_current_context();
 	se_framebuffer *framebuffer_ptr = se_framebuffer_from_handle(ctx, framebuffer);

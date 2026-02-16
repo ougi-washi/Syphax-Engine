@@ -182,6 +182,34 @@ static void se_scene_debug_markers_clear_keep_capacity(se_scene_debug_markers* m
 	}
 }
 
+static void se_scene_3d_invoke_custom_renders(const se_scene_3d_handle scene, se_scene_3d* scene_ptr) {
+	if (!scene_ptr || s_array_get_size(&scene_ptr->custom_renders) == 0) {
+		return;
+	}
+
+	typedef s_array(se_scene_3d_custom_render_handle, se_scene_3d_custom_render_handles);
+	se_scene_3d_custom_render_handles callback_handles = {0};
+	s_array_init(&callback_handles);
+	s_array_reserve(&callback_handles, s_array_get_size(&scene_ptr->custom_renders));
+	for (sz i = 0; i < s_array_get_size(&scene_ptr->custom_renders); ++i) {
+		const se_scene_3d_custom_render_handle callback_handle = s_array_handle(&scene_ptr->custom_renders, (u32)i);
+		s_array_add(&callback_handles, callback_handle);
+	}
+
+	for (sz i = 0; i < s_array_get_size(&callback_handles); ++i) {
+		se_scene_3d_custom_render_handle* callback_handle = s_array_get(&callback_handles, s_array_handle(&callback_handles, (u32)i));
+		if (!callback_handle) {
+			continue;
+		}
+		se_scene_3d_custom_render_entry* entry = s_array_get(&scene_ptr->custom_renders, *callback_handle);
+		if (!entry || !entry->callback) {
+			continue;
+		}
+		entry->callback(scene, entry->user_data);
+	}
+	s_array_clear(&callback_handles);
+}
+
 static sz se_instances_active_count(const se_instance_actives* actives) {
 	if (!actives) {
 		return 0;
@@ -420,13 +448,20 @@ void se_object_2d_destroy(const se_object_2d_handle object) {
 	s_assertf(ctx, "se_object_2d_destroy :: ctx is null");
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
 	s_assertf(object_ptr, "se_object_2d_destroy :: object is null");
-	if (!object_ptr->is_custom) {
-		se_quad_destroy(&object_ptr->quad);
-		object_ptr->quad.vao = 0;
-		object_ptr->quad.vbo = 0;
-		object_ptr->quad.ebo = 0;
-		object_ptr->shader = S_HANDLE_NULL;
+	if (object_ptr->is_custom) {
+		object_ptr->custom.render = NULL;
+		object_ptr->custom.data_size = 0;
+		object_ptr->is_visible = false;
+		s_array_remove(&ctx->objects_2d, object);
+		return;
 	}
+
+	se_quad_destroy(&object_ptr->quad);
+	object_ptr->quad.vao = 0;
+	object_ptr->quad.vbo = 0;
+	object_ptr->quad.ebo = 0;
+	object_ptr->shader = S_HANDLE_NULL;
+
 	s_array_clear(&object_ptr->render_transforms);
 	s_array_clear(&object_ptr->render_buffers);
 	s_array_clear(&object_ptr->instances.ids);
@@ -436,10 +471,6 @@ void se_object_2d_destroy(const se_object_2d_handle object) {
 	s_array_clear(&object_ptr->instances.free_indices);
 	s_array_clear(&object_ptr->instances.metadata);
 	object_ptr->is_visible = false;
-	if (object_ptr->is_custom) {
-		object_ptr->custom.render = NULL;
-		object_ptr->custom.data_size = 0;
-	}
 
 	s_array_remove(&ctx->objects_2d, object);
 }
@@ -1143,8 +1174,10 @@ se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 object_count
 	s_array_init(&new_scene->objects);
 	s_array_init(&new_scene->post_process);
 	s_array_init(&new_scene->debug_markers);
+	s_array_init(&new_scene->custom_renders);
 	s_array_reserve(&new_scene->objects, object_count);
 	s_array_reserve(&new_scene->post_process, object_count);
+	s_array_reserve(&new_scene->custom_renders, 8);
 	new_scene->output_shader = S_HANDLE_NULL;
 	se_camera_handle camera = se_camera_create();
 	if (camera == S_HANDLE_NULL) {
@@ -1233,6 +1266,7 @@ void se_scene_3d_destroy(const se_scene_3d_handle scene) {
 	}
 	s_array_clear(&scene_ptr->post_process);
 	s_array_clear(&scene_ptr->debug_markers);
+	s_array_clear(&scene_ptr->custom_renders);
 	s_array_clear(&scene_ptr->objects);
 	s_array_remove(&ctx->scenes_3d, scene);
 }
@@ -1431,6 +1465,8 @@ void se_scene_3d_render_to_buffer(const se_scene_3d_handle scene) {
 			glDrawElementsInstanced(GL_TRIANGLES, mesh->gpu.index_count, GL_UNSIGNED_INT, 0, (GLsizei)instance_count);
 		}
 	}
+
+	se_scene_3d_invoke_custom_renders(scene, scene_ptr);
 	se_framebuffer_unbind(scene_ptr->output);
 	se_debug_trace_end("scene3d_render");
 }
@@ -1686,6 +1722,59 @@ void se_scene_3d_clear_debug_markers(const se_scene_3d_handle scene) {
 	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
 	s_assertf(scene_ptr, "se_scene_3d_clear_debug_markers :: scene is null");
 	se_scene_debug_markers_clear_keep_capacity(&scene_ptr->debug_markers);
+}
+
+se_scene_3d_custom_render_handle se_scene_3d_register_custom_render(const se_scene_3d_handle scene, se_scene_3d_custom_render_callback callback, void* user_data) {
+	if (!callback || scene == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	se_context *ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
+	if (!scene_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return S_HANDLE_NULL;
+	}
+	se_scene_3d_custom_render_handle callback_handle = s_array_increment(&scene_ptr->custom_renders);
+	se_scene_3d_custom_render_entry* new_entry = s_array_get(&scene_ptr->custom_renders, callback_handle);
+	if (!new_entry) {
+		s_array_remove(&scene_ptr->custom_renders, callback_handle);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return S_HANDLE_NULL;
+	}
+	memset(new_entry, 0, sizeof(*new_entry));
+	new_entry->callback = callback;
+	new_entry->user_data = user_data;
+	se_set_last_error(SE_RESULT_OK);
+	return callback_handle;
+}
+
+b8 se_scene_3d_unregister_custom_render(const se_scene_3d_handle scene, const se_scene_3d_custom_render_handle callback_handle) {
+	if (scene == S_HANDLE_NULL || callback_handle == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_context *ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
+	if (!scene_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	if (!s_array_get(&scene_ptr->custom_renders, callback_handle)) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	s_array_remove(&scene_ptr->custom_renders, callback_handle);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
 }
 
 se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat4 *transform, const sz max_instances_count) {

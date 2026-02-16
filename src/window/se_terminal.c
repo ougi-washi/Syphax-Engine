@@ -1071,7 +1071,9 @@ void se_window_get_mouse_position_normalized(const se_window_handle window, s_ve
 	if (!window_ptr || !out_mouse_position) {
 		return;
 	}
-	*out_mouse_position = s_vec2((window_ptr->mouse_x / window_ptr->width), (window_ptr->mouse_y / window_ptr->height));
+	if (!se_window_pixel_to_normalized(window, (f32)window_ptr->mouse_x, (f32)window_ptr->mouse_y, out_mouse_position)) {
+		*out_mouse_position = s_vec2(0.0f, 0.0f);
+	}
 }
 
 void se_window_get_mouse_delta(const se_window_handle window, s_vec2* out_mouse_delta) {

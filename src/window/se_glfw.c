@@ -204,6 +204,9 @@ static b8 se_window_context_has_live_resources(const se_context* context) {
 		s_array_get_size(&context->scenes_2d) > 0 ||
 		s_array_get_size(&context->objects_3d) > 0 ||
 		s_array_get_size(&context->scenes_3d) > 0 ||
+		s_array_get_size(&context->vfx_2ds) > 0 ||
+		s_array_get_size(&context->vfx_3ds) > 0 ||
+		s_array_get_size(&context->ui_roots) > 0 ||
 		s_array_get_size(&context->ui_elements) > 0 ||
 		s_array_get_size(&context->ui_texts) > 0;
 }
@@ -1756,9 +1759,9 @@ void se_window_get_mouse_position_normalized(const se_window_handle window, s_ve
 	se_window* window_ptr = se_window_from_handle(context, window);
 	s_assertf(window_ptr, "se_window_get_mouse_position_normalized :: window is null");
 	s_assertf(out_mouse_position, "se_window_get_mouse_position_normalized :: out_mouse_position is null");
-	*out_mouse_position = s_vec2((window_ptr->mouse_x / window_ptr->width) - .5, window_ptr->mouse_y / window_ptr->height - .5);
-	out_mouse_position->x *= 2.;
-	out_mouse_position->y *= 2.;
+	if (!se_window_pixel_to_normalized(window, (f32)window_ptr->mouse_x, (f32)window_ptr->mouse_y, out_mouse_position)) {
+		*out_mouse_position = s_vec2(0.0f, 0.0f);
+	}
 }
 
 void se_window_get_mouse_delta(const se_window_handle window, s_vec2* out_mouse_delta) {

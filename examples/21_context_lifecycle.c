@@ -7,6 +7,7 @@
 #include "se_render_buffer.h"
 #include "se_shader.h"
 #include "se_texture.h"
+#include "se_vfx.h"
 
 #include <stdio.h>
 
@@ -41,6 +42,8 @@ static i32 se_expect_report(
 	if (expected->textures != actual->textures) return 1;
 	if (expected->fonts != actual->fonts) return 1;
 	if (expected->windows != actual->windows) return 1;
+	if (expected->vfx_2ds != actual->vfx_2ds) return 1;
+	if (expected->vfx_3ds != actual->vfx_3ds) return 1;
 	return 0;
 }
 
@@ -132,6 +135,13 @@ i32 main(void) {
 		return 1;
 	}
 
+	se_vfx_2d_handle vfx_2d = se_vfx_2d_create(NULL);
+	se_vfx_3d_handle vfx_3d = se_vfx_3d_create(NULL);
+	if (se_expect_handle(vfx_2d, "vfx_2d") != 0 || se_expect_handle(vfx_3d, "vfx_3d") != 0) {
+		se_context_destroy(context);
+		return 1;
+	}
+
 	// Snapshot counts so the destroy report can be validated after teardown.
 	se_context_destroy_report expected = {0};
 	expected.models = (u32)s_array_get_size(&context->models);
@@ -142,6 +152,8 @@ i32 main(void) {
 	expected.textures = (u32)s_array_get_size(&context->textures);
 	expected.fonts = (u32)s_array_get_size(&context->fonts);
 	expected.windows = (u32)s_array_get_size(&context->windows);
+	expected.vfx_2ds = (u32)s_array_get_size(&context->vfx_2ds);
+	expected.vfx_3ds = (u32)s_array_get_size(&context->vfx_3ds);
 
 	// Destroy the context and compare reported cleanup totals with the snapshot.
 	se_context_destroy(context);
@@ -154,7 +166,7 @@ i32 main(void) {
 	if (se_expect_report(&expected, &actual) != 0) {
 		fprintf(
 			stderr,
-			"21_context_lifecycle :: destroy report mismatch expected(m=%u c=%u f=%u rb=%u s=%u t=%u fn=%u w=%u) actual(m=%u c=%u f=%u rb=%u s=%u t=%u fn=%u w=%u)\n",
+			"21_context_lifecycle :: destroy report mismatch expected(m=%u c=%u f=%u rb=%u s=%u t=%u fn=%u w=%u v2=%u v3=%u) actual(m=%u c=%u f=%u rb=%u s=%u t=%u fn=%u w=%u v2=%u v3=%u)\n",
 			expected.models,
 			expected.cameras,
 			expected.framebuffers,
@@ -163,6 +175,8 @@ i32 main(void) {
 			expected.textures,
 			expected.fonts,
 			expected.windows,
+			expected.vfx_2ds,
+			expected.vfx_3ds,
 			actual.models,
 			actual.cameras,
 			actual.framebuffers,
@@ -170,7 +184,9 @@ i32 main(void) {
 			actual.shaders,
 			actual.textures,
 			actual.fonts,
-			actual.windows);
+			actual.windows,
+			actual.vfx_2ds,
+			actual.vfx_3ds);
 		return 1;
 	}
 

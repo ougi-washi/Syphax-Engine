@@ -21,6 +21,7 @@ extern se_framebuffer_handle se_framebuffer_create(const s_vec2 *size);
 extern void se_framebuffer_destroy(const se_framebuffer_handle framebuffer);
 extern void se_framebuffer_set_size(const se_framebuffer_handle framebuffer, const s_vec2 *size);
 extern void se_framebuffer_get_size(const se_framebuffer_handle framebuffer, s_vec2 *out_size);
+extern b8 se_framebuffer_get_texture_id(const se_framebuffer_handle framebuffer, u32 *out_texture);
 extern void se_framebuffer_bind(const se_framebuffer_handle framebuffer);
 extern void se_framebuffer_unbind(const se_framebuffer_handle framebuffer);
 extern void se_framebuffer_cleanup(const se_framebuffer_handle framebuffer);

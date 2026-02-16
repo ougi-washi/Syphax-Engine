@@ -13,6 +13,7 @@
 #include "se_text.h"
 #include "se_texture.h"
 #include "se_ui.h"
+#include "se_vfx.h"
 #include "se_window.h"
 
 #include <stdlib.h>
@@ -31,6 +32,9 @@
 #define SE_CONTEXT_DEFAULT_SCENES_2D 512
 #define SE_CONTEXT_DEFAULT_OBJECTS_3D 4096
 #define SE_CONTEXT_DEFAULT_SCENES_3D 256
+#define SE_CONTEXT_DEFAULT_VFX_2DS 128
+#define SE_CONTEXT_DEFAULT_VFX_3DS 128
+#define SE_CONTEXT_DEFAULT_UI_ROOTS 64
 #define SE_CONTEXT_DEFAULT_UI_ELEMENTS 512
 #define SE_CONTEXT_DEFAULT_UI_TEXTS 2048
 
@@ -49,28 +53,9 @@ b8 se_context_get_last_destroy_report(se_context_destroy_report *out_report) {
 }
 
 static void se_context_destroy_ui_storage(se_context *context) {
-	for (sz i = 0; i < s_array_get_size(&context->ui_elements); ++i) {
-		se_ui_element *ui_element = s_array_get(&context->ui_elements, s_array_handle(&context->ui_elements, (u32)i));
-		if (ui_element == NULL) {
-			continue;
-		}
-		s_array_clear(&ui_element->children);
-		ui_element->parent = S_HANDLE_NULL;
-		ui_element->scene_2d = S_HANDLE_NULL;
-		ui_element->text = S_HANDLE_NULL;
-		memset(ui_element, 0, sizeof(*ui_element));
-	}
+	se_ui_destroy_all();
+	s_array_clear(&context->ui_roots);
 	s_array_clear(&context->ui_elements);
-
-	for (sz i = 0; i < s_array_get_size(&context->ui_texts); ++i) {
-		se_ui_text *ui_text = s_array_get(&context->ui_texts, s_array_handle(&context->ui_texts, (u32)i));
-		if (ui_text == NULL) {
-			continue;
-		}
-		s_array_clear(&ui_text->characters);
-		s_array_clear(&ui_text->font_path);
-		memset(ui_text, 0, sizeof(*ui_text));
-	}
 	s_array_clear(&context->ui_texts);
 }
 
@@ -116,6 +101,14 @@ static void se_context_log_leaks(se_context *context) {
 			"se_context_log_leaks :: context teardown with simulations alive (%zu)",
 			s_array_get_size(&context->simulations));
 	}
+	if (s_array_get_size(&context->vfx_2ds) > 0 || s_array_get_size(&context->vfx_3ds) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+			"se_context_log_leaks :: context teardown with vfx systems alive (2d=%zu, 3d=%zu)",
+			s_array_get_size(&context->vfx_2ds),
+			s_array_get_size(&context->vfx_3ds));
+	}
 }
 
 se_context *se_context_create(void) {
@@ -140,6 +133,9 @@ se_context *se_context_create(void) {
 	s_array_init(&context->scenes_2d);
 	s_array_init(&context->objects_3d);
 	s_array_init(&context->scenes_3d);
+	s_array_init(&context->vfx_2ds);
+	s_array_init(&context->vfx_3ds);
+	s_array_init(&context->ui_roots);
 	s_array_init(&context->ui_elements);
 	s_array_init(&context->ui_texts);
 	s_array_init(&context->simulations);
@@ -165,6 +161,18 @@ void se_context_destroy(se_context *context) {
 	if (context->ui_text_handle) {
 		se_text_handle_destroy(context->ui_text_handle);
 		context->ui_text_handle = NULL;
+	}
+
+	while (s_array_get_size(&context->vfx_2ds) > 0) {
+		se_vfx_2d_handle vfx_handle = s_array_handle(&context->vfx_2ds, (u32)(s_array_get_size(&context->vfx_2ds) - 1));
+		se_vfx_2d_destroy(vfx_handle);
+		se_last_destroy_report.vfx_2ds++;
+	}
+
+	while (s_array_get_size(&context->vfx_3ds) > 0) {
+		se_vfx_3d_handle vfx_handle = s_array_handle(&context->vfx_3ds, (u32)(s_array_get_size(&context->vfx_3ds) - 1));
+		se_vfx_3d_destroy(vfx_handle);
+		se_last_destroy_report.vfx_3ds++;
 	}
 
 	while (s_array_get_size(&context->scenes_2d) > 0) {
