@@ -130,6 +130,7 @@ static b8 g_ui_debug_overlay_enabled = false;
 static void se_ui_window_text_bridge(se_window_handle window, const c8* utf8_text, void* data);
 static se_ui_root* se_ui_root_from_handle(se_context* ctx, const se_ui_handle ui);
 static se_ui_widget* se_ui_widget_from_handle(se_context* ctx, const se_ui_widget_handle widget);
+static b8 se_ui_parent_context(const se_ui_widget_handle parent, se_ui_handle* out_ui, se_ui_root** out_root);
 static void se_ui_mark_layout_dirty_internal(se_ui_root* root);
 static void se_ui_mark_visual_dirty_internal(se_ui_root* root);
 static void se_ui_mark_text_dirty_internal(se_ui_root* root);
@@ -166,6 +167,24 @@ static se_ui_widget* se_ui_widget_from_handle(se_context* ctx, const se_ui_widge
 		return NULL;
 	}
 	return s_array_get(&ctx->ui_elements, widget);
+}
+
+static b8 se_ui_parent_context(const se_ui_widget_handle parent, se_ui_handle* out_ui, se_ui_root** out_root) {
+	se_context* ctx = se_current_context();
+	if (!ctx || parent == S_HANDLE_NULL || !out_ui || !out_root) {
+		return false;
+	}
+	se_ui_widget* parent_widget = se_ui_widget_from_handle(ctx, parent);
+	if (!parent_widget) {
+		return false;
+	}
+	se_ui_root* root = se_ui_root_from_handle(ctx, parent_widget->ui);
+	if (!root) {
+		return false;
+	}
+	*out_ui = parent_widget->ui;
+	*out_root = root;
+	return true;
 }
 
 static f32 se_ui_clamp01(const f32 value) {
@@ -713,20 +732,34 @@ static b8 se_ui_layout_equal(const se_ui_layout* a, const se_ui_layout* b) {
 		a->clip_children == b->clip_children;
 }
 
+static void* se_ui_callback_data_or_default(void* specific, void* fallback) {
+	return specific ? specific : fallback;
+}
+
 static b8 se_ui_callbacks_equal(const se_ui_callbacks* a, const se_ui_callbacks* b) {
 	if (!a || !b) {
 		return false;
 	}
 	return a->on_hover_start == b->on_hover_start &&
+		a->on_hover_start_data == b->on_hover_start_data &&
 		a->on_hover_end == b->on_hover_end &&
+		a->on_hover_end_data == b->on_hover_end_data &&
 		a->on_focus == b->on_focus &&
+		a->on_focus_data == b->on_focus_data &&
 		a->on_blur == b->on_blur &&
+		a->on_blur_data == b->on_blur_data &&
 		a->on_press == b->on_press &&
+		a->on_press_data == b->on_press_data &&
 		a->on_release == b->on_release &&
+		a->on_release_data == b->on_release_data &&
 		a->on_click == b->on_click &&
+		a->on_click_data == b->on_click_data &&
 		a->on_change == b->on_change &&
+		a->on_change_data == b->on_change_data &&
 		a->on_submit == b->on_submit &&
+		a->on_submit_data == b->on_submit_data &&
 		a->on_scroll == b->on_scroll &&
+		a->on_scroll_data == b->on_scroll_data &&
 		a->user_data == b->user_data;
 }
 
@@ -755,6 +788,34 @@ static b8 se_ui_callbacks_supported_for_type(const se_ui_widget_type type, const
 			callbacks->on_scroll == NULL;
 	}
 	return false;
+}
+
+static void se_ui_callbacks_filter_for_type(const se_ui_widget_type type, se_ui_callbacks* callbacks) {
+	if (!callbacks) {
+		return;
+	}
+	if (type == SE_UI_WIDGET_TEXTBOX) {
+		callbacks->on_scroll = NULL;
+		callbacks->on_scroll_data = NULL;
+		return;
+	}
+	if (type == SE_UI_WIDGET_SCROLLBOX) {
+		callbacks->on_submit = NULL;
+		callbacks->on_submit_data = NULL;
+		return;
+	}
+	if (type == SE_UI_WIDGET_BUTTON || type == SE_UI_WIDGET_PANEL || type == SE_UI_WIDGET_TEXT) {
+		callbacks->on_focus = NULL;
+		callbacks->on_focus_data = NULL;
+		callbacks->on_blur = NULL;
+		callbacks->on_blur_data = NULL;
+		callbacks->on_change = NULL;
+		callbacks->on_change_data = NULL;
+		callbacks->on_submit = NULL;
+		callbacks->on_submit_data = NULL;
+		callbacks->on_scroll = NULL;
+		callbacks->on_scroll_data = NULL;
+	}
 }
 
 typedef enum {
@@ -1723,7 +1784,7 @@ static void se_ui_fire_hover_start(se_ui_root* root, const se_ui_widget_handle w
 			.widget = widget_handle,
 			.pointer_ndc = point_ndc ? *point_ndc : s_vec2(0.0f, 0.0f)
 		};
-		widget->callbacks.on_hover_start(&event, widget->callbacks.user_data);
+		widget->callbacks.on_hover_start(&event, se_ui_callback_data_or_default(widget->callbacks.on_hover_start_data, widget->callbacks.user_data));
 	}
 	se_ui_mark_visual_dirty_internal(root);
 }
@@ -1741,7 +1802,7 @@ static void se_ui_fire_hover_end(se_ui_root* root, const se_ui_widget_handle wid
 			.widget = widget_handle,
 			.pointer_ndc = point_ndc ? *point_ndc : s_vec2(0.0f, 0.0f)
 		};
-		widget->callbacks.on_hover_end(&event, widget->callbacks.user_data);
+		widget->callbacks.on_hover_end(&event, se_ui_callback_data_or_default(widget->callbacks.on_hover_end_data, widget->callbacks.user_data));
 	}
 	se_ui_mark_visual_dirty_internal(root);
 }
@@ -1757,7 +1818,7 @@ static void se_ui_set_focus_internal(se_ui_root* root, const se_ui_widget_handle
 			old_focus->focused = false;
 			if (old_focus->callbacks.on_blur) {
 				se_ui_focus_event event = { .ui = old_focus->ui, .widget = root->focused_widget };
-				old_focus->callbacks.on_blur(&event, old_focus->callbacks.user_data);
+				old_focus->callbacks.on_blur(&event, se_ui_callback_data_or_default(old_focus->callbacks.on_blur_data, old_focus->callbacks.user_data));
 			}
 		}
 	}
@@ -1768,7 +1829,7 @@ static void se_ui_set_focus_internal(se_ui_root* root, const se_ui_widget_handle
 			new_focus->focused = true;
 			if (new_focus->callbacks.on_focus) {
 				se_ui_focus_event event = { .ui = new_focus->ui, .widget = widget_handle };
-				new_focus->callbacks.on_focus(&event, new_focus->callbacks.user_data);
+				new_focus->callbacks.on_focus(&event, se_ui_callback_data_or_default(new_focus->callbacks.on_focus_data, new_focus->callbacks.user_data));
 			}
 		}
 	}
@@ -1785,6 +1846,9 @@ static void se_ui_fire_press(se_ui_root* root, const se_ui_widget_handle widget_
 	}
 	widget->pressed = pressed_state;
 	se_ui_press_callback callback = pressed_state ? widget->callbacks.on_press : widget->callbacks.on_release;
+	void* callback_data = pressed_state
+		? se_ui_callback_data_or_default(widget->callbacks.on_press_data, widget->callbacks.user_data)
+		: se_ui_callback_data_or_default(widget->callbacks.on_release_data, widget->callbacks.user_data);
 	if (callback) {
 		se_ui_press_event event = {
 			.ui = widget->ui,
@@ -1792,7 +1856,7 @@ static void se_ui_fire_press(se_ui_root* root, const se_ui_widget_handle widget_
 			.pointer_ndc = point_ndc ? *point_ndc : s_vec2(0.0f, 0.0f),
 			.button = button
 		};
-		callback(&event, widget->callbacks.user_data);
+		callback(&event, callback_data);
 	}
 	se_ui_mark_visual_dirty_internal(root);
 }
@@ -1807,7 +1871,7 @@ static void se_ui_fire_click(se_ui_widget* widget, const se_ui_widget_handle wid
 		.pointer_ndc = point_ndc ? *point_ndc : s_vec2(0.0f, 0.0f),
 		.button = button
 	};
-	widget->callbacks.on_click(&event, widget->callbacks.user_data);
+	widget->callbacks.on_click(&event, se_ui_callback_data_or_default(widget->callbacks.on_click_data, widget->callbacks.user_data));
 }
 
 static void se_ui_fire_change(se_ui_widget* widget, const se_ui_widget_handle widget_handle) {
@@ -1820,7 +1884,7 @@ static void se_ui_fire_change(se_ui_widget* widget, const se_ui_widget_handle wi
 		.value = widget->value,
 		.text = se_ui_chars_cstr(&widget->text)
 	};
-	widget->callbacks.on_change(&event, widget->callbacks.user_data);
+	widget->callbacks.on_change(&event, se_ui_callback_data_or_default(widget->callbacks.on_change_data, widget->callbacks.user_data));
 }
 
 static void se_ui_fire_submit(se_ui_widget* widget, const se_ui_widget_handle widget_handle) {
@@ -1832,7 +1896,7 @@ static void se_ui_fire_submit(se_ui_widget* widget, const se_ui_widget_handle wi
 		.widget = widget_handle,
 		.text = se_ui_chars_cstr(&widget->text)
 	};
-	widget->callbacks.on_submit(&event, widget->callbacks.user_data);
+	widget->callbacks.on_submit(&event, se_ui_callback_data_or_default(widget->callbacks.on_submit_data, widget->callbacks.user_data));
 }
 
 static void se_ui_fire_scroll(se_ui_widget* widget, const se_ui_widget_handle widget_handle, const s_vec2* point_ndc) {
@@ -1845,7 +1909,7 @@ static void se_ui_fire_scroll(se_ui_widget* widget, const se_ui_widget_handle wi
 		.value = widget->value,
 		.pointer_ndc = point_ndc ? *point_ndc : s_vec2(0.0f, 0.0f)
 	};
-	widget->callbacks.on_scroll(&event, widget->callbacks.user_data);
+	widget->callbacks.on_scroll(&event, se_ui_callback_data_or_default(widget->callbacks.on_scroll_data, widget->callbacks.user_data));
 }
 
 static se_ui_widget_handle se_ui_widget_find_scrollbox_ancestor(se_context* ctx, const se_ui_widget_handle widget_handle) {
@@ -2546,6 +2610,74 @@ static se_ui_widget_handle se_ui_add_widget_common(const se_ui_handle ui, const 
 	return widget;
 }
 
+static void se_ui_apply_widget_basics(se_ui_widget_desc* widget_desc, const c8* id, const s_vec2 position, const s_vec2 size) {
+	if (!widget_desc) {
+		return;
+	}
+	if (id && id[0] != '\0') {
+		widget_desc->id = id;
+	}
+	if (fabsf(position.x) > 0.00001f || fabsf(position.y) > 0.00001f) {
+		widget_desc->position = position;
+	}
+	if (size.x > 0.0f || size.y > 0.0f) {
+		widget_desc->size = s_vec2(s_max(0.0f, size.x), s_max(0.0f, size.y));
+	}
+}
+
+static b8 se_ui_callbacks_has_any_handler(const se_ui_callbacks* callbacks) {
+	if (!callbacks) {
+		return false;
+	}
+	return callbacks->on_hover_start != NULL ||
+		callbacks->on_hover_end != NULL ||
+		callbacks->on_focus != NULL ||
+		callbacks->on_blur != NULL ||
+		callbacks->on_press != NULL ||
+		callbacks->on_release != NULL ||
+		callbacks->on_click != NULL ||
+		callbacks->on_change != NULL ||
+		callbacks->on_submit != NULL ||
+		callbacks->on_scroll != NULL;
+}
+
+static b8 se_ui_callbacks_has_pointer_handlers(const se_ui_callbacks* callbacks) {
+	if (!callbacks) {
+		return false;
+	}
+	return callbacks->on_hover_start != NULL ||
+		callbacks->on_hover_end != NULL ||
+		callbacks->on_press != NULL ||
+		callbacks->on_release != NULL ||
+		callbacks->on_click != NULL ||
+		callbacks->on_scroll != NULL;
+}
+
+#define SE_UI_ARGS_TO_CALLBACKS(dst, args) \
+	do { \
+		(dst).on_hover_start = (args).on_hover_start_fn; \
+		(dst).on_hover_start_data = (args).on_hover_start_data; \
+		(dst).on_hover_end = (args).on_hover_end_fn; \
+		(dst).on_hover_end_data = (args).on_hover_end_data; \
+		(dst).on_focus = (args).on_focus_fn; \
+		(dst).on_focus_data = (args).on_focus_data; \
+		(dst).on_blur = (args).on_blur_fn; \
+		(dst).on_blur_data = (args).on_blur_data; \
+		(dst).on_press = (args).on_press_fn; \
+		(dst).on_press_data = (args).on_press_data; \
+		(dst).on_release = (args).on_release_fn; \
+		(dst).on_release_data = (args).on_release_data; \
+		(dst).on_click = (args).on_click_fn; \
+		(dst).on_click_data = (args).on_click_data; \
+		(dst).on_change = (args).on_change_fn; \
+		(dst).on_change_data = (args).on_change_data; \
+		(dst).on_submit = (args).on_submit_fn; \
+		(dst).on_submit_data = (args).on_submit_data; \
+		(dst).on_scroll = (args).on_scroll_fn; \
+		(dst).on_scroll_data = (args).on_scroll_data; \
+		(dst).user_data = (args).user_data; \
+	} while (0)
+
 se_ui_widget_handle se_ui_panel_add(const se_ui_handle ui, const se_ui_widget_handle parent, const se_ui_panel_desc* desc) {
 	se_ui_panel_desc defaults = SE_UI_PANEL_DESC_DEFAULTS;
 	se_ui_widget_desc base = desc ? desc->widget : defaults.widget;
@@ -2632,6 +2764,190 @@ se_ui_widget_handle se_ui_scrollbox_add(const se_ui_handle ui, const se_ui_widge
 	se_ui_mark_layout_dirty_internal(se_ui_root_from_handle(ctx, ui));
 	return widget;
 }
+
+se_ui_widget_handle se_ui_add_root_impl(se_ui_handle ui, se_ui_panel_args args) {
+	se_ui_panel_desc desc = SE_UI_PANEL_DESC_DEFAULTS;
+	desc.widget.size = s_vec2(1.0f, 1.0f);
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+
+	se_ui_callbacks callbacks = {0};
+	SE_UI_ARGS_TO_CALLBACKS(callbacks, args);
+	se_ui_callbacks_filter_for_type(SE_UI_WIDGET_PANEL, &callbacks);
+	if (se_ui_callbacks_has_pointer_handlers(&callbacks)) {
+		desc.widget.interactable = true;
+	}
+
+	se_ui_widget_handle widget = se_ui_panel_add(ui, S_HANDLE_NULL, &desc);
+	if (widget == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+	if (se_ui_callbacks_has_pointer_handlers(&callbacks)) {
+		(void)se_ui_widget_set_interactable(ui, widget, true);
+	}
+	if (se_ui_callbacks_has_any_handler(&callbacks)) {
+		(void)se_ui_widget_set_callbacks(ui, widget, &callbacks);
+	}
+	return widget;
+}
+
+se_ui_widget_handle se_ui_add_panel_impl(se_ui_widget_handle parent, se_ui_panel_args args) {
+	se_ui_handle ui = S_HANDLE_NULL;
+	se_ui_root* root = NULL;
+	if (!se_ui_parent_context(parent, &ui, &root) || !root) {
+		return S_HANDLE_NULL;
+	}
+
+	se_ui_panel_desc desc = SE_UI_PANEL_DESC_DEFAULTS;
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+
+	se_ui_callbacks callbacks = {0};
+	SE_UI_ARGS_TO_CALLBACKS(callbacks, args);
+	se_ui_callbacks_filter_for_type(SE_UI_WIDGET_PANEL, &callbacks);
+	if (se_ui_callbacks_has_pointer_handlers(&callbacks)) {
+		desc.widget.interactable = true;
+	}
+
+	se_ui_widget_handle widget = se_ui_panel_add(ui, parent, &desc);
+	if (widget == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+	if (se_ui_callbacks_has_pointer_handlers(&callbacks)) {
+		(void)se_ui_widget_set_interactable(ui, widget, true);
+	}
+	if (se_ui_callbacks_has_any_handler(&callbacks)) {
+		(void)se_ui_widget_set_callbacks(ui, widget, &callbacks);
+	}
+	return widget;
+}
+
+se_ui_widget_handle se_ui_add_button_impl(se_ui_widget_handle parent, se_ui_button_args args) {
+	se_ui_handle ui = S_HANDLE_NULL;
+	se_ui_root* root = NULL;
+	if (!se_ui_parent_context(parent, &ui, &root) || !root) {
+		return S_HANDLE_NULL;
+	}
+
+	se_ui_button_desc desc = SE_UI_BUTTON_DESC_DEFAULTS;
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+	desc.text = args.text ? args.text : desc.text;
+	if (args.font_path && args.font_path[0] != '\0') {
+		desc.font_path = args.font_path;
+	}
+	if (args.font_size > 0.0f) {
+		desc.font_size = args.font_size;
+	}
+	SE_UI_ARGS_TO_CALLBACKS(desc.callbacks, args);
+	se_ui_callbacks_filter_for_type(SE_UI_WIDGET_BUTTON, &desc.callbacks);
+	return se_ui_button_add(ui, parent, &desc);
+}
+
+se_ui_widget_handle se_ui_add_text_impl(se_ui_widget_handle parent, se_ui_text_args args) {
+	se_ui_handle ui = S_HANDLE_NULL;
+	se_ui_root* root = NULL;
+	if (!se_ui_parent_context(parent, &ui, &root) || !root) {
+		return S_HANDLE_NULL;
+	}
+
+	se_ui_text_desc desc = SE_UI_TEXT_DESC_DEFAULTS;
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+	desc.text = args.text ? args.text : desc.text;
+	if (args.font_path && args.font_path[0] != '\0') {
+		desc.font_path = args.font_path;
+	}
+	if (args.font_size > 0.0f) {
+		desc.font_size = args.font_size;
+	}
+
+	se_ui_callbacks callbacks = {0};
+	SE_UI_ARGS_TO_CALLBACKS(callbacks, args);
+	se_ui_callbacks_filter_for_type(SE_UI_WIDGET_TEXT, &callbacks);
+	if (se_ui_callbacks_has_pointer_handlers(&callbacks)) {
+		desc.widget.interactable = true;
+	}
+
+	se_ui_widget_handle widget = se_ui_text_add(ui, parent, &desc);
+	if (widget == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+	if (se_ui_callbacks_has_pointer_handlers(&callbacks)) {
+		(void)se_ui_widget_set_interactable(ui, widget, true);
+	}
+	if (se_ui_callbacks_has_any_handler(&callbacks)) {
+		(void)se_ui_widget_set_callbacks(ui, widget, &callbacks);
+	}
+	return widget;
+}
+
+se_ui_widget_handle se_ui_add_textbox_impl(se_ui_widget_handle parent, se_ui_textbox_args args) {
+	se_ui_handle ui = S_HANDLE_NULL;
+	se_ui_root* root = NULL;
+	if (!se_ui_parent_context(parent, &ui, &root) || !root) {
+		return S_HANDLE_NULL;
+	}
+
+	se_ui_textbox_desc desc = SE_UI_TEXTBOX_DESC_DEFAULTS;
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+	desc.text = args.text ? args.text : desc.text;
+	desc.placeholder = args.placeholder ? args.placeholder : desc.placeholder;
+	if (args.font_path && args.font_path[0] != '\0') {
+		desc.font_path = args.font_path;
+	}
+	if (args.font_size > 0.0f) {
+		desc.font_size = args.font_size;
+	}
+	if (args.max_length > 0) {
+		desc.max_length = args.max_length;
+	}
+	if (args.set_submit_on_enter) {
+		desc.submit_on_enter = args.submit_on_enter;
+	}
+	SE_UI_ARGS_TO_CALLBACKS(desc.callbacks, args);
+	se_ui_callbacks_filter_for_type(SE_UI_WIDGET_TEXTBOX, &desc.callbacks);
+	return se_ui_textbox_add(ui, parent, &desc);
+}
+
+se_ui_widget_handle se_ui_add_scrollbox_impl(se_ui_widget_handle parent, se_ui_scrollbox_args args) {
+	se_ui_handle ui = S_HANDLE_NULL;
+	se_ui_root* root = NULL;
+	if (!se_ui_parent_context(parent, &ui, &root) || !root) {
+		return S_HANDLE_NULL;
+	}
+
+	se_ui_scrollbox_desc desc = SE_UI_SCROLLBOX_DESC_DEFAULTS;
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+	desc.widget.layout.clip_children = true;
+	desc.value = se_ui_clamp01(args.value);
+	if (args.wheel_step > 0.0f) {
+		desc.wheel_step = args.wheel_step;
+	}
+	SE_UI_ARGS_TO_CALLBACKS(desc.callbacks, args);
+	se_ui_callbacks_filter_for_type(SE_UI_WIDGET_SCROLLBOX, &desc.callbacks);
+	return se_ui_scrollbox_add(ui, parent, &desc);
+}
+
+se_ui_widget_handle se_ui_add_spacer_impl(se_ui_widget_handle parent, se_ui_panel_args args) {
+	se_ui_handle ui = S_HANDLE_NULL;
+	se_ui_root* root = NULL;
+	if (!se_ui_parent_context(parent, &ui, &root) || !root) {
+		return S_HANDLE_NULL;
+	}
+
+	se_ui_panel_desc desc = SE_UI_PANEL_DESC_DEFAULTS;
+	se_ui_apply_widget_basics(&desc.widget, args.id, args.position, args.size);
+	desc.widget.enabled = false;
+	desc.widget.interactable = false;
+	desc.widget.visible = false;
+	desc.widget.style = SE_UI_STYLE_DEFAULT;
+	desc.widget.style.normal.background_color.w = 0.0f;
+	desc.widget.style.normal.border_width = 0.0f;
+	desc.widget.style.hovered = desc.widget.style.normal;
+	desc.widget.style.pressed = desc.widget.style.normal;
+	desc.widget.style.disabled = desc.widget.style.normal;
+	desc.widget.style.focused = desc.widget.style.normal;
+	return se_ui_panel_add(ui, parent, &desc);
+}
+
+#undef SE_UI_ARGS_TO_CALLBACKS
 
 se_ui_widget_handle se_ui_panel_create(se_ui_handle ui, se_ui_widget_handle parent, s_vec2 size) {
 	se_ui_panel_desc desc = SE_UI_PANEL_DESC_DEFAULTS;
@@ -2720,6 +3036,7 @@ b8 se_ui_widget_on_click(se_ui_handle ui, se_ui_widget_handle widget, se_ui_clic
 		return false;
 	}
 	widget_ptr->callbacks.on_click = cb;
+	widget_ptr->callbacks.on_click_data = user_data;
 	widget_ptr->callbacks.user_data = user_data;
 	return true;
 }
@@ -2732,6 +3049,8 @@ b8 se_ui_widget_on_hover(se_ui_handle ui, se_ui_widget_handle widget, se_ui_hove
 	}
 	widget_ptr->callbacks.on_hover_start = on_start;
 	widget_ptr->callbacks.on_hover_end = on_end;
+	widget_ptr->callbacks.on_hover_start_data = user_data;
+	widget_ptr->callbacks.on_hover_end_data = user_data;
 	widget_ptr->callbacks.user_data = user_data;
 	return true;
 }
@@ -2744,6 +3063,8 @@ b8 se_ui_widget_on_press(se_ui_handle ui, se_ui_widget_handle widget, se_ui_pres
 	}
 	widget_ptr->callbacks.on_press = on_press;
 	widget_ptr->callbacks.on_release = on_release;
+	widget_ptr->callbacks.on_press_data = user_data;
+	widget_ptr->callbacks.on_release_data = user_data;
 	widget_ptr->callbacks.user_data = user_data;
 	return true;
 }
@@ -2755,6 +3076,7 @@ b8 se_ui_widget_on_change(se_ui_handle ui, se_ui_widget_handle widget, se_ui_cha
 		return false;
 	}
 	widget_ptr->callbacks.on_change = cb;
+	widget_ptr->callbacks.on_change_data = user_data;
 	widget_ptr->callbacks.user_data = user_data;
 	return true;
 }
@@ -2766,6 +3088,7 @@ b8 se_ui_widget_on_submit(se_ui_handle ui, se_ui_widget_handle widget, se_ui_sub
 		return false;
 	}
 	widget_ptr->callbacks.on_submit = cb;
+	widget_ptr->callbacks.on_submit_data = user_data;
 	widget_ptr->callbacks.user_data = user_data;
 	return true;
 }
@@ -2777,6 +3100,7 @@ b8 se_ui_widget_on_scroll(se_ui_handle ui, se_ui_widget_handle widget, se_ui_scr
 		return false;
 	}
 	widget_ptr->callbacks.on_scroll = cb;
+	widget_ptr->callbacks.on_scroll_data = user_data;
 	widget_ptr->callbacks.user_data = user_data;
 	return true;
 }

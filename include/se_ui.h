@@ -145,15 +145,25 @@ typedef void (*se_ui_press_callback)(const se_ui_press_event* event, void* user_
 
 typedef struct {
 	se_ui_hover_callback on_hover_start;
+	void* on_hover_start_data;
 	se_ui_hover_callback on_hover_end;
+	void* on_hover_end_data;
 	se_ui_focus_callback on_focus;
+	void* on_focus_data;
 	se_ui_focus_callback on_blur;
+	void* on_blur_data;
 	se_ui_press_callback on_press;
+	void* on_press_data;
 	se_ui_press_callback on_release;
+	void* on_release_data;
 	se_ui_click_callback on_click;
+	void* on_click_data;
 	se_ui_change_callback on_change;
+	void* on_change_data;
 	se_ui_submit_callback on_submit;
+	void* on_submit_data;
 	se_ui_scroll_callback on_scroll;
+	void* on_scroll_data;
 	void* user_data;
 } se_ui_callbacks;
 
@@ -193,6 +203,156 @@ typedef struct {
 	f32 wheel_step;
 	se_ui_callbacks callbacks;
 } se_ui_scrollbox_desc;
+
+typedef struct {
+	const c8* id;
+	s_vec2 position;
+	s_vec2 size;
+	se_ui_hover_callback on_hover_start_fn;
+	void* on_hover_start_data;
+	se_ui_hover_callback on_hover_end_fn;
+	void* on_hover_end_data;
+	se_ui_focus_callback on_focus_fn;
+	void* on_focus_data;
+	se_ui_focus_callback on_blur_fn;
+	void* on_blur_data;
+	se_ui_press_callback on_press_fn;
+	void* on_press_data;
+	se_ui_press_callback on_release_fn;
+	void* on_release_data;
+	se_ui_click_callback on_click_fn;
+	void* on_click_data;
+	se_ui_change_callback on_change_fn;
+	void* on_change_data;
+	se_ui_submit_callback on_submit_fn;
+	void* on_submit_data;
+	se_ui_scroll_callback on_scroll_fn;
+	void* on_scroll_data;
+	void* user_data;
+} se_ui_panel_args;
+
+typedef struct {
+	const c8* id;
+	s_vec2 position;
+	s_vec2 size;
+	const c8* text;
+	const c8* font_path;
+	f32 font_size;
+	se_ui_hover_callback on_hover_start_fn;
+	void* on_hover_start_data;
+	se_ui_hover_callback on_hover_end_fn;
+	void* on_hover_end_data;
+	se_ui_focus_callback on_focus_fn;
+	void* on_focus_data;
+	se_ui_focus_callback on_blur_fn;
+	void* on_blur_data;
+	se_ui_press_callback on_press_fn;
+	void* on_press_data;
+	se_ui_press_callback on_release_fn;
+	void* on_release_data;
+	se_ui_click_callback on_click_fn;
+	void* on_click_data;
+	se_ui_change_callback on_change_fn;
+	void* on_change_data;
+	se_ui_submit_callback on_submit_fn;
+	void* on_submit_data;
+	se_ui_scroll_callback on_scroll_fn;
+	void* on_scroll_data;
+	void* user_data;
+} se_ui_text_args;
+
+typedef struct {
+	const c8* id;
+	s_vec2 position;
+	s_vec2 size;
+	const c8* text;
+	const c8* font_path;
+	f32 font_size;
+	se_ui_hover_callback on_hover_start_fn;
+	void* on_hover_start_data;
+	se_ui_hover_callback on_hover_end_fn;
+	void* on_hover_end_data;
+	se_ui_focus_callback on_focus_fn;
+	void* on_focus_data;
+	se_ui_focus_callback on_blur_fn;
+	void* on_blur_data;
+	se_ui_press_callback on_press_fn;
+	void* on_press_data;
+	se_ui_press_callback on_release_fn;
+	void* on_release_data;
+	se_ui_click_callback on_click_fn;
+	void* on_click_data;
+	se_ui_change_callback on_change_fn;
+	void* on_change_data;
+	se_ui_submit_callback on_submit_fn;
+	void* on_submit_data;
+	se_ui_scroll_callback on_scroll_fn;
+	void* on_scroll_data;
+	void* user_data;
+} se_ui_button_args;
+
+typedef struct {
+	const c8* id;
+	s_vec2 position;
+	s_vec2 size;
+	const c8* text;
+	const c8* placeholder;
+	const c8* font_path;
+	f32 font_size;
+	u32 max_length;
+	b8 set_submit_on_enter : 1;
+	b8 submit_on_enter : 1;
+	se_ui_hover_callback on_hover_start_fn;
+	void* on_hover_start_data;
+	se_ui_hover_callback on_hover_end_fn;
+	void* on_hover_end_data;
+	se_ui_focus_callback on_focus_fn;
+	void* on_focus_data;
+	se_ui_focus_callback on_blur_fn;
+	void* on_blur_data;
+	se_ui_press_callback on_press_fn;
+	void* on_press_data;
+	se_ui_press_callback on_release_fn;
+	void* on_release_data;
+	se_ui_click_callback on_click_fn;
+	void* on_click_data;
+	se_ui_change_callback on_change_fn;
+	void* on_change_data;
+	se_ui_submit_callback on_submit_fn;
+	void* on_submit_data;
+	se_ui_scroll_callback on_scroll_fn;
+	void* on_scroll_data;
+	void* user_data;
+} se_ui_textbox_args;
+
+typedef struct {
+	const c8* id;
+	s_vec2 position;
+	s_vec2 size;
+	f32 value;
+	f32 wheel_step;
+	se_ui_hover_callback on_hover_start_fn;
+	void* on_hover_start_data;
+	se_ui_hover_callback on_hover_end_fn;
+	void* on_hover_end_data;
+	se_ui_focus_callback on_focus_fn;
+	void* on_focus_data;
+	se_ui_focus_callback on_blur_fn;
+	void* on_blur_data;
+	se_ui_press_callback on_press_fn;
+	void* on_press_data;
+	se_ui_press_callback on_release_fn;
+	void* on_release_data;
+	se_ui_click_callback on_click_fn;
+	void* on_click_data;
+	se_ui_change_callback on_change_fn;
+	void* on_change_data;
+	se_ui_submit_callback on_submit_fn;
+	void* on_submit_data;
+	se_ui_scroll_callback on_scroll_fn;
+	void* on_scroll_data;
+	void* user_data;
+} se_ui_scrollbox_args;
 
 #define SE_UI_EDGE_ZERO ((se_ui_edge){ .left = 0.0f, .right = 0.0f, .top = 0.0f, .bottom = 0.0f })
 #define se_ui_edge_all(v) ((se_ui_edge){ (v), (v), (v), (v) })
@@ -279,6 +439,21 @@ extern se_ui_widget_handle se_ui_button_add(const se_ui_handle ui, const se_ui_w
 extern se_ui_widget_handle se_ui_text_add(const se_ui_handle ui, const se_ui_widget_handle parent, const se_ui_text_desc* desc);
 extern se_ui_widget_handle se_ui_textbox_add(const se_ui_handle ui, const se_ui_widget_handle parent, const se_ui_textbox_desc* desc);
 extern se_ui_widget_handle se_ui_scrollbox_add(const se_ui_handle ui, const se_ui_widget_handle parent, const se_ui_scrollbox_desc* desc);
+
+/* One-call root creation. Usage: se_ui_add_root(ui, { .size = s_vec2(1.0f, 1.0f) }); */
+extern se_ui_widget_handle se_ui_add_root_impl(se_ui_handle ui, se_ui_panel_args args);
+/* One-call panel creation from parent. Usage: se_ui_add_panel(parent, { .size = s_vec2(...) }); */
+extern se_ui_widget_handle se_ui_add_panel_impl(se_ui_widget_handle parent, se_ui_panel_args args);
+/* One-call button creation from parent. Usage: se_ui_add_button(parent, { .on_click_fn = ..., .on_click_data = ... }); */
+extern se_ui_widget_handle se_ui_add_button_impl(se_ui_widget_handle parent, se_ui_button_args args);
+/* One-call text creation from parent. Usage: se_ui_add_text(parent, { .text = "..." }); */
+extern se_ui_widget_handle se_ui_add_text_impl(se_ui_widget_handle parent, se_ui_text_args args);
+/* One-call textbox creation from parent. Usage: se_ui_add_textbox(parent, { .on_change_fn = ... }); */
+extern se_ui_widget_handle se_ui_add_textbox_impl(se_ui_widget_handle parent, se_ui_textbox_args args);
+/* One-call scrollbox creation from parent. Usage: se_ui_add_scrollbox(parent, { .on_scroll_fn = ... }); */
+extern se_ui_widget_handle se_ui_add_scrollbox_impl(se_ui_widget_handle parent, se_ui_scrollbox_args args);
+/* One-call spacer creation from parent. Usage: se_ui_add_spacer(parent, { .size = s_vec2(...) }); */
+extern se_ui_widget_handle se_ui_add_spacer_impl(se_ui_widget_handle parent, se_ui_panel_args args);
 
 /* Adds a panel with default style/behavior and explicit size. */
 extern se_ui_widget_handle se_ui_panel_create(se_ui_handle ui, se_ui_widget_handle parent, s_vec2 size);
@@ -398,6 +573,13 @@ extern b8 se_ui_minimap_ui_to_world(const se_box_2d* world_rect, const se_box_2d
 
 #define se_ui_create_root(ui) se_ui_panel_create((ui), S_HANDLE_NULL, s_vec2(1.0f, 1.0f))
 #define se_ui_label(ui, parent, text) se_ui_text_create((ui), (parent), (text))
+#define se_ui_add_root(ui, ...) se_ui_add_root_impl((ui), (se_ui_panel_args)__VA_ARGS__)
+#define se_ui_add_panel(parent, ...) se_ui_add_panel_impl((parent), (se_ui_panel_args)__VA_ARGS__)
+#define se_ui_add_button(parent, ...) se_ui_add_button_impl((parent), (se_ui_button_args)__VA_ARGS__)
+#define se_ui_add_text(parent, ...) se_ui_add_text_impl((parent), (se_ui_text_args)__VA_ARGS__)
+#define se_ui_add_textbox(parent, ...) se_ui_add_textbox_impl((parent), (se_ui_textbox_args)__VA_ARGS__)
+#define se_ui_add_scrollbox(parent, ...) se_ui_add_scrollbox_impl((parent), (se_ui_scrollbox_args)__VA_ARGS__)
+#define se_ui_add_spacer(parent, ...) se_ui_add_spacer_impl((parent), (se_ui_panel_args)__VA_ARGS__)
 
 static inline b8 se_ui_widget_apply_vstack(se_ui_handle ui, se_ui_widget_handle widget, f32 spacing, se_ui_edge padding) {
 	return se_ui_widget_set_stack_vertical(ui, widget, spacing) && se_ui_widget_set_padding(ui, widget, padding);

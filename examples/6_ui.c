@@ -171,7 +171,7 @@ static se_ui_widget_handle ui_add_panel(
 	if (!state) {
 		return S_HANDLE_NULL;
 	}
-	se_ui_widget_handle panel = se_ui_panel_create(state->ui, parent, size);
+	se_ui_widget_handle panel = se_ui_add_panel(parent, { .size = size });
 	if (panel == S_HANDLE_NULL) {
 		return S_HANDLE_NULL;
 	}
@@ -195,21 +195,15 @@ static se_ui_widget_handle ui_add_label(
 	if (!state) {
 		return S_HANDLE_NULL;
 	}
-	se_ui_widget_handle label = se_ui_label(state->ui, parent, text);
+	se_ui_widget_handle label = se_ui_add_text(parent, {
+		.text = text,
+		.size = size
+	});
 	if (label == S_HANDLE_NULL) {
 		return S_HANDLE_NULL;
 	}
-	(void)se_ui_widget_set_size(state->ui, label, &size);
 	(void)se_ui_widget_set_alignment(state->ui, label, align_h, align_v);
 	return label;
-}
-
-static void ui_bind_common_button_callbacks(ui_example_state* state, const se_ui_widget_handle widget) {
-	if (!state || widget == S_HANDLE_NULL) {
-		return;
-	}
-	(void)se_ui_widget_on_hover(state->ui, widget, ui_on_hover_start, ui_on_hover_end, state);
-	(void)se_ui_widget_on_press(state->ui, widget, ui_on_press, ui_on_release, state);
 }
 
 static se_ui_widget_handle ui_add_button_row(ui_example_state* state, const se_ui_widget_handle parent) {
@@ -658,14 +652,24 @@ static se_ui_widget_handle ui_add_action_button(
 	const se_ui_widget_handle parent,
 	const c8* text,
 	const se_ui_click_callback on_click) {
-	se_ui_widget_handle button = se_ui_button(state->ui, parent, text, on_click, state);
+	se_ui_widget_handle button = se_ui_add_button(parent, {
+		.text = text,
+		.size = s_vec2(0.125f, 0.042f),
+		.on_click_fn = on_click,
+		.on_click_data = state,
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = state
+	});
 	if (button == S_HANDLE_NULL) {
 		return S_HANDLE_NULL;
 	}
-	(void)se_ui_widget_set_size(state->ui, button, &s_vec2(0.125f, 0.042f));
 	(void)se_ui_widget_set_alignment(state->ui, button, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_CENTER);
-	(void)se_ui_widget_on_hover(state->ui, button, ui_on_hover_start, ui_on_hover_end, state);
-	(void)se_ui_widget_on_press(state->ui, button, ui_on_press, ui_on_release, state);
 	return button;
 }
 
@@ -986,7 +990,9 @@ i32 main(void) {
 	state.last_dirty = false;
 	s_array_init(&state.scroll_items);
 
-	se_ui_widget_handle root = se_ui_create_root(ui);
+	se_ui_widget_handle root = se_ui_add_root(ui, {
+		.size = s_vec2(1.0f, 1.0f)
+	});
 	(void)se_ui_vstack(ui, root, 0.012f, se_ui_edge_all(0.014f));
 	(void)se_ui_widget_set_alignment(ui, root, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_START);
 
@@ -1010,10 +1016,21 @@ i32 main(void) {
 		SE_UI_ALIGN_STRETCH,
 		SE_UI_ALIGN_CENTER);
 
-	se_ui_widget_handle close_button = se_ui_button(ui, header, "Exit", ui_on_exit, &state);
-	(void)se_ui_widget_set_size(ui, close_button, &s_vec2(0.10f, 0.042f));
+	se_ui_widget_handle close_button = se_ui_add_button(header, {
+		.text = "Exit",
+		.size = s_vec2(0.10f, 0.042f),
+		.on_click_fn = ui_on_exit,
+		.on_click_data = &state,
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = &state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = &state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = &state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = &state
+	});
 	(void)se_ui_widget_set_alignment(ui, close_button, SE_UI_ALIGN_END, SE_UI_ALIGN_CENTER);
-	ui_bind_common_button_callbacks(&state, close_button);
 	(void)se_ui_widget_use_style_preset(ui, close_button, SE_UI_STYLE_PRESET_BUTTON_DANGER);
 	se_ui_widget_handle status_panel = ui_add_panel(
 		&state,
@@ -1067,31 +1084,43 @@ i32 main(void) {
 		SE_UI_ALIGN_STRETCH,
 		SE_UI_ALIGN_START);
 
-	state.demo_button = se_ui_button(ui, controls, "Demo Button (on_click)", ui_on_demo_button_click, &state);
-	(void)se_ui_widget_set_size(ui, state.demo_button, &s_vec2(0.40f, 0.055f));
+	state.demo_button = se_ui_add_button(controls, {
+		.text = "Demo Button (on_click)",
+		.size = s_vec2(0.40f, 0.055f),
+		.on_click_fn = ui_on_demo_button_click,
+		.on_click_data = &state,
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = &state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = &state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = &state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = &state
+	});
 	(void)se_ui_widget_set_alignment(ui, state.demo_button, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_CENTER);
-	ui_bind_common_button_callbacks(&state, state.demo_button);
 
-	state.textbox = se_ui_textbox(
-		ui,
-		controls,
-		"Type text, Enter to submit (supports selection + caret)",
-		ui_on_change,
-		ui_on_submit,
-		&state);
-	(void)se_ui_widget_set_size(ui, state.textbox, &s_vec2(0.42f, 0.055f));
+	state.textbox = se_ui_add_textbox(controls, {
+		.placeholder = "Type text, Enter to submit (supports selection + caret)",
+		.size = s_vec2(0.42f, 0.055f),
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = &state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = &state,
+		.on_focus_fn = ui_on_focus,
+		.on_focus_data = &state,
+		.on_blur_fn = ui_on_blur,
+		.on_blur_data = &state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = &state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = &state,
+		.on_change_fn = ui_on_change,
+		.on_change_data = &state,
+		.on_submit_fn = ui_on_submit,
+		.on_submit_data = &state
+	});
 	(void)se_ui_widget_set_alignment(ui, state.textbox, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_CENTER);
-	se_ui_callbacks textbox_callbacks = {0};
-	textbox_callbacks.user_data = &state;
-	textbox_callbacks.on_hover_start = ui_on_hover_start;
-	textbox_callbacks.on_hover_end = ui_on_hover_end;
-	textbox_callbacks.on_focus = ui_on_focus;
-	textbox_callbacks.on_blur = ui_on_blur;
-	textbox_callbacks.on_press = ui_on_press;
-	textbox_callbacks.on_release = ui_on_release;
-	textbox_callbacks.on_change = ui_on_change;
-	textbox_callbacks.on_submit = ui_on_submit;
-	(void)se_ui_widget_set_callbacks(ui, state.textbox, &textbox_callbacks);
 
 	se_ui_widget_handle row_a = ui_add_button_row(&state, controls);
 	(void)ui_add_action_button(&state, row_a, "Focus Box", ui_on_focus_textbox_click);
@@ -1152,10 +1181,21 @@ i32 main(void) {
 		SE_UI_ALIGN_START,
 		true);
 
-	state.align_sample = se_ui_button(ui, state.align_container, "Align Sample", ui_on_demo_button_click, &state);
-	(void)se_ui_widget_set_size(ui, state.align_sample, &s_vec2(0.16f, 0.05f));
+	state.align_sample = se_ui_add_button(state.align_container, {
+		.text = "Align Sample",
+		.size = s_vec2(0.16f, 0.05f),
+		.on_click_fn = ui_on_demo_button_click,
+		.on_click_data = &state,
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = &state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = &state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = &state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = &state
+	});
 	(void)se_ui_widget_set_alignment(ui, state.align_sample, SE_UI_ALIGN_START, SE_UI_ALIGN_START);
-	ui_bind_common_button_callbacks(&state, state.align_sample);
 
 	(void)ui_add_label(&state, showcase, "Drag card body and drop on LEFT/RIGHT dock", s_vec2(0.46f, 0.028f), SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_START);
 
@@ -1207,29 +1247,47 @@ i32 main(void) {
 	(void)se_ui_widget_set_interactable(ui, state.card_panel, true);
 	(void)ui_add_label(&state, state.card_panel, "Drag this body", s_vec2(0.18f, 0.023f), SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_START);
 
-	state.card_button = se_ui_button(ui, state.card_panel, "Card Button", ui_on_card_button_click, &state);
-	(void)se_ui_widget_set_size(ui, state.card_button, &s_vec2(0.17f, 0.042f));
+	state.card_button = se_ui_add_button(state.card_panel, {
+		.text = "Card Button",
+		.size = s_vec2(0.17f, 0.042f),
+		.on_click_fn = ui_on_card_button_click,
+		.on_click_data = &state,
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = &state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = &state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = &state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = &state
+	});
 	(void)se_ui_widget_set_alignment(ui, state.card_button, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_CENTER);
-	ui_bind_common_button_callbacks(&state, state.card_button);
 
 	(void)ui_add_label(&state, showcase, "Scrollbox (wheel + thumb drag + selectable items)", s_vec2(0.46f, 0.028f), SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_START);
 
-	state.scrollbox = se_ui_scrollbox(ui, showcase, s_vec2(0.46f, 0.22f), ui_on_scroll, &state);
+	state.scrollbox = se_ui_add_scrollbox(showcase, {
+		.size = s_vec2(0.46f, 0.22f),
+		.on_hover_start_fn = ui_on_hover_start,
+		.on_hover_start_data = &state,
+		.on_hover_end_fn = ui_on_hover_end,
+		.on_hover_end_data = &state,
+		.on_focus_fn = ui_on_focus,
+		.on_focus_data = &state,
+		.on_blur_fn = ui_on_blur,
+		.on_blur_data = &state,
+		.on_press_fn = ui_on_press,
+		.on_press_data = &state,
+		.on_release_fn = ui_on_release,
+		.on_release_data = &state,
+		.on_scroll_fn = ui_on_scroll,
+		.on_scroll_data = &state,
+		.on_change_fn = ui_on_change,
+		.on_change_data = &state
+	});
 	const se_ui_edge scroll_padding = (se_ui_edge){0.010f, 0.022f, 0.010f, 0.010f};
 	(void)se_ui_vstack(ui, state.scrollbox, 0.006f, scroll_padding);
 	(void)se_ui_widget_set_alignment(ui, state.scrollbox, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_START);
 	(void)se_ui_widget_set_clipping(ui, state.scrollbox, true);
-	se_ui_callbacks scrollbox_callbacks = {0};
-	scrollbox_callbacks.user_data = &state;
-	scrollbox_callbacks.on_hover_start = ui_on_hover_start;
-	scrollbox_callbacks.on_hover_end = ui_on_hover_end;
-	scrollbox_callbacks.on_focus = ui_on_focus;
-	scrollbox_callbacks.on_blur = ui_on_blur;
-	scrollbox_callbacks.on_press = ui_on_press;
-	scrollbox_callbacks.on_release = ui_on_release;
-	scrollbox_callbacks.on_scroll = ui_on_scroll;
-	scrollbox_callbacks.on_change = ui_on_change;
-	(void)se_ui_widget_set_callbacks(ui, state.scrollbox, &scrollbox_callbacks);
 	(void)se_ui_scrollbox_enable_single_select(ui, state.scrollbox, true);
 	se_ui_style scroll_item_normal = SE_UI_STYLE_DEFAULT;
 	se_ui_style scroll_item_selected = SE_UI_STYLE_DEFAULT;
