@@ -7,15 +7,6 @@ prerequisites:
 
 # First Window
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- Context and window creation order.
-- Null-handle failure checks.
-- Exit-key setup.
-
-</div>
 
 ## When to use this
 

@@ -8,15 +8,6 @@ prerequisites:
 
 # Install And Build
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- Submodule initialization flow.
-- Full and single-target builds.
-- Render backend selection.
-
-</div>
 
 ## When to use this
 

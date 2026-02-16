@@ -74,7 +74,6 @@ for header in headers:
 
 # Required concept sections
 required_sections = {
-    "what you will learn",
     "when to use this",
     "minimal working snippet",
     "step-by-step explanation",

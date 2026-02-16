@@ -7,15 +7,6 @@ prerequisites:
 
 # se_render_buffer
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- What `se_render_buffer` is responsible for.
-- The smallest setup sequence for this module.
-- How to jump from guide to generated API declarations.
-
-</div>
 
 ## When to use this
 

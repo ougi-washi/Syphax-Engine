@@ -7,15 +7,6 @@ prerequisites:
 
 # Resource Paths
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- Resource scope intent.
-- Macro-based path construction.
-- How scopes affect portability and ownership.
-
-</div>
 
 ## When to use this
 

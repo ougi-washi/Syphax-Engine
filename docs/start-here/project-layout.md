@@ -7,15 +7,6 @@ prerequisites:
 
 # Project Layout
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- Where public headers live.
-- Where modules are implemented.
-- Where example assets live.
-
-</div>
 
 ## When to use this
 

@@ -7,15 +7,6 @@ prerequisites:
 
 # Frame Loop Basics
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- Frame boundaries.
-- Where update/draw logic belongs.
-- How to keep one consistent loop structure.
-
-</div>
 
 ## When to use this
 

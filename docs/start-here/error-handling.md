@@ -7,15 +7,6 @@ prerequisites:
 
 # Error Handling
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- How to check handle failures.
-- How to print result strings.
-- How to stop early safely.
-
-</div>
 
 ## When to use this
 

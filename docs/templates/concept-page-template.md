@@ -1,9 +1,5 @@
 # Concept Page Template
 
-## What you will learn
-
-- Item
-
 ## When to use this
 
 Describe the use case.

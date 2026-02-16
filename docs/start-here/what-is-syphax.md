@@ -8,15 +8,6 @@ prerequisites:
 
 # What Is Syphax
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- What the framework includes.
-- What remains app-side by design.
-- How module APIs are organized.
-
-</div>
 
 ## When to use this
 

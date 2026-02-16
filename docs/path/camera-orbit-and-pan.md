@@ -7,15 +7,6 @@ prerequisites:
 
 # Camera Orbit And Pan
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- The minimum calls that make this concept work.
-- How this concept fits in the default path order.
-- Which module and API pages to open next.
-
-</div>
 
 ## When to use this
 

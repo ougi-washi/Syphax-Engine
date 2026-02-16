@@ -7,15 +7,6 @@ prerequisites:
 
 # First Run Checklist
 
-<div class="learn-block" markdown>
-
-## What you will learn
-
-- What to run first.
-- What behavior to verify.
-- What to capture when reporting issues.
-
-</div>
 
 ## When to use this
 
