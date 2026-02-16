@@ -1,6 +1,8 @@
 ## Syphax Engine - 𐤒𐤐𐤎
 Simple, fast, lightweight framework for interactive visuals, games, and tools in C.
 
+Documentation: [Syphax Engine Docs](https://syphax-engine.github.io/syphax-engine/)
+
 ### Highlights
 - Window + input handling
 - 2D/3D scenes with instancing and physics
