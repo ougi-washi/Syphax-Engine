@@ -10,8 +10,8 @@ Advanced simulation and integration references.
 
 ## In this section
 
-- [Playbook: se_simulation](../playbooks/se-simulation.md)
-- [Playbook: se_navigation](../playbooks/se-navigation.md)
+- [Path: Simulation](../path/simulation.md)
+- [Path: Navigation](../path/navigation.md)
 - [Example: simulation_intro](../examples/advanced/simulation_intro.md)
 - [Example: simulation_advanced](../examples/advanced/simulation_advanced.md)
 - [Example: rts_integration](../examples/advanced/rts_integration.md)

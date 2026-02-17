@@ -9,9 +9,9 @@ Global constants, resource scope macros, and engine-wide result codes.
 
 This page is generated from `include/se_defines.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-math-defines-ext-quad.md)
+- [Deep dive path page](../../path/utilities.md)
 
 ## Functions
 

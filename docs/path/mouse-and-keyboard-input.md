@@ -45,4 +45,4 @@ se_input_tick(input);
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
-- [Deep dive Playbook](../playbooks/se-input.md)
+- [Deep dive path page](input.md)

@@ -20,20 +20,20 @@ prerequisites:
 ./scripts/docs/check_nav_consistency.sh
 ./scripts/docs/check_links.sh
 ./scripts/docs/check_content_quality.sh
-./scripts/docs/check_playbook_coverage.sh
+./scripts/docs/check_path_coverage.sh
 ./scripts/docs/verify_snippets.sh
 ./scripts/docs/build.sh
 ```
 
-## Playbook authoring workflow
+## Path authoring workflow
 
-1. Create or update one page under `docs/playbooks/`.
+1. Create or update one page under `docs/path/`.
 1. Add exactly four snippet files under `docs/snippets/<module_id>/`:
    - `step1_minimal.c`
    - `step2_core.c`
    - `step3_interactive.c`
    - `step4_complete.c`
-1. Keep required Playbook headings:
+1. Keep required Path headings:
    - `## When to use this`
    - `## Step 1: Minimal Working Project`
    - `## Step 2: Add Core Feature`
@@ -45,15 +45,15 @@ prerequisites:
 1. Add at least one link to an API module page and one link to an example page.
 1. Add or update the page in `mkdocs.yml` navigation.
 
-## Add a new module Playbook
+## Add a new module Path
 
-1. Copy `docs/templates/playbook-template.md` into `docs/playbooks/<slug>.md`.
+1. Copy `docs/templates/path-template.md` into `docs/path/<slug>.md`.
 1. Create `docs/snippets/<module_id>/step1_minimal.c` through `step4_complete.c`.
 1. Add links:
-   - Section landing page -> Playbook
-   - Module guide -> Playbook
-   - Example page learning path -> Playbook step
-   - Generated API page -> Playbook (via API generator mapping)
+   - Section landing page -> Path
+   - Module guide -> Path
+   - Example page learning path -> Path step
+   - Generated API page -> Path (via API generator mapping)
 1. Run the required command set above before opening the PR.
 
 ## Release cadence
@@ -84,9 +84,9 @@ Use front matter on each page:
 ## Cross-linking rules
 
 - Concept pages must include a `Related pages` section.
-- Example pages must include related API links and a learning-path mapping to Playbook steps.
-- Module guides must link to deep-dive Playbooks plus generated API pages.
-- Playbooks must link back to module guides, API pages, and at least one example page.
+- Example pages must include related API links and a learning-path mapping to Path steps.
+- Module guides must link to deep-dive Path plus generated API pages.
+- Path must link back to module guides, API pages, and at least one example page.
 
 ## Labels for docs issues
 

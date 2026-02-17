@@ -20,8 +20,8 @@ Extended simulation with system sequencing and diagnostics.
 
 ## Learning path
 
-- This example corresponds to [se_simulation Playbook](../../playbooks/se-simulation.md) Step 4.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Simulation path page](../../path/simulation.md) Step 4.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - No runtime controls. Observe diagnostics output.
@@ -46,7 +46,7 @@ Extended simulation with system sequencing and diagnostics.
 
 ## Related API links
 
-- [Playbook: se_simulation Playbook](../../playbooks/se-simulation.md)
+- [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_simulation](../../module-guides/se-simulation.md)
 - [Advanced: simulation_intro](simulation_intro.md)
 - [API: se_simulation.h](../../api-reference/modules/se_simulation.md)

@@ -72,7 +72,7 @@ for header in headers:
     if page_rel not in nav_paths:
         raise SystemExit(f"Generated API page missing in nav: {page_rel}")
 
-# Required concept sections for start-here/path/module-guides pages.
+# Required concept sections for Start Here, module guides, and concept path pages.
 required_concept_sections = {
     "when to use this",
     "minimal working snippet",
@@ -82,26 +82,48 @@ required_concept_sections = {
     "related pages",
 }
 
-concept_files = []
-for folder in ("start-here", "path", "module-guides"):
-    folder_abs = os.path.join(docs_dir, folder)
-    for path in glob.glob(os.path.join(folder_abs, "*.md")):
-        name = os.path.basename(path)
-        if name == "index.md":
-            continue
-        concept_files.append(path)
-
 heading_re = re.compile(r"^##\s+(.+?)\s*$")
-for concept in sorted(concept_files):
+
+def headings_for_file(path: str) -> set:
     found = set()
-    with open(concept, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             m = heading_re.match(line.strip())
             if m:
-                heading = m.group(1).strip().lower()
-                heading = heading.replace("`", "")
+                heading = m.group(1).strip().lower().replace("`", "")
                 found.add(heading)
+    return found
 
+
+concept_files = []
+for folder in ("start-here", "module-guides"):
+    folder_abs = os.path.join(docs_dir, folder)
+    for path in glob.glob(os.path.join(folder_abs, "*.md")):
+        if os.path.basename(path) == "index.md":
+            continue
+        concept_files.append(path)
+
+path_concept_files = {
+    "colors-and-clear.md",
+    "draw-your-first-text.md",
+    "basic-shapes-and-scene2d.md",
+    "motion-with-time.md",
+    "mouse-and-keyboard-input.md",
+    "buttons-and-ui-basics.md",
+    "add-sound.md",
+    "your-first-3d-object.md",
+    "camera-orbit-and-pan.md",
+    "load-a-model.md",
+    "particles-and-vfx.md",
+    "physics-as-motion.md",
+    "debug-overlay-and-traces.md",
+    "export-and-share.md",
+}
+for name in sorted(path_concept_files):
+    concept_files.append(os.path.join(docs_dir, "path", name))
+
+for concept in sorted(concept_files):
+    found = headings_for_file(concept)
     missing = sorted(required_concept_sections - found)
     if missing:
         rel = os.path.relpath(concept, docs_dir).replace("\\", "/")
@@ -110,9 +132,10 @@ for concept in sorted(concept_files):
             print(f" - {heading}")
         raise SystemExit(1)
 
-# Required sections for Playbook pages.
-required_playbook_sections = {
+# Required sections for module walkthrough path pages.
+required_path_walkthrough_sections = {
     "when to use this",
+    "quick start",
     "step 1: minimal working project",
     "step 2: add core feature",
     "step 3: interactive / tunable",
@@ -122,22 +145,43 @@ required_playbook_sections = {
     "related pages",
 }
 
-playbook_files = sorted(glob.glob(os.path.join(docs_dir, "playbooks", "*.md")))
-for playbook in playbook_files:
-    if os.path.basename(playbook) == "index.md":
-        continue
-    found = set()
-    with open(playbook, "r", encoding="utf-8") as f:
-        for line in f:
-            m = heading_re.match(line.strip())
-            if m:
-                heading = m.group(1).strip().lower().replace("`", "")
-                found.add(heading)
+path_walkthrough_files = [
+    "window.md",
+    "input.md",
+    "ui.md",
+    "text.md",
+    "audio.md",
+    "vfx.md",
+    "curve.md",
+    "sdf.md",
+    "utilities.md",
+    "graphics.md",
+    "camera.md",
+    "scene.md",
+    "model.md",
+    "shader.md",
+    "texture.md",
+    "loader.md",
+    "gltf.md",
+    "render-buffer.md",
+    "framebuffer.md",
+    "backend.md",
+    "physics.md",
+    "navigation.md",
+    "simulation.md",
+    "debug.md",
+]
 
-    missing = sorted(required_playbook_sections - found)
+for name in path_walkthrough_files:
+    path_page = os.path.join(docs_dir, "path", name)
+    if not os.path.isfile(path_page):
+        raise SystemExit(f"Missing required path walkthrough page: path/{name}")
+
+    found = headings_for_file(path_page)
+    missing = sorted(required_path_walkthrough_sections - found)
     if missing:
-        rel = os.path.relpath(playbook, docs_dir).replace("\\", "/")
-        print(f"Missing required sections in playbook page: {rel}")
+        rel = os.path.relpath(path_page, docs_dir).replace("\\", "/")
+        print(f"Missing required sections in path walkthrough page: {rel}")
         for heading in missing:
             print(f" - {heading}")
         raise SystemExit(1)

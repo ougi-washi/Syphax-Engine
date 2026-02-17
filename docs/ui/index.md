@@ -10,7 +10,7 @@ Widget, layout, and callback pages.
 
 ## In this section
 
-- [Playbook: se_ui](../playbooks/se-ui.md)
+- [Path: UI](../path/ui.md)
 - [Path: buttons and UI basics](../path/buttons-and-ui-basics.md)
 - [Example: ui_basics](../examples/default/ui_basics.md)
 - [Example: ui_showcase (advanced)](../examples/advanced/ui_showcase.md)

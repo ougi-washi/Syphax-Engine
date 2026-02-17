@@ -9,9 +9,9 @@ Signed distance field scene graph, renderer, and material controls.
 
 This page is generated from `include/se_sdf.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-sdf.md)
+- [Deep dive path page](../../path/sdf.md)
 
 ## Functions
 

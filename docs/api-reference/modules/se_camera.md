@@ -9,9 +9,9 @@ Camera data, projection setup, and camera-controller helpers.
 
 This page is generated from `include/se_camera.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-camera.md)
+- [Deep dive path page](../../path/camera.md)
 
 ## Functions
 

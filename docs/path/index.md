@@ -8,7 +8,7 @@ prerequisites:
 
 Default learning path with one concept per page.
 
-## In this section
+## Core concepts
 
 - [Colors and clear](colors-and-clear.md)
 - [Draw your first text](draw-your-first-text.md)
@@ -24,3 +24,30 @@ Default learning path with one concept per page.
 - [Physics as motion](physics-as-motion.md)
 - [Debug overlay and traces](debug-overlay-and-traces.md)
 - [Export and share](export-and-share.md)
+
+## Module walkthroughs
+
+- [Window](window.md)
+- [Input](input.md)
+- [UI](ui.md)
+- [Text](text.md)
+- [Audio](audio.md)
+- [VFX](vfx.md)
+- [Curve](curve.md)
+- [SDF](sdf.md)
+- [Utilities](utilities.md)
+- [Graphics](graphics.md)
+- [Camera](camera.md)
+- [Scene](scene.md)
+- [Model](model.md)
+- [Shader](shader.md)
+- [Texture](texture.md)
+- [Loader](loader.md)
+- [GLTF](gltf.md)
+- [Render Buffer](render-buffer.md)
+- [Framebuffer](framebuffer.md)
+- [Backend](backend.md)
+- [Physics](physics.md)
+- [Navigation](navigation.md)
+- [Simulation](simulation.md)
+- [Debug](debug.md)

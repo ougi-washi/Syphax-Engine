@@ -1,16 +1,25 @@
 ---
-title: se_simulation Playbook
+title: Simulation
 summary: From first entity spawn to controlled deterministic stepping and reset.
 prerequisites:
   - Entity/component vocabulary understood.
   - Need deterministic runtime behavior.
 ---
 
-# se_simulation Playbook
+# Simulation
 
 ## When to use this
 
 Use this when runtime state should be stepped predictably and replayed/debugged with consistent outcomes.
+
+## Quick start
+
+```c
+se_simulation_create(...);
+se_simulation_entity_create(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se debug](../playbooks/se-debug.md)
+- Next step: [Debug](debug.md)
 - Run and compare with: [Linked example](../examples/advanced/simulation_intro.md)
 
 ## Related pages

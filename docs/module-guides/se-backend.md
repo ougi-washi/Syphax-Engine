@@ -41,6 +41,6 @@ se_backend_get_runtime_info(&info);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-backend.md)
+- [Deep dive path page](../path/backend.md)
 - [API module page](../api-reference/modules/se_backend.md)
 - [Example: context_lifecycle](../examples/advanced/context_lifecycle.md)

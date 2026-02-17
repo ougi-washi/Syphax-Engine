@@ -9,9 +9,9 @@ Particle system APIs for 2D and 3D emitters.
 
 This page is generated from `include/se_vfx.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-vfx.md)
+- [Deep dive path page](../../path/vfx.md)
 
 ## Functions
 

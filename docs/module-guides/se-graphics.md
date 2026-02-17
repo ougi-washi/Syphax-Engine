@@ -41,7 +41,7 @@ se_render_clear();
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-graphics.md)
+- [Deep dive path page](../path/graphics.md)
 - [API module page](../api-reference/modules/se_graphics.md)
 - [Example: hello_text](../examples/default/hello_text.md)
 - [Example: scene2d_click](../examples/default/scene2d_click.md)

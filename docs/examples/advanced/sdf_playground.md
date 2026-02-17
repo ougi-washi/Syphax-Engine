@@ -20,8 +20,8 @@ Build SDF scene graph primitives and render with stylized shading.
 
 ## Learning path
 
-- This example corresponds to [se_sdf Playbook](../../playbooks/se-sdf.md) Step 4.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [SDF path page](../../path/sdf.md) Step 4.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Camera controls from controller preset
@@ -47,7 +47,7 @@ Build SDF scene graph primitives and render with stylized shading.
 
 ## Related API links
 
-- [Playbook: se_sdf Playbook](../../playbooks/se-sdf.md)
+- [Path: SDF](../../path/sdf.md)
 - [API: se_sdf.h](../../api-reference/modules/se_sdf.md)
 - [Module guide: se_camera](../../module-guides/se-camera.md)
 - [Glossary: scene](../../glossary/terms.md#scene)

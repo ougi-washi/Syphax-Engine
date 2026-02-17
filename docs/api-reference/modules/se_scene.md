@@ -9,9 +9,9 @@ Source header: `include/se_scene.h`
 
 This page is generated from `include/se_scene.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-scene.md)
+- [Deep dive path page](../../path/scene.md)
 
 ## Functions
 

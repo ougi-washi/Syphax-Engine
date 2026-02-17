@@ -9,9 +9,9 @@ Audio engine setup, clips, streams, buses, and capture APIs.
 
 This page is generated from `include/se_audio.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-audio.md)
+- [Deep dive path page](../../path/audio.md)
 
 ## Functions
 

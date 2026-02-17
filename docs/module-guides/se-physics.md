@@ -41,7 +41,7 @@ se_physics_world_3d_step(world, dt);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-physics.md)
+- [Deep dive path page](../path/physics.md)
 - [API module page](../api-reference/modules/se_physics.md)
 - [Example: physics2d_playground](../examples/default/physics2d_playground.md)
 - [Example: physics3d_playground](../examples/default/physics3d_playground.md)

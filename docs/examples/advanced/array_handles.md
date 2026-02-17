@@ -20,8 +20,8 @@ Reference operations for `s_array` and handle-based remove behavior.
 
 ## Learning path
 
-- This example corresponds to [Utility Playbook](../../playbooks/se-math-defines-ext-quad.md) Step 2.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Utility Path](../../path/utilities.md) Step 2.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - No runtime controls. Uses stdout logging.
@@ -46,7 +46,7 @@ Reference operations for `s_array` and handle-based remove behavior.
 
 ## Related API links
 
-- [Playbook: Utility Playbook](../../playbooks/se-math-defines-ext-quad.md)
+- [Path: Utility Path](../../path/utilities.md)
 - [Glossary: handle](../../glossary/terms.md#handle)
 - [API: se_defines.h](../../api-reference/modules/se_defines.md)
 - [Module guide: se_navigation](../../module-guides/se-navigation.md)

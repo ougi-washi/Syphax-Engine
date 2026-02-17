@@ -48,4 +48,4 @@ Read first, before implementing app-level architecture on top of the engine.
 - [Project layout](project-layout.md)
 - [Glossary terms](../glossary/terms.md)
 - [API reference index](../api-reference/index.md)
-- [Next Playbook](../playbooks/se-window.md)
+- [Next path page](../path/window.md)

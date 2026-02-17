@@ -1,16 +1,25 @@
 ---
-title: se_framebuffer Playbook
+title: Framebuffer
 summary: Lifecycle guide for framebuffer handles, resizing, and texture extraction.
 prerequisites:
   - Need offscreen rendering or custom compositing.
   - Render loop already active.
 ---
 
-# se_framebuffer Playbook
+# Framebuffer
 
 ## When to use this
 
 Use this when an explicit framebuffer object lifecycle is needed for multi-pass rendering.
+
+## Quick start
+
+```c
+se_framebuffer_create(...);
+se_framebuffer_bind(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se backend](../playbooks/se-backend.md)
+- Next step: [Backend](backend.md)
 - Run and compare with: [Linked example](../examples/advanced/context_lifecycle.md)
 
 ## Related pages

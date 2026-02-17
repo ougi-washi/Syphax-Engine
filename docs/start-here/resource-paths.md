@@ -45,4 +45,4 @@ SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl");
 - [Project layout](project-layout.md)
 - [Path: load a model](../path/load-a-model.md)
 - [API: se_defines.h](../api-reference/modules/se_defines.md)
-- [Next Playbook](../playbooks/loader-se-loader.md)
+- [Next path page](../path/loader.md)

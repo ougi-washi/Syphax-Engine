@@ -1,16 +1,25 @@
 ---
-title: se_sdf Playbook
+title: SDF
 summary: SDF scene graph flow from scene creation to validated transform updates.
 prerequisites:
   - SDF concepts and scene graph basics understood.
   - Runtime target with camera controls.
 ---
 
-# se_sdf Playbook
+# SDF
 
 ## When to use this
 
 Use this when signed-distance content should be assembled with reusable scene nodes and validated structure.
+
+## Quick start
+
+```c
+se_sdf_scene_create(...);
+se_sdf_scene_clear(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se math defines ext quad](../playbooks/se-math-defines-ext-quad.md)
+- Next step: [Utilities](utilities.md)
 - Run and compare with: [Linked example](../examples/advanced/sdf_playground.md)
 
 ## Related pages

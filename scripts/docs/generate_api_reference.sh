@@ -85,34 +85,34 @@ MODULE_OVERVIEW = {
     "loader_se_loader": "General loader helpers used by model and asset loading paths.",
 }
 
-PLAYBOOK_PATH = {
-    "se_window": "playbooks/se-window.md",
-    "se_input": "playbooks/se-input.md",
-    "se_camera": "playbooks/se-camera.md",
-    "se_scene": "playbooks/se-scene.md",
-    "se_ui": "playbooks/se-ui.md",
-    "se_audio": "playbooks/se-audio.md",
-    "se_physics": "playbooks/se-physics.md",
-    "se_vfx": "playbooks/se-vfx.md",
-    "se_navigation": "playbooks/se-navigation.md",
-    "se_simulation": "playbooks/se-simulation.md",
-    "se_debug": "playbooks/se-debug.md",
-    "se_graphics": "playbooks/se-graphics.md",
-    "se_model": "playbooks/se-model.md",
-    "se_shader": "playbooks/se-shader.md",
-    "se_texture": "playbooks/se-texture.md",
-    "se_text": "playbooks/se-text.md",
-    "se_render_buffer": "playbooks/se-render-buffer.md",
-    "se_framebuffer": "playbooks/se-framebuffer.md",
-    "se_backend": "playbooks/se-backend.md",
-    "se_curve": "playbooks/se-curve.md",
-    "se_sdf": "playbooks/se-sdf.md",
-    "loader_se_loader": "playbooks/loader-se-loader.md",
-    "loader_se_gltf": "playbooks/loader-se-gltf.md",
-    "se_math": "playbooks/se-math-defines-ext-quad.md",
-    "se_defines": "playbooks/se-math-defines-ext-quad.md",
-    "se_ext": "playbooks/se-math-defines-ext-quad.md",
-    "se_quad": "playbooks/se-math-defines-ext-quad.md",
+PATH_WALKTHROUGH = {
+    "se_window": "path/window.md",
+    "se_input": "path/input.md",
+    "se_camera": "path/camera.md",
+    "se_scene": "path/scene.md",
+    "se_ui": "path/ui.md",
+    "se_audio": "path/audio.md",
+    "se_physics": "path/physics.md",
+    "se_vfx": "path/vfx.md",
+    "se_navigation": "path/navigation.md",
+    "se_simulation": "path/simulation.md",
+    "se_debug": "path/debug.md",
+    "se_graphics": "path/graphics.md",
+    "se_model": "path/model.md",
+    "se_shader": "path/shader.md",
+    "se_texture": "path/texture.md",
+    "se_text": "path/text.md",
+    "se_render_buffer": "path/render-buffer.md",
+    "se_framebuffer": "path/framebuffer.md",
+    "se_backend": "path/backend.md",
+    "se_curve": "path/curve.md",
+    "se_sdf": "path/sdf.md",
+    "loader_se_loader": "path/loader.md",
+    "loader_se_gltf": "path/gltf.md",
+    "se_math": "path/utilities.md",
+    "se_defines": "path/utilities.md",
+    "se_ext": "path/utilities.md",
+    "se_quad": "path/utilities.md",
 }
 
 
@@ -385,13 +385,13 @@ for module in module_docs:
         "",
     ]
 
-    playbook_rel = PLAYBOOK_PATH.get(module.module_id)
-    if playbook_rel:
+    path_rel = PATH_WALKTHROUGH.get(module.module_id)
+    if path_rel:
         lines.extend(
             [
-                "## Read the Playbook",
+                "## Read the path walkthrough",
                 "",
-                f"- [Deep dive Playbook](../../{playbook_rel})",
+                f"- [Deep dive path page](../../{path_rel})",
                 "",
             ]
         )

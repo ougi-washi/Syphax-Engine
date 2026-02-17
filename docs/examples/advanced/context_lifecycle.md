@@ -20,9 +20,9 @@ Validate resource ownership and context teardown reports.
 
 ## Learning path
 
-- This example corresponds to [se_window Playbook](../../playbooks/se-window.md) Step 4.
-- This example corresponds to [se_framebuffer Playbook](../../playbooks/se-framebuffer.md) Step 4.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Window path page](../../path/window.md) Step 4.
+- This example corresponds to [Framebuffer path page](../../path/framebuffer.md) Step 4.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - No runtime controls. Uses validation output in console.
@@ -47,7 +47,7 @@ Validate resource ownership and context teardown reports.
 
 ## Related API links
 
-- [Playbook: se_window Playbook](../../playbooks/se-window.md)
+- [Path: Window](../../path/window.md)
 - [Module guide: se_window](../../module-guides/se-window.md)
 - [Module guide: se_framebuffer](../../module-guides/se-framebuffer.md)
 - [API: se_window.h](../../api-reference/modules/se_window.md)

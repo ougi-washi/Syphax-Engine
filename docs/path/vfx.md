@@ -1,16 +1,25 @@
 ---
-title: se_vfx Playbook
+title: VFX
 summary: Emitter lifecycle from first spawn to tunable burst-driven effects.
 prerequisites:
   - Texture/model assets available.
   - Frame loop and timing basics ready.
 ---
 
-# se_vfx Playbook
+# VFX
 
 ## When to use this
 
 Use this when particle behavior should be data-driven and tuned live without rewriting update loops.
+
+## Quick start
+
+```c
+se_vfx_2d_create(...);
+se_vfx_2d_add_emitter(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se curve](../playbooks/se-curve.md)
+- Next step: [Curve](curve.md)
 - Run and compare with: [Linked example](../examples/advanced/vfx_emitters.md)
 
 ## Related pages

@@ -9,9 +9,9 @@ Backend selection and runtime backend information.
 
 This page is generated from `include/se_backend.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-backend.md)
+- [Deep dive path page](../../path/backend.md)
 
 ## Functions
 

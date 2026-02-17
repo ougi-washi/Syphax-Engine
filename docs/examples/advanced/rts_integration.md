@@ -20,9 +20,9 @@ Integration-scale runtime combining scene, UI, debug, and simulation patterns.
 
 ## Learning path
 
-- This example corresponds to [se_simulation Playbook](../../playbooks/se-simulation.md) Step 4.
-- This example corresponds to [se_debug Playbook](../../playbooks/se-debug.md) Step 4.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Simulation path page](../../path/simulation.md) Step 4.
+- This example corresponds to [Debug path page](../../path/debug.md) Step 4.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Use startup control map printed by target
@@ -48,7 +48,7 @@ Integration-scale runtime combining scene, UI, debug, and simulation patterns.
 
 ## Related API links
 
-- [Playbook: se_simulation Playbook](../../playbooks/se-simulation.md)
+- [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [Module guide: se_debug](../../module-guides/se-debug.md)
 - [API: se_scene.h](../../api-reference/modules/se_scene.md)

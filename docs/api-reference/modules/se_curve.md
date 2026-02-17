@@ -9,9 +9,9 @@ Curve keyframe data and interpolation helpers.
 
 This page is generated from `include/se_curve.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-curve.md)
+- [Deep dive path page](../../path/curve.md)
 
 ## Functions
 

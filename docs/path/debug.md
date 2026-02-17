@@ -1,16 +1,25 @@
 ---
-title: se_debug Playbook
+title: Debug
 summary: Instrumentation progression from one trace span to full frame timing visibility.
 prerequisites:
   - A looped runtime target available.
   - Need diagnostics for performance or behavior.
 ---
 
-# se_debug Playbook
+# Debug
 
 ## When to use this
 
 Use this when timing, validation, and runtime traces are needed to isolate regressions quickly.
+
+## Quick start
+
+```c
+se_debug_set_level(...);
+se_debug_frame_begin(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -91,7 +100,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se model](../playbooks/se-model.md)
+- Next step: [Model](model.md)
 - Run and compare with: [Linked example](../examples/advanced/debug_tools.md)
 
 ## Related pages

@@ -1,28 +1,36 @@
 ---
-title: loader/se_loader Playbook
-summary: Integrate loader helpers from one asset pointer to scene/model utility flow.
+title: GLTF
+summary: GLTF/GLB parsing progression from load to export and cleanup.
 prerequisites:
-  - GLTF assets available.
-  - Model/texture module basics known.
+  - Model asset path available.
+  - Need explicit import/export control.
 ---
 
-# loader/se_loader Playbook
+# GLTF
 
 ## When to use this
 
-Use this when asset loading should map directly to scene/model helpers without custom loader wrappers.
+Use this when you need direct access to parsed GLTF data and deterministic export operations.
+
+## Quick start
+
+```c
+se_gltf_load(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
-Build the smallest compileable setup that touches `loader/se_loader` with explicit handles and one safe call path.
+Build the smallest compileable setup that touches `loader/se_gltf` with explicit handles and one safe call path.
 
 ```c
---8<-- "snippets/loader_se_loader/step1_minimal.c"
+--8<-- "snippets/loader_se_gltf/step1_minimal.c"
 ```
 
 Key API calls:
 
-- `se_gltf_model_load`
+- `se_gltf_load`
 
 ## Step 2: Add Core Feature
 
@@ -31,14 +39,13 @@ Add the core runtime feature so the module starts doing useful work every frame 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/loader_se_loader/step2_core.c"
+--8<-- "snippets/loader_se_gltf/step2_core.c"
 ```
 
 Key API calls:
 
-- `se_gltf_model_load`
-- `se_gltf_texture_load`
-- `se_gltf_scene_compute_bounds`
+- `se_gltf_load`
+- `se_gltf_write`
 
 ## Step 3: Interactive / Tunable
 
@@ -47,15 +54,14 @@ Add one interactive or tunable behavior so runtime changes are visible and easy 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/loader_se_loader/step3_interactive.c"
+--8<-- "snippets/loader_se_gltf/step3_interactive.c"
 ```
 
 Key API calls:
 
-- `se_gltf_model_load`
-- `se_gltf_texture_load`
-- `se_gltf_scene_compute_bounds`
-- `se_gltf_model_load_first`
+- `se_gltf_load`
+- `se_gltf_write`
+- `se_set_last_error`
 
 ## Step 4: Complete Practical Demo
 
@@ -64,17 +70,15 @@ Complete the flow with cleanup and final integration structure suitable for a re
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/loader_se_loader/step4_complete.c"
+--8<-- "snippets/loader_se_gltf/step4_complete.c"
 ```
 
 Key API calls:
 
-- `se_gltf_model_load`
-- `se_gltf_texture_load`
-- `se_gltf_scene_compute_bounds`
-- `se_gltf_model_load_first`
-- `se_model_destroy`
-- `se_texture_destroy`
+- `se_gltf_load`
+- `se_gltf_write`
+- `se_set_last_error`
+- `se_gltf_free`
 
 ## Common mistakes
 
@@ -84,12 +88,11 @@ Key API calls:
 
 ## Next
 
-- Next step: [loader se gltf](../playbooks/loader-se-gltf.md)
-- Run and compare with: [Linked example](../examples/default/model_viewer.md)
+- Next step: [Render Buffer](render-buffer.md)
+- Run and compare with: [Linked example](../examples/advanced/gltf_roundtrip.md)
 
 ## Related pages
 
-- [Module guide](../module-guides/loader-se-loader.md)
-- [API: loader/se_loader.h](../api-reference/modules/loader_se_loader.md)
-- [Example: model_viewer](../examples/default/model_viewer.md)
+- [Module guide](../module-guides/loader-se-gltf.md)
+- [API: loader/se_gltf.h](../api-reference/modules/loader_se_gltf.md)
 - [Example: gltf_roundtrip](../examples/advanced/gltf_roundtrip.md)

@@ -1,16 +1,25 @@
 ---
-title: se_render_buffer Playbook
+title: Render Buffer
 summary: Offscreen render flow from one buffer to configurable post-processing placement.
 prerequisites:
   - Framebuffer concepts understood.
   - Post-processing shader path available.
 ---
 
-# se_render_buffer Playbook
+# Render Buffer
 
 ## When to use this
 
 Use this when drawing into intermediate targets and compositing to screen in controlled stages.
+
+## Quick start
+
+```c
+se_render_buffer_create(...);
+se_render_buffer_bind(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se framebuffer](../playbooks/se-framebuffer.md)
+- Next step: [Framebuffer](framebuffer.md)
 - Run and compare with: [Linked example](../examples/advanced/multi_window.md)
 
 ## Related pages

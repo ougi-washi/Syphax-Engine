@@ -41,6 +41,6 @@ se_navigation_find_path_simple(&grid, start, goal, true, &path);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-navigation.md)
+- [Deep dive path page](../path/navigation.md)
 - [API module page](../api-reference/modules/se_navigation.md)
 - [Example: navigation_grid](../examples/advanced/navigation_grid.md)

@@ -1,29 +1,38 @@
 ---
-title: se_window Playbook
-summary: Window lifecycle from minimal frame loop to stable runtime pacing.
+title: Input
+summary: Build action maps, contexts, and tunable input behavior from one small setup.
 prerequisites:
-  - Start Here pages completed.
-  - A target that already builds.
+  - A valid window handle in your target.
+  - Basic frame loop in place.
 ---
 
-# se_window Playbook
+# Input
 
 ## When to use this
 
-Use this when you need deterministic frame boundaries, input polling, and runtime pacing controls.
+Use this when raw keyboard/mouse state should become named actions that are easy to remap and test.
+
+## Quick start
+
+```c
+se_input_create(...);
+se_input_tick(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
-Build the smallest compileable setup that touches `se_window` with explicit handles and one safe call path.
+Build the smallest compileable setup that touches `se_input` with explicit handles and one safe call path.
 
 ```c
---8<-- "snippets/se_window/step1_minimal.c"
+--8<-- "snippets/se_input/step1_minimal.c"
 ```
 
 Key API calls:
 
-- `se_window_set_exit_key`
-- `se_window_should_close`
+- `se_input_create`
+- `se_input_tick`
 
 ## Step 2: Add Core Feature
 
@@ -32,16 +41,15 @@ Add the core runtime feature so the module starts doing useful work every frame 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_window/step2_core.c"
+--8<-- "snippets/se_input/step2_core.c"
 ```
 
 Key API calls:
 
-- `se_window_set_exit_key`
-- `se_window_should_close`
-- `se_window_begin_frame`
-- `se_window_end_frame`
-- `se_window_poll_events`
+- `se_input_create`
+- `se_input_tick`
+- `se_input_action_create`
+- `se_input_action_get_value`
 
 ## Step 3: Interactive / Tunable
 
@@ -50,17 +58,17 @@ Add one interactive or tunable behavior so runtime changes are visible and easy 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_window/step3_interactive.c"
+--8<-- "snippets/se_input/step3_interactive.c"
 ```
 
 Key API calls:
 
-- `se_window_set_exit_key`
-- `se_window_should_close`
-- `se_window_begin_frame`
-- `se_window_end_frame`
-- `se_window_poll_events`
-- `se_window_set_target_fps`
+- `se_input_create`
+- `se_input_tick`
+- `se_input_action_create`
+- `se_input_action_get_value`
+- `se_input_action_is_pressed`
+- `se_input_set_enabled`
 
 ## Step 4: Complete Practical Demo
 
@@ -69,17 +77,17 @@ Complete the flow with cleanup and final integration structure suitable for a re
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_window/step4_complete.c"
+--8<-- "snippets/se_input/step4_complete.c"
 ```
 
 Key API calls:
 
-- `se_window_set_exit_key`
-- `se_window_should_close`
-- `se_window_begin_frame`
-- `se_window_end_frame`
-- `se_window_poll_events`
-- `se_window_set_target_fps`
+- `se_input_create`
+- `se_input_tick`
+- `se_input_action_create`
+- `se_input_action_get_value`
+- `se_input_action_is_pressed`
+- `se_input_set_enabled`
 
 ## Common mistakes
 
@@ -89,12 +97,11 @@ Key API calls:
 
 ## Next
 
-- Next step: [se input](../playbooks/se-input.md)
-- Run and compare with: [Linked example](../examples/default/hello_text.md)
+- Next step: [UI](ui.md)
+- Run and compare with: [Linked example](../examples/default/input_actions.md)
 
 ## Related pages
 
-- [Module guide](../module-guides/se-window.md)
-- [API: se_window.h](../api-reference/modules/se_window.md)
-- [Example: hello_text](../examples/default/hello_text.md)
+- [Module guide](../module-guides/se-input.md)
+- [API: se_input.h](../api-reference/modules/se_input.md)
 - [Example: input_actions](../examples/default/input_actions.md)

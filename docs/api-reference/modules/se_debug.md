@@ -9,9 +9,9 @@ Logging, trace spans, overlays, and frame timing diagnostics.
 
 This page is generated from `include/se_debug.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-debug.md)
+- [Deep dive path page](../../path/debug.md)
 
 ## Functions
 

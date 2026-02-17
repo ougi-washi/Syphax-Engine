@@ -41,6 +41,6 @@ se_debug_dump_last_frame_timing_lines(buf, sizeof(buf));
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-debug.md)
+- [Deep dive path page](../path/debug.md)
 - [API module page](../api-reference/modules/se_debug.md)
 - [Example: debug_tools](../examples/advanced/debug_tools.md)

@@ -1,16 +1,25 @@
 ---
-title: se_physics Playbook
+title: Physics
 summary: Reference-quality progression from fixed-step world setup to a complete mini simulation flow.
 prerequisites:
   - Frame loop and dt handling ready.
   - Scene/object transform basics understood.
 ---
 
-# se_physics Playbook
+# Physics
 
 ## When to use this
 
 Use this when you need deterministic body stepping, collision setup, and runtime tuning for motion systems.
+
+## Quick start
+
+```c
+se_physics_world_2d_create(...);
+se_physics_world_2d_step(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -87,7 +96,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se navigation](../playbooks/se-navigation.md)
+- Next step: [Navigation](navigation.md)
 - Run and compare with: [Linked example](../examples/default/physics2d_playground.md)
 
 ## Related pages

@@ -9,9 +9,9 @@ Shader loading, uniform access, and shader handle lifecycle.
 
 This page is generated from `include/se_shader.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-shader.md)
+- [Deep dive path page](../../path/shader.md)
 
 ## Functions
 

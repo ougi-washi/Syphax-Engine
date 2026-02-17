@@ -1,29 +1,36 @@
 ---
-title: se_text Playbook
-summary: Layer text rendering from one label to reusable font/text lifecycle management.
+title: Texture
+summary: Texture loading progression from one file to runtime-friendly handle management.
 prerequisites:
-  - Font files present under resources.
-  - Window/render loop working.
+  - Texture assets available.
+  - Shader/material path already configured.
 ---
 
-# se_text Playbook
+# Texture
 
 ## When to use this
 
-Use this when runtime feedback, labels, and debug text need clear font ownership and draw calls.
+Use this when texture data should stay in explicit handles with clear ownership and wrap behavior.
+
+## Quick start
+
+```c
+se_texture_load(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
-Build the smallest compileable setup that touches `se_text` with explicit handles and one safe call path.
+Build the smallest compileable setup that touches `se_texture` with explicit handles and one safe call path.
 
 ```c
---8<-- "snippets/se_text/step1_minimal.c"
+--8<-- "snippets/se_texture/step1_minimal.c"
 ```
 
 Key API calls:
 
-- `se_text_handle_create`
-- `se_font_load`
+- `se_texture_load`
 
 ## Step 2: Add Core Feature
 
@@ -32,14 +39,13 @@ Add the core runtime feature so the module starts doing useful work every frame 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_text/step2_core.c"
+--8<-- "snippets/se_texture/step2_core.c"
 ```
 
 Key API calls:
 
-- `se_text_handle_create`
-- `se_font_load`
-- `se_text_render`
+- `se_texture_load`
+- `se_texture_load_from_memory`
 
 ## Step 3: Interactive / Tunable
 
@@ -48,14 +54,13 @@ Add one interactive or tunable behavior so runtime changes are visible and easy 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_text/step3_interactive.c"
+--8<-- "snippets/se_texture/step3_interactive.c"
 ```
 
 Key API calls:
 
-- `se_text_handle_create`
-- `se_font_load`
-- `se_text_render`
+- `se_texture_load`
+- `se_texture_load_from_memory`
 
 ## Step 4: Complete Practical Demo
 
@@ -64,16 +69,14 @@ Complete the flow with cleanup and final integration structure suitable for a re
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_text/step4_complete.c"
+--8<-- "snippets/se_texture/step4_complete.c"
 ```
 
 Key API calls:
 
-- `se_text_handle_create`
-- `se_font_load`
-- `se_text_render`
-- `se_font_destroy`
-- `se_text_handle_destroy`
+- `se_texture_load`
+- `se_texture_load_from_memory`
+- `se_texture_destroy`
 
 ## Common mistakes
 
@@ -83,11 +86,12 @@ Key API calls:
 
 ## Next
 
-- Next step: [se audio](../playbooks/se-audio.md)
-- Run and compare with: [Linked example](../examples/default/hello_text.md)
+- Next step: [Loader](loader.md)
+- Run and compare with: [Linked example](../examples/default/model_viewer.md)
 
 ## Related pages
 
-- [Module guide](../module-guides/se-text.md)
-- [API: se_text.h](../api-reference/modules/se_text.md)
-- [Example: hello_text](../examples/default/hello_text.md)
+- [Module guide](../module-guides/se-texture.md)
+- [API: se_texture.h](../api-reference/modules/se_texture.md)
+- [Example: model_viewer](../examples/default/model_viewer.md)
+- [Example: vfx_emitters](../examples/advanced/vfx_emitters.md)

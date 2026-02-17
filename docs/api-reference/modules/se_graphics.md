@@ -9,9 +9,9 @@ Render lifecycle helpers such as clear, blending, and context state.
 
 This page is generated from `include/se_graphics.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-graphics.md)
+- [Deep dive path page](../../path/graphics.md)
 
 ## Functions
 

@@ -42,7 +42,7 @@ se_window_end_frame(window);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-window.md)
+- [Deep dive path page](../path/window.md)
 - [API module page](../api-reference/modules/se_window.md)
 - [Example: hello_text](../examples/default/hello_text.md)
 - [Example: input_actions](../examples/default/input_actions.md)

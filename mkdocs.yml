@@ -95,6 +95,30 @@ nav:
       - Physics As Motion: path/physics-as-motion.md
       - Debug Overlay And Traces: path/debug-overlay-and-traces.md
       - Export And Share: path/export-and-share.md
+      - Window: path/window.md
+      - Input: path/input.md
+      - UI: path/ui.md
+      - Text: path/text.md
+      - Audio: path/audio.md
+      - VFX: path/vfx.md
+      - Curve: path/curve.md
+      - SDF: path/sdf.md
+      - Utilities: path/utilities.md
+      - Graphics: path/graphics.md
+      - Camera: path/camera.md
+      - Scene: path/scene.md
+      - Model: path/model.md
+      - Shader: path/shader.md
+      - Texture: path/texture.md
+      - Loader: path/loader.md
+      - GLTF: path/gltf.md
+      - Render Buffer: path/render-buffer.md
+      - Framebuffer: path/framebuffer.md
+      - Backend: path/backend.md
+      - Physics: path/physics.md
+      - Navigation: path/navigation.md
+      - Simulation: path/simulation.md
+      - Debug: path/debug.md
   - Visual Building Blocks:
       - visual-building-blocks/index.md
   - Interaction:
@@ -163,32 +187,6 @@ nav:
       - se_curve: module-guides/se-curve.md
       - loader/se_loader: module-guides/loader-se-loader.md
       - loader/se_gltf: module-guides/loader-se-gltf.md
-  - Playbooks:
-      - playbooks/index.md
-      - se_window Playbook: playbooks/se-window.md
-      - se_input Playbook: playbooks/se-input.md
-      - se_camera Playbook: playbooks/se-camera.md
-      - se_scene Playbook: playbooks/se-scene.md
-      - se_ui Playbook: playbooks/se-ui.md
-      - se_audio Playbook: playbooks/se-audio.md
-      - se_physics Playbook: playbooks/se-physics.md
-      - se_vfx Playbook: playbooks/se-vfx.md
-      - se_navigation Playbook: playbooks/se-navigation.md
-      - se_simulation Playbook: playbooks/se-simulation.md
-      - se_debug Playbook: playbooks/se-debug.md
-      - se_graphics Playbook: playbooks/se-graphics.md
-      - se_model Playbook: playbooks/se-model.md
-      - se_shader Playbook: playbooks/se-shader.md
-      - se_texture Playbook: playbooks/se-texture.md
-      - se_text Playbook: playbooks/se-text.md
-      - se_render_buffer Playbook: playbooks/se-render-buffer.md
-      - se_framebuffer Playbook: playbooks/se-framebuffer.md
-      - se_backend Playbook: playbooks/se-backend.md
-      - se_curve Playbook: playbooks/se-curve.md
-      - se_sdf Playbook: playbooks/se-sdf.md
-      - loader/se_loader Playbook: playbooks/loader-se-loader.md
-      - loader/se_gltf Playbook: playbooks/loader-se-gltf.md
-      - Utility Playbook: playbooks/se-math-defines-ext-quad.md
   - API Reference:
       - api-reference/index.md
       - Module Index: api-reference/modules/index.md

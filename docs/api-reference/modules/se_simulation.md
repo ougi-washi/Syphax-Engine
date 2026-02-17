@@ -9,9 +9,9 @@ Deterministic simulation components, systems, events, and snapshots.
 
 This page is generated from `include/se_simulation.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-simulation.md)
+- [Deep dive path page](../../path/simulation.md)
 
 ## Functions
 

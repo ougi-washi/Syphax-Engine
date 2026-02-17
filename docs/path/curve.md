@@ -1,16 +1,25 @@
 ---
-title: se_curve Playbook
+title: Curve
 summary: Progress from basic keyframes to tunable interpolation for runtime animation values.
 prerequisites:
   - Need value interpolation over time.
   - Basic math/vector types understood.
 ---
 
-# se_curve Playbook
+# Curve
 
 ## When to use this
 
 Use this when scalar/vector tracks must be authorable as keys and evaluated deterministically.
+
+## Quick start
+
+```c
+se_curve_float_init(...);
+se_curve_float_add_key(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -84,7 +93,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se sdf](../playbooks/se-sdf.md)
+- Next step: [SDF](sdf.md)
 - Run and compare with: [Linked example](../examples/advanced/vfx_emitters.md)
 
 ## Related pages

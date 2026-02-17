@@ -20,9 +20,9 @@ Combined 2D and 3D emitters with animated uniform callbacks.
 
 ## Learning path
 
-- This example corresponds to [se_vfx Playbook](../../playbooks/se-vfx.md) Step 4.
-- This example corresponds to [se_curve Playbook](../../playbooks/se-curve.md) Step 3.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [VFX path page](../../path/vfx.md) Step 4.
+- This example corresponds to [Curve path page](../../path/curve.md) Step 3.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Esc: quit
@@ -47,7 +47,7 @@ Combined 2D and 3D emitters with animated uniform callbacks.
 
 ## Related API links
 
-- [Playbook: se_vfx Playbook](../../playbooks/se-vfx.md)
+- [Path: VFX](../../path/vfx.md)
 - [Path: particles and VFX](../../path/particles-and-vfx.md)
 - [Module guide: se_vfx](../../module-guides/se-vfx.md)
 - [API: se_vfx.h](../../api-reference/modules/se_vfx.md)

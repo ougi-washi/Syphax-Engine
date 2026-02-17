@@ -41,6 +41,6 @@ se_shader_set_float(shader, "u_value", 1.0f);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-shader.md)
+- [Deep dive path page](../path/shader.md)
 - [API module page](../api-reference/modules/se_shader.md)
 - [Example: scene2d_click](../examples/default/scene2d_click.md)

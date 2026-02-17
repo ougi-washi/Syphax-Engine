@@ -10,9 +10,9 @@ prerequisites:
 
 ## In this section
 
-- [Playbook: se_camera](../playbooks/se-camera.md)
-- [Playbook: se_scene](../playbooks/se-scene.md)
-- [Playbook: se_model](../playbooks/se-model.md)
+- [Path: Camera](../path/camera.md)
+- [Path: Scene](../path/scene.md)
+- [Path: Model](../path/model.md)
 - [Path: your first 3D object](../path/your-first-3d-object.md)
 - [Path: camera orbit and pan](../path/camera-orbit-and-pan.md)
 - [Path: load a model](../path/load-a-model.md)

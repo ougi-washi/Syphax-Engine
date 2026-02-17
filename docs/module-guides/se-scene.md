@@ -41,7 +41,7 @@ se_scene_3d_draw(scene, window);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-scene.md)
+- [Deep dive path page](../path/scene.md)
 - [API module page](../api-reference/modules/se_scene.md)
 - [Example: scene2d_click](../examples/default/scene2d_click.md)
 - [Example: scene2d_instancing](../examples/default/scene2d_instancing.md)

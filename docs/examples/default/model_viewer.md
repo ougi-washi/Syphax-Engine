@@ -18,9 +18,9 @@ Load and inspect a 3D model with a camera controller.
 
 ## Learning path
 
-- This example corresponds to [se_model Playbook](../../playbooks/se-model.md) Step 3.
-- This example corresponds to [loader/se_loader Playbook](../../playbooks/loader-se-loader.md) Step 2.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Model path page](../../path/model.md) Step 3.
+- This example corresponds to [Loader path page](../../path/loader.md) Step 2.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Mouse + WASD: camera movement
@@ -47,7 +47,7 @@ Load and inspect a 3D model with a camera controller.
 
 ## Related API links
 
-- [Playbook: se_model Playbook](../../playbooks/se-model.md)
+- [Path: Model](../../path/model.md)
 - [Path: load a model](../../path/load-a-model.md)
 - [Module guide: se_model](../../module-guides/se-model.md)
 - [API: se_model.h](../../api-reference/modules/se_model.md)

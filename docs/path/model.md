@@ -1,29 +1,36 @@
 ---
-title: se_input Playbook
-summary: Build action maps, contexts, and tunable input behavior from one small setup.
+title: Model
+summary: Grow from one loaded model to tunable transforms and safe resource teardown.
 prerequisites:
-  - A valid window handle in your target.
-  - Basic frame loop in place.
+  - Model files and shaders available.
+  - 3D basics and camera setup understood.
 ---
 
-# se_input Playbook
+# Model
 
 ## When to use this
 
-Use this when raw keyboard/mouse state should become named actions that are easy to remap and test.
+Use this when mesh/model loading and transform updates should stay in reusable engine-level primitives.
+
+## Quick start
+
+```c
+se_model_load_obj_simple(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
-Build the smallest compileable setup that touches `se_input` with explicit handles and one safe call path.
+Build the smallest compileable setup that touches `se_model` with explicit handles and one safe call path.
 
 ```c
---8<-- "snippets/se_input/step1_minimal.c"
+--8<-- "snippets/se_model/step1_minimal.c"
 ```
 
 Key API calls:
 
-- `se_input_create`
-- `se_input_tick`
+- `se_model_load_obj_simple`
 
 ## Step 2: Add Core Feature
 
@@ -32,15 +39,14 @@ Add the core runtime feature so the module starts doing useful work every frame 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_input/step2_core.c"
+--8<-- "snippets/se_model/step2_core.c"
 ```
 
 Key API calls:
 
-- `se_input_create`
-- `se_input_tick`
-- `se_input_action_create`
-- `se_input_action_get_value`
+- `se_model_load_obj_simple`
+- `se_model_scale`
+- `se_model_rotate`
 
 ## Step 3: Interactive / Tunable
 
@@ -49,17 +55,16 @@ Add one interactive or tunable behavior so runtime changes are visible and easy 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_input/step3_interactive.c"
+--8<-- "snippets/se_model/step3_interactive.c"
 ```
 
 Key API calls:
 
-- `se_input_create`
-- `se_input_tick`
-- `se_input_action_create`
-- `se_input_action_get_value`
-- `se_input_action_is_pressed`
-- `se_input_set_enabled`
+- `se_model_load_obj_simple`
+- `se_model_scale`
+- `se_model_rotate`
+- `se_model_get_mesh_count`
+- `se_model_render`
 
 ## Step 4: Complete Practical Demo
 
@@ -68,17 +73,17 @@ Complete the flow with cleanup and final integration structure suitable for a re
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
 ```c
---8<-- "snippets/se_input/step4_complete.c"
+--8<-- "snippets/se_model/step4_complete.c"
 ```
 
 Key API calls:
 
-- `se_input_create`
-- `se_input_tick`
-- `se_input_action_create`
-- `se_input_action_get_value`
-- `se_input_action_is_pressed`
-- `se_input_set_enabled`
+- `se_model_load_obj_simple`
+- `se_model_scale`
+- `se_model_rotate`
+- `se_model_get_mesh_count`
+- `se_model_render`
+- `se_model_destroy`
 
 ## Common mistakes
 
@@ -88,11 +93,11 @@ Key API calls:
 
 ## Next
 
-- Next step: [se ui](../playbooks/se-ui.md)
-- Run and compare with: [Linked example](../examples/default/input_actions.md)
+- Next step: [Shader](shader.md)
+- Run and compare with: [Linked example](../examples/default/model_viewer.md)
 
 ## Related pages
 
-- [Module guide](../module-guides/se-input.md)
-- [API: se_input.h](../api-reference/modules/se_input.md)
-- [Example: input_actions](../examples/default/input_actions.md)
+- [Module guide](../module-guides/se-model.md)
+- [API: se_model.h](../api-reference/modules/se_model.md)
+- [Example: model_viewer](../examples/default/model_viewer.md)

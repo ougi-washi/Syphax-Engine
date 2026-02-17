@@ -18,8 +18,8 @@ Run a 3D rigid-body simulation and update instance transforms.
 
 ## Learning path
 
-- This example corresponds to [se_physics Playbook](../../playbooks/se-physics.md) Step 4.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Physics path page](../../path/physics.md) Step 4.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Space: launch all cubes upward
@@ -45,7 +45,7 @@ Run a 3D rigid-body simulation and update instance transforms.
 
 ## Related API links
 
-- [Playbook: se_physics Playbook](../../playbooks/se-physics.md)
+- [Path: Physics](../../path/physics.md)
 - [Path: physics as motion](../../path/physics-as-motion.md)
 - [Module guide: se_physics](../../module-guides/se-physics.md)
 - [API: se_physics.h](../../api-reference/modules/se_physics.md)

@@ -20,8 +20,8 @@ Enable trace and overlay diagnostics and inspect frame timing lines.
 
 ## Learning path
 
-- This example corresponds to [se_debug Playbook](../../playbooks/se-debug.md) Step 3.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Debug path page](../../path/debug.md) Step 3.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Esc: quit
@@ -46,7 +46,7 @@ Enable trace and overlay diagnostics and inspect frame timing lines.
 
 ## Related API links
 
-- [Playbook: se_debug Playbook](../../playbooks/se-debug.md)
+- [Path: Debug](../../path/debug.md)
 - [Path: debug overlay and traces](../../path/debug-overlay-and-traces.md)
 - [Module guide: se_debug](../../module-guides/se-debug.md)
 - [API: se_debug.h](../../api-reference/modules/se_debug.md)

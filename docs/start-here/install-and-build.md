@@ -47,4 +47,4 @@ git submodule update --init --recursive
 - [Troubleshooting](../troubleshooting/docs-build.md)
 - [First run checklist](first-run-checklist.md)
 - [README](../index.md)
-- [Next Playbook](../playbooks/se-window.md)
+- [Next path page](../path/window.md)

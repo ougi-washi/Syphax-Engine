@@ -9,9 +9,9 @@ General loader helpers used by model and asset loading paths.
 
 This page is generated from `include/loader/se_loader.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/loader-se-loader.md)
+- [Deep dive path page](../../path/loader.md)
 
 ## Functions
 

@@ -1,16 +1,25 @@
 ---
-title: se_audio Playbook
+title: Audio
 summary: Build a stable audio loop from one clip to tunable bus-level control.
 prerequisites:
   - Audio assets available in resource paths.
   - Runtime frame loop in place.
 ---
 
-# se_audio Playbook
+# Audio
 
 ## When to use this
 
 Use this when clips/streams need consistent playback and mix-level controls without custom audio plumbing.
+
+## Quick start
+
+```c
+se_audio_init(...);
+se_audio_update(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se vfx](../playbooks/se-vfx.md)
+- Next step: [VFX](vfx.md)
 - Run and compare with: [Linked example](../examples/default/audio_basics.md)
 
 ## Related pages

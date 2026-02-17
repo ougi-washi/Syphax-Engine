@@ -41,6 +41,6 @@ se_input_tick(input);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-input.md)
+- [Deep dive path page](../path/input.md)
 - [API module page](../api-reference/modules/se_input.md)
 - [Example: input_actions](../examples/default/input_actions.md)

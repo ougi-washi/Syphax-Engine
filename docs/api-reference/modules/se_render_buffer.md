@@ -9,9 +9,9 @@ Render-to-texture buffers and offscreen draw orchestration.
 
 This page is generated from `include/se_render_buffer.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-render-buffer.md)
+- [Deep dive path page](../../path/render-buffer.md)
 
 ## Functions
 

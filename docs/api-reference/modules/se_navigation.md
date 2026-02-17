@@ -9,9 +9,9 @@ Grid navigation, pathfinding, smoothing, and occupancy controls.
 
 This page is generated from `include/se_navigation.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-navigation.md)
+- [Deep dive path page](../../path/navigation.md)
 
 ## Functions
 

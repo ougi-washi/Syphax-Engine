@@ -1,16 +1,25 @@
 ---
-title: se_graphics Playbook
+title: Graphics
 summary: Establish render lifecycle helpers from clear calls to context-aware state checks.
 prerequisites:
   - Window or offscreen target ready.
   - Basic scene/text draw calls understood.
 ---
 
-# se_graphics Playbook
+# Graphics
 
 ## When to use this
 
 Use this when render setup/cleanup must stay explicit and consistent across different runtime contexts.
+
+## Quick start
+
+```c
+se_render_init(...);
+se_render_set_background_color(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -90,7 +99,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se camera](../playbooks/se-camera.md)
+- Next step: [Camera](camera.md)
 - Run and compare with: [Linked example](../examples/default/hello_text.md)
 
 ## Related pages

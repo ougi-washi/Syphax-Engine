@@ -45,4 +45,4 @@ se_text_render(text, font, "Hello", &s_vec2(0.0f, 0.0f), &s_vec2(1.0f, 1.0f), 0.
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
-- [Deep dive Playbook](../playbooks/se-text.md)
+- [Deep dive path page](text.md)

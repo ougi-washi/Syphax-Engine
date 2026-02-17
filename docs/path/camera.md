@@ -1,16 +1,25 @@
 ---
-title: se_camera Playbook
+title: Camera
 summary: Progress from basic camera setup to tunable orbit and dolly control.
 prerequisites:
   - A 3D scene or model test target.
   - Window loop already running.
 ---
 
-# se_camera Playbook
+# Camera
 
 ## When to use this
 
 Use this when the runtime needs predictable view/projection setup and smooth camera interaction.
+
+## Quick start
+
+```c
+se_camera_create(...);
+se_camera_set_aspect(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se scene](../playbooks/se-scene.md)
+- Next step: [Scene](scene.md)
 - Run and compare with: [Linked example](../examples/default/scene3d_orbit.md)
 
 ## Related pages

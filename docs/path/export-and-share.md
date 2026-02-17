@@ -45,4 +45,4 @@ Use this concept when implementing `export-and-share` behavior in a runtime targ
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
-- [Deep dive Playbook](../playbooks/index.md)
+- [Deep dive path page](index.md)

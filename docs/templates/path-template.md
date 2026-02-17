@@ -1,16 +1,25 @@
 ---
-title: <module> Playbook
+title: <module> Path
 summary: One module, four compileable steps from minimal to complete.
 prerequisites:
   - Relevant Start Here pages completed.
   - Working build of at least one target.
 ---
 
-# <module> Playbook
+# <module> Path
 
 ## When to use this
 
 State one concrete runtime need that this module solves.
+
+## Quick start
+
+```c
+<api_call_1>(...);
+<api_call_2>(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -21,6 +30,7 @@ Describe the smallest version that runs.
 ```
 
 Key API calls:
+
 - `<api_call_1>`
 
 ## Step 2: Add Core Feature
@@ -32,6 +42,7 @@ What changed from previous step: explain the single new capability and why it ma
 ```
 
 Key API calls:
+
 - `<api_call_2>`
 
 ## Step 3: Interactive / Tunable
@@ -43,6 +54,7 @@ What changed from previous step: explain the runtime tuning or interaction logic
 ```
 
 Key API calls:
+
 - `<api_call_3>`
 
 ## Step 4: Complete Practical Demo
@@ -54,6 +66,7 @@ What changed from previous step: explain final composition, cleanup, and product
 ```
 
 Key API calls:
+
 - `<api_call_4>`
 
 ## Common mistakes
@@ -63,7 +76,7 @@ Key API calls:
 
 ## Next
 
-- Next step path: `../playbooks/<next>.md`
+- Next step path: `../path/<next>.md`
 
 ## Related pages
 

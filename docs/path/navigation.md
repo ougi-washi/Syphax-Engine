@@ -1,16 +1,24 @@
 ---
-title: se_navigation Playbook
+title: Navigation
 summary: Build pathfinding from one grid to robust route and smoothing behavior.
 prerequisites:
   - Grid/world coordinate conventions decided.
   - Basic structs and arrays understood.
 ---
 
-# se_navigation Playbook
+# Navigation
 
 ## When to use this
 
 Use this when navigation needs deterministic grid operations and explicit control over obstacles/path smoothing.
+
+## Quick start
+
+```c
+se_navigation_grid_create(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -85,7 +93,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se simulation](../playbooks/se-simulation.md)
+- Next step: [Simulation](simulation.md)
 - Run and compare with: [Linked example](../examples/advanced/navigation_grid.md)
 
 ## Related pages

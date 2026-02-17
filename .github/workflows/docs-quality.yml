@@ -49,8 +49,8 @@ jobs:
       - name: Content quality checks
         run: ./scripts/docs/check_content_quality.sh
 
-      - name: Playbook coverage checks
-        run: ./scripts/docs/check_playbook_coverage.sh
+      - name: Path coverage checks
+        run: ./scripts/docs/check_path_coverage.sh
 
       - name: Snippet compile checks
         run: ./scripts/docs/verify_snippets.sh
@@ -58,8 +58,8 @@ jobs:
       - name: Strict docs build
         run: mkdocs build --strict --config-file mkdocs.yml
 
-      - name: Playbook render checks
-        run: ./scripts/docs/check_playbook_render.sh
+      - name: Path render checks
+        run: ./scripts/docs/check_path_render.sh
 
       - name: Site budget checks
         run: ./scripts/docs/check_site_size.sh

@@ -41,6 +41,6 @@ se_audio_update(audio);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-audio.md)
+- [Deep dive path page](../path/audio.md)
 - [API module page](../api-reference/modules/se_audio.md)
 - [Example: audio_basics](../examples/default/audio_basics.md)

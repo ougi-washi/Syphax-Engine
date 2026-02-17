@@ -9,9 +9,9 @@ GLTF/GLB parsing, in-memory representation, and export utilities.
 
 This page is generated from `include/loader/se_gltf.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/loader-se-gltf.md)
+- [Deep dive path page](../../path/gltf.md)
 
 ## Functions
 

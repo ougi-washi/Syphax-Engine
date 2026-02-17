@@ -1,16 +1,24 @@
 ---
-title: se_math + se_defines + se_ext + se_quad Playbook
+title: Utilities
 summary: Utility-focused progression for math, results, extension checks, and quad helpers.
 prerequisites:
   - General C structs and enums familiarity.
   - Need reusable utility patterns across modules.
 ---
 
-# se_math + se_defines + se_ext + se_quad Playbook
+# Utilities
 
 ## When to use this
 
 Use this when foundational utility APIs are needed to keep higher-level module code concise and safe.
+
+## Quick start
+
+```c
+se_box_2d_make(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -88,7 +96,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Playbooks index](../playbooks/index.md)
+- Next step: [Path index](index.md)
 - Run and compare with: [Linked example](../examples/advanced/array_handles.md)
 
 ## Related pages

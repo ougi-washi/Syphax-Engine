@@ -41,6 +41,6 @@ se_model_load_obj_simple(path, vs, fs);
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-model.md)
+- [Deep dive path page](../path/model.md)
 - [API module page](../api-reference/modules/se_model.md)
 - [Example: model_viewer](../examples/default/model_viewer.md)

@@ -45,4 +45,4 @@ se_camera_dolly(camera, &pivot, wheel, 3.0f, 26.0f);
 - [Examples index](../examples/index.md)
 - [Module guides](../module-guides/index.md)
 - [API module index](../api-reference/modules/index.md)
-- [Deep dive Playbook](../playbooks/se-camera.md)
+- [Deep dive path page](camera.md)

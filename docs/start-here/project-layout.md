@@ -48,4 +48,4 @@ docs/
 - [Resource paths](resource-paths.md)
 - [Contributing docs](../contributing-docs.md)
 - [API module index](../api-reference/modules/index.md)
-- [Next Playbook](../playbooks/se-window.md)
+- [Next path page](../path/window.md)

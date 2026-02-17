@@ -18,8 +18,8 @@ Step a 2D physics world and sync body positions to 2D render objects.
 
 ## Learning path
 
-- This example corresponds to [se_physics Playbook](../../playbooks/se-physics.md) Step 3.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Physics path page](../../path/physics.md) Step 3.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Space: push all balls upward
@@ -45,7 +45,7 @@ Step a 2D physics world and sync body positions to 2D render objects.
 
 ## Related API links
 
-- [Playbook: se_physics Playbook](../../playbooks/se-physics.md)
+- [Path: Physics](../../path/physics.md)
 - [Path: physics as motion](../../path/physics-as-motion.md)
 - [Module guide: se_physics](../../module-guides/se-physics.md)
 - [API: se_physics.h](../../api-reference/modules/se_physics.md)

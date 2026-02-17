@@ -20,8 +20,8 @@ Load GLTF, export GLB, and validate roundtrip asset counts.
 
 ## Learning path
 
-- This example corresponds to [loader/se_gltf Playbook](../../playbooks/loader-se-gltf.md) Step 4.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [GLTF path page](../../path/gltf.md) Step 4.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - No runtime controls. Uses console output.
@@ -46,7 +46,7 @@ Load GLTF, export GLB, and validate roundtrip asset counts.
 
 ## Related API links
 
-- [Playbook: loader/se_gltf Playbook](../../playbooks/loader-se-gltf.md)
+- [Path: GLTF](../../path/gltf.md)
 - [Module guide: loader/se_gltf](../../module-guides/loader-se-gltf.md)
 - [Path: load a model](../../path/load-a-model.md)
 - [API: loader/se_gltf.h](../../api-reference/modules/loader_se_gltf.md)

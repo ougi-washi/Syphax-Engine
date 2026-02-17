@@ -9,9 +9,9 @@ Immediate mode style UI tree, widgets, layout, and events.
 
 This page is generated from `include/se_ui.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-ui.md)
+- [Deep dive path page](../../path/ui.md)
 
 ## Functions
 

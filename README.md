@@ -90,9 +90,10 @@ int main(void) {
 ./scripts/docs/check_nav_consistency.sh
 ./scripts/docs/check_links.sh
 ./scripts/docs/check_content_quality.sh
-./scripts/docs/check_playbook_coverage.sh
+./scripts/docs/check_path_coverage.sh
 ./scripts/docs/verify_snippets.sh
 mkdocs build --strict --config-file mkdocs.yml
+./scripts/docs/check_path_render.sh
 ./scripts/docs/check_site_size.sh
 ```
 

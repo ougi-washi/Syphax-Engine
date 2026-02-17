@@ -9,9 +9,9 @@ Window lifecycle, frame loop, input state, and cursor/window utilities.
 
 This page is generated from `include/se_window.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-window.md)
+- [Deep dive path page](../../path/window.md)
 
 ## Functions
 

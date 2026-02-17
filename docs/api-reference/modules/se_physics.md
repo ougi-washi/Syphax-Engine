@@ -9,9 +9,9 @@ Source header: `include/se_physics.h`
 
 This page is generated from `include/se_physics.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-physics.md)
+- [Deep dive path page](../../path/physics.md)
 
 ## Functions
 

@@ -9,9 +9,9 @@ Input bindings, action contexts, queues, recording, and replay.
 
 This page is generated from `include/se_input.h` and is deterministic.
 
-## Read the Playbook
+## Read the path walkthrough
 
-- [Deep dive Playbook](../../playbooks/se-input.md)
+- [Deep dive path page](../../path/input.md)
 
 ## Functions
 

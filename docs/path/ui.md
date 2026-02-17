@@ -1,16 +1,25 @@
 ---
-title: se_ui Playbook
+title: UI
 summary: From one UI handle to a tuned, responsive widget update/draw cycle.
 prerequisites:
   - Window setup complete.
   - Input module basics understood.
 ---
 
-# se_ui Playbook
+# UI
 
 ## When to use this
 
 Use this when interaction, layout, and widget lifecycle should stay separate from scene/game logic.
+
+## Quick start
+
+```c
+se_ui_create(...);
+se_ui_tick(...);
+```
+
+Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
@@ -89,7 +98,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [se text](../playbooks/se-text.md)
+- Next step: [Text](text.md)
 - Run and compare with: [Linked example](../examples/default/ui_basics.md)
 
 ## Related pages

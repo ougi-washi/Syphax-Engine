@@ -18,8 +18,8 @@ Play clips and stream looped audio with bus-level volume control.
 
 ## Learning path
 
-- This example corresponds to [se_audio Playbook](../../playbooks/se-audio.md) Step 3.
-- Next: apply one change from the linked Playbook step and rerun this target.
+- This example corresponds to [Audio path page](../../path/audio.md) Step 3.
+- Next: apply one change from the linked path step and rerun this target.
 ## Controls
 
 - Space: play chime
@@ -47,7 +47,7 @@ Play clips and stream looped audio with bus-level volume control.
 
 ## Related API links
 
-- [Playbook: se_audio Playbook](../../playbooks/se-audio.md)
+- [Path: Audio](../../path/audio.md)
 - [Path: add sound](../../path/add-sound.md)
 - [Module guide: se_audio](../../module-guides/se-audio.md)
 - [API: se_audio.h](../../api-reference/modules/se_audio.md)

@@ -41,6 +41,6 @@ Use `se_curve` for features that map directly to its module boundary.
 
 ## Related pages
 
-- [Deep dive Playbook](../playbooks/se-curve.md)
+- [Deep dive path page](../path/curve.md)
 - [API module page](../api-reference/modules/se_curve.md)
 - [Example: vfx_emitters](../examples/advanced/vfx_emitters.md)
