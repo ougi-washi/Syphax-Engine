@@ -11,11 +11,13 @@ layout(location = 2) in mat4 in_glyph;
                                        
 out vec2 tex_coord;
 out vec4 glyph_uv;
+out vec4 glyph_effect;
 
 void main() {
     vec4 glyph_rect = in_glyph[0];
     glyph_uv = in_glyph[1];
     vec2 pen_pos = in_glyph[2].xy;
+    glyph_effect = in_glyph[3];
     
     // glyph_rect: {xoff, yoff, width, height}
     vec2 glyph_offset = glyph_rect.xy;

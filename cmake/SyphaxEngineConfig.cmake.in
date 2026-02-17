@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(@SE_CONFIG_NEEDS_OPENGL@)
+	find_dependency(OpenGL REQUIRED)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/SyphaxEngineTargets.cmake")

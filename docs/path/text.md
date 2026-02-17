@@ -1,6 +1,6 @@
 ---
 title: Text
-summary: Layer text rendering from one label to reusable font/text lifecycle management.
+summary: Layer text rendering from one label to one-line font setup and one-line draw calls.
 prerequisites:
   - Font files present under resources.
   - Window/render loop working.
@@ -10,20 +10,20 @@ prerequisites:
 
 ## When to use this
 
-Use this when runtime feedback, labels, and debug text need clear font ownership and draw calls.
+Use this when runtime feedback, labels, and debug text need simple per-frame drawing with optional advanced handle control.
 
 ## Quick start
 
 ```c
-se_text_handle_create(...);
 se_font_load(...);
+se_text_draw(...);
 ```
 
 Use this tiny call path first, then continue with the four progressive snippets below.
 
 ## Step 1: Minimal Working Project
 
-Build the smallest compileable setup that touches `se_text` with explicit handles and one safe call path.
+Build the smallest compileable setup that touches `se_text` with one safe font setup call.
 
 ```c
 --8<-- "snippets/se_text/step1_minimal.c"
@@ -31,7 +31,6 @@ Build the smallest compileable setup that touches `se_text` with explicit handle
 
 Key API calls:
 
-- `se_text_handle_create`
 - `se_font_load`
 
 ## Step 2: Add Core Feature
@@ -46,9 +45,8 @@ What changed from previous step: this step layers one additional capability with
 
 Key API calls:
 
-- `se_text_handle_create`
 - `se_font_load`
-- `se_text_render`
+- `se_text_draw`
 
 ## Step 3: Interactive / Tunable
 
@@ -62,9 +60,8 @@ What changed from previous step: this step layers one additional capability with
 
 Key API calls:
 
-- `se_text_handle_create`
 - `se_font_load`
-- `se_text_render`
+- `se_text_draw`
 
 ## Step 4: Complete Practical Demo
 
@@ -78,14 +75,13 @@ What changed from previous step: this step layers one additional capability with
 
 Key API calls:
 
-- `se_text_handle_create`
 - `se_font_load`
-- `se_text_render`
+- `se_text_draw`
 - `se_font_destroy`
-- `se_text_handle_destroy`
 
 ## Common mistakes
 
+- Calling the old signature `se_font_load(text_handle, path, size)` instead of `se_font_load(path, size)`.
 - Skipping explicit cleanup paths when introducing new handles or resources.
 - Changing multiple system parameters at once, which hides root-cause behavior shifts.
 - Forgetting to keep update frequency stable when adding runtime tuning logic.

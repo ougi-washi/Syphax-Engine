@@ -16,14 +16,15 @@ Use `se_text` for features that map directly to its module boundary.
 
 ```c
 #include "se_text.h"
-se_text_render(text, font, "Label", &pos, &scale, 0.03f);
+se_font_handle font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
+se_text_draw(font, "Label", &pos, &scale, 0.03f);
 ```
 
 ## Step-by-step explanation
 
-1. Include the module header and create required handles.
+1. Include the module header and load a font once.
 1. Call per-frame functions in your frame loop where needed.
-1. Destroy resources before context teardown.
+1. Destroy resources before context teardown (or rely on full context teardown).
 
 <div class="next-block" markdown="1">
 

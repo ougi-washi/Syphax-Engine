@@ -235,6 +235,22 @@ static b8 se_ui_box_intersects(const se_box_2d* a, const se_box_2d* b) {
 	return a->min.x <= b->max.x && a->max.x >= b->min.x && a->min.y <= b->max.y && a->max.y >= b->min.y;
 }
 
+static f32 se_ui_widget_text_start_x(const se_ui_widget* widget, const u32 text_len) {
+	if (!widget) {
+		return 0.0f;
+	}
+	const f32 estimated_w = (f32)text_len * widget->font_size * SE_UI_TEXT_CHAR_WIDTH_FACTOR;
+	const f32 left = widget->content_bounds.min.x + widget->desc.layout.padding.left;
+	const f32 right = widget->content_bounds.max.x - widget->desc.layout.padding.right;
+	f32 x = left;
+	if (widget->desc.layout.align_horizontal == SE_UI_ALIGN_CENTER) {
+		x = (left + right) * 0.5f - estimated_w * 0.5f;
+	} else if (widget->desc.layout.align_horizontal == SE_UI_ALIGN_END) {
+		x = right - estimated_w;
+	}
+	return x;
+}
+
 static se_box_2d se_ui_box_intersection(const se_box_2d* a, const se_box_2d* b) {
 	if (!a) {
 		return b ? *b : se_ui_make_box(0, 0, 0, 0);
@@ -369,8 +385,7 @@ static se_font_handle se_ui_font_cache_get(se_context* ctx, const c8* font_path,
 			return cache->font;
 		}
 	}
-	se_text_handle* text_handle = se_ui_text_handle_get(ctx);
-	se_font_handle font = se_font_load(text_handle, font_path, font_size);
+	se_font_handle font = se_font_load(font_path, font_size);
 	if (font == S_HANDLE_NULL) {
 		return S_HANDLE_NULL;
 	}
@@ -448,12 +463,14 @@ static void se_ui_object_set_rect_style(
 	const s_vec4* fill_color,
 	const s_vec4* border_color,
 	const f32 border_width,
+	const s_vec4* effect,
 	const b8 visible) {
 	if (!ctx || object == S_HANDLE_NULL || !bounds) {
 		return;
 	}
 	const s_vec4 fill = fill_color ? *fill_color : s_vec4(0.0f, 0.0f, 0.0f, 0.0f);
 	const s_vec4 border = border_color ? *border_color : s_vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	const s_vec4 fx = effect ? *effect : s_vec4(0.0f, 1.0f, 1.0f, 0.0f);
 	const s_vec2 position = s_vec2((bounds->min.x + bounds->max.x) * 0.5f, (bounds->min.y + bounds->max.y) * 0.5f);
 	const s_vec2 scale = s_vec2(
 		s_max(0.00001f, (bounds->max.x - bounds->min.x) * 0.5f),
@@ -473,6 +490,10 @@ static void se_ui_object_set_rect_style(
 	buffer.m[2][1] = scale.y;
 	buffer.m[2][2] = s_max(0.0f, border_width);
 	buffer.m[2][3] = 0.0f;
+	buffer.m[3][0] = fx.x;
+	buffer.m[3][1] = fx.y;
+	buffer.m[3][2] = fx.z;
+	buffer.m[3][3] = fx.w;
 	se_object_2d_set_instance_buffer(object, 0, &buffer);
 	se_ui_object_set_visible(ctx, object, visible);
 }
@@ -486,7 +507,7 @@ static void se_ui_object_set_rect_color(
 	if (!color) {
 		return;
 	}
-	se_ui_object_set_rect_style(ctx, object, bounds, color, &s_vec4(0.0f, 0.0f, 0.0f, 0.0f), 0.0f, visible);
+	se_ui_object_set_rect_style(ctx, object, bounds, color, &s_vec4(0.0f, 0.0f, 0.0f, 0.0f), 0.0f, NULL, visible);
 }
 
 static void se_ui_destroy_object(se_context* ctx, se_ui_root* root, se_object_2d_handle* object) {
@@ -526,6 +547,29 @@ static void se_ui_update_text_proxy(const se_ui_widget* widget, const c8* displa
 	data->position = *position;
 	data->visible = visible;
 	data->font = se_ui_font_cache_get(ctx, se_ui_chars_cstr(&widget->font_path), widget->font_size > 0.0f ? widget->font_size : 24.0f);
+}
+
+static void se_ui_textbox_build_display_text_with_caret(const c8* text, const u32 caret, c8* out_text, const sz out_size) {
+	if (!out_text || out_size == 0) {
+		return;
+	}
+	const c8* src = text ? text : "";
+	const sz len = strlen(src);
+	const sz caret_pos = (sz)s_min((u32)len, caret);
+	sz write = 0;
+	for (sz i = 0; i < caret_pos && write + 1 < out_size; ++i) {
+		out_text[write++] = src[i];
+	}
+	if (write + 1 < out_size) {
+		out_text[write++] = '|';
+		if (write + 1 < out_size) {
+			out_text[write++] = SE_TEXT_CURSOR_SENTINEL;
+		}
+	}
+	for (sz i = caret_pos; i < len && write + 1 < out_size; ++i) {
+		out_text[write++] = src[i];
+	}
+	out_text[write] = '\0';
 }
 
 static se_ui_style_state se_ui_widget_state_style(const se_ui_widget* widget) {
@@ -1643,6 +1687,7 @@ static void se_ui_widget_update_visual_recursive(se_ui_root* root, const se_ui_w
 			&state.background_color,
 			&state.border_color,
 			state.border_width,
+			NULL,
 			visible && has_area && (has_fill || has_border));
 	}
 
@@ -1651,29 +1696,25 @@ static void se_ui_widget_update_visual_recursive(se_ui_root* root, const se_ui_w
 		if (widget->type == SE_UI_WIDGET_TEXTBOX && text_ptr[0] == '\0' && !widget->focused) {
 			text_ptr = se_ui_chars_cstr(&widget->placeholder);
 		}
+		c8 textbox_display_with_caret[SE_TEXT_CHAR_COUNT] = {0};
+		const c8* draw_text = text_ptr;
 		const u32 text_len = (u32)strlen(text_ptr);
-		const f32 estimated_w = (f32)text_len * widget->font_size * SE_UI_TEXT_CHAR_WIDTH_FACTOR;
-		const f32 padding_x = widget->desc.layout.padding.left;
-		const f32 left = widget->content_bounds.min.x + padding_x;
-		const f32 right = widget->content_bounds.max.x - widget->desc.layout.padding.right;
-		f32 x = left;
-		if (widget->desc.layout.align_horizontal == SE_UI_ALIGN_CENTER) {
-			x = (left + right) * 0.5f - estimated_w * 0.5f;
-		} else if (widget->desc.layout.align_horizontal == SE_UI_ALIGN_END) {
-			x = right - estimated_w;
+		if (widget->type == SE_UI_WIDGET_TEXTBOX && widget->focused) {
+			se_ui_textbox_build_display_text_with_caret(text_ptr, widget->caret, textbox_display_with_caret, sizeof(textbox_display_with_caret));
+			draw_text = textbox_display_with_caret;
 		}
+		const f32 x = se_ui_widget_text_start_x(widget, text_len);
 		const f32 y_center = (widget->content_bounds.min.y + widget->content_bounds.max.y) * 0.5f;
 		s_vec2 text_pos = s_vec2(x, y_center);
-		se_ui_update_text_proxy(widget, text_ptr, &text_pos, visible && text_ptr[0] != '\0');
+		se_ui_update_text_proxy(widget, draw_text, &text_pos, visible && draw_text[0] != '\0');
 	}
 
 	if (widget->type == SE_UI_WIDGET_TEXTBOX) {
 		const b8 has_selection = widget->selection_end > widget->selection_start;
 		const c8* text_ptr = se_ui_chars_cstr(&widget->text);
 		const u32 text_len = (u32)strlen(text_ptr);
-		const u32 caret = (u32)s_min((u32)text_len, widget->caret);
 		const f32 char_w = widget->font_size * SE_UI_TEXT_CHAR_WIDTH_FACTOR;
-		const f32 base_x = widget->content_bounds.min.x + widget->desc.layout.padding.left;
+		const f32 base_x = se_ui_widget_text_start_x(widget, text_len);
 		const f32 y_mid = (widget->content_bounds.min.y + widget->content_bounds.max.y) * 0.5f;
 		if (widget->selection_object != S_HANDLE_NULL && has_selection) {
 			const u32 a = (u32)s_min(widget->selection_start, widget->selection_end);
@@ -1689,13 +1730,7 @@ static void se_ui_widget_update_visual_recursive(se_ui_root* root, const se_ui_w
 			se_ui_object_set_visible(ctx, widget->selection_object, false);
 		}
 		if (widget->caret_object != S_HANDLE_NULL) {
-			const se_box_2d caret_bounds = se_ui_make_box(
-				base_x + (f32)caret * char_w,
-				y_mid - 0.022f,
-				base_x + (f32)caret * char_w + 0.002f,
-				y_mid + 0.022f);
-			const s_vec4 caret_color = s_vec4(0.92f, 0.95f, 1.0f, 0.95f);
-			se_ui_object_set_rect_color(ctx, widget->caret_object, &caret_bounds, &caret_color, visible && widget->focused && root->caret_visible);
+			se_ui_object_set_visible(ctx, widget->caret_object, false);
 		}
 	}
 
@@ -2076,6 +2111,27 @@ static void se_ui_textbox_move_caret(se_ui_widget* widget, const u32 new_caret, 
 	widget->caret = clamped;
 }
 
+static u32 se_ui_textbox_caret_from_pointer(const se_ui_widget* widget, const s_vec2* pointer_ndc) {
+	if (!widget || !pointer_ndc) {
+		return 0;
+	}
+	const u32 text_len = se_ui_chars_length(&widget->text);
+	const f32 char_w = widget->font_size * SE_UI_TEXT_CHAR_WIDTH_FACTOR;
+	if (char_w <= 0.00001f) {
+		return 0;
+	}
+	const f32 base_x = se_ui_widget_text_start_x(widget, text_len);
+	const f32 relative_x = (pointer_ndc->x - base_x) / char_w;
+	i32 caret = (i32)floorf(relative_x + 0.5f);
+	if (caret < 0) {
+		caret = 0;
+	}
+	if ((u32)caret > text_len) {
+		caret = (i32)text_len;
+	}
+	return (u32)caret;
+}
+
 static b8 se_ui_handle_text_input_for_widget(se_ui_root* root, const se_ui_widget_handle widget_handle, const c8* utf8_text, const b8 fire_callback) {
 	se_context* ctx = se_current_context();
 	if (!ctx || !root || widget_handle == S_HANDLE_NULL || !utf8_text) {
@@ -2093,6 +2149,8 @@ static b8 se_ui_handle_text_input_for_widget(se_ui_root* root, const se_ui_widge
 	}
 	widget->caret = new_caret;
 	se_ui_textbox_clear_selection(widget);
+	root->caret_visible = true;
+	root->caret_blink_accumulator = 0.0;
 	se_ui_mark_text_dirty_internal(root);
 	se_ui_mark_visual_dirty_internal(root);
 	if (fire_callback) {
@@ -2178,6 +2236,8 @@ static b8 se_ui_textbox_key_edit(se_ui_root* root, const se_ui_widget_handle tex
 	}
 
 	if (changed) {
+		root->caret_visible = true;
+		root->caret_blink_accumulator = 0.0;
 		se_ui_mark_text_dirty_internal(root);
 		se_ui_mark_visual_dirty_internal(root);
 		se_ui_fire_change(widget, textbox);
@@ -2413,6 +2473,10 @@ void se_ui_tick(const se_ui_handle ui) {
 				se_ui_fire_press(root, hit, &pointer_ndc, true, SE_MOUSE_LEFT);
 				if (hit_widget->type == SE_UI_WIDGET_TEXTBOX) {
 					se_ui_set_focus_internal(root, hit);
+					se_ui_textbox_move_caret(hit_widget, se_ui_textbox_caret_from_pointer(hit_widget, &pointer_ndc), false);
+					root->caret_visible = true;
+					root->caret_blink_accumulator = 0.0;
+					se_ui_mark_visual_dirty_internal(root);
 				} else if (root->focused_widget != S_HANDLE_NULL) {
 					se_ui_set_focus_internal(root, S_HANDLE_NULL);
 				}
@@ -2482,12 +2546,14 @@ void se_ui_tick(const se_ui_handle ui) {
 	}
 
 	if (root->focused_widget != S_HANDLE_NULL) {
-		root->caret_blink_accumulator += se_window_get_delta_time(root->window);
-		if (root->caret_blink_accumulator >= SE_UI_CARET_BLINK_SECONDS) {
-			root->caret_blink_accumulator = 0.0;
-			root->caret_visible = !root->caret_visible;
+		se_ui_widget* focused_widget = se_ui_widget_from_handle(ctx, root->focused_widget);
+		if (focused_widget && focused_widget->type == SE_UI_WIDGET_TEXTBOX && focused_widget->desc.enabled) {
+			root->caret_visible = true;
 			se_ui_mark_visual_dirty_internal(root);
+		} else if (!root->caret_visible) {
+			root->caret_visible = true;
 		}
+		root->caret_blink_accumulator = 0.0;
 	} else {
 		root->caret_visible = false;
 		root->caret_blink_accumulator = 0.0;

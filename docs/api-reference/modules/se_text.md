@@ -32,7 +32,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const f32 size);
+extern se_font_handle se_font_load(const char* path, const f32 size);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_text_draw`
+
+<div class="api-signature">
+
+```c
+extern void se_text_draw(const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset);
 ```
 
 </div>

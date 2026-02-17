@@ -1059,7 +1059,7 @@ void se_scene_2d_render_raw(const se_scene_2d_handle scene) {
 			if (se_object_2d_are_instances_dirty(object_handle)) {
 				se_object_2d_sync_render_instances(current_object_2d);
 			}
-			se_shader_use(current_object_2d->shader, true, true);
+			se_uniform_apply(current_object_2d->shader, true);
 			const sz instance_count = se_object_2d_get_instance_count(object_handle);
 			se_quad_render(&current_object_2d->quad, instance_count);
 		}

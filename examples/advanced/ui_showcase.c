@@ -1123,6 +1123,7 @@ i32 main(void) {
 		.on_submit_data = &state
 	});
 	(void)se_ui_widget_set_alignment(ui, state.textbox, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_CENTER);
+	(void)se_ui_focus_widget(ui, state.textbox);
 
 	se_ui_widget_handle row_a = ui_add_button_row(&state, controls);
 	(void)ui_add_action_button(&state, row_a, "Focus Box", ui_on_focus_textbox_click);

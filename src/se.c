@@ -140,6 +140,8 @@ se_context *se_context_create(void) {
 	s_array_init(&context->ui_texts);
 	s_array_init(&context->simulations);
 	context->ui_text_handle = NULL;
+	context->default_text_handle = NULL;
+	se_uniform_set_float((se_uniforms*)&context->global_uniforms, "u_time", 0.0f);
 
 	if (se_global_context == NULL) {
 		se_set_global_context(context);
@@ -158,10 +160,16 @@ void se_context_destroy(se_context *context) {
 	memset(&se_last_destroy_report, 0, sizeof(se_last_destroy_report));
 
 	se_context_destroy_ui_storage(context);
-	if (context->ui_text_handle) {
-		se_text_handle_destroy(context->ui_text_handle);
-		context->ui_text_handle = NULL;
+	se_text_handle* ui_text_handle = context->ui_text_handle;
+	se_text_handle* default_text_handle = context->default_text_handle;
+	if (ui_text_handle) {
+		se_text_handle_destroy(ui_text_handle);
 	}
+	if (default_text_handle && default_text_handle != ui_text_handle) {
+		se_text_handle_destroy(default_text_handle);
+	}
+	context->ui_text_handle = NULL;
+	context->default_text_handle = NULL;
 
 	while (s_array_get_size(&context->vfx_2ds) > 0) {
 		se_vfx_2d_handle vfx_handle = s_array_handle(&context->vfx_2ds, (u32)(s_array_get_size(&context->vfx_2ds) - 1));

@@ -9,6 +9,7 @@ out vec2 tex_coord;
 out vec4 instance_color;
 out vec4 instance_border_color;
 out vec3 instance_border_info;
+out vec4 instance_effect;
 
 void main() {
 	vec3 transformed = in_instance_transform * vec3(in_position, 1.0);
@@ -19,4 +20,5 @@ void main() {
 	instance_color = in_instance_buffer[0];
 	instance_border_color = in_instance_buffer[1];
 	instance_border_info = in_instance_buffer[2].xyz;
+	instance_effect = in_instance_buffer[3];
 }

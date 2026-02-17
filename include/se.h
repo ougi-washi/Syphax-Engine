@@ -47,7 +47,6 @@ struct se_simulation;
 
 typedef struct se_context {
 	s_array(struct se_window, windows);
-	s_array(struct se_font, fonts);
 	s_array(struct se_model, models);
 	s_array(struct se_camera, cameras);
 	s_array(struct se_framebuffer, framebuffers);
@@ -65,7 +64,9 @@ typedef struct se_context {
 	s_array(struct se_ui_widget, ui_elements);
 	s_array(struct se_ui_text_cache, ui_texts);
 	s_array(struct se_simulation, simulations);
+	s_array(struct se_font, fonts);
 	se_text_handle *ui_text_handle;
+	se_text_handle *default_text_handle;
 } se_context;
 
 typedef struct {

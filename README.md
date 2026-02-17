@@ -53,18 +53,16 @@ int main(void) {
 		return 1;
 	}
 
-	se_text_handle* text = se_text_handle_create(0);
-	se_font_handle font = se_font_load(text, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
+	se_font_handle font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 32.0f);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
 		se_render_clear();
-		se_text_render(text, font, "Hello Syphax", &s_vec2(0.0f, 0.0f), &s_vec2(1.0f, 1.0f), 0.03f);
+		se_text_draw(font, "Hello Syphax", &s_vec2(0.0f, 0.0f), &s_vec2(1.0f, 1.0f), 0.03f);
 		se_window_end_frame(window);
 	}
 
-	se_text_handle_destroy(text);
 	se_context_destroy(ctx); // canonical final teardown
 	return 0;
 }

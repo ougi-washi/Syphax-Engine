@@ -46,6 +46,16 @@ static void se_font_cleanup(se_font* font) {
 	memset(font, 0, sizeof(*font));
 }
 
+static se_text_handle* se_text_default_handle_get(se_context* ctx) {
+	if (!ctx) {
+		return NULL;
+	}
+	if (!ctx->default_text_handle) {
+		ctx->default_text_handle = se_text_handle_create(0);
+	}
+	return ctx->default_text_handle;
+}
+
 se_text_handle* se_text_handle_create(const u32 fonts_count) {
 	se_context *ctx = se_current_context();
 	if (!ctx) {
@@ -90,12 +100,12 @@ void se_text_handle_destroy(se_text_handle* text_handle) {
 	text_handle = NULL;
 }
 
-se_font_handle se_font_load(se_text_handle* text_handle, const char* path, const f32 size) {
-	if (!text_handle || !path) {
+se_font_handle se_font_load(const char* path, const f32 size) {
+	if (!path || path[0] == '\0') {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return S_HANDLE_NULL;
 	}
-	se_context* ctx = text_handle->ctx;
+	se_context* ctx = se_current_context();
 	if (!ctx) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return S_HANDLE_NULL;
@@ -216,6 +226,36 @@ void se_font_destroy(const se_font_handle font) {
 	s_array_remove(&ctx->fonts, font);
 }
 
+void se_text_draw(const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset) {
+	if (!text || !position || !size) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	if (!se_render_has_context()) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		return;
+	}
+	se_font* font_ptr = s_array_get(&ctx->fonts, font);
+	if (!font_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_text_handle* text_handle = se_text_default_handle_get(ctx);
+	if (!text_handle) {
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		}
+		return;
+	}
+	se_text_render(text_handle, font, text, position, size, new_line_offset);
+	se_set_last_error(SE_RESULT_OK);
+}
+
 void se_text_render(se_text_handle* text_handle, const se_font_handle font, const c8* text, const s_vec2* position, const s_vec2* size, const f32 new_line_offset) {
 	se_debug_trace_begin("text_render");
 	s_assertf(text_handle, "se_text_render :: text_handle is null");
@@ -242,6 +282,10 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 	i32 glyph_count = 0;
 	for (sz i = 0; i < text_size; ++i) {
 		const c8 raw_c = text[i];
+		if (raw_c == SE_TEXT_CURSOR_SENTINEL) {
+			continue;
+		}
+		const b8 blink_cursor = (raw_c == '|') && (i + 1 < text_size) && (text[i + 1] == SE_TEXT_CURSOR_SENTINEL);
 		const i32 c = (u8)raw_c;
 		
 		if (raw_c == '\n') {
@@ -276,6 +320,10 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 			text_handle->buffer[glyph_count].m[1][3] = aligned_quad->t1;
 			text_handle->buffer[glyph_count].m[2][0] = local_position.x;
 			text_handle->buffer[glyph_count].m[2][1] = local_position.y;
+			text_handle->buffer[glyph_count].m[3][0] = blink_cursor ? 1.0f : 0.0f;
+			text_handle->buffer[glyph_count].m[3][1] = 1.0f;
+			text_handle->buffer[glyph_count].m[3][2] = 0.5f;
+			text_handle->buffer[glyph_count].m[3][3] = 0.0f;
 
 			// Advance cursor by xadvance (scaled)
 			local_position.x += packed_char->xadvance * text_scale.x;

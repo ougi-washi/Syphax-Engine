@@ -438,7 +438,7 @@ void se_debug_render_overlay(const se_window_handle window, se_input_handle* inp
 		return;
 	}
 
-	se_font_handle font = se_font_load(g_overlay_text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 16.0f);
+	se_font_handle font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 16.0f);
 	if (font == S_HANDLE_NULL) {
 		return;
 	}

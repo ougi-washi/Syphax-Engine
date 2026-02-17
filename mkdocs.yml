@@ -201,6 +201,7 @@ nav:
       - se_ui.h: api-reference/modules/se_ui.md
       - se_vfx.h: api-reference/modules/se_vfx.md
       - se_window.h: api-reference/modules/se_window.md
+      - se_worker.h: api-reference/modules/se_worker.md
       - loader/se_gltf.h: api-reference/modules/loader_se_gltf.md
       - loader/se_loader.h: api-reference/modules/loader_se_loader.md
   - Glossary:

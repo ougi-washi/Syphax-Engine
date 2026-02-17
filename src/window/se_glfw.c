@@ -1466,6 +1466,16 @@ extern void se_window_update(const se_window_handle window) {
 
 void se_window_tick(const se_window_handle window) {
 	se_window_update(window);
+	se_context* context = se_current_context();
+	if (context) {
+		se_window* window_ptr = se_window_from_handle(context, window);
+		if (window_ptr) {
+			se_uniforms* global_uniforms = se_context_get_global_uniforms();
+			if (global_uniforms) {
+				se_uniform_set_float(global_uniforms, "u_time", (f32)window_ptr->time.current);
+			}
+		}
+	}
 	se_debug_trace_begin("input_tick");
 	se_window_poll_events();
 	se_debug_trace_end("input_tick");

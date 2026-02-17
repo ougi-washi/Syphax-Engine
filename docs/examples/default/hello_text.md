@@ -41,7 +41,7 @@ Create a window, render text, and toggle the background palette.
 
 - `se_context_create` + `se_window_create` set up the runtime and the default frame loop state.
 - `se_window_is_key_pressed(SE_KEY_SPACE)` toggles the active palette branch before clear.
-- `se_text_render` queues glyph draws each frame, and `se_window_end_frame` submits the frame.
+- `se_font_load` initializes one reusable font handle, and `se_text_draw` queues glyph draws each frame before `se_window_end_frame` submits.
 
 ## Related API links
 
