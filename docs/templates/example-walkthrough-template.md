@@ -20,9 +20,11 @@ One sentence goal.
 ./bin/<target>
 ```
 
-## Edits to try
+## Internal flow
 
-1. Edit
+- One technical statement about initialization and ownership.
+- One technical statement about per-frame update/tick behavior.
+- One technical statement about render/output/teardown behavior.
 
 ## Related API links
 

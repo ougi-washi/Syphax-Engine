@@ -1,6 +1,6 @@
 ---
 title: scene2d_click
-summary: Walkthrough page for scene2d_click.
+summary: Reference for scene2d_click example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/scene2d_click.png" alt="scene2d_click preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/scene2d_click.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Pick an object with pointer input and update shader color on click.
 ## Learning path
 
 - This example corresponds to [Scene path page](../../path/scene.md) Step 2.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Left click center button: toggle color
@@ -37,11 +36,11 @@ Pick an object with pointer input and update shader color on click.
 ./bin/scene2d_click
 ```
 
-## Edits to try
+## Internal flow
 
-1. Add a second clickable object.
-1. Change click feedback color values.
-1. Display click count in a text label.
+- Pointer input is converted to normalized coordinates each click frame.
+- `se_scene_2d_pick_object` resolves the clicked object handle against scene bounds.
+- On hit, shader state (`u_color`) and local click counters update before the next draw.
 
 ## Related API links
 

@@ -1,6 +1,6 @@
 ---
 title: vfx_emitters
-summary: Walkthrough page for vfx_emitters.
+summary: Reference for vfx_emitters example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/vfx_emitters.png" alt="vfx_emitters preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/vfx_emitters.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -22,7 +21,7 @@ Combined 2D and 3D emitters with animated uniform callbacks.
 
 - This example corresponds to [VFX path page](../../path/vfx.md) Step 4.
 - This example corresponds to [Curve path page](../../path/curve.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Esc: quit
@@ -39,11 +38,11 @@ Combined 2D and 3D emitters with animated uniform callbacks.
 ./bin/vfx_emitters
 ```
 
-## Edits to try
+## Internal flow
 
-1. Increase spawn rates.
-1. Swap texture wrap mode.
-1. Change uniform animation speed.
+- 2D and 3D emitters are configured with curve keys for velocity/color/size evolution.
+- Optional burst/blend/tick toggles change simulation behavior while emitters stay live.
+- Uniform callbacks animate shader inputs per frame before VFX draw submission.
 
 ## Related API links
 

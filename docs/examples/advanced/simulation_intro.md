@@ -1,6 +1,6 @@
 ---
 title: simulation_intro
-summary: Walkthrough page for simulation_intro.
+summary: Reference for simulation_intro example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/simulation_intro.svg" alt="simulation_intro preview image">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,10 +20,10 @@ Deterministic simulation starter with component and event registration.
 ## Learning path
 
 - This example corresponds to [Simulation path page](../../path/simulation.md) Step 2.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
-- No runtime controls. Observe log output for replay checks.
+- Non-interactive example. Inspect stdout diagnostics.
 
 ## Build command
 
@@ -38,11 +37,11 @@ Deterministic simulation starter with component and event registration.
 ./bin/simulation_intro
 ```
 
-## Edits to try
+## Internal flow
 
-1. Add one event type.
-1. Change replay sequence.
-1. Register one additional component.
+- Components/events/systems are registered once, then a single entity is initialized.
+- Deterministic event sequences are emitted, stepped, snapshotted, restored, and replayed.
+- State equality checks after replay verify deterministic simulation behavior.
 
 ## Related API links
 

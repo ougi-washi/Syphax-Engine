@@ -1,6 +1,6 @@
 ---
 title: physics3d_playground
-summary: Walkthrough page for physics3d_playground.
+summary: Reference for physics3d_playground example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/physics3d_playground.png" alt="physics3d_playground preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/physics3d_playground.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Run a 3D rigid-body simulation and update instance transforms.
 ## Learning path
 
 - This example corresponds to [Physics path page](../../path/physics.md) Step 4.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Space: launch all cubes upward
@@ -37,11 +36,11 @@ Run a 3D rigid-body simulation and update instance transforms.
 ./bin/physics3d_playground
 ```
 
-## Edits to try
+## Internal flow
 
-1. Use non-uniform half extents.
-1. Add lateral impulse.
-1. Change gravity for slower motion.
+- A 3D physics world owns rigid bodies while render instances are tracked by `se_instance_id`.
+- `se_physics_world_3d_step` updates body transforms, including ground/body collision resolution.
+- Updated transforms are pushed with `se_object_3d_set_instance_transform` before scene draw.
 
 ## Related API links
 

@@ -1,6 +1,6 @@
 ---
 title: navigation_grid
-summary: Walkthrough page for navigation_grid.
+summary: Reference for navigation_grid example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/navigation_grid.svg" alt="navigation_grid preview image">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,10 +20,10 @@ Run pathfinding and raycast queries over a blocked grid.
 ## Learning path
 
 - This example corresponds to [Navigation path page](../../path/navigation.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
-- No runtime controls. Inspect console output.
+- Non-interactive example. Inspect stdout diagnostics.
 
 ## Build command
 
@@ -38,11 +37,11 @@ Run pathfinding and raycast queries over a blocked grid.
 ./bin/navigation_grid
 ```
 
-## Edits to try
+## Internal flow
 
-1. Change obstacle regions.
-1. Disable smoothing to compare path length.
-1. Change start and goal cells.
+- A navigation grid is initialized, then static/dynamic blockers are stamped into occupancy.
+- Path search runs from start to goal, followed by path smoothing on the same grid snapshot.
+- A raycast query reports line-of-sight traversal to compare against pathfinding output.
 
 ## Related API links
 

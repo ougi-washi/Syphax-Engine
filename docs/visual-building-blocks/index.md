@@ -17,5 +17,4 @@ Core visual systems used across 2D and 3D work.
 - [Module guide: se_scene](../module-guides/se-scene.md)
 
 ![Render flow diagram](../assets/img/render-flow.svg)
-
-*Caption: high-level order from input and simulation to shading and present.*
+Diagram: high-level order from input and simulation to shading and present.

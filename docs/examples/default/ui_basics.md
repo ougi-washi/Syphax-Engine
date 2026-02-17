@@ -1,6 +1,6 @@
 ---
 title: ui_basics
-summary: Walkthrough page for ui_basics.
+summary: Reference for ui_basics example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/ui_basics.png" alt="ui_basics preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/ui_basics.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Build a small UI with two buttons and text updates from callbacks.
 ## Learning path
 
 - This example corresponds to [UI path page](../../path/ui.md) Step 2.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Click buttons: update/reset counter
@@ -38,11 +37,11 @@ Build a small UI with two buttons and text updates from callbacks.
 ./bin/ui_basics
 ```
 
-## Edits to try
+## Internal flow
 
-1. Add a new button action.
-1. Adjust layout spacing.
-1. Disable a widget and display state text.
+- The UI tree is built once from a root widget with vertical stack layout.
+- Button callbacks mutate shared state and push new label text through `se_ui_widget_set_text`.
+- `se_ui_tick` resolves input/focus/click events, then `se_ui_draw` emits the widget pass.
 
 ## Related API links
 

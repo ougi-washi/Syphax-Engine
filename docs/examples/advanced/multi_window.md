@@ -1,6 +1,6 @@
 ---
 title: multi_window
-summary: Walkthrough page for multi_window.
+summary: Reference for multi_window example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/multi_window.png" alt="multi_window preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/multi_window.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -22,7 +21,7 @@ Render three windows in one context with per-window clear colors.
 
 - This example corresponds to [Window path page](../../path/window.md) Step 3.
 - This example corresponds to [Render Buffer path page](../../path/render-buffer.md) Step 2.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Esc on main window: quit all
@@ -39,11 +38,11 @@ Render three windows in one context with per-window clear colors.
 ./bin/multi_window
 ```
 
-## Edits to try
+## Internal flow
 
-1. Change each window color.
-1. Set target FPS values per window.
-1. Add per-window key toggles.
+- Three windows are created in one context, each with its own active GL context state.
+- The loop updates each window, switches current context, clears, then presents per window.
+- Exit is coordinated through the main window close condition, then context teardown releases all.
 
 ## Related API links
 

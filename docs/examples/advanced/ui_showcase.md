@@ -1,6 +1,6 @@
 ---
 title: ui_showcase
-summary: Walkthrough page for ui_showcase.
+summary: Reference for ui_showcase example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/ui_showcase.png" alt="ui_showcase preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/ui_showcase.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,7 +20,7 @@ Advanced UI interactions with dynamic layout and widget states.
 ## Learning path
 
 - This example corresponds to [UI path page](../../path/ui.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Use startup control list printed by target
@@ -39,11 +38,11 @@ Advanced UI interactions with dynamic layout and widget states.
 ./bin/ui_showcase
 ```
 
-## Edits to try
+## Internal flow
 
-1. Toggle clipping defaults.
-1. Add dynamic list item types.
-1. Enable overlay by default.
+- A larger widget graph is built with layout containers, docking, clipping, and dynamic lists.
+- Hover/focus/press/scroll callbacks feed live state labels and interaction counters.
+- Runtime toggles exercise widget flags and layout recomputation under real input traffic.
 
 ## Related API links
 

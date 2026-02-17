@@ -1,6 +1,6 @@
 ---
 title: sdf_playground
-summary: Walkthrough page for sdf_playground.
+summary: Reference for sdf_playground example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/sdf_playground.png" alt="sdf_playground preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/sdf_playground.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,7 +20,7 @@ Build SDF scene graph primitives and render with stylized shading.
 ## Learning path
 
 - This example corresponds to [SDF path page](../../path/sdf.md) Step 4.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Camera controls from controller preset
@@ -39,11 +38,11 @@ Build SDF scene graph primitives and render with stylized shading.
 ./bin/sdf_playground
 ```
 
-## Edits to try
+## Internal flow
 
-1. Add a second primitive type.
-1. Modify stylized band levels.
-1. Adjust camera align padding.
+- SDF primitives are assembled into a scene graph and attached to one SDF renderer.
+- Camera + frame descriptors (resolution, time, mouse) are refreshed every loop iteration.
+- `se_sdf_renderer_render` evaluates the signed-distance shading pass before present.
 
 ## Related API links
 

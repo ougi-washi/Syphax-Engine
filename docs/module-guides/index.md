@@ -37,5 +37,4 @@ Deep dive progression pages live in [Path](../path/index.md).
 - [loader/se_gltf](loader-se-gltf.md)
 
 ![Scene structure diagram](../assets/img/scene-graph.svg)
-
-*Caption: scene and object relationships used across module pages.*
+Diagram: scene and object ownership relationships used across module pages.

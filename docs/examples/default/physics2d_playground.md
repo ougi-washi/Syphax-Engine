@@ -1,6 +1,6 @@
 ---
 title: physics2d_playground
-summary: Walkthrough page for physics2d_playground.
+summary: Reference for physics2d_playground example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/physics2d_playground.png" alt="physics2d_playground preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/physics2d_playground.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Step a 2D physics world and sync body positions to 2D render objects.
 ## Learning path
 
 - This example corresponds to [Physics path page](../../path/physics.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Space: push all balls upward
@@ -37,11 +36,11 @@ Step a 2D physics world and sync body positions to 2D render objects.
 ./bin/physics2d_playground
 ```
 
-## Edits to try
+## Internal flow
 
-1. Increase body count.
-1. Adjust gravity magnitude.
-1. Tune impulse strength.
+- A 2D world is created with one static floor body and several dynamic circle bodies.
+- `se_physics_world_2d_step` integrates motion and collision response for the current `delta_time`.
+- Post-step, each body position is copied to its render object so scene draw matches physics state.
 
 ## Related API links
 

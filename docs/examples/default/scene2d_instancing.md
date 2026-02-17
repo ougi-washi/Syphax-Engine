@@ -1,6 +1,6 @@
 ---
 title: scene2d_instancing
-summary: Walkthrough page for scene2d_instancing.
+summary: Reference for scene2d_instancing example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/scene2d_instancing.png" alt="scene2d_instancing preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/scene2d_instancing.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Create multiple 2D instances and animate them with a wave function.
 ## Learning path
 
 - This example corresponds to [Scene path page](../../path/scene.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Space: pause or resume wave motion
@@ -37,11 +36,11 @@ Create multiple 2D instances and animate them with a wave function.
 ./bin/scene2d_instancing
 ```
 
-## Edits to try
+## Internal flow
 
-1. Increase instance count.
-1. Change wave speed.
-1. Add random phase offsets.
+- One 2D object owns many instances; IDs are stored in `s_array` for stable iteration.
+- Each frame computes a sine-wave offset and rewrites each instance transform.
+- Instance updates avoid object recreation, so animation cost stays in transform writes only.
 
 ## Related API links
 

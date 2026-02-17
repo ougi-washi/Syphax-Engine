@@ -1,6 +1,6 @@
 ---
 title: model_viewer
-summary: Walkthrough page for model_viewer.
+summary: Reference for model_viewer example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/model_viewer.png" alt="model_viewer preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/model_viewer.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -20,7 +19,7 @@ Load and inspect a 3D model with a camera controller.
 
 - This example corresponds to [Model path page](../../path/model.md) Step 3.
 - This example corresponds to [Loader path page](../../path/loader.md) Step 2.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Mouse + WASD: camera movement
@@ -39,11 +38,11 @@ Load and inspect a 3D model with a camera controller.
 ./bin/model_viewer
 ```
 
-## Edits to try
+## Internal flow
 
-1. Swap sphere and cube assets.
-1. Increase movement speed.
-1. Add a second row of instances.
+- Model data is loaded once, then reused through one scene object with multiple instances.
+- `se_camera_controller_tick` converts input into camera transform updates each frame.
+- `se_scene_3d_draw` walks model instances, binds materials/shaders, and submits the 3D pass.
 
 ## Related API links
 

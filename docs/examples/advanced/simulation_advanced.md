@@ -1,6 +1,6 @@
 ---
 title: simulation_advanced
-summary: Walkthrough page for simulation_advanced.
+summary: Reference for simulation_advanced example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/simulation_advanced.svg" alt="simulation_advanced preview image">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,10 +20,10 @@ Extended simulation with system sequencing and diagnostics.
 ## Learning path
 
 - This example corresponds to [Simulation path page](../../path/simulation.md) Step 4.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
-- No runtime controls. Observe diagnostics output.
+- Non-interactive example. Inspect stdout diagnostics.
 
 ## Build command
 
@@ -38,11 +37,11 @@ Extended simulation with system sequencing and diagnostics.
 ./bin/simulation_advanced
 ```
 
-## Edits to try
+## Internal flow
 
-1. Increase event queue capacity.
-1. Add one extra system.
-1. Compare snapshot outputs across runs.
+- The simulation registers ordered systems for event application and fixed-dt integration.
+- Diagnostics report queue usage, pending/ready events, and tick progression.
+- Validation paths (including stale-entity checks) confirm robust event routing and replay state.
 
 ## Related API links
 

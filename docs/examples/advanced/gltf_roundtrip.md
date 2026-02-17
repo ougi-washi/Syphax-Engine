@@ -1,6 +1,6 @@
 ---
 title: gltf_roundtrip
-summary: Walkthrough page for gltf_roundtrip.
+summary: Reference for gltf_roundtrip example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/gltf_roundtrip.svg" alt="gltf_roundtrip preview image">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,10 +20,10 @@ Load GLTF, export GLB, and validate roundtrip asset counts.
 ## Learning path
 
 - This example corresponds to [GLTF path page](../../path/gltf.md) Step 4.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
-- No runtime controls. Uses console output.
+- Non-interactive example. Inspect stdout diagnostics.
 
 ## Build command
 
@@ -38,11 +37,11 @@ Load GLTF, export GLB, and validate roundtrip asset counts.
 ./bin/gltf_roundtrip
 ```
 
-## Edits to try
+## Internal flow
 
-1. Point to a larger input asset.
-1. Change export path.
-1. Add strict count checks.
+- `se_gltf_load` parses source assets into in-memory arrays (meshes, nodes, scenes, etc.).
+- The loaded asset is written as GLB via `se_gltf_write`, then loaded back again.
+- Roundtrip validation compares key array counts to catch serialization mismatches.
 
 ## Related API links
 

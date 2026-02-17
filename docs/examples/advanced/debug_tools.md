@@ -1,6 +1,6 @@
 ---
 title: debug_tools
-summary: Walkthrough page for debug_tools.
+summary: Reference for debug_tools example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/debug_tools.png" alt="debug_tools preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/debug_tools.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,7 +20,7 @@ Enable trace and overlay diagnostics and inspect frame timing lines.
 ## Learning path
 
 - This example corresponds to [Debug path page](../../path/debug.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Esc: quit
@@ -38,11 +37,11 @@ Enable trace and overlay diagnostics and inspect frame timing lines.
 ./bin/debug_tools
 ```
 
-## Edits to try
+## Internal flow
 
-1. Reduce debug level to INFO.
-1. Add one custom trace span.
-1. Write timing output to file.
+- Debug level/category masks are enabled before entering the frame loop.
+- Trace spans wrap frame work, and the debug subsystem records per-frame timing buckets.
+- On shutdown, trace counts and formatted timing lines are dumped for analysis.
 
 ## Related API links
 

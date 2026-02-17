@@ -1,6 +1,6 @@
 ---
 title: context_lifecycle
-summary: Walkthrough page for context_lifecycle.
+summary: Reference for context_lifecycle example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/context_lifecycle.svg" alt="context_lifecycle preview image">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -22,10 +21,10 @@ Validate resource ownership and context teardown reports.
 
 - This example corresponds to [Window path page](../../path/window.md) Step 4.
 - This example corresponds to [Framebuffer path page](../../path/framebuffer.md) Step 4.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
-- No runtime controls. Uses validation output in console.
+- Non-interactive example. Inspect stdout diagnostics.
 
 ## Build command
 
@@ -39,11 +38,11 @@ Validate resource ownership and context teardown reports.
 ./bin/context_lifecycle
 ```
 
-## Edits to try
+## Internal flow
 
-1. Add one resource type to setup.
-1. Change expected counts and verify failure path.
-1. Run on different backends and compare output.
+- The example allocates multiple windows and resource types under one context owner.
+- It snapshots internal resource counts, destroys the context, then reads the destroy report.
+- Expected and actual destroy counts are compared to verify full teardown coverage.
 
 ## Related API links
 

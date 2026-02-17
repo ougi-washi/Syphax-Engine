@@ -51,5 +51,4 @@ while (!se_window_should_close(window)) {
 - [API: se_window.h](../api-reference/modules/se_window.md)
 
 ![Frame loop flow diagram](../assets/img/frame-loop.svg)
-
-*Caption: one frame cycle from begin to present, then loop.*
+Diagram: one frame cycle from `begin_frame` through present, then repeat.

@@ -1,6 +1,6 @@
 ---
 title: array_handles
-summary: Walkthrough page for array_handles.
+summary: Reference for array_handles example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/array_handles.svg" alt="array_handles preview image">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -21,10 +20,10 @@ Reference operations for `s_array` and handle-based remove behavior.
 ## Learning path
 
 - This example corresponds to [Utility Path](../../path/utilities.md) Step 2.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
-- No runtime controls. Uses stdout logging.
+- Non-interactive example. Inspect stdout diagnostics.
 
 ## Build command
 
@@ -38,11 +37,11 @@ Reference operations for `s_array` and handle-based remove behavior.
 ./bin/array_handles
 ```
 
-## Edits to try
+## Internal flow
 
-1. Increase `ARRAY_SIZE`.
-1. Remove a different index.
-1. Add sorting after insertion.
+- `s_array_init` + `s_array_reserve` allocate typed storage for handle-based access.
+- Removals are executed through `s_array_remove` using handles, not raw pointer arithmetic.
+- Logged output after each mutation shows size/content evolution for safe container operations.
 
 ## Related API links
 

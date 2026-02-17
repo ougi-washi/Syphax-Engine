@@ -1,6 +1,6 @@
 ---
 title: rts_integration
-summary: Walkthrough page for rts_integration.
+summary: Reference for rts_integration example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -11,7 +11,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/advanced/rts_integration.png" alt="rts_integration preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/rts_integration.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -22,7 +21,7 @@ Integration-scale runtime combining scene, UI, debug, and simulation patterns.
 
 - This example corresponds to [Simulation path page](../../path/simulation.md) Step 4.
 - This example corresponds to [Debug path page](../../path/debug.md) Step 4.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Use startup control map printed by target
@@ -40,11 +39,11 @@ Integration-scale runtime combining scene, UI, debug, and simulation patterns.
 ./bin/rts_integration
 ```
 
-## Edits to try
+## Internal flow
 
-1. Lower unit caps for profiling.
-1. Run with `--track-systems`.
-1. Toggle one subsystem at a time for isolation.
+- This target runs a full integration loop across scene, UI, simulation, and debug systems.
+- Runtime flags control autotest/perf/system-tracking behavior without changing source code.
+- Frame diagnostics and subsystem timings are emitted to validate integration behavior.
 
 ## Related API links
 

@@ -1,6 +1,6 @@
 ---
 title: scene3d_orbit
-summary: Walkthrough page for scene3d_orbit.
+summary: Reference for scene3d_orbit example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/scene3d_orbit.png" alt="scene3d_orbit preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/scene3d_orbit.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Render a 3D grid of cubes and navigate with orbit camera controls.
 ## Learning path
 
 - This example corresponds to [Camera path page](../../path/camera.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - Hold left mouse + move: orbit
@@ -39,11 +38,11 @@ Render a 3D grid of cubes and navigate with orbit camera controls.
 ./bin/scene3d_orbit
 ```
 
-## Edits to try
+## Internal flow
 
-1. Change orbit sensitivity.
-1. Increase cube grid dimensions.
-1. Tighten dolly min/max values.
+- The example creates a 3x3 cube instance grid in one 3D scene object.
+- Mouse delta and wheel delta drive orbit/dolly camera updates against a fixed pivot.
+- `se_scene_3d_draw` renders with the updated camera matrices every frame.
 
 ## Related API links
 

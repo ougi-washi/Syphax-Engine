@@ -1,6 +1,6 @@
 ---
 title: input_actions
-summary: Walkthrough page for input_actions.
+summary: Reference for input_actions example.
 prerequisites:
   - Build toolchain and resources available.
 ---
@@ -9,7 +9,6 @@ prerequisites:
 
 <img src="../../../assets/img/examples/default/input_actions.png" alt="input_actions preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/input_actions.svg';">
 
-*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -19,7 +18,7 @@ Bind keyboard and mouse inputs to actions and move a 2D actor.
 ## Learning path
 
 - This example corresponds to [Input path page](../../path/input.md) Step 3.
-- Next: apply one change from the linked path step and rerun this target.
+
 ## Controls
 
 - W A S D: move square
@@ -39,11 +38,11 @@ Bind keyboard and mouse inputs to actions and move a 2D actor.
 ./bin/input_actions
 ```
 
-## Edits to try
+## Internal flow
 
-1. Remap movement to arrow keys.
-1. Adjust boost multiplier.
-1. Add a reset-position action.
+- `se_input_create` builds an action map over raw keyboard/mouse sources for one input context.
+- `se_input_tick` resolves pressed/down/value states, then movement integrates with `delta_time`.
+- Action-triggered state changes update scene data (`se_object_2d_set_position`, shader uniforms) before draw.
 
 ## Related API links
 
