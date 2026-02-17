@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![navigation_grid preview](../../assets/img/examples/advanced/navigation_grid.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/navigation_grid.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/navigation_grid.svg" alt="navigation_grid preview image">
+</picture>
 
-*Caption: representative preview panel for `navigation_grid`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 

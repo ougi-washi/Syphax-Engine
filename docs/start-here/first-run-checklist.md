@@ -32,7 +32,7 @@ Use after setup or after large environment changes.
 ## Next
 
 1. Next: [Path](../path/index.md).
-1. Start with [Colors and clear](../path/colors-and-clear.md).
+1. Start with [Window](../path/window.md).
 
 </div>
 

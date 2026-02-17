@@ -97,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Backend](backend.md)
+- Next step: [VFX](vfx.md)
 - Run and compare with: [Linked example](../examples/advanced/context_lifecycle.md)
 
 ## Related pages

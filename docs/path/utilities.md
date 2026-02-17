@@ -96,7 +96,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Path index](index.md)
+- Next step: [Backend](backend.md)
 - Run and compare with: [Linked example](../examples/advanced/array_handles.md)
 
 ## Related pages

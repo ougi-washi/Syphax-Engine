@@ -72,7 +72,7 @@ for header in headers:
     if page_rel not in nav_paths:
         raise SystemExit(f"Generated API page missing in nav: {page_rel}")
 
-# Required concept sections for Start Here, module guides, and concept path pages.
+# Required concept sections for Start Here and module guides.
 required_concept_sections = {
     "when to use this",
     "minimal working snippet",
@@ -102,25 +102,6 @@ for folder in ("start-here", "module-guides"):
         if os.path.basename(path) == "index.md":
             continue
         concept_files.append(path)
-
-path_concept_files = {
-    "colors-and-clear.md",
-    "draw-your-first-text.md",
-    "basic-shapes-and-scene2d.md",
-    "motion-with-time.md",
-    "mouse-and-keyboard-input.md",
-    "buttons-and-ui-basics.md",
-    "add-sound.md",
-    "your-first-3d-object.md",
-    "camera-orbit-and-pan.md",
-    "load-a-model.md",
-    "particles-and-vfx.md",
-    "physics-as-motion.md",
-    "debug-overlay-and-traces.md",
-    "export-and-share.md",
-}
-for name in sorted(path_concept_files):
-    concept_files.append(os.path.join(docs_dir, "path", name))
 
 for concept in sorted(concept_files):
     found = headings_for_file(concept)

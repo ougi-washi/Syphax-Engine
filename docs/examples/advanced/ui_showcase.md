@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![ui_showcase preview](../../assets/img/examples/advanced/ui_showcase.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/ui_showcase.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/ui_showcase.svg" alt="ui_showcase preview image">
+</picture>
 
-*Caption: representative preview panel for `ui_showcase`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 

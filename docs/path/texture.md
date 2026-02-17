@@ -86,7 +86,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Loader](loader.md)
+- Next step: [Render Buffer](render-buffer.md)
 - Run and compare with: [Linked example](../examples/default/model_viewer.md)
 
 ## Related pages

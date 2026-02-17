@@ -97,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Utilities](utilities.md)
+- Next step: [Physics](physics.md)
 - Run and compare with: [Linked example](../examples/advanced/sdf_playground.md)
 
 ## Related pages

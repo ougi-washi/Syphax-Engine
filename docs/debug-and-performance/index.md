@@ -11,7 +11,6 @@ Debug traces and frame timing pages.
 ## In this section
 
 - [Path: Debug](../path/debug.md)
-- [Path: debug overlay and traces](../path/debug-overlay-and-traces.md)
 - [Example: debug_tools](../examples/advanced/debug_tools.md)
 - [Example: rts_integration](../examples/advanced/rts_integration.md)
 - [Module guide: se_debug](../module-guides/se-debug.md)

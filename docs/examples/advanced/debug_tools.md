@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![debug_tools preview](../../assets/img/examples/advanced/debug_tools.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/debug_tools.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/debug_tools.svg" alt="debug_tools preview image">
+</picture>
 
-*Caption: representative preview panel for `debug_tools`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -47,6 +50,5 @@ Enable trace and overlay diagnostics and inspect frame timing lines.
 ## Related API links
 
 - [Path: Debug](../../path/debug.md)
-- [Path: debug overlay and traces](../../path/debug-overlay-and-traces.md)
 - [Module guide: se_debug](../../module-guides/se-debug.md)
 - [API: se_debug.h](../../api-reference/modules/se_debug.md)

@@ -81,44 +81,30 @@ nav:
       - First Run Checklist: start-here/first-run-checklist.md
   - Path:
       - path/index.md
-      - Colors And Clear: path/colors-and-clear.md
-      - Draw Your First Text: path/draw-your-first-text.md
-      - Basic Shapes And Scene2D: path/basic-shapes-and-scene2d.md
-      - Motion With Time: path/motion-with-time.md
-      - Mouse And Keyboard Input: path/mouse-and-keyboard-input.md
-      - Buttons And UI Basics: path/buttons-and-ui-basics.md
-      - Add Sound: path/add-sound.md
-      - Your First 3D Object: path/your-first-3d-object.md
-      - Camera Orbit And Pan: path/camera-orbit-and-pan.md
-      - Load A Model: path/load-a-model.md
-      - Particles And VFX: path/particles-and-vfx.md
-      - Physics As Motion: path/physics-as-motion.md
-      - Debug Overlay And Traces: path/debug-overlay-and-traces.md
-      - Export And Share: path/export-and-share.md
       - Window: path/window.md
       - Input: path/input.md
       - UI: path/ui.md
       - Text: path/text.md
       - Audio: path/audio.md
+      - Graphics: path/graphics.md
+      - Scene: path/scene.md
+      - Camera: path/camera.md
+      - Model: path/model.md
+      - Loader: path/loader.md
+      - GLTF: path/gltf.md
+      - Shader: path/shader.md
+      - Texture: path/texture.md
+      - Render Buffer: path/render-buffer.md
+      - Framebuffer: path/framebuffer.md
       - VFX: path/vfx.md
       - Curve: path/curve.md
       - SDF: path/sdf.md
-      - Utilities: path/utilities.md
-      - Graphics: path/graphics.md
-      - Camera: path/camera.md
-      - Scene: path/scene.md
-      - Model: path/model.md
-      - Shader: path/shader.md
-      - Texture: path/texture.md
-      - Loader: path/loader.md
-      - GLTF: path/gltf.md
-      - Render Buffer: path/render-buffer.md
-      - Framebuffer: path/framebuffer.md
-      - Backend: path/backend.md
       - Physics: path/physics.md
       - Navigation: path/navigation.md
       - Simulation: path/simulation.md
       - Debug: path/debug.md
+      - Utilities: path/utilities.md
+      - Backend: path/backend.md
   - Visual Building Blocks:
       - visual-building-blocks/index.md
   - Interaction:

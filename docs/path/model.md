@@ -93,7 +93,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Shader](shader.md)
+- Next step: [Loader](loader.md)
 - Run and compare with: [Linked example](../examples/default/model_viewer.md)
 
 ## Related pages

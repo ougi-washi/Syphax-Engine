@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![vfx_emitters preview](../../assets/img/examples/advanced/vfx_emitters.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/vfx_emitters.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/vfx_emitters.svg" alt="vfx_emitters preview image">
+</picture>
 
-*Caption: representative preview panel for `vfx_emitters`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -48,6 +51,5 @@ Combined 2D and 3D emitters with animated uniform callbacks.
 ## Related API links
 
 - [Path: VFX](../../path/vfx.md)
-- [Path: particles and VFX](../../path/particles-and-vfx.md)
 - [Module guide: se_vfx](../../module-guides/se-vfx.md)
 - [API: se_vfx.h](../../api-reference/modules/se_vfx.md)

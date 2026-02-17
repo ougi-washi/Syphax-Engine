@@ -31,7 +31,7 @@ SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl");
 ## Next
 
 1. Next: [First run checklist](first-run-checklist.md).
-1. Apply scope checks in [load a model](../path/load-a-model.md).
+1. Apply scope checks in [model](../path/model.md).
 
 </div>
 
@@ -43,6 +43,6 @@ SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl");
 ## Related pages
 
 - [Project layout](project-layout.md)
-- [Path: load a model](../path/load-a-model.md)
+- [Path: Model](../path/model.md)
 - [API: se_defines.h](../api-reference/modules/se_defines.md)
 - [Next path page](../path/loader.md)

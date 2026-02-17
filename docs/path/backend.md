@@ -87,7 +87,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Curve](curve.md)
+- Next step: [Path index](index.md)
 - Run and compare with: [Linked example](../examples/advanced/context_lifecycle.md)
 
 ## Related pages

@@ -7,9 +7,12 @@ prerequisites:
 
 # physics3d_playground
 
-![physics3d_playground preview](../../assets/img/examples/default/physics3d_playground.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/physics3d_playground.png" type="image/png">
+  <img src="../../assets/img/examples/default/physics3d_playground.svg" alt="physics3d_playground preview image">
+</picture>
 
-*Caption: representative preview panel for `physics3d_playground`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -46,6 +49,5 @@ Run a 3D rigid-body simulation and update instance transforms.
 ## Related API links
 
 - [Path: Physics](../../path/physics.md)
-- [Path: physics as motion](../../path/physics-as-motion.md)
 - [Module guide: se_physics](../../module-guides/se-physics.md)
 - [API: se_physics.h](../../api-reference/modules/se_physics.md)

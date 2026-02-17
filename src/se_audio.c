@@ -2,7 +2,17 @@
 
 #include "se_audio.h"
 
+#if defined(__has_include)
+#if __has_include("miniaudio/miniaudio.h")
 #include "miniaudio/miniaudio.h"
+#elif __has_include("miniaudio.h")
+#include "miniaudio.h"
+#else
+#error "miniaudio header not found"
+#endif
+#else
+#include "miniaudio/miniaudio.h"
+#endif
 
 #include "se_defines.h"
 #include "se_debug.h"

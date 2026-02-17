@@ -99,7 +99,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Camera](camera.md)
+- Next step: [Scene](scene.md)
 - Run and compare with: [Linked example](../examples/default/hello_text.md)
 
 ## Related pages

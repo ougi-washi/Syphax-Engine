@@ -7,9 +7,12 @@ prerequisites:
 
 # ui_basics
 
-![ui_basics preview](../../assets/img/examples/default/ui_basics.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/ui_basics.png" type="image/png">
+  <img src="../../assets/img/examples/default/ui_basics.svg" alt="ui_basics preview image">
+</picture>
 
-*Caption: representative preview panel for `ui_basics`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -47,6 +50,5 @@ Build a small UI with two buttons and text updates from callbacks.
 ## Related API links
 
 - [Path: UI](../../path/ui.md)
-- [Path: buttons and UI basics](../../path/buttons-and-ui-basics.md)
 - [Module guide: se_ui](../../module-guides/se-ui.md)
 - [API: se_ui.h](../../api-reference/modules/se_ui.md)

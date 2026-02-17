@@ -7,9 +7,12 @@ prerequisites:
 
 # model_viewer
 
-![model_viewer preview](../../assets/img/examples/default/model_viewer.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/model_viewer.png" type="image/png">
+  <img src="../../assets/img/examples/default/model_viewer.svg" alt="model_viewer preview image">
+</picture>
 
-*Caption: representative preview panel for `model_viewer`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -48,6 +51,5 @@ Load and inspect a 3D model with a camera controller.
 ## Related API links
 
 - [Path: Model](../../path/model.md)
-- [Path: load a model](../../path/load-a-model.md)
 - [Module guide: se_model](../../module-guides/se-model.md)
 - [API: se_model.h](../../api-reference/modules/se_model.md)

@@ -7,9 +7,12 @@ prerequisites:
 
 # scene2d_instancing
 
-![scene2d_instancing preview](../../assets/img/examples/default/scene2d_instancing.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/scene2d_instancing.png" type="image/png">
+  <img src="../../assets/img/examples/default/scene2d_instancing.svg" alt="scene2d_instancing preview image">
+</picture>
 
-*Caption: representative preview panel for `scene2d_instancing`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -46,6 +49,6 @@ Create multiple 2D instances and animate them with a wave function.
 ## Related API links
 
 - [Path: Scene](../../path/scene.md)
-- [Path: motion with time](../../path/motion-with-time.md)
+- [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [API: se_scene.h](../../api-reference/modules/se_scene.md)

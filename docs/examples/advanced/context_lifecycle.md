@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![context_lifecycle preview](../../assets/img/examples/advanced/context_lifecycle.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/context_lifecycle.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/context_lifecycle.svg" alt="context_lifecycle preview image">
+</picture>
 
-*Caption: representative preview panel for `context_lifecycle`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 

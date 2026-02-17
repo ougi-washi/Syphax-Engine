@@ -12,7 +12,6 @@ Emitter and effect pages.
 
 - [Path: VFX](../path/vfx.md)
 - [Path: Curve](../path/curve.md)
-- [Path: particles and VFX](../path/particles-and-vfx.md)
 - [Example: vfx_emitters (advanced)](../examples/advanced/vfx_emitters.md)
 - [Module guide: se_vfx](../module-guides/se-vfx.md)
 - [API: se_vfx.h](../api-reference/modules/se_vfx.md)

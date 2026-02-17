@@ -7,9 +7,12 @@ prerequisites:
 
 # input_actions
 
-![input_actions preview](../../assets/img/examples/default/input_actions.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/input_actions.png" type="image/png">
+  <img src="../../assets/img/examples/default/input_actions.svg" alt="input_actions preview image">
+</picture>
 
-*Caption: representative preview panel for `input_actions`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -48,6 +51,5 @@ Bind keyboard and mouse inputs to actions and move a 2D actor.
 ## Related API links
 
 - [Path: Input](../../path/input.md)
-- [Path: mouse and keyboard input](../../path/mouse-and-keyboard-input.md)
 - [Module guide: se_input](../../module-guides/se-input.md)
 - [API: se_input.h](../../api-reference/modules/se_input.md)

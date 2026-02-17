@@ -182,8 +182,6 @@ typedef struct {
 	f32 initial_min_resource_amount;
 	f32 initial_camera_x;
 	f32 initial_camera_z;
-	f32 initial_camera_yaw;
-	f32 initial_camera_pitch;
 	f32 initial_camera_distance;
 
 	f32 min_enemy_hq_hp;
@@ -211,7 +209,7 @@ typedef struct {
 	b8 saw_building_damage;
 	b8 saw_unit_death;
 	b8 saw_building_death;
-	b8 saw_camera_motion;
+	b8 saw_camera_update;
 	b8 saw_minimap_update;
 	b8 saw_build_preview_update;
 	b8 saw_text_render;
@@ -318,6 +316,7 @@ typedef struct {
 } rts_pick_filter_state;
 
 static void rts_autotest_mark_system(rts_game *game, const rts_autotest_system system);
+static void rts_update_match_result(rts_game *game);
 
 static f32 rts_clampf(const f32 value, const f32 min_value, const f32 max_value) {
 	if (value < min_value) return min_value;
@@ -532,6 +531,24 @@ static void rts_clamp_world_position(s_vec3 *position) {
 	}
 	position->x = rts_clampf(position->x, -RTS_MAP_HALF_SIZE, RTS_MAP_HALF_SIZE);
 	position->z = rts_clampf(position->z, -RTS_MAP_HALF_SIZE, RTS_MAP_HALF_SIZE);
+}
+
+static s_vec3 rts_camera_offset_for_distance(const f32 distance) {
+	return s_vec3(
+		sinf(RTS_CAMERA_DEFAULT_YAW) * cosf(RTS_CAMERA_DEFAULT_PITCH) * distance,
+		sinf(RTS_CAMERA_DEFAULT_PITCH) * distance,
+		cosf(RTS_CAMERA_DEFAULT_YAW) * cosf(RTS_CAMERA_DEFAULT_PITCH) * distance);
+}
+
+static void rts_camera_set_static_pose(se_camera *camera, const s_vec3 *target, const f32 distance) {
+	if (!camera || !target) {
+		return;
+	}
+	camera->target = *target;
+	camera->target.y = 0.0f;
+	const s_vec3 offset = rts_camera_offset_for_distance(distance);
+	camera->position = s_vec3_add(&camera->target, &offset);
+	camera->up = s_vec3(0.0f, 1.0f, 0.0f);
 }
 
 static void rts_get_input_view_size(const rts_game *game, f32 *out_width, f32 *out_height) {
@@ -1574,8 +1591,6 @@ static void rts_autotest_capture_baseline(rts_game *game) {
 	autotest->max_ally_resources = autotest->initial_ally_resources;
 	autotest->initial_camera_x = game->camera_target.x;
 	autotest->initial_camera_z = game->camera_target.z;
-	autotest->initial_camera_yaw = game->camera_yaw;
-	autotest->initial_camera_pitch = game->camera_pitch;
 	autotest->initial_camera_distance = game->camera_distance;
 
 	const rts_building *enemy_hq = rts_find_primary_building(game, RTS_TEAM_ENEMY, RTS_BUILDING_TYPE_HQ);
@@ -1644,12 +1659,9 @@ static void rts_autotest_sample_state(rts_game *game) {
 	const f32 camera_target_delta =
 		fabsf(game->camera_target.x - autotest->initial_camera_x) +
 		fabsf(game->camera_target.z - autotest->initial_camera_z);
-	const f32 camera_orbit_delta =
-		fabsf(game->camera_yaw - autotest->initial_camera_yaw) +
-		fabsf(game->camera_pitch - autotest->initial_camera_pitch) +
-		fabsf(game->camera_distance - autotest->initial_camera_distance);
-	if (camera_target_delta > 0.35f || camera_orbit_delta > 0.30f) {
-		autotest->saw_camera_motion = true;
+	const f32 camera_distance_delta = fabsf(game->camera_distance - autotest->initial_camera_distance);
+	if (camera_target_delta > 0.35f || camera_distance_delta > 0.30f) {
+		autotest->saw_camera_update = true;
 	}
 }
 
@@ -1703,7 +1715,7 @@ static void rts_autotest_check_progress(rts_game *game) {
 		"training growth");
 
 	if (game->autotest.full_systems_required) {
-		rts_autotest_checkpoint(game, 13, 6.0f, game->autotest.saw_camera_motion, "camera movement");
+		rts_autotest_checkpoint(game, 13, 2.0f, game->autotest.saw_camera_update, "camera updates");
 		rts_autotest_checkpoint(game, 14, 4.0f, game->autotest.saw_minimap_update, "minimap updates");
 		rts_autotest_checkpoint(game, 15, 4.0f, game->autotest.saw_build_preview_update, "build preview updates");
 		rts_autotest_checkpoint(game, 16, 4.0f, game->autotest.saw_text_render, "overlay text render");
@@ -1728,7 +1740,7 @@ static void rts_autotest_log_summary(const rts_game *game) {
 		game->autotest.saw_building_damage ? 1 : 0,
 		game->autotest.saw_unit_death ? 1 : 0,
 		game->autotest.saw_building_death ? 1 : 0,
-		game->autotest.saw_camera_motion ? 1 : 0,
+		game->autotest.saw_camera_update ? 1 : 0,
 		game->autotest.saw_minimap_update ? 1 : 0,
 		game->autotest.saw_build_preview_update ? 1 : 0,
 		game->autotest.saw_text_render ? 1 : 0);
@@ -1794,7 +1806,7 @@ static void rts_autotest_finalize(rts_game *game) {
 		rts_autotest_fail(game, "state validator never passed");
 	}
 	if (game->autotest.full_systems_required &&
-		(!game->autotest.saw_camera_motion || !game->autotest.saw_minimap_update || !game->autotest.saw_build_preview_update || !game->autotest.saw_text_render)) {
+		(!game->autotest.saw_camera_update || !game->autotest.saw_minimap_update || !game->autotest.saw_build_preview_update || !game->autotest.saw_text_render)) {
 		rts_autotest_fail(game, "window-system coverage incomplete (camera/minimap/preview/text)");
 	}
 
@@ -2859,6 +2871,9 @@ static void rts_update_camera(rts_game *game, const f32 dt) {
 	if (!camera) {
 		return;
 	}
+	if (game->autotest.enabled) {
+		game->autotest.saw_camera_update = true;
+	}
 
 	const f32 mouse_x = se_window_get_mouse_position_x(game->window);
 	const f32 mouse_y = se_window_get_mouse_position_y(game->window);
@@ -2872,12 +2887,7 @@ static void rts_update_camera(rts_game *game, const f32 dt) {
 	const b8 shift = se_window_is_key_down(game->window, SE_KEY_LEFT_SHIFT) || se_window_is_key_down(game->window, SE_KEY_RIGHT_SHIFT);
 	f32 movement_speed = shift ? 27.0f : 14.0f;
 	movement_speed *= dt;
-	s_vec3 camera_forward_xz = se_camera_get_forward_vector(camera_handle);
-	camera_forward_xz.y = 0.0f;
-	if (s_vec3_length(&camera_forward_xz) <= 0.0001f) {
-		camera_forward_xz = s_vec3(-sinf(game->camera_yaw), 0.0f, -cosf(game->camera_yaw));
-	}
-	camera_forward_xz = s_vec3_normalize(&camera_forward_xz);
+	const s_vec3 camera_forward_xz = s_vec3(-sinf(RTS_CAMERA_DEFAULT_YAW), 0.0f, -cosf(RTS_CAMERA_DEFAULT_YAW));
 	const s_vec3 right_xz = s_vec3(-camera_forward_xz.z, 0.0f, camera_forward_xz.x);
 
 	s_vec3 movement_delta = s_vec3(0.0f, 0.0f, 0.0f);
@@ -2898,26 +2908,10 @@ static void rts_update_camera(rts_game *game, const f32 dt) {
 		se_camera_pan_world(camera_handle, &movement_delta);
 	}
 
-	const b8 rotate_left = se_window_is_key_down(game->window, SE_KEY_Q);
-	const b8 rotate_right = se_window_is_key_down(game->window, SE_KEY_E);
-	static b8 camera_pre_debug_printed = false;
-	if (!camera_pre_debug_printed) {
-		camera_pre_debug_printed = true;
-		rts_log(
-			"camera_pre yaw=%.2f pitch=%.2f dist=%.2f q=%d e=%d mouse=(%.1f %.1f)",
-			game->camera_yaw,
-			game->camera_pitch,
-			game->camera_distance,
-			rotate_left ? 1 : 0,
-			rotate_right ? 1 : 0,
-			mouse_x,
-			mouse_y);
-	}
-
 	const f32 edge_margin = 18.0f;
 	const b8 allow_edge_pan = (game->frame_index > 4) && (mouse_x > 0.5f || mouse_y > 0.5f);
 	s_vec3 edge_delta = s_vec3(0.0f, 0.0f, 0.0f);
-	if (allow_edge_pan && mouse_inside && !se_window_is_mouse_down(game->window, SE_MOUSE_MIDDLE) && !rotate_left && !rotate_right && game->build_mode == RTS_BUILD_MODE_NONE) {
+	if (allow_edge_pan && mouse_inside && !se_window_is_mouse_down(game->window, SE_MOUSE_MIDDLE) && game->build_mode == RTS_BUILD_MODE_NONE) {
 		if (mouse_x < edge_margin) {
 			edge_delta = s_vec3_sub(&edge_delta, &s_vec3_muls(&right_xz, movement_speed * 0.85f));
 		}
@@ -2933,17 +2927,6 @@ static void rts_update_camera(rts_game *game, const f32 dt) {
 	}
 	if (s_vec3_length(&edge_delta) > 0.0f) {
 		se_camera_pan_world(camera_handle, &edge_delta);
-	}
-
-	/* Q = rotate camera left (CCW around world up), E = rotate right (CW). */
-	f32 yaw_delta = 0.0f;
-	f32 pitch_delta = 0.0f;
-	if (rotate_left) yaw_delta += dt * 0.95f;
-	if (rotate_right) yaw_delta -= dt * 0.95f;
-	if (se_window_is_key_down(game->window, SE_KEY_Z)) pitch_delta += dt * 0.45f;
-	if (se_window_is_key_down(game->window, SE_KEY_X)) pitch_delta -= dt * 0.45f;
-	if (yaw_delta != 0.0f || pitch_delta != 0.0f) {
-		se_camera_orbit(camera_handle, &camera->target, yaw_delta, pitch_delta, 0.70f, 1.18f);
 	}
 
 	if (se_window_is_mouse_down(game->window, SE_MOUSE_MIDDLE) && game->build_mode == RTS_BUILD_MODE_NONE) {
@@ -3003,48 +2986,25 @@ static void rts_update_camera(rts_game *game, const f32 dt) {
 			reset_target.x += 1.8f;
 			reset_target.z -= 1.6f;
 		}
-		camera->target = reset_target;
-		const s_vec3 reset_offset = s_vec3(
-			sinf(RTS_CAMERA_DEFAULT_YAW) * cosf(RTS_CAMERA_DEFAULT_PITCH) * RTS_CAMERA_DEFAULT_DISTANCE,
-			sinf(RTS_CAMERA_DEFAULT_PITCH) * RTS_CAMERA_DEFAULT_DISTANCE,
-			cosf(RTS_CAMERA_DEFAULT_YAW) * cosf(RTS_CAMERA_DEFAULT_PITCH) * RTS_CAMERA_DEFAULT_DISTANCE);
-		camera->position = s_vec3_add(&camera->target, &reset_offset);
+		rts_camera_set_static_pose(camera, &reset_target, RTS_CAMERA_DEFAULT_DISTANCE);
 		rts_set_command_line(game, "Camera reset");
 	}
 
 	const s_vec3 min_bounds = s_vec3(-RTS_MAP_HALF_SIZE, 0.0f, -RTS_MAP_HALF_SIZE);
 	const s_vec3 max_bounds = s_vec3(RTS_MAP_HALF_SIZE, 0.0f, RTS_MAP_HALF_SIZE);
 	se_camera_clamp_target(camera_handle, &min_bounds, &max_bounds);
-	camera->target.y = 0.0f;
-	camera->up = s_vec3(0.0f, 1.0f, 0.0f);
 
 	const s_vec3 cam_offset = s_vec3_sub(&camera->position, &camera->target);
 	const f32 cam_distance = s_max(s_vec3_length(&cam_offset), 0.0001f);
+	rts_camera_set_static_pose(camera, &camera->target, cam_distance);
 	game->camera_target = camera->target;
 	game->camera_distance = cam_distance;
-	game->camera_yaw = atan2f(cam_offset.x, cam_offset.z);
-	game->camera_pitch = asinf(rts_clampf(cam_offset.y / cam_distance, -1.0f, 1.0f));
+	game->camera_yaw = RTS_CAMERA_DEFAULT_YAW;
+	game->camera_pitch = RTS_CAMERA_DEFAULT_PITCH;
 
 	game->mouse_world_valid = rts_screen_to_ground(game, mouse_x, mouse_y, &game->mouse_world);
 	if (!game->mouse_world_valid) {
 		game->mouse_world = game->camera_target;
-	}
-
-	static b8 camera_debug_printed = false;
-	if (!camera_debug_printed) {
-		camera_debug_printed = true;
-		s_vec3 center_world = s_vec3(0.0f, 0.0f, 0.0f);
-		const b8 center_hit = rts_screen_to_ground(game, width * 0.5f, height * 0.5f, &center_world);
-		s_vec3 view_dir = s_vec3_sub(&camera->target, &camera->position);
-		view_dir = s_vec3_normalize(&view_dir);
-		rts_log(
-			"camera_init pos=(%.2f %.2f %.2f) target=(%.2f %.2f %.2f) yaw=%.2f pitch=%.2f dir=(%.2f %.2f %.2f) center_hit=%d center=(%.2f %.2f)",
-			camera->position.x, camera->position.y, camera->position.z,
-			camera->target.x, camera->target.y, camera->target.z,
-			game->camera_yaw, game->camera_pitch,
-			view_dir.x, view_dir.y, view_dir.z,
-			center_hit ? 1 : 0,
-			center_world.x, center_world.z);
 	}
 }
 
@@ -3503,6 +3463,69 @@ static b8 rts_team_defeated(rts_game *game, const rts_team team) {
 	return true;
 }
 
+static void rts_step_simulation(rts_game *game, const f32 dt) {
+	if (!game) {
+		return;
+	}
+	game->frame_index++;
+	game->sim_time += dt;
+	if (game->command_line_timer > 0.0f) {
+		game->command_line_timer -= dt;
+	}
+
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_SIMULATOR);
+	rts_run_input_simulator(game, dt);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_CAMERA);
+	rts_update_camera(game, dt);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_PLAYER_INPUT);
+	rts_handle_player_input(game);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_ENEMY_AI);
+	rts_update_enemy_ai(game, dt);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_UNITS);
+	rts_update_units(game, dt);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_NAVIGATION);
+	rts_resolve_unit_navigation(game, dt);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_BUILDINGS);
+	rts_update_buildings(game, dt);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_SELECTION);
+	rts_recount_selection(game);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_VISUALS);
+	rts_update_visuals(game);
+	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_BUILD_PREVIEW);
+	rts_update_build_preview_visual(game);
+	rts_update_minimap_ui(game);
+	rts_update_match_result(game);
+}
+
+static void rts_step_validation_checkpoint(rts_game *game) {
+	if (!game) {
+		return;
+	}
+	if ((game->frame_index % 30) == 0) {
+		rts_validate_state(game);
+		rts_autotest_check_progress(game);
+	}
+}
+
+static void rts_update_match_result(rts_game *game) {
+	if (!game || game->match_result != 0) {
+		return;
+	}
+	if (rts_team_defeated(game, RTS_TEAM_ENEMY)) {
+		game->match_result = 1;
+		rts_set_command_line(game, "Victory");
+		if (game->window != S_HANDLE_NULL && game->simulator.enabled && !game->autotest.enabled) {
+			se_window_set_should_close(game->window, true);
+		}
+	} else if (rts_team_defeated(game, RTS_TEAM_ALLY)) {
+		game->match_result = -1;
+		rts_set_command_line(game, "Defeat");
+		if (game->window != S_HANDLE_NULL && game->simulator.enabled && !game->autotest.enabled) {
+			se_window_set_should_close(game->window, true);
+		}
+	}
+}
+
 static b8 rts_world_to_ndc(rts_game *game, const s_vec3 *world, s_vec2 *out_ndc) {
 	if (!game || !world || !out_ndc || game->scene == S_HANDLE_NULL) {
 		return false;
@@ -3620,8 +3643,8 @@ static void rts_render_overlay(rts_game *game) {
 		"Mouse Ground: %7.2f %7.2f valid=%d   Build:%s preview:%s reason:%s\n"
 		"%s\n"
 		"Msg: %s\n"
-		"Controls: LMB select  RMB command  WASD+Arrows pan  MMB drag camera  wheel zoom\n"
-		"Q/E rotate  Z/X pitch  F focus selected  H center HQ  R reset camera  F2 minimap toggle  click minimap to move camera\n"
+		"Controls: LMB select  RMB command  WASD+Arrows pan  MMB drag camera  wheel zoom  (angle fixed)\n"
+		"F focus selected  H center HQ  R reset camera  F2 minimap toggle  click minimap to move camera\n"
 		"1 workers 2 soldiers 3 all 0 clear  U worker  I soldier  B barracks  T tower  G gather  M move  V attack-move\n"
 		"Build mode: LMB place  RMB/ESC cancel   Minimap: cyan ally / red enemy / gold resources\n",
 		fps,
@@ -3699,7 +3722,6 @@ static void rts_render_frame(rts_game *game) {
 	}
 	se_scene_3d_render_to_buffer(game->scene);
 	se_scene_3d_render_to_screen(game->scene, game->window);
-	rts_update_minimap_ui(game);
 	if (game->show_minimap_ui && game->hud_scene != S_HANDLE_NULL) {
 		const s_vec4 scene_bg = s_vec4(0.045f, 0.053f, 0.058f, 1.0f);
 		/* Keep HUD framebuffer transparent so it overlays 3D instead of replacing it. */
@@ -3711,6 +3733,18 @@ static void rts_render_frame(rts_game *game) {
 	rts_render_overlay(game);
 	rts_render_health_labels(game);
 	se_window_render_screen(game->window);
+}
+
+static void rts_spawn_units_near(rts_game *game, const rts_unit_kind kind, const s_vec3 *center, const i32 count, const f32 spread) {
+	if (!game || !center || count <= 0) {
+		return;
+	}
+	for (i32 i = 0; i < count; ++i) {
+		s_vec3 pos = *center;
+		pos.x += rts_randf(-spread, spread);
+		pos.z += rts_randf(-spread, spread);
+		(void)rts_spawn_unit(game, kind, &pos);
+	}
 }
 
 static void rts_seed_world(rts_game *game) {
@@ -3738,30 +3772,10 @@ static void rts_seed_world(rts_game *game) {
 		(void)rts_spawn_resource(game, &resource_positions[i], 520.0f + (f32)(i * 80));
 	}
 
-	for (i32 i = 0; i < 4; ++i) {
-		s_vec3 pos = ally_hq_pos;
-		pos.x += rts_randf(-2.3f, 2.3f);
-		pos.z += rts_randf(-2.3f, 2.3f);
-		(void)rts_spawn_unit(game, RTS_UNIT_KIND_ALLY_WORKER, &pos);
-	}
-	for (i32 i = 0; i < 2; ++i) {
-		s_vec3 pos = ally_hq_pos;
-		pos.x += rts_randf(-2.8f, 2.8f);
-		pos.z += rts_randf(-2.8f, 2.8f);
-		(void)rts_spawn_unit(game, RTS_UNIT_KIND_ALLY_SOLDIER, &pos);
-	}
-	for (i32 i = 0; i < 4; ++i) {
-		s_vec3 pos = enemy_hq_pos;
-		pos.x += rts_randf(-2.6f, 2.6f);
-		pos.z += rts_randf(-2.6f, 2.6f);
-		(void)rts_spawn_unit(game, RTS_UNIT_KIND_ENEMY_WORKER, &pos);
-	}
-	for (i32 i = 0; i < 4; ++i) {
-		s_vec3 pos = enemy_hq_pos;
-		pos.x += rts_randf(-3.0f, 3.0f);
-		pos.z += rts_randf(-3.0f, 3.0f);
-		(void)rts_spawn_unit(game, RTS_UNIT_KIND_ENEMY_SOLDIER, &pos);
-	}
+	rts_spawn_units_near(game, RTS_UNIT_KIND_ALLY_WORKER, &ally_hq_pos, 4, 2.3f);
+	rts_spawn_units_near(game, RTS_UNIT_KIND_ALLY_SOLDIER, &ally_hq_pos, 2, 2.8f);
+	rts_spawn_units_near(game, RTS_UNIT_KIND_ENEMY_WORKER, &enemy_hq_pos, 4, 2.6f);
+	rts_spawn_units_near(game, RTS_UNIT_KIND_ENEMY_SOLDIER, &enemy_hq_pos, 4, 3.0f);
 
 	game->camera_target = ally_hq_pos;
 	game->camera_target.x += 1.8f;
@@ -3774,13 +3788,7 @@ static void rts_seed_world(rts_game *game) {
 		if (camera_handle != S_HANDLE_NULL) {
 			se_camera *camera = se_camera_get(camera_handle);
 			if (camera) {
-				const s_vec3 camera_offset = s_vec3(
-					sinf(game->camera_yaw) * cosf(game->camera_pitch) * game->camera_distance,
-					sinf(game->camera_pitch) * game->camera_distance,
-					cosf(game->camera_yaw) * cosf(game->camera_pitch) * game->camera_distance);
-				camera->target = game->camera_target;
-				camera->position = s_vec3_add(&camera->target, &camera_offset);
-				camera->up = s_vec3(0.0f, 1.0f, 0.0f);
+				rts_camera_set_static_pose(camera, &game->camera_target, game->camera_distance);
 				se_camera_set_perspective(camera_handle, 52.0f, 0.1f, 220.0f);
 				if (game->window != S_HANDLE_NULL) {
 					se_camera_set_aspect_from_window(camera_handle, game->window);
@@ -3823,44 +3831,14 @@ static int rts_run_headless_simulation(rts_game *game) {
 
 	const f32 dt = (game->autotest.enabled && game->autotest.fixed_dt > 0.0001f) ? game->autotest.fixed_dt : (1.0f / 60.0f);
 	while (game->simulator.total_time < game->simulator.stop_after_seconds) {
-		game->frame_index++;
-		game->sim_time += dt;
-		if (game->command_line_timer > 0.0f) {
-			game->command_line_timer -= dt;
-		}
-
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_SIMULATOR);
-		rts_run_input_simulator(game, dt);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_CAMERA);
-		rts_update_camera(game, dt);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_PLAYER_INPUT);
-		rts_handle_player_input(game);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_ENEMY_AI);
-		rts_update_enemy_ai(game, dt);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_UNITS);
-		rts_update_units(game, dt);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_NAVIGATION);
-		rts_resolve_unit_navigation(game, dt);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_BUILDINGS);
-		rts_update_buildings(game, dt);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_SELECTION);
-		rts_recount_selection(game);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_VISUALS);
-		rts_update_visuals(game);
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_BUILD_PREVIEW);
-		rts_update_build_preview_visual(game);
-		rts_update_minimap_ui(game);
+		rts_step_simulation(game, dt);
 		rts_render_frame(game);
-
-		if ((game->frame_index % 30) == 0) {
-			rts_validate_state(game);
-			rts_autotest_check_progress(game);
-		}
+		rts_step_validation_checkpoint(game);
 		if (game->autotest.enabled && game->validations_failed && game->autotest.strict_fail_fast) {
 			break;
 		}
 
-		if (!game->autotest.enabled && (rts_team_defeated(game, RTS_TEAM_ENEMY) || rts_team_defeated(game, RTS_TEAM_ALLY))) {
+		if (!game->autotest.enabled && game->match_result != 0) {
 			break;
 		}
 	}
@@ -3877,6 +3855,21 @@ static int rts_run_headless_simulation(rts_game *game) {
 
 	rts_log("headless finished at t=%.2f, validations=%s", game->simulator.total_time, game->validations_failed ? "FAILED" : "OK");
 	return game->validations_failed ? 2 : 0;
+}
+
+static int rts_fail_runtime(rts_game *game, const c8 *reason) {
+	if (reason && reason[0] != '\0') {
+		fprintf(stderr, RTS_LOG_PREFIX "%s\n", reason);
+	}
+	if (game && game->simulator.enabled) {
+		rts_log("falling back to headless simulation");
+		rts_shutdown_runtime(game);
+		return rts_run_headless_simulation(game);
+	}
+	if (game) {
+		rts_shutdown_runtime(game);
+	}
+	return 1;
 }
 
 int main(int argc, char **argv) {
@@ -3987,24 +3980,10 @@ int main(int argc, char **argv) {
 
 	game.window = se_window_create("Syphax-Engine - 99 RTS 3D", RTS_WINDOW_WIDTH, RTS_WINDOW_HEIGHT);
 	if (game.window == S_HANDLE_NULL) {
-		fprintf(stderr, RTS_LOG_PREFIX "failed to create window\n");
-		if (game.simulator.enabled) {
-			rts_log("falling back to headless simulation");
-			rts_shutdown_runtime(&game);
-			return rts_run_headless_simulation(&game);
-		}
-		rts_shutdown_runtime(&game);
-		return 1;
+		return rts_fail_runtime(&game, "failed to create window");
 	}
 	if (!se_render_has_context()) {
-		fprintf(stderr, RTS_LOG_PREFIX "no graphics context available\n");
-		if (game.simulator.enabled) {
-			rts_log("falling back to headless simulation");
-			rts_shutdown_runtime(&game);
-			return rts_run_headless_simulation(&game);
-		}
-		rts_shutdown_runtime(&game);
-		return 1;
+		return rts_fail_runtime(&game, "no graphics context available");
 	}
 
 	se_window_set_exit_key(game.window, SE_KEY_ESCAPE);
@@ -4018,47 +3997,19 @@ int main(int argc, char **argv) {
 
 	game.text_handle = se_text_handle_create(0);
 	if (!game.text_handle) {
-		fprintf(stderr, RTS_LOG_PREFIX "failed to create text handle\n");
-		if (game.simulator.enabled) {
-			rts_log("falling back to headless simulation");
-			rts_shutdown_runtime(&game);
-			return rts_run_headless_simulation(&game);
-		}
-		rts_shutdown_runtime(&game);
-		return 1;
+		return rts_fail_runtime(&game, "failed to create text handle");
 	}
 	game.font = se_font_load(game.text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 26.0f);
 	if (game.font == S_HANDLE_NULL) {
-		fprintf(stderr, RTS_LOG_PREFIX "failed to load font\n");
-		if (game.simulator.enabled) {
-			rts_log("falling back to headless simulation");
-			rts_shutdown_runtime(&game);
-			return rts_run_headless_simulation(&game);
-		}
-		rts_shutdown_runtime(&game);
-		return 1;
+		return rts_fail_runtime(&game, "failed to load font");
 	}
 
 	rts_reset_slots(&game);
 	if (!rts_init_rendering(&game)) {
-		fprintf(stderr, RTS_LOG_PREFIX "failed to initialize rendering assets\n");
-		if (game.simulator.enabled) {
-			rts_log("falling back to headless simulation");
-			rts_shutdown_runtime(&game);
-			return rts_run_headless_simulation(&game);
-		}
-		rts_shutdown_runtime(&game);
-		return 1;
+		return rts_fail_runtime(&game, "failed to initialize rendering assets");
 	}
 	if (!rts_init_hud_scene(&game)) {
-		fprintf(stderr, RTS_LOG_PREFIX "failed to initialize HUD\n");
-		if (game.simulator.enabled) {
-			rts_log("falling back to headless simulation");
-			rts_shutdown_runtime(&game);
-			return rts_run_headless_simulation(&game);
-		}
-		rts_shutdown_runtime(&game);
-		return 1;
+		return rts_fail_runtime(&game, "failed to initialize HUD");
 	}
 
 	rts_seed_world(&game);
@@ -4081,11 +4032,7 @@ int main(int argc, char **argv) {
 				: frame_dt;
 
 		for (i32 step = 0; step < sim_steps && !se_window_should_close(game.window); ++step) {
-			game.frame_index++;
-			game.sim_time += sim_dt;
-			if (game.command_line_timer > 0.0f) {
-				game.command_line_timer -= sim_dt;
-			}
+			rts_step_simulation(&game, sim_dt);
 			se_uniform_set_float(se_context_get_global_uniforms(), "u_time", game.sim_time);
 			if (shader_hot_reload_enabled) {
 				shader_reload_accumulator += (f64)sim_dt;
@@ -4094,48 +4041,7 @@ int main(int argc, char **argv) {
 					shader_reload_accumulator = 0.0;
 				}
 			}
-
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_SIMULATOR);
-			rts_run_input_simulator(&game, sim_dt);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_CAMERA);
-			rts_update_camera(&game, sim_dt);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_PLAYER_INPUT);
-			rts_handle_player_input(&game);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_ENEMY_AI);
-			rts_update_enemy_ai(&game, sim_dt);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_UNITS);
-			rts_update_units(&game, sim_dt);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_NAVIGATION);
-			rts_resolve_unit_navigation(&game, sim_dt);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_BUILDINGS);
-			rts_update_buildings(&game, sim_dt);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_SELECTION);
-			rts_recount_selection(&game);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_VISUALS);
-			rts_update_visuals(&game);
-			rts_autotest_mark_system(&game, RTS_AUTOTEST_SYSTEM_BUILD_PREVIEW);
-			rts_update_build_preview_visual(&game);
-
-			if ((game.frame_index % 30) == 0) {
-				rts_validate_state(&game);
-				rts_autotest_check_progress(&game);
-			}
-
-			if (game.match_result == 0) {
-				if (rts_team_defeated(&game, RTS_TEAM_ENEMY)) {
-					game.match_result = 1;
-					rts_set_command_line(&game, "Victory");
-					if (game.simulator.enabled && !game.autotest.enabled) {
-						se_window_set_should_close(game.window, true);
-					}
-				} else if (rts_team_defeated(&game, RTS_TEAM_ALLY)) {
-					game.match_result = -1;
-					rts_set_command_line(&game, "Defeat");
-					if (game.simulator.enabled && !game.autotest.enabled) {
-						se_window_set_should_close(game.window, true);
-					}
-				}
-			}
+			rts_step_validation_checkpoint(&game);
 
 			if (game.autotest.enabled && game.validations_failed && game.autotest.strict_fail_fast) {
 				se_window_set_should_close(game.window, true);

@@ -7,9 +7,12 @@ prerequisites:
 
 # scene2d_click
 
-![scene2d_click preview](../../assets/img/examples/default/scene2d_click.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/scene2d_click.png" type="image/png">
+  <img src="../../assets/img/examples/default/scene2d_click.svg" alt="scene2d_click preview image">
+</picture>
 
-*Caption: representative preview panel for `scene2d_click`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -46,6 +49,5 @@ Pick an object with pointer input and update shader color on click.
 ## Related API links
 
 - [Path: Scene](../../path/scene.md)
-- [Path: basic shapes and Scene2D](../../path/basic-shapes-and-scene2d.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [API: se_scene.h](../../api-reference/modules/se_scene.md)

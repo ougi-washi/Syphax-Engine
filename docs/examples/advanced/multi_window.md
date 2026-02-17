@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![multi_window preview](../../assets/img/examples/advanced/multi_window.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/multi_window.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/multi_window.svg" alt="multi_window preview image">
+</picture>
 
-*Caption: representative preview panel for `multi_window`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 

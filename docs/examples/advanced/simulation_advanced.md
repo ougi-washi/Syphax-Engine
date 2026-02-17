@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![simulation_advanced preview](../../assets/img/examples/advanced/simulation_advanced.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/simulation_advanced.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/simulation_advanced.svg" alt="simulation_advanced preview image">
+</picture>
 
-*Caption: representative preview panel for `simulation_advanced`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 

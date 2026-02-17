@@ -7,9 +7,12 @@ prerequisites:
 
 # hello_text
 
-![hello_text preview](../../assets/img/examples/default/hello_text.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/hello_text.png" type="image/png">
+  <img src="../../assets/img/examples/default/hello_text.svg" alt="hello_text preview image">
+</picture>
 
-*Caption: representative preview panel for `hello_text`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -47,6 +50,6 @@ Create a window, render text, and toggle the background palette.
 ## Related API links
 
 - [Path: Window](../../path/window.md)
-- [Path: draw your first text](../../path/draw-your-first-text.md)
+- [Path: Text](../../path/text.md)
 - [Module guide: se_text](../../module-guides/se-text.md)
 - [API: se_window.h](../../api-reference/modules/se_window.md)

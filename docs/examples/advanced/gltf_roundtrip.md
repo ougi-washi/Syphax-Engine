@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![gltf_roundtrip preview](../../assets/img/examples/advanced/gltf_roundtrip.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/gltf_roundtrip.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/gltf_roundtrip.svg" alt="gltf_roundtrip preview image">
+</picture>
 
-*Caption: representative preview panel for `gltf_roundtrip`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -48,5 +51,5 @@ Load GLTF, export GLB, and validate roundtrip asset counts.
 
 - [Path: GLTF](../../path/gltf.md)
 - [Module guide: loader/se_gltf](../../module-guides/loader-se-gltf.md)
-- [Path: load a model](../../path/load-a-model.md)
+- [Path: Model](../../path/model.md)
 - [API: loader/se_gltf.h](../../api-reference/modules/loader_se_gltf.md)

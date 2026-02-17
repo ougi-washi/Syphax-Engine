@@ -47,10 +47,9 @@ while (!se_window_should_close(window)) {
 ## Related pages
 
 - [First window](first-window.md)
-- [Path: motion with time](../path/motion-with-time.md)
+- [Path: Window](../path/window.md)
 - [API: se_window.h](../api-reference/modules/se_window.md)
 
 ![Frame loop flow diagram](../assets/img/frame-loop.svg)
 
 *Caption: one frame cycle from begin to present, then loop.*
-- [Next path page](../path/window.md)

@@ -88,7 +88,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Render Buffer](render-buffer.md)
+- Next step: [Shader](shader.md)
 - Run and compare with: [Linked example](../examples/advanced/gltf_roundtrip.md)
 
 ## Related pages

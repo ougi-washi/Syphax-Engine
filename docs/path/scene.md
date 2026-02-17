@@ -99,7 +99,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Graphics](graphics.md)
+- Next step: [Camera](camera.md)
 - Run and compare with: [Linked example](../examples/default/scene2d_click.md)
 
 ## Related pages

@@ -97,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [Scene](scene.md)
+- Next step: [Model](model.md)
 - Run and compare with: [Linked example](../examples/default/scene3d_orbit.md)
 
 ## Related pages

@@ -7,9 +7,12 @@ prerequisites:
 
 # audio_basics
 
-![audio_basics preview](../../assets/img/examples/default/audio_basics.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/audio_basics.png" type="image/png">
+  <img src="../../assets/img/examples/default/audio_basics.svg" alt="audio_basics preview image">
+</picture>
 
-*Caption: representative preview panel for `audio_basics`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -48,6 +51,5 @@ Play clips and stream looped audio with bus-level volume control.
 ## Related API links
 
 - [Path: Audio](../../path/audio.md)
-- [Path: add sound](../../path/add-sound.md)
 - [Module guide: se_audio](../../module-guides/se-audio.md)
 - [API: se_audio.h](../../api-reference/modules/se_audio.md)

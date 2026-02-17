@@ -9,9 +9,12 @@ prerequisites:
 
 > Scope: advanced
 
-![rts_integration preview](../../assets/img/examples/advanced/rts_integration.svg)
+<picture>
+  <source srcset="../../assets/img/examples/advanced/rts_integration.png" type="image/png">
+  <img src="../../assets/img/examples/advanced/rts_integration.svg" alt="rts_integration preview image">
+</picture>
 
-*Caption: representative preview panel for `rts_integration`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 

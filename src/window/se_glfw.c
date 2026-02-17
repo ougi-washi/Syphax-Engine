@@ -18,6 +18,9 @@
 #include <limits.h>
 #include <string.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #define SE_MAX_WINDOWS 8
 #define SE_MAX_KEY_COMBOS 8
 #define SE_MAX_INPUT_EVENTS 1024
@@ -75,8 +78,18 @@ typedef struct {
 	sz pixel_buffer_capacity;
 } se_window_terminal_mirror_state;
 
+typedef struct {
+	b8 configured;
+	b8 enabled;
+	b8 captured;
+	b8 auto_exit;
+	u32 target_frame;
+	c8 output_path[PATH_MAX];
+} se_window_docs_capture_state;
+
 static se_window_terminal_mirror_state g_terminal_mirror = {0};
 static se_window_terminal_input_parser g_terminal_input_parser = {0};
+static se_window_docs_capture_state g_docs_capture = {0};
 static volatile sig_atomic_t g_terminal_restore_emitted = 0;
 
 static i32 se_window_terminal_mirror_output_fd(void) {
@@ -99,6 +112,8 @@ static se_window* se_window_from_handle(se_context* context, const se_window_han
 static void gl_error_callback(i32 error, const c8* description);
 static void se_window_terminal_mirror_configure(void);
 static void se_window_terminal_mirror_shutdown(void);
+static void se_window_docs_capture_configure(void);
+static void se_window_docs_capture_present(se_window* window_ptr);
 static void se_window_backend_process_shutdown(void) {
 	if (!glfw_backend_initialized) {
 		return;
@@ -113,6 +128,7 @@ static void se_window_backend_process_shutdown(void) {
 static b8 se_window_backend_init(void) {
 	glfwSetErrorCallback(gl_error_callback);
 	se_window_terminal_mirror_configure();
+	se_window_docs_capture_configure();
 	if (glfw_backend_initialized) {
 		return true;
 	}
@@ -709,6 +725,20 @@ static b8 se_window_env_flag_enabled(const c8* key) {
 	return true;
 }
 
+static b8 se_window_env_flag_value(const c8* key, const b8 fallback) {
+	const c8* value = getenv(key);
+	if (!value || value[0] == '\0') {
+		return fallback;
+	}
+	if (strcmp(value, "0") == 0 ||
+		se_window_string_equal_ci(value, "false") ||
+		se_window_string_equal_ci(value, "off") ||
+		se_window_string_equal_ci(value, "no")) {
+		return false;
+	}
+	return true;
+}
+
 static b8 se_window_terminal_allow_logs(void) {
 	return
 		se_window_env_flag_enabled("SE_TERMINAL_ALLOW_LOGS") ||
@@ -733,6 +763,111 @@ static u32 se_window_env_u32(const c8* key, const u32 fallback, const u32 min_va
 		return max_value;
 	}
 	return (u32)parsed;
+}
+
+static void se_window_docs_capture_configure(void) {
+	if (g_docs_capture.configured) {
+		return;
+	}
+	memset(&g_docs_capture, 0, sizeof(g_docs_capture));
+	g_docs_capture.configured = true;
+
+	const c8* output_path = getenv("SE_DOCS_CAPTURE_PATH");
+	if (!output_path || output_path[0] == '\0') {
+		return;
+	}
+	if (strlen(output_path) >= sizeof(g_docs_capture.output_path)) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_WINDOW,
+			"se_window_docs_capture_configure :: capture path too long");
+		return;
+	}
+
+	snprintf(g_docs_capture.output_path, sizeof(g_docs_capture.output_path), "%s", output_path);
+	g_docs_capture.target_frame = se_window_env_u32("SE_DOCS_CAPTURE_FRAME", 20u, 1u, 10000u);
+	g_docs_capture.auto_exit = se_window_env_flag_value("SE_DOCS_CAPTURE_EXIT", true);
+	g_docs_capture.enabled = true;
+}
+
+static void se_window_docs_capture_present(se_window* window_ptr) {
+	if (!g_docs_capture.enabled || g_docs_capture.captured || !window_ptr || !window_ptr->handle) {
+		return;
+	}
+	if (window_ptr->frame_count < (u64)g_docs_capture.target_frame) {
+		return;
+	}
+
+	i32 fb_width = 0;
+	i32 fb_height = 0;
+	glfwGetFramebufferSize((GLFWwindow*)window_ptr->handle, &fb_width, &fb_height);
+	if (fb_width <= 0 || fb_height <= 0) {
+		return;
+	}
+
+	const sz row_stride = (sz)fb_width * 3;
+	const sz byte_count = row_stride * (sz)fb_height;
+	if (byte_count == 0) {
+		g_docs_capture.captured = true;
+		return;
+	}
+
+	u8* pixels = malloc(byte_count);
+	if (!pixels) {
+		g_docs_capture.captured = true;
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_WINDOW,
+			"se_window_docs_capture_present :: failed to allocate pixel buffer");
+		return;
+	}
+
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadBuffer(GL_BACK);
+	glReadPixels(0, 0, fb_width, fb_height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+
+	u8* row_swap = malloc(row_stride);
+	if (row_swap) {
+		for (i32 y = 0; y < fb_height / 2; ++y) {
+			u8* top = pixels + (sz)y * row_stride;
+			u8* bottom = pixels + (sz)(fb_height - 1 - y) * row_stride;
+			memcpy(row_swap, top, row_stride);
+			memcpy(top, bottom, row_stride);
+			memcpy(bottom, row_swap, row_stride);
+		}
+		free(row_swap);
+	}
+
+	const i32 write_result = stbi_write_png(
+		g_docs_capture.output_path,
+		fb_width,
+		fb_height,
+		3,
+		pixels,
+		(i32)row_stride);
+
+	free(pixels);
+	g_docs_capture.captured = true;
+
+	if (write_result != 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_INFO,
+			SE_DEBUG_CATEGORY_WINDOW,
+			"se_window_docs_capture_present :: wrote %s (frame=%llu)",
+			g_docs_capture.output_path,
+			(unsigned long long)window_ptr->frame_count);
+	} else {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_WINDOW,
+			"se_window_docs_capture_present :: failed to write %s",
+			g_docs_capture.output_path);
+	}
+
+	if (g_docs_capture.auto_exit) {
+		window_ptr->should_close = true;
+		glfwSetWindowShouldClose((GLFWwindow*)window_ptr->handle, GLFW_TRUE);
+	}
 }
 
 static void se_window_terminal_mirror_configure(void) {
@@ -1386,6 +1521,7 @@ void se_window_render_screen(const se_window_handle window) {
 		}
 	}
 	se_debug_render_overlay(window, NULL);
+	se_window_docs_capture_present(window_ptr);
 	se_window_terminal_mirror_present(window_ptr);
 	glfwSwapBuffers((GLFWwindow*)window_ptr->handle);
 	window_ptr->diagnostics.frames_presented++;

@@ -97,7 +97,7 @@ Key API calls:
 
 ## Next
 
-- Next step: [VFX](vfx.md)
+- Next step: [Graphics](graphics.md)
 - Run and compare with: [Linked example](../examples/default/audio_basics.md)
 
 ## Related pages

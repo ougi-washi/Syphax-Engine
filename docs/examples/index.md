@@ -39,13 +39,27 @@ Use this section to find build/run commands, controls, and small edits for each 
 
 ## Screenshot naming convention
 
-Store example visuals under:
+Generated runtime captures are stored under:
 
-`docs/assets/img/examples/<track>/<target>.svg`
+`docs/assets/img/examples/<track>/<target>.png`
 
 Rules:
 
 - `<track>` is `default` or `advanced`.
 - `<target>` matches the executable name exactly.
 - Use lowercase and underscores.
-- Add alt text and one caption line in every example page.
+- Keep the existing `.svg` placeholder file as a fallback for each example page.
+
+## Generate captures locally
+
+Run this locally to avoid workflow cost and review images before commit:
+
+```bash
+./scripts/docs/capture_examples.sh --build
+```
+
+Useful options:
+
+- `--track default` or `--track advanced`
+- `--frame 30` for later capture timing
+- `--show-window` to capture with visible windows instead of hidden terminal mode

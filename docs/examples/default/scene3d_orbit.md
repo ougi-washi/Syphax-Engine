@@ -7,9 +7,12 @@ prerequisites:
 
 # scene3d_orbit
 
-![scene3d_orbit preview](../../assets/img/examples/default/scene3d_orbit.svg)
+<picture>
+  <source srcset="../../assets/img/examples/default/scene3d_orbit.png" type="image/png">
+  <img src="../../assets/img/examples/default/scene3d_orbit.svg" alt="scene3d_orbit preview image">
+</picture>
 
-*Caption: representative preview panel for `scene3d_orbit`.*
+*Caption: live runtime capture if available; falls back to placeholder preview card.*
 
 ## Goal
 
@@ -48,6 +51,5 @@ Render a 3D grid of cubes and navigate with orbit camera controls.
 ## Related API links
 
 - [Path: Camera](../../path/camera.md)
-- [Path: camera orbit and pan](../../path/camera-orbit-and-pan.md)
 - [Module guide: se_camera](../../module-guides/se-camera.md)
 - [API: se_camera.h](../../api-reference/modules/se_camera.md)
