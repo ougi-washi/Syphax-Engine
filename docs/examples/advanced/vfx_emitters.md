@@ -9,10 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <source srcset="../../../assets/img/examples/advanced/vfx_emitters.png" type="image/png">
-  <img src="../../../assets/img/examples/advanced/vfx_emitters.svg" alt="vfx_emitters preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/vfx_emitters.png" alt="vfx_emitters preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/vfx_emitters.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

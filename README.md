@@ -1,5 +1,7 @@
 ## Syphax Engine - 𐤒𐤐𐤎
-<img src="docs/assets/img/syphax-engine-icon.png" alt="Syphax Engine icon" width="96">
+<p align="center">
+  <img src="docs/assets/img/syphax-engine-icon.png" alt="Syphax Engine icon" width="96">
+</p>
 
 Simple, fast, lightweight framework for interactive visuals, games, and tools in C.
 

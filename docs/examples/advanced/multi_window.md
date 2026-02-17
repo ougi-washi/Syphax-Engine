@@ -9,10 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <source srcset="../../../assets/img/examples/advanced/multi_window.png" type="image/png">
-  <img src="../../../assets/img/examples/advanced/multi_window.svg" alt="multi_window preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/multi_window.png" alt="multi_window preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/multi_window.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

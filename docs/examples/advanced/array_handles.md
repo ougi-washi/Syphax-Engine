@@ -9,9 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <img src="../../../assets/img/examples/advanced/array_handles.svg" alt="array_handles preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/array_handles.svg" alt="array_handles preview image">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

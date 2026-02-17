@@ -7,10 +7,7 @@ prerequisites:
 
 # input_actions
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/input_actions.png" type="image/png">
-  <img src="../../../assets/img/examples/default/input_actions.svg" alt="input_actions preview image">
-</picture>
+<img src="../../../assets/img/examples/default/input_actions.png" alt="input_actions preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/input_actions.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

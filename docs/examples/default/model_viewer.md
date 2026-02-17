@@ -7,10 +7,7 @@ prerequisites:
 
 # model_viewer
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/model_viewer.png" type="image/png">
-  <img src="../../../assets/img/examples/default/model_viewer.svg" alt="model_viewer preview image">
-</picture>
+<img src="../../../assets/img/examples/default/model_viewer.png" alt="model_viewer preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/model_viewer.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

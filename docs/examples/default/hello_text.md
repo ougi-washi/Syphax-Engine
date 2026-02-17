@@ -7,10 +7,7 @@ prerequisites:
 
 # hello_text
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/hello_text.png" type="image/png">
-  <img src="../../../assets/img/examples/default/hello_text.svg" alt="hello_text preview image">
-</picture>
+<img src="../../../assets/img/examples/default/hello_text.png" alt="hello_text preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/hello_text.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

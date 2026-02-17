@@ -9,9 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <img src="../../../assets/img/examples/advanced/context_lifecycle.svg" alt="context_lifecycle preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/context_lifecycle.svg" alt="context_lifecycle preview image">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

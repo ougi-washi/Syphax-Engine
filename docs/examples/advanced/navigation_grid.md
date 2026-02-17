@@ -9,9 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <img src="../../../assets/img/examples/advanced/navigation_grid.svg" alt="navigation_grid preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/navigation_grid.svg" alt="navigation_grid preview image">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

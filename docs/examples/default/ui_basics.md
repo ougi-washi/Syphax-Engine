@@ -7,10 +7,7 @@ prerequisites:
 
 # ui_basics
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/ui_basics.png" type="image/png">
-  <img src="../../../assets/img/examples/default/ui_basics.svg" alt="ui_basics preview image">
-</picture>
+<img src="../../../assets/img/examples/default/ui_basics.png" alt="ui_basics preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/ui_basics.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

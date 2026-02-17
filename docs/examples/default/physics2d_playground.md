@@ -7,10 +7,7 @@ prerequisites:
 
 # physics2d_playground
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/physics2d_playground.png" type="image/png">
-  <img src="../../../assets/img/examples/default/physics2d_playground.svg" alt="physics2d_playground preview image">
-</picture>
+<img src="../../../assets/img/examples/default/physics2d_playground.png" alt="physics2d_playground preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/physics2d_playground.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

@@ -9,9 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <img src="../../../assets/img/examples/advanced/simulation_advanced.svg" alt="simulation_advanced preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/simulation_advanced.svg" alt="simulation_advanced preview image">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

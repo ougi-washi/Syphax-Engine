@@ -9,10 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <source srcset="../../../assets/img/examples/advanced/sdf_playground.png" type="image/png">
-  <img src="../../../assets/img/examples/advanced/sdf_playground.svg" alt="sdf_playground preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/sdf_playground.png" alt="sdf_playground preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/sdf_playground.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

@@ -9,10 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <source srcset="../../../assets/img/examples/advanced/rts_integration.png" type="image/png">
-  <img src="../../../assets/img/examples/advanced/rts_integration.svg" alt="rts_integration preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/rts_integration.png" alt="rts_integration preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/rts_integration.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

@@ -9,10 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <source srcset="../../../assets/img/examples/advanced/debug_tools.png" type="image/png">
-  <img src="../../../assets/img/examples/advanced/debug_tools.svg" alt="debug_tools preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/debug_tools.png" alt="debug_tools preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/debug_tools.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

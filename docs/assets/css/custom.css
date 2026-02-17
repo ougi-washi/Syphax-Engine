@@ -46,6 +46,12 @@ body {
   border-bottom: 1px solid var(--sx-color-border);
 }
 
+.md-header__button.md-logo img {
+  width: 1.4rem;
+  height: 1.4rem;
+  object-fit: contain;
+}
+
 .md-main {
   background: var(--sx-color-bg);
   padding-bottom: 1.5rem;

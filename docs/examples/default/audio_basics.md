@@ -7,10 +7,7 @@ prerequisites:
 
 # audio_basics
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/audio_basics.png" type="image/png">
-  <img src="../../../assets/img/examples/default/audio_basics.svg" alt="audio_basics preview image">
-</picture>
+<img src="../../../assets/img/examples/default/audio_basics.png" alt="audio_basics preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/audio_basics.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

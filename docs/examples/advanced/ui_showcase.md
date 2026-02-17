@@ -9,10 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <source srcset="../../../assets/img/examples/advanced/ui_showcase.png" type="image/png">
-  <img src="../../../assets/img/examples/advanced/ui_showcase.svg" alt="ui_showcase preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/ui_showcase.png" alt="ui_showcase preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/advanced/ui_showcase.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

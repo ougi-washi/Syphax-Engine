@@ -9,9 +9,7 @@ prerequisites:
 
 > Scope: advanced
 
-<picture>
-  <img src="../../../assets/img/examples/advanced/gltf_roundtrip.svg" alt="gltf_roundtrip preview image">
-</picture>
+<img src="../../../assets/img/examples/advanced/gltf_roundtrip.svg" alt="gltf_roundtrip preview image">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 

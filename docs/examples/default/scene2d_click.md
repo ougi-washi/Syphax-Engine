@@ -7,10 +7,7 @@ prerequisites:
 
 # scene2d_click
 
-<picture>
-  <source srcset="../../../assets/img/examples/default/scene2d_click.png" type="image/png">
-  <img src="../../../assets/img/examples/default/scene2d_click.svg" alt="scene2d_click preview image">
-</picture>
+<img src="../../../assets/img/examples/default/scene2d_click.png" alt="scene2d_click preview image" onerror="this.onerror=null;this.src='../../../assets/img/examples/default/scene2d_click.svg';">
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
 
