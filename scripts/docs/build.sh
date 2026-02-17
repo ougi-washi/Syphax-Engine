@@ -20,4 +20,5 @@ rm -rf site
 ./scripts/docs/check_playbook_coverage.sh
 ./scripts/docs/verify_snippets.sh
 "$MKDOCS_BIN" build --strict --config-file mkdocs.yml
+./scripts/docs/check_playbook_render.sh
 ./scripts/docs/check_site_size.sh

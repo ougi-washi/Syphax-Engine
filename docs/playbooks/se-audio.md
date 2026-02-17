@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_audio` with explicit handl
 ```
 
 Key API calls:
+
 - `se_audio_init`
 - `se_audio_update`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_audio_init`
 - `se_audio_update`
 - `se_audio_clip_load`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_audio_init`
 - `se_audio_update`
 - `se_audio_clip_load`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_audio_init`
 - `se_audio_update`
 - `se_audio_clip_load`

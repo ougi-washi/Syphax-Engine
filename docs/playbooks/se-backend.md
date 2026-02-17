@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_backend` with explicit han
 ```
 
 Key API calls:
+
 - `se_get_backend_info`
 
 ## Step 2: Add Core Feature
@@ -34,6 +35,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_get_backend_info`
 - `se_get_portability_profile`
 
@@ -48,6 +50,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_get_backend_info`
 - `se_get_portability_profile`
 - `se_capabilities_get`
@@ -63,6 +66,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_get_backend_info`
 - `se_get_portability_profile`
 - `se_capabilities_get`

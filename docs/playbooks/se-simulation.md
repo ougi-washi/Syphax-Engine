@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_simulation` with explicit 
 ```
 
 Key API calls:
+
 - `se_simulation_create`
 - `se_simulation_entity_create`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_simulation_create`
 - `se_simulation_entity_create`
 - `se_simulation_entity_alive`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_simulation_create`
 - `se_simulation_entity_create`
 - `se_simulation_entity_alive`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_simulation_create`
 - `se_simulation_entity_create`
 - `se_simulation_entity_alive`

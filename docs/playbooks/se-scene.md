@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_scene` with explicit handl
 ```
 
 Key API calls:
+
 - `se_scene_2d_create`
 - `se_object_2d_create`
 - `se_scene_2d_add_object`
@@ -36,6 +37,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_scene_2d_create`
 - `se_object_2d_create`
 - `se_scene_2d_add_object`
@@ -53,6 +55,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_scene_2d_create`
 - `se_object_2d_create`
 - `se_scene_2d_add_object`
@@ -71,6 +74,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_scene_2d_create`
 - `se_object_2d_create`
 - `se_scene_2d_add_object`

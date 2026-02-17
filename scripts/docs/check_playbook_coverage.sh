@@ -12,6 +12,7 @@ from pathlib import Path
 root = Path(sys.argv[1]).resolve()
 docs = root / "docs"
 playbooks_dir = docs / "playbooks"
+mkdocs_path = root / "mkdocs.yml"
 
 required_playbooks = [
     "se-window.md",
@@ -67,6 +68,14 @@ api_link_re = re.compile(r"\(\.\./api-reference/modules/[A-Za-z0-9_./-]+\.md\)")
 example_link_re = re.compile(r"\(\.\./examples/[A-Za-z0-9_./-]+\.md\)")
 
 errors = []
+mkdocs_text = mkdocs_path.read_text(encoding="utf-8")
+if "pymdownx.snippets:" not in mkdocs_text:
+    errors.append("mkdocs.yml: missing pymdownx.snippets configuration block")
+if "check_paths: true" not in mkdocs_text:
+    errors.append("mkdocs.yml: pymdownx.snippets must set check_paths: true")
+if "base_path:" not in mkdocs_text or "\n        - docs\n" not in mkdocs_text:
+    errors.append("mkdocs.yml: pymdownx.snippets must include base_path with docs")
+
 for name in required_playbooks:
     path = playbooks_dir / name
     text = path.read_text(encoding="utf-8")
@@ -89,6 +98,13 @@ for name in required_playbooks:
         snippet_path = docs / include
         if not snippet_path.is_file():
             errors.append(f"{name}: missing snippet file {include}")
+        elif snippet_path.stat().st_size == 0:
+            errors.append(f"{name}: snippet file is empty: {include}")
+
+    if "Key API calls:\n- " in text:
+        errors.append(f"{name}: missing blank line after 'Key API calls:'")
+    if len(re.findall(r"Key API calls:\n\n- ", text)) != 4:
+        errors.append(f"{name}: expected 4 well-formed 'Key API calls' list blocks")
 
     if not api_link_re.search(text):
         errors.append(f"{name}: missing API module link")

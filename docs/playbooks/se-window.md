@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_window` with explicit hand
 ```
 
 Key API calls:
+
 - `se_window_set_exit_key`
 - `se_window_should_close`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_window_set_exit_key`
 - `se_window_should_close`
 - `se_window_begin_frame`
@@ -52,6 +54,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_window_set_exit_key`
 - `se_window_should_close`
 - `se_window_begin_frame`
@@ -70,6 +73,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_window_set_exit_key`
 - `se_window_should_close`
 - `se_window_begin_frame`

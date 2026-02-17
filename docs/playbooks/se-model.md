@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_model` with explicit handl
 ```
 
 Key API calls:
+
 - `se_model_load_obj_simple`
 
 ## Step 2: Add Core Feature
@@ -34,6 +35,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_model_load_obj_simple`
 - `se_model_scale`
 - `se_model_rotate`
@@ -49,6 +51,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_model_load_obj_simple`
 - `se_model_scale`
 - `se_model_rotate`
@@ -66,6 +69,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_model_load_obj_simple`
 - `se_model_scale`
 - `se_model_rotate`

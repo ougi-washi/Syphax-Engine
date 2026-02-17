@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_texture` with explicit han
 ```
 
 Key API calls:
+
 - `se_texture_load`
 
 ## Step 2: Add Core Feature
@@ -34,6 +35,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_texture_load`
 - `se_texture_load_from_memory`
 
@@ -48,6 +50,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_texture_load`
 - `se_texture_load_from_memory`
 
@@ -62,6 +65,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_texture_load`
 - `se_texture_load_from_memory`
 - `se_texture_destroy`

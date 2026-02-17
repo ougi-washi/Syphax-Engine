@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_shader` with explicit hand
 ```
 
 Key API calls:
+
 - `se_shader_load`
 - `se_shader_use`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_shader_load`
 - `se_shader_use`
 - `se_shader_set_float`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_shader_load`
 - `se_shader_use`
 - `se_shader_set_float`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_shader_load`
 - `se_shader_use`
 - `se_shader_set_float`

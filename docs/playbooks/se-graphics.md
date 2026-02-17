@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_graphics` with explicit ha
 ```
 
 Key API calls:
+
 - `se_render_init`
 - `se_render_set_background_color`
 - `se_render_clear`
@@ -36,6 +37,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_render_init`
 - `se_render_set_background_color`
 - `se_render_clear`
@@ -53,6 +55,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_render_init`
 - `se_render_set_background_color`
 - `se_render_clear`
@@ -71,6 +74,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_render_init`
 - `se_render_set_background_color`
 - `se_render_clear`

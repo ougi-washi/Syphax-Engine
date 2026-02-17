@@ -62,6 +62,9 @@ jobs:
       - name: Build docs (strict)
         run: mkdocs build --strict --config-file mkdocs.yml
 
+      - name: Check playbook rendered snippets
+        run: ./scripts/docs/check_playbook_render.sh
+
       - name: Check site size budget
         run: ./scripts/docs/check_site_size.sh
 

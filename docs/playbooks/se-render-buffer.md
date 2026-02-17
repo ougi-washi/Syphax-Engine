@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_render_buffer` with explic
 ```
 
 Key API calls:
+
 - `se_render_buffer_create`
 - `se_render_buffer_bind`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_render_buffer_create`
 - `se_render_buffer_bind`
 - `se_render_buffer_set_scale`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_render_buffer_create`
 - `se_render_buffer_bind`
 - `se_render_buffer_set_scale`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_render_buffer_create`
 - `se_render_buffer_bind`
 - `se_render_buffer_set_scale`

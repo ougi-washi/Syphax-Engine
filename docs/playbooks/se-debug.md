@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_debug` with explicit handl
 ```
 
 Key API calls:
+
 - `se_debug_set_level`
 - `se_debug_frame_begin`
 - `se_debug_trace_begin`
@@ -36,6 +37,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_debug_set_level`
 - `se_debug_frame_begin`
 - `se_debug_trace_begin`
@@ -54,6 +56,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_debug_set_level`
 - `se_debug_frame_begin`
 - `se_debug_trace_begin`
@@ -72,6 +75,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_debug_set_level`
 - `se_debug_frame_begin`
 - `se_debug_trace_begin`

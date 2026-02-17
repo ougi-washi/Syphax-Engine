@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `loader/se_loader` with explic
 ```
 
 Key API calls:
+
 - `se_gltf_model_load`
 
 ## Step 2: Add Core Feature
@@ -34,6 +35,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_gltf_model_load`
 - `se_gltf_texture_load`
 - `se_gltf_scene_compute_bounds`
@@ -49,6 +51,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_gltf_model_load`
 - `se_gltf_texture_load`
 - `se_gltf_scene_compute_bounds`
@@ -65,6 +68,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_gltf_model_load`
 - `se_gltf_texture_load`
 - `se_gltf_scene_compute_bounds`

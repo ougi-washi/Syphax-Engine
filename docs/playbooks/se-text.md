@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_text` with explicit handle
 ```
 
 Key API calls:
+
 - `se_text_handle_create`
 - `se_font_load`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_text_handle_create`
 - `se_font_load`
 - `se_text_render`
@@ -50,6 +52,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_text_handle_create`
 - `se_font_load`
 - `se_text_render`
@@ -65,6 +68,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_text_handle_create`
 - `se_font_load`
 - `se_text_render`

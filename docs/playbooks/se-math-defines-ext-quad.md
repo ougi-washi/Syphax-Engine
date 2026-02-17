@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_math + se_defines + se_ext
 ```
 
 Key API calls:
+
 - `se_box_2d_make`
 
 ## Step 2: Add Core Feature
@@ -34,6 +35,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_box_2d_make`
 - `se_set_last_error`
 - `se_result_str`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_box_2d_make`
 - `se_set_last_error`
 - `se_result_str`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_box_2d_make`
 - `se_set_last_error`
 - `se_result_str`

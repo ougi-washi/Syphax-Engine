@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_input` with explicit handl
 ```
 
 Key API calls:
+
 - `se_input_create`
 - `se_input_tick`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_input_create`
 - `se_input_tick`
 - `se_input_action_create`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_input_create`
 - `se_input_tick`
 - `se_input_action_create`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_input_create`
 - `se_input_tick`
 - `se_input_action_create`

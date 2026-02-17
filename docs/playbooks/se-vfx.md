@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_vfx` with explicit handles
 ```
 
 Key API calls:
+
 - `se_vfx_2d_create`
 - `se_vfx_2d_add_emitter`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_vfx_2d_create`
 - `se_vfx_2d_add_emitter`
 - `se_vfx_2d_emitter_start`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_vfx_2d_create`
 - `se_vfx_2d_add_emitter`
 - `se_vfx_2d_emitter_start`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_vfx_2d_create`
 - `se_vfx_2d_add_emitter`
 - `se_vfx_2d_emitter_start`

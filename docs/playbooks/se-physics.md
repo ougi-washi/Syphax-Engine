@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_physics` with explicit han
 ```
 
 Key API calls:
+
 - `se_physics_world_2d_create`
 - `se_physics_world_2d_step`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_physics_world_2d_create`
 - `se_physics_world_2d_step`
 - `se_physics_body_2d_create`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_physics_world_2d_create`
 - `se_physics_world_2d_step`
 - `se_physics_body_2d_create`
@@ -68,6 +71,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_physics_world_2d_create`
 - `se_physics_world_2d_step`
 - `se_physics_body_2d_create`

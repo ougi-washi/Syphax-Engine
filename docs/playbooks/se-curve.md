@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_curve` with explicit handl
 ```
 
 Key API calls:
+
 - `se_curve_float_init`
 - `se_curve_float_add_key`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_curve_float_init`
 - `se_curve_float_add_key`
 - `se_curve_float_sort`
@@ -50,6 +52,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_curve_float_init`
 - `se_curve_float_add_key`
 - `se_curve_float_sort`
@@ -66,6 +69,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_curve_float_init`
 - `se_curve_float_add_key`
 - `se_curve_float_sort`

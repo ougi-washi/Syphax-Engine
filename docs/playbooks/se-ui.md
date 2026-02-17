@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_ui` with explicit handles 
 ```
 
 Key API calls:
+
 - `se_ui_create`
 - `se_ui_tick`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_ui_create`
 - `se_ui_tick`
 - `se_ui_draw`
@@ -52,6 +54,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_ui_create`
 - `se_ui_tick`
 - `se_ui_draw`
@@ -70,6 +73,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_ui_create`
 - `se_ui_tick`
 - `se_ui_draw`

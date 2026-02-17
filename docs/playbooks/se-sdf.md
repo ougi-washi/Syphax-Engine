@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_sdf` with explicit handles
 ```
 
 Key API calls:
+
 - `se_sdf_scene_create`
 - `se_sdf_scene_clear`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_sdf_scene_create`
 - `se_sdf_scene_clear`
 - `se_sdf_node_create_group`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_sdf_scene_create`
 - `se_sdf_scene_clear`
 - `se_sdf_node_create_group`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_sdf_scene_create`
 - `se_sdf_scene_clear`
 - `se_sdf_node_create_group`

@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_camera` with explicit hand
 ```
 
 Key API calls:
+
 - `se_camera_create`
 - `se_camera_set_aspect`
 
@@ -35,6 +36,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_camera_create`
 - `se_camera_set_aspect`
 - `se_camera_set_perspective`
@@ -51,6 +53,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_camera_create`
 - `se_camera_set_aspect`
 - `se_camera_set_perspective`
@@ -69,6 +72,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_camera_create`
 - `se_camera_set_aspect`
 - `se_camera_set_perspective`

@@ -21,6 +21,7 @@ Build the smallest compileable setup that touches `se_navigation` with explicit 
 ```
 
 Key API calls:
+
 - `se_navigation_grid_create`
 
 ## Step 2: Add Core Feature
@@ -34,6 +35,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_navigation_grid_create`
 - `se_navigation_path_init`
 - `se_navigation_find_path_simple`
@@ -49,6 +51,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_navigation_grid_create`
 - `se_navigation_path_init`
 - `se_navigation_find_path_simple`
@@ -66,6 +69,7 @@ What changed from previous step: this step layers one additional capability with
 ```
 
 Key API calls:
+
 - `se_navigation_grid_create`
 - `se_navigation_path_init`
 - `se_navigation_find_path_simple`
