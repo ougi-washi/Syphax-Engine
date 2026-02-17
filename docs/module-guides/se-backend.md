@@ -16,7 +16,7 @@ Use `se_backend` for features that map directly to its module boundary.
 
 ```c
 #include "se_backend.h"
-se_backend_get_runtime_info(&info);
+se_backend_info info = se_get_backend_info();
 ```
 
 ## Step-by-step explanation
@@ -43,4 +43,6 @@ se_backend_get_runtime_info(&info);
 
 - [Deep dive path page](../path/backend.md)
 - [API module page](../api-reference/modules/se_backend.md)
+- [API: se_render_frame.h](../api-reference/modules/se_render_frame.md)
+- [API: se_render_thread.h](../api-reference/modules/se_render_thread.md)
 - [Example: context_lifecycle](../examples/advanced/context_lifecycle.md)

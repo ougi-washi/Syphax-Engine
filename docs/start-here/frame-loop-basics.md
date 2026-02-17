@@ -28,7 +28,7 @@ while (!se_window_should_close(window)) {
 
 1. Begin frame.
 1. Update state and process input.
-1. Draw and present.
+1. Draw, then end frame (present or queue-submit happens inside `se_window_end_frame`).
 
 <div class="next-block" markdown="1">
 
@@ -43,12 +43,14 @@ while (!se_window_should_close(window)) {
 
 - Calling frame functions in the wrong order.
 - Skipping `end_frame` on an early branch.
+- Mixing manual present calls with the canonical `begin_frame` / `end_frame` loop.
 
 ## Related pages
 
 - [First window](first-window.md)
 - [Path: Window](../path/window.md)
 - [API: se_window.h](../api-reference/modules/se_window.md)
+- [API: se_render_frame.h](../api-reference/modules/se_render_frame.md)
 
 ![Frame loop flow diagram](../assets/img/frame-loop.svg)
 Diagram: one frame cycle from `begin_frame` through present, then repeat.

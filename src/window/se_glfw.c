@@ -4,8 +4,12 @@
 
 #include "se_window.h"
 #include "se_debug.h"
+#include "se_render_frame.h"
+#include "se_render_thread.h"
 #include "se_graphics.h"
 #include "render/se_gl.h"
+#include "render/se_render_queue.h"
+#include "window/se_window_backend_internal.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -118,6 +122,10 @@ static void se_window_backend_process_shutdown(void) {
 	if (!glfw_backend_initialized) {
 		return;
 	}
+	se_window_handle active_window = se_render_queue_active_window();
+	if (active_window != S_HANDLE_NULL) {
+		se_render_queue_stop(active_window);
+	}
 	glfwMakeContextCurrent(NULL);
 	se_window_terminal_mirror_shutdown();
 	se_render_shutdown();
@@ -151,6 +159,10 @@ static b8 se_window_backend_init(void) {
 static void se_window_backend_shutdown_if_unused(void) {
 	if (s_array_get_size(&windows_registry) != 0) {
 		return;
+	}
+	se_window_handle active_window = se_render_queue_active_window();
+	if (active_window != S_HANDLE_NULL) {
+		se_render_queue_stop(active_window);
 	}
 	s_array_clear(&windows_registry);
 	windows_owner_context = NULL;
@@ -1298,6 +1310,8 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	}
 	se_window_handle window_handle = s_array_increment(&context->windows);
 	se_window* new_window = s_array_get(&context->windows, window_handle);
+	b8 registry_added = false;
+	b8 render_thread_started = false;
 
 	memset(new_window, 0, sizeof(se_window));
 	s_array_init(&new_window->input_events);
@@ -1321,7 +1335,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 	}
-	 
+
 	new_window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
 	if (!new_window->handle) {
 		s_array_clear(&new_window->input_events);
@@ -1342,8 +1356,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	new_window->raw_mouse_motion_enabled = false;
 	new_window->vsync_enabled = false;
 	new_window->should_close = false;
-	
-	se_window_set_current_context(window_handle);
+
 	se_window_user_ptr* user_ptr = malloc(sizeof(*user_ptr));
 	if (!user_ptr) {
 		glfwDestroyWindow((GLFWwindow *)new_window->handle);
@@ -1360,8 +1373,7 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	user_ptr->ctx = context;
 	user_ptr->window = window_handle;
 	glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, user_ptr);
-	glfwSwapInterval(0);
-	
+
 	// Set callbacks
 	glfwSetKeyCallback((GLFWwindow*)new_window->handle, key_callback);
 	glfwSetCursorPosCallback((GLFWwindow*)new_window->handle, mouse_callback);
@@ -1369,55 +1381,6 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	glfwSetScrollCallback((GLFWwindow*)new_window->handle, scroll_callback);
 	glfwSetCharCallback((GLFWwindow*)new_window->handle, char_callback);
 	glfwSetFramebufferSizeCallback((GLFWwindow*)new_window->handle, framebuffer_size_callback);
-	
-	if (!se_render_init()) {
-		se_window_user_ptr* window_user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer((GLFWwindow*)new_window->handle);
-		if (window_user_ptr) {
-			free(window_user_ptr);
-			glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, NULL);
-		}
-		glfwDestroyWindow((GLFWwindow *)new_window->handle);
-		new_window->handle = NULL;
-		s_array_clear(&new_window->input_events);
-		s_array_clear(&new_window->resize_handles);
-		s_array_remove(&context->windows, window_handle);
-		if (s_array_get_size(&windows_registry) == 0) {
-			se_window_terminal_mirror_shutdown();
-		}
-		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
-		return S_HANDLE_NULL;
-	}
-	
-	glEnable(GL_DEPTH_TEST);
-	
-	//create_fullscreen_quad(&new_window->quad_vao, &new_window->quad_vbo, &new_window->quad_ebo);
-	se_result render_result = se_window_init_render(new_window, context);
-	if (render_result != SE_RESULT_OK) {
-		if (new_window->quad.vao != 0) {
-			se_quad_destroy(&new_window->quad);
-		}
-		se_window_user_ptr* window_user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer((GLFWwindow*)new_window->handle);
-		if (window_user_ptr) {
-			free(window_user_ptr);
-			glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, NULL);
-		}
-		glfwDestroyWindow((GLFWwindow *)new_window->handle);
-		new_window->handle = NULL;
-		s_array_clear(&new_window->input_events);
-		s_array_clear(&new_window->resize_handles);
-		s_array_remove(&context->windows, window_handle);
-		if (s_array_get_size(&windows_registry) == 0) {
-			se_window_terminal_mirror_shutdown();
-		}
-		se_set_last_error(render_result);
-		return S_HANDLE_NULL;
-	}
-
-	new_window->time.current = glfwGetTime();
-	new_window->time.last_frame = new_window->time.current;
-	new_window->time.delta = 0;
-	new_window->frame_count = 0;
-	new_window->target_fps = 30;
 
 	if (s_array_get_capacity(&windows_registry) == 0) {
 		s_array_init(&windows_registry);
@@ -1429,12 +1392,74 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	se_window_registry_entry* entry_slot = s_array_get(&windows_registry, entry_handle);
 	*entry_slot = entry;
 	windows_owner_context = context;
+	registry_added = true;
+
+	if (!se_render_queue_is_running()) {
+		if (se_render_thread_start(window_handle, NULL) == SE_RENDER_THREAD_NULL) {
+			goto fail;
+		}
+		render_thread_started = true;
+	}
+
+	glEnable(GL_DEPTH_TEST);
+
+	se_result render_result = se_window_init_render(new_window, context);
+	if (render_result != SE_RESULT_OK) {
+		se_set_last_error(render_result);
+		goto fail;
+	}
+
+	new_window->time.current = glfwGetTime();
+	new_window->time.last_frame = new_window->time.current;
+	new_window->time.delta = 0;
+	new_window->frame_count = 0;
+	new_window->target_fps = 30;
+
 	if (g_terminal_mirror.enabled && g_terminal_mirror.hide_window) {
 		se_window_terminal_mirror_input_enable();
 	}
 
 	se_set_last_error(SE_RESULT_OK);
 	return window_handle;
+
+fail:
+	if (new_window->quad.vao != 0) {
+		se_quad_destroy(&new_window->quad);
+	}
+	if (new_window->shader != S_HANDLE_NULL &&
+		s_array_get(&context->shaders, new_window->shader) != NULL) {
+		se_shader_destroy(new_window->shader);
+	}
+	new_window->shader = S_HANDLE_NULL;
+	if (render_thread_started) {
+		se_render_queue_stop(window_handle);
+	}
+	se_window_user_ptr* window_user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer((GLFWwindow*)new_window->handle);
+	if (window_user_ptr) {
+		free(window_user_ptr);
+		glfwSetWindowUserPointer((GLFWwindow*)new_window->handle, NULL);
+	}
+	if (new_window->handle) {
+		glfwDestroyWindow((GLFWwindow*)new_window->handle);
+	}
+	new_window->handle = NULL;
+	s_array_clear(&new_window->input_events);
+	s_array_clear(&new_window->resize_handles);
+	if (registry_added) {
+		sz registry_index = 0;
+		se_window_registry_entry* registry_entry = se_window_registry_find(context, window_handle, &registry_index);
+		if (registry_entry != NULL) {
+			s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)registry_index));
+		}
+	}
+	s_array_remove(&context->windows, window_handle);
+	if (s_array_get_size(&windows_registry) == 0) {
+		se_window_terminal_mirror_shutdown();
+	}
+	if (se_get_last_error() == SE_RESULT_OK) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+	}
+	return S_HANDLE_NULL;
 }
 
 void se_window_attach_render(const se_window_handle window) {
@@ -1481,25 +1506,11 @@ void se_window_tick(const se_window_handle window) {
 	se_debug_trace_end("input_tick");
 }
 
-void se_window_set_current_context(const se_window_handle window) {
-	se_context* context = se_current_context();
-	se_window* window_ptr = se_window_from_handle(context, window);
-	current_conext_window = (GLFWwindow*)window_ptr->handle;
-	glfwMakeContextCurrent((GLFWwindow*)window_ptr->handle);
-}
-
-void se_window_render_quad(const se_window_handle window) {
-	se_context* context = se_current_context();
-	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr->shader != S_HANDLE_NULL, "se_window_render_quad :: shader is null");
-	se_shader_use(window_ptr->shader, true, false);
-	se_quad_render(&window_ptr->quad, 0);
-}
-
-void se_window_render_screen(const se_window_handle window) {
+static void se_window_render_screen_internal(const se_window_handle window, se_window* window_ptr) {
+	if (!window_ptr) {
+		return;
+	}
 	se_debug_trace_begin("window_present");
-	se_context* context = se_current_context();
-	se_window* window_ptr = se_window_from_handle(context, window);
 	const f64 present_begin = glfwGetTime();
 	window_ptr->diagnostics.last_sleep_duration = 0.0;
 	if (!window_ptr->vsync_enabled && window_ptr->target_fps > 0) {
@@ -1508,11 +1519,6 @@ void se_window_render_screen(const se_window_handle window) {
 		const f64 elapsed = now - window_ptr->time.frame_start;
 		f64 time_left = target_frame_time - elapsed;
 		if (time_left > 0.0) {
-			/*
-			 * Coarse sleep first, then spin for the final sub-millisecond window.
-			 * This avoids repeatedly sleeping in 1ms chunks, which caused
-			 * significant oversleep and unstable high-FPS pacing.
-			 */
 			const f64 coarse_guard = 0.001;
 			if (time_left > coarse_guard) {
 				const f64 coarse_sleep = time_left - coarse_guard;
@@ -1540,13 +1546,75 @@ void se_window_render_screen(const se_window_handle window) {
 	se_debug_frame_end();
 }
 
+void se_window_set_current_context(const se_window_handle window) {
+	if (se_render_queue_is_running_for_window(window)) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return;
+	}
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	current_conext_window = (GLFWwindow*)window_ptr->handle;
+	glfwMakeContextCurrent((GLFWwindow*)window_ptr->handle);
+	se_set_last_error(SE_RESULT_OK);
+}
+
+void se_window_render_quad(const se_window_handle window) {
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	s_assertf(window_ptr->shader != S_HANDLE_NULL, "se_window_render_quad :: shader is null");
+	se_shader_use(window_ptr->shader, true, false);
+	se_quad_render(&window_ptr->quad, 0);
+}
+
+void se_window_render_screen(const se_window_handle window) {
+	if (se_render_queue_is_running_for_window(window)) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return;
+	}
+	se_context* context = se_current_context();
+	se_window* window_ptr = se_window_from_handle(context, window);
+	if (!window_ptr || window_ptr->handle == NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	se_window_render_screen_internal(window, window_ptr);
+	se_set_last_error(SE_RESULT_OK);
+}
+
+typedef struct {
+	se_window_handle window;
+	b8 enabled;
+} se_window_vsync_sync_payload;
+
+static void se_window_vsync_sync_exec(const void* payload, void* out_result) {
+	(void)out_result;
+	const se_window_vsync_sync_payload* args = (const se_window_vsync_sync_payload*)payload;
+	if (!args) {
+		return;
+	}
+	se_window_backend_render_thread_set_vsync(args->window, args->enabled);
+}
+
 void se_window_set_vsync(const se_window_handle window, const b8 enabled) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	s_assertf(window_ptr, "se_window_set_vsync :: window is null");
+	if (se_render_queue_is_running_for_window(window)) {
+		const se_window_vsync_sync_payload payload = {
+			.window = window,
+			.enabled = enabled
+		};
+		if (!se_render_queue_call_sync_sized(se_window_vsync_sync_exec, &payload, NULL, sizeof(payload))) {
+			return;
+		}
+		window_ptr->vsync_enabled = enabled;
+		se_set_last_error(SE_RESULT_OK);
+		return;
+	}
 	se_window_set_current_context(window);
 	glfwSwapInterval(enabled ? 1 : 0);
 	window_ptr->vsync_enabled = enabled;
+	se_set_last_error(SE_RESULT_OK);
 }
 
 b8 se_window_is_vsync_enabled(const se_window_handle window) {
@@ -1557,10 +1625,18 @@ b8 se_window_is_vsync_enabled(const se_window_handle window) {
 }
 
 void se_window_present(const se_window_handle window) {
+	if (se_render_queue_is_running_for_window(window)) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return;
+	}
 	se_window_render_screen(window);
 }
 
 void se_window_present_frame(const se_window_handle window, const s_vec4* clear_color) {
+	if (se_render_queue_is_running_for_window(window)) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return;
+	}
 	if (clear_color) {
 		se_render_set_background_color(*clear_color);
 	}
@@ -1579,8 +1655,12 @@ void se_window_begin_frame(const se_window_handle window) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return;
 	}
-	se_window_set_current_context(window);
 	se_window_tick(window);
+	if (se_render_queue_is_running_for_window(window)) {
+		se_render_frame_begin(window);
+		return;
+	}
+	se_window_set_current_context(window);
 	se_set_last_error(SE_RESULT_OK);
 }
 
@@ -1593,6 +1673,10 @@ void se_window_end_frame(const se_window_handle window) {
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr || window_ptr->handle == NULL) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
+	if (se_render_queue_is_running_for_window(window)) {
+		se_render_frame_submit(window);
 		return;
 	}
 	se_window_present(window);
@@ -2018,38 +2102,54 @@ b8 se_window_is_raw_mouse_motion_enabled(const se_window_handle window) {
 b8 se_window_should_close(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_should_close :: window is null");
+	if (!window_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return true;
+	}
 	return glfwWindowShouldClose((GLFWwindow*)window_ptr->handle);
 }
 
 void se_window_set_should_close(const se_window_handle window, const b8 should_close) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_set_should_close :: window is null");
+	if (!window_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
 	glfwSetWindowShouldClose((GLFWwindow*)window_ptr->handle, should_close);
+	se_set_last_error(SE_RESULT_OK);
 }
 
 void se_window_set_exit_keys(const se_window_handle window, se_key_combo* keys) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_set_exit_keys :: window is null");
-	s_assertf(keys, "se_window_set_exit_keys :: keys is null");
+	if (!window_ptr || !keys) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
 	window_ptr->exit_keys = keys;
 	window_ptr->use_exit_key = false;
+	se_set_last_error(SE_RESULT_OK);
 }
 
 void se_window_set_exit_key(const se_window_handle window, se_key key) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_set_exit_key :: window is null");
+	if (!window_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return;
+	}
 	window_ptr->exit_key = key;
 	window_ptr->use_exit_key = true;
+	se_set_last_error(SE_RESULT_OK);
 }
 
 void se_window_check_exit_keys(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_check_exit_keys :: window is null");
+	if (!window_ptr) {
+		return;
+	}
 	if (window_ptr->use_exit_key) {
 		if (window_ptr->exit_key != SE_KEY_UNKNOWN && se_window_is_key_down(window, window_ptr->exit_key)) {
 			glfwSetWindowShouldClose((GLFWwindow*)window_ptr->handle, GLFW_TRUE);
@@ -2233,12 +2333,6 @@ void se_window_destroy(const se_window_handle window) {
 
 	se_context* previous_context = se_push_tls_context(owner_context);
 	GLFWwindow* glfw_window = (GLFWwindow*)window_ptr->handle;
-	GLFWwindow* previous_glfw_window = glfwGetCurrentContext();
-	const b8 switched_gl_context = glfw_window != NULL && previous_glfw_window != glfw_window;
-	if (switched_gl_context) {
-		glfwMakeContextCurrent(glfw_window);
-		current_conext_window = glfw_window;
-	}
 	if (window_ptr->quad.vao != 0) {
 		se_quad_destroy(&window_ptr->quad);
 	}
@@ -2250,6 +2344,10 @@ void se_window_destroy(const se_window_handle window) {
 	s_array_clear(&window_ptr->input_events);
 	s_array_clear(&window_ptr->resize_handles);
 
+	if (se_render_queue_is_running_for_window(owner_window)) {
+		se_render_queue_stop(owner_window);
+	}
+
 	if (glfw_window) {
 		se_window_user_ptr* user_ptr = (se_window_user_ptr*)glfwGetWindowUserPointer(glfw_window);
 		if (user_ptr) {
@@ -2257,23 +2355,13 @@ void se_window_destroy(const se_window_handle window) {
 		}
 		glfwDestroyWindow(glfw_window);
 	}
+	if (current_conext_window == glfw_window) {
+		current_conext_window = NULL;
+	}
 	window_ptr->handle = NULL;
 
 	s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)registry_index));
 	s_array_remove(&owner_context->windows, owner_window);
-
-	if (switched_gl_context) {
-		if (previous_glfw_window != NULL) {
-			glfwMakeContextCurrent(previous_glfw_window);
-			current_conext_window = previous_glfw_window;
-		} else {
-			glfwMakeContextCurrent(NULL);
-			current_conext_window = NULL;
-		}
-	} else if (current_conext_window == glfw_window) {
-		glfwMakeContextCurrent(NULL);
-		current_conext_window = NULL;
-	}
 
 	se_pop_tls_context(previous_context);
 	se_window_backend_shutdown_if_unused();
@@ -2298,6 +2386,63 @@ void se_window_destroy_all(void){
 		}
 	}
 	se_window_backend_shutdown_if_unused();
+}
+
+static se_window* se_window_backend_find_window_ptr(const se_window_handle window, se_context** out_context) {
+	if (out_context) {
+		*out_context = NULL;
+	}
+	se_window_registry_refresh_owner_context();
+	se_window_registry_entry* entry = se_window_registry_find(NULL, window, NULL);
+	if (!entry || !entry->ctx || entry->window == S_HANDLE_NULL) {
+		return NULL;
+	}
+	se_window* window_ptr = s_array_get(&entry->ctx->windows, entry->window);
+	if (!window_ptr || !window_ptr->handle) {
+		return NULL;
+	}
+	if (out_context) {
+		*out_context = entry->ctx;
+	}
+	return window_ptr;
+}
+
+b8 se_window_backend_render_thread_attach(const se_window_handle window) {
+	se_context* context = NULL;
+	se_window* window_ptr = se_window_backend_find_window_ptr(window, &context);
+	if (!context || !window_ptr || !window_ptr->handle) {
+		return false;
+	}
+	se_set_tls_context(context);
+	current_conext_window = (GLFWwindow*)window_ptr->handle;
+	glfwMakeContextCurrent((GLFWwindow*)window_ptr->handle);
+	return true;
+}
+
+void se_window_backend_render_thread_detach(void) {
+	current_conext_window = NULL;
+	glfwMakeContextCurrent(NULL);
+}
+
+void se_window_backend_render_thread_present(const se_window_handle window) {
+	se_context* context = NULL;
+	se_window* window_ptr = se_window_backend_find_window_ptr(window, &context);
+	if (!context || !window_ptr) {
+		return;
+	}
+	se_set_tls_context(context);
+	se_window_render_screen_internal(window, window_ptr);
+}
+
+void se_window_backend_render_thread_set_vsync(const se_window_handle window, const b8 enabled) {
+	se_context* context = NULL;
+	se_window* window_ptr = se_window_backend_find_window_ptr(window, &context);
+	if (!context || !window_ptr) {
+		return;
+	}
+	se_set_tls_context(context);
+	glfwSwapInterval(enabled ? 1 : 0);
+	window_ptr->vsync_enabled = enabled;
 }
 
 #endif // SE_WINDOW_BACKEND_GLFW

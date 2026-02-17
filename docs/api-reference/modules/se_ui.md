@@ -207,6 +207,18 @@ extern void se_ui_get_default_layout(se_ui_layout* out_layout);
 
 No inline description found in header comments.
 
+### `se_ui_get_default_style`
+
+<div class="api-signature">
+
+```c
+extern void se_ui_get_default_style(se_ui_style* out_style);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_ui_get_default_widget_desc`
 
 <div class="api-signature">

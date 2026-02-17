@@ -79,6 +79,21 @@ Key API calls:
 - `se_get_portability_profile`
 - `se_capabilities_get`
 
+## Current backend status
+
+Current implementation status in this repository:
+
+- Render backends: `gl`, `gles` implemented; `webgl`, `metal`, `vulkan`, `software` planned.
+- Platform backends: `desktop_glfw`, `terminal` implemented; `android`, `ios`, `web` planned.
+
+Use `se_get_backend_info` and `se_capabilities_get` at runtime to gate features instead of assuming target capabilities.
+
+## Dedicated render-thread notes
+
+- `desktop_glfw` uses a dedicated render thread/queue path in normal window lifecycle.
+- `terminal` keeps the single-threaded present path.
+- While dedicated render-thread mode is active, direct present/context window calls are unsupported; use the canonical frame loop APIs.
+
 ## Common mistakes
 
 - Skipping explicit cleanup paths when introducing new handles or resources.
@@ -94,4 +109,6 @@ Key API calls:
 
 - [Module guide](../module-guides/se-backend.md)
 - [API: se_backend.h](../api-reference/modules/se_backend.md)
+- [API: se_render_frame.h](../api-reference/modules/se_render_frame.md)
+- [API: se_render_thread.h](../api-reference/modules/se_render_thread.md)
 - [Example: context_lifecycle](../examples/advanced/context_lifecycle.md)

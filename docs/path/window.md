@@ -90,11 +90,26 @@ Key API calls:
 - `se_window_poll_events`
 - `se_window_set_target_fps`
 
+## Dedicated render queue behavior
+
+On `desktop_glfw`, `se_window_create` starts the dedicated render thread automatically.
+
+Keep using the canonical frame loop (`se_window_begin_frame` / `se_window_end_frame`): these calls route to `se_render_frame_begin` / `se_render_frame_submit` when the queue is active.
+
+While the queue is active, legacy direct present/context calls (`se_window_set_current_context`, `se_window_present`, `se_window_present_frame`, `se_window_render_screen`) return `SE_RESULT_UNSUPPORTED`.
+
+For explicit sync/telemetry, use:
+
+- `se_render_frame_wait_presented`
+- `se_render_frame_get_stats`
+
 ## Common mistakes
 
 - Skipping explicit cleanup paths when introducing new handles or resources.
 - Changing multiple system parameters at once, which hides root-cause behavior shifts.
 - Forgetting to keep update frequency stable when adding runtime tuning logic.
+- Mixing `se_window_end_frame` with manual `se_render_frame_submit` in the same frame.
+- Calling legacy present/context APIs while dedicated render-thread mode is active.
 
 ## Next
 
@@ -105,5 +120,7 @@ Key API calls:
 
 - [Module guide](../module-guides/se-window.md)
 - [API: se_window.h](../api-reference/modules/se_window.md)
+- [API: se_render_frame.h](../api-reference/modules/se_render_frame.md)
+- [API: se_render_thread.h](../api-reference/modules/se_render_thread.md)
 - [Example: hello_text](../examples/default/hello_text.md)
 - [Example: input_actions](../examples/default/input_actions.md)

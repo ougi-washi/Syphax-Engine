@@ -6,6 +6,7 @@
 #include "se_debug.h"
 #include "se_graphics.h"
 #include "se_quad.h"
+#include "render/se_render_queue.h"
 #include "syphax/s_files.h"
 #if defined(SE_RENDER_BACKEND_GLES)
 #include <EGL/egl.h>
@@ -18,6 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#if !defined(SE_WINDOW_BACKEND_TERMINAL)
 static void *se_gl_get_proc_address(const char *name) {
 #if defined(SE_RENDER_BACKEND_GLES)
 	return (void *)eglGetProcAddress(name);
@@ -25,6 +27,7 @@ static void *se_gl_get_proc_address(const char *name) {
 	return (void *)glfwGetProcAddress(name);
 #endif
 }
+#endif
 
 #define SE_UNIFORMS_MAX 128
 
@@ -114,6 +117,418 @@ PFNGLCHECKFRAMEBUFFERSTATUS se_glCheckFramebufferStatus = NULL;
 PFNGLGENERATEMIPMAP se_glGenerateMipmap = NULL;
 PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer = NULL;
 
+#if defined(SE_WINDOW_BACKEND_TERMINAL)
+static GLuint se_gl_terminal_next_id = 1u;
+
+static GLuint se_gl_terminal_generate_id(void) {
+	const GLuint id = se_gl_terminal_next_id;
+	se_gl_terminal_next_id++;
+	if (se_gl_terminal_next_id == 0u) {
+		se_gl_terminal_next_id = 1u;
+	}
+	return id;
+}
+
+static void se_gl_terminal_fill_ids(const GLsizei n, GLuint* out_ids) {
+	if (!out_ids || n <= 0) {
+		return;
+	}
+	for (GLsizei i = 0; i < n; ++i) {
+		out_ids[i] = se_gl_terminal_generate_id();
+	}
+}
+
+static void APIENTRY se_gl_terminal_delete_buffers(const GLsizei n, const GLuint* buffers) {
+	(void)n;
+	(void)buffers;
+}
+
+static void APIENTRY se_gl_terminal_gen_buffers(const GLsizei n, GLuint* buffers) {
+	se_gl_terminal_fill_ids(n, buffers);
+}
+
+static void APIENTRY se_gl_terminal_bind_buffer(const GLenum target, const GLuint buffer) {
+	(void)target;
+	(void)buffer;
+}
+
+static void APIENTRY se_gl_terminal_buffer_sub_data(const GLenum target, const GLintptr offset, const GLsizeiptr size, const void* data) {
+	(void)target;
+	(void)offset;
+	(void)size;
+	(void)data;
+}
+
+static void APIENTRY se_gl_terminal_buffer_data(const GLenum target, const GLsizeiptr size, const void* data, const GLenum usage) {
+	(void)target;
+	(void)size;
+	(void)data;
+	(void)usage;
+}
+
+static void APIENTRY se_gl_terminal_use_program(const GLuint program) {
+	(void)program;
+}
+
+static GLuint APIENTRY se_gl_terminal_create_shader(const GLenum type) {
+	(void)type;
+	return se_gl_terminal_generate_id();
+}
+
+static void APIENTRY se_gl_terminal_shader_source(const GLuint shader, const GLsizei count, const GLchar** string, const GLint* length) {
+	(void)shader;
+	(void)count;
+	(void)string;
+	(void)length;
+}
+
+static void APIENTRY se_gl_terminal_compile_shader(const GLuint shader) {
+	(void)shader;
+}
+
+static GLuint APIENTRY se_gl_terminal_create_program(void) {
+	return se_gl_terminal_generate_id();
+}
+
+static void APIENTRY se_gl_terminal_link_program(const GLuint program) {
+	(void)program;
+}
+
+static void APIENTRY se_gl_terminal_attach_shader(const GLuint program, const GLuint shader) {
+	(void)program;
+	(void)shader;
+}
+
+static void APIENTRY se_gl_terminal_delete_program(const GLuint program) {
+	(void)program;
+}
+
+static void APIENTRY se_gl_terminal_delete_shader(const GLuint shader) {
+	(void)shader;
+}
+
+static void APIENTRY se_gl_terminal_gen_renderbuffers(const GLsizei n, GLuint* renderbuffers) {
+	se_gl_terminal_fill_ids(n, renderbuffers);
+}
+
+static void APIENTRY se_gl_terminal_bind_framebuffer(const GLenum target, const GLuint framebuffer) {
+	(void)target;
+	(void)framebuffer;
+}
+
+static void APIENTRY se_gl_terminal_framebuffer_renderbuffer(const GLenum target, const GLenum attachment, const GLenum renderbuffer_target, const GLuint renderbuffer) {
+	(void)target;
+	(void)attachment;
+	(void)renderbuffer_target;
+	(void)renderbuffer;
+}
+
+static void APIENTRY se_gl_terminal_framebuffer_texture(const GLenum target, const GLenum attachment, const GLuint texture, const GLint level) {
+	(void)target;
+	(void)attachment;
+	(void)texture;
+	(void)level;
+}
+
+static void APIENTRY se_gl_terminal_bind_vertex_array(const GLuint array) {
+	(void)array;
+}
+
+static void APIENTRY se_gl_terminal_gen_vertex_arrays(const GLsizei n, GLuint* arrays) {
+	se_gl_terminal_fill_ids(n, arrays);
+}
+
+static void APIENTRY se_gl_terminal_delete_vertex_arrays(const GLsizei n, const GLuint* arrays) {
+	(void)n;
+	(void)arrays;
+}
+
+static void APIENTRY se_gl_terminal_vertex_attrib_pointer(const GLuint index, const GLint size, const GLenum type, const GLboolean normalized, const GLsizei stride, const void* pointer) {
+	(void)index;
+	(void)size;
+	(void)type;
+	(void)normalized;
+	(void)stride;
+	(void)pointer;
+}
+
+static void APIENTRY se_gl_terminal_enable_vertex_attrib_array(const GLuint index) {
+	(void)index;
+}
+
+static void APIENTRY se_gl_terminal_disable_vertex_attrib_array(const GLuint index) {
+	(void)index;
+}
+
+static void APIENTRY se_gl_terminal_vertex_attrib_divisor(const GLuint index, const GLuint divisor) {
+	(void)index;
+	(void)divisor;
+}
+
+static void APIENTRY se_gl_terminal_draw_arrays_instanced(const GLenum mode, const GLint first, const GLsizei count, const GLsizei instancecount) {
+	(void)mode;
+	(void)first;
+	(void)count;
+	(void)instancecount;
+}
+
+static void APIENTRY se_gl_terminal_gen_framebuffers(const GLsizei n, GLuint* framebuffers) {
+	se_gl_terminal_fill_ids(n, framebuffers);
+}
+
+static void APIENTRY se_gl_terminal_framebuffer_texture2d(const GLenum target, const GLenum attachment, const GLenum textarget, const GLuint texture, const GLint level) {
+	(void)target;
+	(void)attachment;
+	(void)textarget;
+	(void)texture;
+	(void)level;
+}
+
+static void APIENTRY se_gl_terminal_get_shader_iv(const GLuint shader, const GLenum pname, GLint* params) {
+	(void)shader;
+	if (!params) {
+		return;
+	}
+	if (pname == GL_INFO_LOG_LENGTH) {
+		*params = 0;
+		return;
+	}
+	*params = 1;
+}
+
+static void APIENTRY se_gl_terminal_get_shader_info_log(const GLuint shader, const GLsizei buf_size, GLsizei* out_length, GLchar* out_log) {
+	(void)shader;
+	if (out_length) {
+		*out_length = 0;
+	}
+	if (out_log && buf_size > 0) {
+		out_log[0] = '\0';
+	}
+}
+
+static void APIENTRY se_gl_terminal_get_program_iv(const GLuint program, const GLenum pname, GLint* params) {
+	(void)program;
+	if (!params) {
+		return;
+	}
+	if (pname == GL_INFO_LOG_LENGTH) {
+		*params = 0;
+		return;
+	}
+	*params = 1;
+}
+
+static void APIENTRY se_gl_terminal_get_program_info_log(const GLuint program, const GLsizei buf_size, GLsizei* out_length, GLchar* out_log) {
+	(void)program;
+	if (out_length) {
+		*out_length = 0;
+	}
+	if (out_log && buf_size > 0) {
+		out_log[0] = '\0';
+	}
+}
+
+static void APIENTRY se_gl_terminal_draw_elements_instanced(const GLenum mode, const GLsizei count, const GLenum type, const void* indices, const GLsizei primcount) {
+	(void)mode;
+	(void)count;
+	(void)type;
+	(void)indices;
+	(void)primcount;
+}
+
+static void* APIENTRY se_gl_terminal_map_buffer(const GLenum target, const GLenum access) {
+	(void)target;
+	(void)access;
+	return NULL;
+}
+
+static GLboolean APIENTRY se_gl_terminal_unmap_buffer(const GLenum target) {
+	(void)target;
+	return GL_TRUE;
+}
+
+static GLint APIENTRY se_gl_terminal_get_uniform_location(const GLuint program, const GLchar* name) {
+	(void)program;
+	(void)name;
+	return 0;
+}
+
+static void APIENTRY se_gl_terminal_uniform1i(const GLint location, const GLint v0) {
+	(void)location;
+	(void)v0;
+}
+
+static void APIENTRY se_gl_terminal_uniform1f(const GLint location, const GLfloat v0) {
+	(void)location;
+	(void)v0;
+}
+
+static void APIENTRY se_gl_terminal_uniform1fv(const GLint location, const GLsizei count, const GLfloat* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform2fv(const GLint location, const GLsizei count, const GLfloat* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform3fv(const GLint location, const GLsizei count, const GLfloat* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform4fv(const GLint location, const GLsizei count, const GLfloat* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform1iv(const GLint location, const GLsizei count, const GLint* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform2iv(const GLint location, const GLsizei count, const GLint* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform3iv(const GLint location, const GLsizei count, const GLint* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform4iv(const GLint location, const GLsizei count, const GLint* value) {
+	(void)location;
+	(void)count;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform_matrix3fv(const GLint location, const GLsizei count, const GLboolean transpose, const GLfloat* value) {
+	(void)location;
+	(void)count;
+	(void)transpose;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_uniform_matrix4fv(const GLint location, const GLsizei count, const GLboolean transpose, const GLfloat* value) {
+	(void)location;
+	(void)count;
+	(void)transpose;
+	(void)value;
+}
+
+static void APIENTRY se_gl_terminal_bind_renderbuffer(const GLenum target, const GLuint renderbuffer) {
+	(void)target;
+	(void)renderbuffer;
+}
+
+static void APIENTRY se_gl_terminal_delete_renderbuffers(const GLsizei n, const GLuint* renderbuffers) {
+	(void)n;
+	(void)renderbuffers;
+}
+
+static void APIENTRY se_gl_terminal_delete_framebuffers(const GLsizei n, const GLuint* framebuffers) {
+	(void)n;
+	(void)framebuffers;
+}
+
+static void APIENTRY se_gl_terminal_renderbuffer_storage(const GLenum target, const GLenum internalformat, const GLsizei width, const GLsizei height) {
+	(void)target;
+	(void)internalformat;
+	(void)width;
+	(void)height;
+}
+
+static GLenum APIENTRY se_gl_terminal_check_framebuffer_status(const GLenum target) {
+	(void)target;
+	return GL_FRAMEBUFFER_COMPLETE;
+}
+
+static void APIENTRY se_gl_terminal_generate_mipmap(const GLenum target) {
+	(void)target;
+}
+
+static void APIENTRY se_gl_terminal_blit_framebuffer(const GLint src_x0, const GLint src_y0, const GLint src_x1, const GLint src_y1, const GLint dst_x0, const GLint dst_y0, const GLint dst_x1, const GLint dst_y1, const GLbitfield mask, const GLenum filter) {
+	(void)src_x0;
+	(void)src_y0;
+	(void)src_x1;
+	(void)src_y1;
+	(void)dst_x0;
+	(void)dst_y0;
+	(void)dst_x1;
+	(void)dst_y1;
+	(void)mask;
+	(void)filter;
+}
+
+static b8 se_init_opengl_terminal(void) {
+	se_glDeleteBuffers = se_gl_terminal_delete_buffers;
+	se_glGenBuffers = se_gl_terminal_gen_buffers;
+	se_glBindBuffer = se_gl_terminal_bind_buffer;
+	se_glBufferSubData = se_gl_terminal_buffer_sub_data;
+	se_glBufferData = se_gl_terminal_buffer_data;
+	se_glUseProgram = se_gl_terminal_use_program;
+	se_glCreateShader = se_gl_terminal_create_shader;
+	se_glShaderSource = se_gl_terminal_shader_source;
+	se_glCompileShader = se_gl_terminal_compile_shader;
+	se_glCreateProgram = se_gl_terminal_create_program;
+	se_glLinkProgram = se_gl_terminal_link_program;
+	se_glAttachShader = se_gl_terminal_attach_shader;
+	se_glDeleteProgram = se_gl_terminal_delete_program;
+	se_glDeleteShader = se_gl_terminal_delete_shader;
+	se_glGenRenderbuffers = se_gl_terminal_gen_renderbuffers;
+	se_glBindFramebuffer = se_gl_terminal_bind_framebuffer;
+	se_glFramebufferRenderbuffer = se_gl_terminal_framebuffer_renderbuffer;
+	se_glFramebufferTexture = se_gl_terminal_framebuffer_texture;
+	se_glBindVertexArray = se_gl_terminal_bind_vertex_array;
+	se_glGenVertexArrays = se_gl_terminal_gen_vertex_arrays;
+	se_glDeleteVertexArrays = se_gl_terminal_delete_vertex_arrays;
+	se_glVertexAttribPointer = se_gl_terminal_vertex_attrib_pointer;
+	se_glEnableVertexAttribArray = se_gl_terminal_enable_vertex_attrib_array;
+	se_glDisableVertexAttribArray = se_gl_terminal_disable_vertex_attrib_array;
+	se_glVertexAttribDivisor = se_gl_terminal_vertex_attrib_divisor;
+	se_glDrawArraysInstanced = se_gl_terminal_draw_arrays_instanced;
+	se_glGenFramebuffers = se_gl_terminal_gen_framebuffers;
+	se_glFramebufferTexture2D = se_gl_terminal_framebuffer_texture2d;
+	se_glGetShaderiv = se_gl_terminal_get_shader_iv;
+	se_glGetShaderInfoLog = se_gl_terminal_get_shader_info_log;
+	se_glGetProgramiv = se_gl_terminal_get_program_iv;
+	se_glGetProgramInfoLog = se_gl_terminal_get_program_info_log;
+	se_glDrawElementsInstanced = se_gl_terminal_draw_elements_instanced;
+	se_glMapBuffer = se_gl_terminal_map_buffer;
+	se_glUnmapBuffer = se_gl_terminal_unmap_buffer;
+	se_glGetUniformLocation = se_gl_terminal_get_uniform_location;
+	se_glUniform1i = se_gl_terminal_uniform1i;
+	se_glUniform1f = se_gl_terminal_uniform1f;
+	se_glUniform1fv = se_gl_terminal_uniform1fv;
+	se_glUniform2fv = se_gl_terminal_uniform2fv;
+	se_glUniform3fv = se_gl_terminal_uniform3fv;
+	se_glUniform4fv = se_gl_terminal_uniform4fv;
+	se_glUniform1iv = se_gl_terminal_uniform1iv;
+	se_glUniform2iv = se_gl_terminal_uniform2iv;
+	se_glUniform3iv = se_gl_terminal_uniform3iv;
+	se_glUniform4iv = se_gl_terminal_uniform4iv;
+	se_glUniformMatrix3fv = se_gl_terminal_uniform_matrix3fv;
+	se_glUniformMatrix4fv = se_gl_terminal_uniform_matrix4fv;
+	se_glBindRenderbuffer = se_gl_terminal_bind_renderbuffer;
+	se_glDeleteRenderbuffers = se_gl_terminal_delete_renderbuffers;
+	se_glDeleteFramebuffers = se_gl_terminal_delete_framebuffers;
+	se_glRenderbufferStorage = se_gl_terminal_renderbuffer_storage;
+	se_glCheckFramebufferStatus = se_gl_terminal_check_framebuffer_status;
+	se_glGenerateMipmap = se_gl_terminal_generate_mipmap;
+	se_glBlitFramebuffer = se_gl_terminal_blit_framebuffer;
+	return true;
+}
+#endif // SE_WINDOW_BACKEND_TERMINAL
+
 #define SE_GL_ASSIGN(func, func_type, name, fallback) \
 	func = (func_type)se_gl_get_proc_address(name); \
 	if (!func) { \
@@ -125,7 +540,9 @@ PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer = NULL;
 	}
 
 b8 se_init_opengl(void) {
-#if defined(SE_RENDER_BACKEND_GLES)
+#if defined(SE_WINDOW_BACKEND_TERMINAL)
+	return se_init_opengl_terminal();
+#elif defined(SE_RENDER_BACKEND_GLES)
 	SE_GL_ASSIGN(se_glDeleteBuffers, PFNGLDELETEBUFFERS, "glDeleteBuffers", glDeleteBuffers);
 	SE_GL_ASSIGN(se_glGenBuffers, PFNGLGENBUFFERS, "glGenBuffers", glGenBuffers);
 	SE_GL_ASSIGN(se_glBindBuffer, PFNGLBINDBUFFER, "glBindBuffer", glBindBuffer);
@@ -269,7 +686,10 @@ void se_render_shutdown(void) {
 
 b8 se_render_has_context(void) {
 #if defined(SE_WINDOW_BACKEND_GLFW)
-	return glfwGetCurrentContext() != NULL;
+	if (glfwGetCurrentContext() != NULL) {
+		return true;
+	}
+	return se_render_queue_is_running();
 #else
 	return se_render_initialized;
 #endif

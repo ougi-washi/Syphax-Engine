@@ -5,6 +5,14 @@
 #include "se_debug.h"
 #include "se_defines.h"
 
+#if defined(SE_RENDER_BACKEND_GLES)
+#define SE_FRAMEBUFFER_COLOR_INTERNAL_FORMAT GL_RGBA
+#define SE_FRAMEBUFFER_DEPTH_INTERNAL_FORMAT GL_DEPTH_COMPONENT16
+#else
+#define SE_FRAMEBUFFER_COLOR_INTERNAL_FORMAT GL_RGBA8
+#define SE_FRAMEBUFFER_DEPTH_INTERNAL_FORMAT GL_DEPTH_COMPONENT
+#endif
+
 static void se_framebuffer_cleanup_raw(se_framebuffer *framebuffer) {
 	se_log("se_framebuffer_cleanup :: framebuffer: %p", (void*)framebuffer);
 	if (framebuffer->framebuffer) {
@@ -46,7 +54,7 @@ se_framebuffer_handle se_framebuffer_create(const s_vec2 *size) {
 	// Create color texture
 	glGenTextures(1, &framebuffer->texture);
 	glBindTexture(GL_TEXTURE_2D, framebuffer->texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size->x, size->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, SE_FRAMEBUFFER_COLOR_INTERNAL_FORMAT, size->x, size->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -56,7 +64,7 @@ se_framebuffer_handle se_framebuffer_create(const s_vec2 *size) {
 	// Create depth buffer
 	glGenRenderbuffers(1, &framebuffer->depth_buffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, framebuffer->depth_buffer);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, size->x, size->y);
+	glRenderbufferStorage(GL_RENDERBUFFER, SE_FRAMEBUFFER_DEPTH_INTERNAL_FORMAT, size->x, size->y);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebuffer->depth_buffer);
 
 	// Check framebuffer completeness
@@ -103,7 +111,7 @@ void se_framebuffer_set_size(const se_framebuffer_handle framebuffer, const s_ve
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_ptr->framebuffer);
 
 	glBindTexture(GL_TEXTURE_2D, framebuffer_ptr->texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (i32)size->x, (i32)size->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, SE_FRAMEBUFFER_COLOR_INTERNAL_FORMAT, (i32)size->x, (i32)size->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -111,7 +119,7 @@ void se_framebuffer_set_size(const se_framebuffer_handle framebuffer, const s_ve
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuffer_ptr->texture, 0);
 
 	glBindRenderbuffer(GL_RENDERBUFFER, framebuffer_ptr->depth_buffer);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, (i32)size->x, (i32)size->y);
+	glRenderbufferStorage(GL_RENDERBUFFER, SE_FRAMEBUFFER_DEPTH_INTERNAL_FORMAT, (i32)size->x, (i32)size->y);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, framebuffer_ptr->depth_buffer);
 
 	glBindRenderbuffer(GL_RENDERBUFFER, (GLuint)previous_renderbuffer);

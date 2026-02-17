@@ -493,7 +493,7 @@ extern void se_window_poll_events();
 
 </div>
 
-Legacy per-frame calls kept for compatibility: - `se_window_tick(window)` is equivalent to begin-frame input/update prep. - `se_window_present(window)` / `se_window_render_screen(window)` complete present. New code should prefer `se_window_begin_frame` + `se_window_end_frame`.
+Legacy per-frame calls kept for compatibility: - `se_window_tick(window)` is equivalent to begin-frame input/update prep. - `se_window_present(window)` / `se_window_render_screen(window)` complete present. New code should prefer `se_window_begin_frame` + `se_window_end_frame`. - In dedicated render-thread mode, direct present/context calls are unsupported.
 
 ### `se_window_present`
 
@@ -505,7 +505,7 @@ extern void se_window_present(const se_window_handle window);
 
 </div>
 
-No inline description found in header comments.
+In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 
 ### `se_window_present_frame`
 
@@ -517,7 +517,7 @@ extern void se_window_present_frame(const se_window_handle window, const s_vec4*
 
 </div>
 
-No inline description found in header comments.
+In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 
 ### `se_window_register_input_event`
 
@@ -565,7 +565,7 @@ extern void se_window_render_screen(const se_window_handle window);
 
 </div>
 
-No inline description found in header comments.
+In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 
 ### `se_window_reset_diagnostics`
 
@@ -589,7 +589,7 @@ extern void se_window_set_current_context(const se_window_handle window);
 
 </div>
 
-No inline description found in header comments.
+In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 
 ### `se_window_set_cursor_mode`
 

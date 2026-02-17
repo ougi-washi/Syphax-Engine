@@ -186,6 +186,8 @@ extern PFNGLCHECKFRAMEBUFFERSTATUS se_glCheckFramebufferStatus;
 extern PFNGLGENERATEMIPMAP se_glGenerateMipmap;
 extern PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer;
 
+#if defined(SE_GL_NO_DISPATCH_WRAPPERS)
+
 #define glDeleteBuffers se_glDeleteBuffers
 #define glGenBuffers se_glGenBuffers
 #define glBindBuffer se_glBindBuffer
@@ -241,6 +243,174 @@ extern PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer;
 #define glCheckFramebufferStatus se_glCheckFramebufferStatus
 #define glGenerateMipmap se_glGenerateMipmap
 #define glBlitFramebuffer se_glBlitFramebuffer
+
+#else
+
+extern void se_gl_dispatchDeleteBuffers(GLsizei n, const GLuint *buffers);
+extern void se_gl_dispatchGenBuffers(GLsizei n, GLuint *buffers);
+extern void se_gl_dispatchBindBuffer(GLenum target, GLuint buffer);
+extern void se_gl_dispatchBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const void *data);
+extern void se_gl_dispatchBufferData(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+extern void se_gl_dispatchUseProgram(GLuint program);
+extern GLuint se_gl_dispatchCreateShader(GLenum type);
+extern void se_gl_dispatchShaderSource(GLuint shader, GLsizei count, const GLchar **string, const GLint *length);
+extern void se_gl_dispatchCompileShader(GLuint shader);
+extern GLuint se_gl_dispatchCreateProgram(void);
+extern void se_gl_dispatchLinkProgram(GLuint program);
+extern void se_gl_dispatchAttachShader(GLuint program, GLuint shader);
+extern void se_gl_dispatchDeleteProgram(GLuint program);
+extern void se_gl_dispatchDeleteShader(GLuint shader);
+extern void se_gl_dispatchGenRenderbuffers(GLsizei n, GLuint *renderbuffers);
+extern void se_gl_dispatchBindFramebuffer(GLenum target, GLuint framebuffer);
+extern void se_gl_dispatchFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
+extern void se_gl_dispatchBindVertexArray(GLuint array);
+extern void se_gl_dispatchGenVertexArrays(GLsizei n, GLuint *arrays);
+extern void se_gl_dispatchDeleteVertexArrays(GLsizei n, const GLuint *arrays);
+extern void se_gl_dispatchVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+extern void se_gl_dispatchEnableVertexAttribArray(GLuint index);
+extern void se_gl_dispatchVertexAttribDivisor(GLuint index, GLuint divisor);
+extern void se_gl_dispatchDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instancecount);
+extern void se_gl_dispatchGenFramebuffers(GLsizei n, GLuint *framebuffers);
+extern void se_gl_dispatchFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+extern void se_gl_dispatchGetShaderiv(GLuint shader, GLenum pname, GLint *params);
+extern void se_gl_dispatchGetShaderInfoLog(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+extern void se_gl_dispatchGetProgramiv(GLuint program, GLenum pname, GLint *params);
+extern void se_gl_dispatchGetProgramInfoLog(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+extern void se_gl_dispatchDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount);
+extern void *se_gl_dispatchMapBuffer(GLenum target, GLenum access);
+extern GLboolean se_gl_dispatchUnmapBuffer(GLenum target);
+extern GLint se_gl_dispatchGetUniformLocation(GLuint program, const GLchar *name);
+extern void se_gl_dispatchUniform1i(GLint location, GLint v0);
+extern void se_gl_dispatchUniform1f(GLint location, GLfloat v0);
+extern void se_gl_dispatchUniform1fv(GLint location, GLsizei count, const GLfloat *value);
+extern void se_gl_dispatchUniform2fv(GLint location, GLsizei count, const GLfloat *value);
+extern void se_gl_dispatchUniform3fv(GLint location, GLsizei count, const GLfloat *value);
+extern void se_gl_dispatchUniform4fv(GLint location, GLsizei count, const GLfloat *value);
+extern void se_gl_dispatchUniformMatrix3fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void se_gl_dispatchUniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+extern void se_gl_dispatchBindRenderbuffer(GLenum target, GLuint renderbuffer);
+extern void se_gl_dispatchDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers);
+extern void se_gl_dispatchDeleteFramebuffers(GLsizei n, const GLuint *framebuffers);
+extern void se_gl_dispatchRenderbufferStorage(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
+extern GLenum se_gl_dispatchCheckFramebufferStatus(GLenum target);
+extern void se_gl_dispatchGenerateMipmap(GLenum target);
+extern void se_gl_dispatchBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
+
+extern void se_gl_dispatchEnable(GLenum cap);
+extern void se_gl_dispatchDisable(GLenum cap);
+extern void se_gl_dispatchBlendEquation(GLenum mode);
+extern void se_gl_dispatchBlendFunc(GLenum sfactor, GLenum dfactor);
+extern void se_gl_dispatchClear(GLbitfield mask);
+extern void se_gl_dispatchClearColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
+extern void se_gl_dispatchColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
+extern void se_gl_dispatchDepthMask(GLboolean flag);
+extern void se_gl_dispatchStencilMask(GLuint mask);
+extern void se_gl_dispatchDepthFunc(GLenum func);
+extern void se_gl_dispatchCullFace(GLenum mode);
+extern void se_gl_dispatchFrontFace(GLenum mode);
+extern void se_gl_dispatchDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices);
+extern void se_gl_dispatchBindTexture(GLenum target, GLuint texture);
+extern void se_gl_dispatchDeleteTextures(GLsizei n, const GLuint *textures);
+extern void se_gl_dispatchGenTextures(GLsizei n, GLuint *textures);
+extern void se_gl_dispatchTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels);
+extern void se_gl_dispatchTexParameteri(GLenum target, GLenum pname, GLint param);
+extern void se_gl_dispatchActiveTexture(GLenum texture);
+extern void se_gl_dispatchViewport(GLint x, GLint y, GLsizei width, GLsizei height);
+extern void se_gl_dispatchGetIntegerv(GLenum pname, GLint *data);
+extern void se_gl_dispatchGetBooleanv(GLenum pname, GLboolean *data);
+extern void se_gl_dispatchGetFloatv(GLenum pname, GLfloat *data);
+extern GLboolean se_gl_dispatchIsEnabled(GLenum cap);
+extern void se_gl_dispatchPixelStorei(GLenum pname, GLint param);
+extern void se_gl_dispatchReadBuffer(GLenum src);
+extern void se_gl_dispatchReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels);
+extern const GLubyte* se_gl_dispatchGetString(GLenum name);
+
+#define glDeleteBuffers se_gl_dispatchDeleteBuffers
+#define glGenBuffers se_gl_dispatchGenBuffers
+#define glBindBuffer se_gl_dispatchBindBuffer
+#define glBufferSubData se_gl_dispatchBufferSubData
+#define glBufferData se_gl_dispatchBufferData
+#define glUseProgram se_gl_dispatchUseProgram
+#define glCreateShader se_gl_dispatchCreateShader
+#define glShaderSource se_gl_dispatchShaderSource
+#define glCompileShader se_gl_dispatchCompileShader
+#define glCreateProgram se_gl_dispatchCreateProgram
+#define glLinkProgram se_gl_dispatchLinkProgram
+#define glAttachShader se_gl_dispatchAttachShader
+#define glDeleteProgram se_gl_dispatchDeleteProgram
+#define glDeleteShader se_gl_dispatchDeleteShader
+#define glGenRenderbuffers se_gl_dispatchGenRenderbuffers
+#define glBindFramebuffer se_gl_dispatchBindFramebuffer
+#define glFramebufferRenderbuffer se_gl_dispatchFramebufferRenderbuffer
+#define glFramebufferTexture se_glFramebufferTexture
+#define glBindVertexArray se_gl_dispatchBindVertexArray
+#define glGenVertexArrays se_gl_dispatchGenVertexArrays
+#define glDeleteVertexArrays se_gl_dispatchDeleteVertexArrays
+#define glVertexAttribPointer se_gl_dispatchVertexAttribPointer
+#define glEnableVertexAttribArray se_gl_dispatchEnableVertexAttribArray
+#define glDisableVertexAttribArray se_glDisableVertexAttribArray
+#define glVertexAttribDivisor se_gl_dispatchVertexAttribDivisor
+#define glDrawArraysInstanced se_gl_dispatchDrawArraysInstanced
+#define glGenFramebuffers se_gl_dispatchGenFramebuffers
+#define glFramebufferTexture2D se_gl_dispatchFramebufferTexture2D
+#define glGetShaderiv se_gl_dispatchGetShaderiv
+#define glGetShaderInfoLog se_gl_dispatchGetShaderInfoLog
+#define glGetProgramiv se_gl_dispatchGetProgramiv
+#define glGetProgramInfoLog se_gl_dispatchGetProgramInfoLog
+#define glDrawElementsInstanced se_gl_dispatchDrawElementsInstanced
+#define glMapBuffer se_gl_dispatchMapBuffer
+#define glUnmapBuffer se_gl_dispatchUnmapBuffer
+#define glGetUniformLocation se_gl_dispatchGetUniformLocation
+#define glUniform1i se_gl_dispatchUniform1i
+#define glUniform1f se_gl_dispatchUniform1f
+#define glUniform1fv se_gl_dispatchUniform1fv
+#define glUniform2fv se_gl_dispatchUniform2fv
+#define glUniform3fv se_gl_dispatchUniform3fv
+#define glUniform4fv se_gl_dispatchUniform4fv
+#define glUniform1iv se_glUniform1iv
+#define glUniform2iv se_glUniform2iv
+#define glUniform3iv se_glUniform3iv
+#define glUniform4iv se_glUniform4iv
+#define glUniformMatrix3fv se_gl_dispatchUniformMatrix3fv
+#define glUniformMatrix4fv se_gl_dispatchUniformMatrix4fv
+#define glBindRenderbuffer se_gl_dispatchBindRenderbuffer
+#define glDeleteRenderbuffers se_gl_dispatchDeleteRenderbuffers
+#define glDeleteFramebuffers se_gl_dispatchDeleteFramebuffers
+#define glRenderbufferStorage se_gl_dispatchRenderbufferStorage
+#define glCheckFramebufferStatus se_gl_dispatchCheckFramebufferStatus
+#define glGenerateMipmap se_gl_dispatchGenerateMipmap
+#define glBlitFramebuffer se_gl_dispatchBlitFramebuffer
+
+#define glEnable se_gl_dispatchEnable
+#define glDisable se_gl_dispatchDisable
+#define glBlendEquation se_gl_dispatchBlendEquation
+#define glBlendFunc se_gl_dispatchBlendFunc
+#define glClear se_gl_dispatchClear
+#define glClearColor se_gl_dispatchClearColor
+#define glColorMask se_gl_dispatchColorMask
+#define glDepthMask se_gl_dispatchDepthMask
+#define glStencilMask se_gl_dispatchStencilMask
+#define glDepthFunc se_gl_dispatchDepthFunc
+#define glCullFace se_gl_dispatchCullFace
+#define glFrontFace se_gl_dispatchFrontFace
+#define glDrawElements se_gl_dispatchDrawElements
+#define glBindTexture se_gl_dispatchBindTexture
+#define glDeleteTextures se_gl_dispatchDeleteTextures
+#define glGenTextures se_gl_dispatchGenTextures
+#define glTexImage2D se_gl_dispatchTexImage2D
+#define glTexParameteri se_gl_dispatchTexParameteri
+#define glActiveTexture se_gl_dispatchActiveTexture
+#define glViewport se_gl_dispatchViewport
+#define glGetIntegerv se_gl_dispatchGetIntegerv
+#define glGetBooleanv se_gl_dispatchGetBooleanv
+#define glGetFloatv se_gl_dispatchGetFloatv
+#define glIsEnabled se_gl_dispatchIsEnabled
+#define glPixelStorei se_gl_dispatchPixelStorei
+#define glReadBuffer se_gl_dispatchReadBuffer
+#define glReadPixels se_gl_dispatchReadPixels
+#define glGetString se_gl_dispatchGetString
+
+#endif
 
 extern b8 se_init_opengl(void);
 

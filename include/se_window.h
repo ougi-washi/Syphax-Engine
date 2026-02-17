@@ -238,12 +238,16 @@ typedef s_array(se_window, se_windows);
 extern se_window_handle se_window_create(const char* title, const u32 width, const u32 height);
 extern void se_window_update(const se_window_handle window);
 extern void se_window_tick(const se_window_handle window);
+// In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 extern void se_window_set_current_context(const se_window_handle window);
 extern void se_window_render_quad(const se_window_handle window);
+// In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 extern void se_window_render_screen(const se_window_handle window);
 extern void se_window_set_vsync(const se_window_handle window, const b8 enabled);
 extern b8 se_window_is_vsync_enabled(const se_window_handle window);
+// In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 extern void se_window_present(const se_window_handle window);
+// In dedicated render-thread mode this returns SE_RESULT_UNSUPPORTED.
 extern void se_window_present_frame(const se_window_handle window, const s_vec4* clear_color);
 
 /*
@@ -267,6 +271,7 @@ extern void se_window_end_frame(const se_window_handle window);
  * - `se_window_tick(window)` is equivalent to begin-frame input/update prep.
  * - `se_window_present(window)` / `se_window_render_screen(window)` complete present.
  * New code should prefer `se_window_begin_frame` + `se_window_end_frame`.
+ * - In dedicated render-thread mode, direct present/context calls are unsupported.
  */
 extern void se_window_poll_events();
 extern b8 se_window_is_key_down(const se_window_handle window, se_key key);

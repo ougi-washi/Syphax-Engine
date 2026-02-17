@@ -4,6 +4,8 @@
 
 #include "se_window.h"
 #include "se_debug.h"
+#include "se_graphics.h"
+#include "window/se_window_backend_internal.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -697,6 +699,12 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 		s_array_init(&windows_registry);
 	}
 	s_array_add(&windows_registry, window_handle);
+	if (!se_render_init()) {
+		s_array_remove(&windows_registry, s_array_handle(&windows_registry, (u32)(s_array_get_size(&windows_registry) - 1)));
+		s_array_remove(&context->windows, window_handle);
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		return S_HANDLE_NULL;
+	}
 	se_window_terminal_input_enable();
 
 	se_log("se_window_create :: [terminal] window: %s (%u x %u)", title, new_window->width, new_window->height);
@@ -1354,6 +1362,7 @@ void se_window_destroy(const se_window_handle window) {
 	if (s_array_get_size(&windows_registry) == 0) {
 		se_window_terminal_input_disable();
 		s_array_clear(&windows_registry);
+		se_render_shutdown();
 	}
 }
 
@@ -1366,6 +1375,23 @@ void se_window_destroy_all(void){
 		}
 		se_window_destroy(window_handle);
 	}
+}
+
+b8 se_window_backend_render_thread_attach(const se_window_handle window) {
+	(void)window;
+	return false;
+}
+
+void se_window_backend_render_thread_detach(void) {
+}
+
+void se_window_backend_render_thread_present(const se_window_handle window) {
+	(void)window;
+}
+
+void se_window_backend_render_thread_set_vsync(const se_window_handle window, const b8 enabled) {
+	(void)window;
+	(void)enabled;
 }
 
 #endif // SE_WINDOW_BACKEND_TERMINAL

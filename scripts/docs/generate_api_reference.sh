@@ -72,6 +72,8 @@ MODULE_OVERVIEW = {
     "se_physics": "2D and 3D rigid body worlds, shapes, stepping, and queries.",
     "se_quad": "Quad and mesh instance utility structs.",
     "se_render_buffer": "Render-to-texture buffers and offscreen draw orchestration.",
+    "se_render_frame": "Dedicated render-frame submission and frame-queue statistics APIs.",
+    "se_render_thread": "Dedicated render-thread lifecycle and diagnostics APIs.",
     "se_scene": "2D/3D scenes, objects, instance management, and picking.",
     "se_sdf": "Signed distance field scene graph, renderer, and material controls.",
     "se_shader": "Shader loading, uniform access, and shader handle lifecycle.",
@@ -113,6 +115,8 @@ PATH_WALKTHROUGH = {
     "se_defines": "path/utilities.md",
     "se_ext": "path/utilities.md",
     "se_quad": "path/utilities.md",
+    "se_render_frame": "path/window.md",
+    "se_render_thread": "path/window.md",
 }
 
 
@@ -131,6 +135,7 @@ def parse_top_level_declarations(source: str) -> List[Tuple[str, str]]:
     buffer: List[str] = []
     brace_depth = 0
     in_block_comment = False
+    in_preprocessor_continuation = False
 
     def flush_buffer() -> None:
         nonlocal buffer, pending_comment, brace_depth
@@ -149,6 +154,12 @@ def parse_top_level_declarations(source: str) -> List[Tuple[str, str]]:
     for raw_line in lines:
         line = raw_line.rstrip("\n")
         stripped = line.strip()
+
+        if in_preprocessor_continuation:
+            if stripped.endswith("\\"):
+                continue
+            in_preprocessor_continuation = False
+            continue
 
         if in_block_comment:
             end_idx = stripped.find("*/")
@@ -186,6 +197,8 @@ def parse_top_level_declarations(source: str) -> List[Tuple[str, str]]:
                 continue
             if stripped.startswith("#"):
                 pending_comment = []
+                if stripped.endswith("\\"):
+                    in_preprocessor_continuation = True
                 continue
 
         buffer.append(line)

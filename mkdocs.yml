@@ -192,6 +192,8 @@ nav:
       - se_physics.h: api-reference/modules/se_physics.md
       - se_quad.h: api-reference/modules/se_quad.md
       - se_render_buffer.h: api-reference/modules/se_render_buffer.md
+      - se_render_frame.h: api-reference/modules/se_render_frame.md
+      - se_render_thread.h: api-reference/modules/se_render_thread.md
       - se_scene.h: api-reference/modules/se_scene.md
       - se_sdf.h: api-reference/modules/se_sdf.md
       - se_shader.h: api-reference/modules/se_shader.md

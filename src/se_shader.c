@@ -26,6 +26,14 @@ static se_shader* se_shader_from_handle(se_context *ctx, const se_shader_handle 
 	return s_array_get(&ctx->shaders, shader);
 }
 
+static se_shader* se_shader_from_handle_safe(const se_shader_handle shader) {
+	se_context* ctx = se_current_context();
+	if (!ctx || shader == S_HANDLE_NULL) {
+		return NULL;
+	}
+	return se_shader_from_handle(ctx, shader);
+}
+
 static const char *se_shader_skip_bom(const char *source) {
 	if (!source) {
 		return source;
@@ -399,14 +407,18 @@ static void se_shader_cleanup(se_shader *shader) {
 }
 
 i32 se_shader_get_uniform_location(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name || shader_ptr->program == 0) {
+		return -1;
+	}
 	return (i32)glGetUniformLocation(shader_ptr->program, name);
 }
 
 f32 *se_shader_get_uniform_float(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -417,8 +429,10 @@ f32 *se_shader_get_uniform_float(const se_shader_handle shader, const char *name
 }
 
 s_vec2 *se_shader_get_uniform_vec2(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -429,8 +443,10 @@ s_vec2 *se_shader_get_uniform_vec2(const se_shader_handle shader, const char *na
 }
 
 s_vec3 *se_shader_get_uniform_vec3(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -441,8 +457,10 @@ s_vec3 *se_shader_get_uniform_vec3(const se_shader_handle shader, const char *na
 }
 
 s_vec4 *se_shader_get_uniform_vec4(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -453,8 +471,10 @@ s_vec4 *se_shader_get_uniform_vec4(const se_shader_handle shader, const char *na
 }
 
 i32 *se_shader_get_uniform_int(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -465,8 +485,10 @@ i32 *se_shader_get_uniform_int(const se_shader_handle shader, const char *name) 
 }
 
 s_mat4 *se_shader_get_uniform_mat4(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -477,8 +499,10 @@ s_mat4 *se_shader_get_uniform_mat4(const se_shader_handle shader, const char *na
 }
 
 u32 *se_shader_get_uniform_texture(const se_shader_handle shader, const char *name) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return NULL;
+	}
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
 		if (uniform && strcmp(uniform->name, name) == 0) {
@@ -489,50 +513,66 @@ u32 *se_shader_get_uniform_texture(const se_shader_handle shader, const char *na
 }
 
 void se_shader_set_float(const se_shader_handle shader, const char *name, f32 value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return;
+	}
 	se_uniform_set_float(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_vec2(const se_shader_handle shader, const char *name, const s_vec2 *value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name || !value) {
+		return;
+	}
 	se_uniform_set_vec2(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_vec3(const se_shader_handle shader, const char *name, const s_vec3 *value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name || !value) {
+		return;
+	}
 	se_uniform_set_vec3(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_vec4(const se_shader_handle shader, const char *name, const s_vec4 *value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name || !value) {
+		return;
+	}
 	se_uniform_set_vec4(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_int(const se_shader_handle shader, const char *name, i32 value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return;
+	}
 	se_uniform_set_int(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_mat3(const se_shader_handle shader, const char *name, const s_mat3 *value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name || !value) {
+		return;
+	}
 	se_uniform_set_mat3(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_mat4(const se_shader_handle shader, const char *name, const s_mat4 *value) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name || !value) {
+		return;
+	}
 	se_uniform_set_mat4(&shader_ptr->uniforms, name, value);
 }
 
 void se_shader_set_texture(const se_shader_handle shader, const char *name, const u32 texture) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || !name) {
+		return;
+	}
 	se_uniform_set_texture(&shader_ptr->uniforms, name, texture);
 }
 
@@ -716,8 +756,14 @@ void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 t
 }
 
 void se_uniform_apply(const se_shader_handle shader, const b8 update_global_uniforms) {
-	se_context *ctx = se_current_context();
-	se_shader *shader_ptr = se_shader_from_handle(ctx, shader);
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		return;
+	}
+	se_shader *shader_ptr = se_shader_from_handle_safe(shader);
+	if (!shader_ptr || shader_ptr->program == 0) {
+		return;
+	}
 	glUseProgram(shader_ptr->program);
 	u32 texture_unit = 0;
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
