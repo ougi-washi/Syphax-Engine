@@ -10,6 +10,12 @@ if [[ ! -d "$SNIPPETS_DIR" ]]; then
 	exit 1
 fi
 
+if [[ ! -f "$ROOT_DIR/lib/syphax/s_types.h" ]]; then
+	echo "Missing dependency header: $ROOT_DIR/lib/syphax/s_types.h" >&2
+	echo "Initialize submodules before running docs checks (for CI checkout use submodules: recursive)." >&2
+	exit 1
+fi
+
 mapfile -t snippet_files < <(find "$SNIPPETS_DIR" -type f -name '*.c' | sort)
 if [[ ${#snippet_files[@]} -eq 0 ]]; then
 	echo "No snippet sources found under $SNIPPETS_DIR" >&2
