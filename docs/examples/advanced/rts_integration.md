@@ -47,6 +47,7 @@ Integration-scale runtime combining scene, UI, debug, and simulation patterns.
 
 ## Related API links
 
+- [Source code: `examples/advanced/rts_integration.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/rts_integration.c)
 - [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [Module guide: se_debug](../../module-guides/se-debug.md)

@@ -73,7 +73,8 @@ int main(void) {
 		s_array_add(&slots, slot);
 	}
 
-	se_camera_set_orbit_defaults(se_scene_3d_get_camera(scene), window, &s_vec3(0.0f, 0.0f, 0.0f), 11.0f);
+	se_camera_handle camera = se_scene_3d_get_camera(scene);
+	se_camera_set_orbit_defaults(camera, window, &s_vec3(40.0f, 30.0f, .0f), 30.0f);
 	printf("physics3d_playground controls:\n");
 	printf("  Space: launch all cubes upward\n  Esc: quit\n");
 

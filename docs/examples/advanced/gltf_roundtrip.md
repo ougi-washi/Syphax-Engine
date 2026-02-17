@@ -45,6 +45,7 @@ Load GLTF, export GLB, and validate roundtrip asset counts.
 
 ## Related API links
 
+- [Source code: `examples/advanced/gltf_roundtrip.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/gltf_roundtrip.c)
 - [Path: GLTF](../../path/gltf.md)
 - [Module guide: loader/se_gltf](../../module-guides/loader-se-gltf.md)
 - [Path: Model](../../path/model.md)

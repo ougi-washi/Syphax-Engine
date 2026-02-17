@@ -6,6 +6,7 @@ layout(location = 2) in vec2 in_tex_coord;
 layout(location = 3) in mat4 in_instance_mvp;
 
 out vec2 tex_coord;
+out vec3 normal;
 
 void main() {
 	gl_Position = in_instance_mvp * vec4(in_position, 1.0);

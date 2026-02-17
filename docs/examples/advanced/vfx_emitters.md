@@ -46,6 +46,7 @@ Combined 2D and 3D emitters with animated uniform callbacks.
 
 ## Related API links
 
+- [Source code: `examples/advanced/vfx_emitters.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/vfx_emitters.c)
 - [Path: VFX](../../path/vfx.md)
 - [Module guide: se_vfx](../../module-guides/se-vfx.md)
 - [API: se_vfx.h](../../api-reference/modules/se_vfx.md)

@@ -44,6 +44,7 @@ Create multiple 2D instances and animate them with a wave function.
 
 ## Related API links
 
+- [Source code: `examples/scene2d_instancing.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/scene2d_instancing.c)
 - [Path: Scene](../../path/scene.md)
 - [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)

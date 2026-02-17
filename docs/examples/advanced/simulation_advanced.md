@@ -45,6 +45,7 @@ Extended simulation with system sequencing and diagnostics.
 
 ## Related API links
 
+- [Source code: `examples/advanced/simulation_advanced.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/simulation_advanced.c)
 - [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_simulation](../../module-guides/se-simulation.md)
 - [Advanced: simulation_intro](simulation_intro.md)

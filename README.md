@@ -79,6 +79,61 @@ int main(void) {
 - `SE_RESOURCE_PUBLIC("...")`: reusable assets for framework users
 - `SE_RESOURCE_EXAMPLE("...")`: example/demo-only assets
 
+### Use In Your CMake Project
+
+Add Syphax as a git submodule (recommended for app repos):
+
+```bash
+git submodule add https://github.com/ougi-washi/Syphax-Engine.git external/syphax-engine
+git submodule update --init --recursive
+```
+
+Then include it from your top-level `CMakeLists.txt`:
+
+```cmake
+# Optional: dependency-mode defaults
+set(SE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SE_INSTALL OFF CACHE BOOL "" FORCE)
+
+# Optional: backend selection
+set(SE_BACKEND_RENDER gl CACHE STRING "" FORCE)            # gl | gles
+set(SE_BACKEND_PLATFORM desktop_glfw CACHE STRING "" FORCE) # desktop_glfw | terminal
+
+add_subdirectory(external/syphax-engine)
+
+add_executable(my_app src/main.c)
+target_link_libraries(my_app PRIVATE syphax::engine)
+```
+
+Possible link target names when included via `add_subdirectory(...)`:
+- `syphax::engine` (recommended)
+- `se_engine`
+- `MAIN` (compatibility alias)
+
+Possible C/C++ header include patterns:
+- `#include "se_window.h"` (engine public API from `include/`)
+- `#include "syphax/s_types.h"` (utility types from `lib/syphax/`)
+
+Other CMake include/integration ways:
+- `FetchContent`:
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+	syphax_engine
+	GIT_REPOSITORY https://github.com/ougi-washi/Syphax-Engine.git
+	GIT_TAG main
+)
+FetchContent_MakeAvailable(syphax_engine)
+
+target_link_libraries(my_app PRIVATE syphax::engine)
+```
+- Installed package + `find_package`:
+```cmake
+# Build/install Syphax once with: -DSE_INSTALL=ON
+find_package(SyphaxEngine CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE syphax::engine)
+```
+
 ### Project Layout
 - `include/`: public headers
 - `src/`: engine modules

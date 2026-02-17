@@ -45,6 +45,7 @@ Create a window, render text, and toggle the background palette.
 
 ## Related API links
 
+- [Source code: `examples/hello_text.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/hello_text.c)
 - [Path: Window](../../path/window.md)
 - [Path: Text](../../path/text.md)
 - [Module guide: se_text](../../module-guides/se-text.md)

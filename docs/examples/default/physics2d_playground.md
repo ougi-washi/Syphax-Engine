@@ -44,6 +44,7 @@ Step a 2D physics world and sync body positions to 2D render objects.
 
 ## Related API links
 
+- [Source code: `examples/physics2d_playground.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/physics2d_playground.c)
 - [Path: Physics](../../path/physics.md)
 - [Module guide: se_physics](../../module-guides/se-physics.md)
 - [API: se_physics.h](../../api-reference/modules/se_physics.md)

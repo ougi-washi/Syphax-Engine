@@ -46,6 +46,7 @@ Render a 3D grid of cubes and navigate with orbit camera controls.
 
 ## Related API links
 
+- [Source code: `examples/scene3d_orbit.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/scene3d_orbit.c)
 - [Path: Camera](../../path/camera.md)
 - [Module guide: se_camera](../../module-guides/se-camera.md)
 - [API: se_camera.h](../../api-reference/modules/se_camera.md)

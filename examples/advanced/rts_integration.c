@@ -1620,6 +1620,70 @@ static void rts_damage_building(rts_game *game, const rts_building_kind kind, co
 	}
 }
 
+static void rts_make_health_bar(const f32 ratio, c8 *out_bar, const i32 bar_len) {
+	if (!out_bar || bar_len <= 0) {
+		return;
+	}
+	const f32 clamped = rts_clampf(ratio, 0.0f, 1.0f);
+	const i32 filled = (i32)roundf(clamped * (f32)bar_len);
+	for (i32 i = 0; i < bar_len; ++i) {
+		out_bar[i] = (i < filled) ? '#' : '-';
+	}
+	out_bar[bar_len] = '\0';
+}
+
+static void rts_render_health_labels(rts_game *game) {
+	if (!game || !game->text_handle || game->font == S_HANDLE_NULL || game->headless_mode) {
+		return;
+	}
+	c8 label[96] = {0};
+	c8 bar[12] = {0};
+
+	for (i32 kind = 0; kind < RTS_UNIT_KIND_COUNT; ++kind) {
+		for (i32 i = 0; i < RTS_MAX_UNITS_PER_KIND; ++i) {
+			const rts_unit *unit = &game->units[kind][i];
+			if (!unit->active) {
+				continue;
+			}
+			if (!unit->selected && unit->health >= unit->max_health - 0.1f) {
+				continue;
+			}
+			s_vec3 world = unit->position;
+			world.y = rts_unit_scale(unit->role, false).y * 2.2f + 0.35f;
+			s_vec2 ndc = {0};
+			const se_camera_handle camera_handle = se_scene_3d_get_camera(game->scene);
+			if (!se_ui_world_to_ndc(camera_handle, &world, &ndc)) {
+				continue;
+			}
+			rts_make_health_bar(unit->health / unit->max_health, bar, 8);
+			snprintf(label, sizeof(label), "%c[%s] %3.0f", unit->team == RTS_TEAM_ALLY ? 'A' : 'E', bar, unit->health);
+			se_text_render(game->text_handle, game->font, label, &ndc, &s_vec2(0.62f, 0.62f), 0.045f);
+		}
+	}
+
+	for (i32 kind = 0; kind < RTS_BUILDING_KIND_COUNT; ++kind) {
+		for (i32 i = 0; i < RTS_MAX_BUILDINGS_PER_KIND; ++i) {
+			const rts_building *building = &game->buildings[kind][i];
+			if (!building->active) {
+				continue;
+			}
+			if (building->type != RTS_BUILDING_TYPE_HQ && building->health >= building->max_health - 0.1f) {
+				continue;
+			}
+			s_vec3 world = building->position;
+			world.y = rts_building_scale(building->type).y * 2.0f + 0.6f;
+			s_vec2 ndc = {0};
+			se_camera_handle camera_handle = se_scene_3d_get_camera(game->scene);
+			if (!se_ui_world_to_ndc(camera_handle, &world, &ndc)) {
+				continue;
+			}
+			rts_make_health_bar(building->health / building->max_health, bar, 8);
+			snprintf(label, sizeof(label), "%c%s [%s]", building->team == RTS_TEAM_ALLY ? 'A' : 'E', building->type == RTS_BUILDING_TYPE_HQ ? "HQ" : "B", bar);
+			se_text_render(game->text_handle, game->font, label, &ndc, &s_vec2(0.75f, 0.75f), 0.045f);
+		}
+	}
+}
+
 static void rts_clear_selection(rts_game *game) {
 	for (i32 kind = 0; kind < RTS_UNIT_KIND_COUNT; ++kind) {
 		if (rts_unit_kind_team((rts_unit_kind)kind) != RTS_TEAM_ALLY) {
@@ -3116,6 +3180,7 @@ static void rts_render_frame(rts_game *game) {
 		return;
 	}
 	se_scene_3d_render_to_buffer(game->scene);
+	rts_render_health_labels(game);
 	se_scene_3d_render_to_screen(game->scene, game->window);
 	if (game->show_minimap_ui && game->hud_scene != S_HANDLE_NULL) {
 		const s_vec4 scene_bg = s_vec4(0.045f, 0.053f, 0.058f, 1.0f);

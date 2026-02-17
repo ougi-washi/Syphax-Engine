@@ -46,6 +46,7 @@ Build SDF scene graph primitives and render with stylized shading.
 
 ## Related API links
 
+- [Source code: `examples/advanced/sdf_playground.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/sdf_playground.c)
 - [Path: SDF](../../path/sdf.md)
 - [API: se_sdf.h](../../api-reference/modules/se_sdf.md)
 - [Module guide: se_camera](../../module-guides/se-camera.md)

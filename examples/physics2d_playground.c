@@ -41,7 +41,9 @@ int main(void) {
 	floor_params.position = s_vec2(0.0f, -0.90f);
 	se_physics_body_2d* floor = se_physics_body_2d_create(world, &floor_params);
 	se_physics_body_2d_add_aabb(floor, &s_vec2(0.0f, 0.0f), &s_vec2(0.95f, 0.05f), false);
-	se_object_2d_handle floor_object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/button.glsl"), &s_mat3_identity, 0);
+	se_object_2d_handle floor_object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/box.glsl"), &s_mat3_identity, 0);
+	se_shader_handle obj_shader = se_object_2d_get_shader(floor_object);
+	se_shader_set_vec3(obj_shader, "u_color", &s_vec3(0.6f, 0.6f, .6f));
 	se_object_2d_set_position(floor_object, &floor->position);
 	se_object_2d_set_scale(floor_object, &s_vec2(0.95f, 0.05f));
 	se_scene_2d_add_object(scene, floor_object);
@@ -52,8 +54,14 @@ int main(void) {
 		se_physics_body_params_2d body_params = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
 		body_params.position = s_vec2(-0.75f + i * 0.20f, 0.45f + i * 0.12f);
 		se_physics_body_2d* body = se_physics_body_2d_create(world, &body_params);
-		se_physics_body_2d_add_circle(body, &s_vec2(0.0f, 0.0f), 0.06f, false);
-		se_object_2d_handle object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/button.glsl"), &s_mat3_identity, 0);
+		se_physics_body_2d_add_box(body, &s_vec2(0.0f, 0.0f), &s_vec2(0.06f, 0.06f), 0.0f, false);
+		se_object_2d_handle object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/box.glsl"), &s_mat3_identity, 0);
+		se_shader_handle obj_shader = se_object_2d_get_shader(object);
+		if (i % 2 == 0) {
+			se_shader_set_vec3(obj_shader, "u_color", &s_vec3(1.0f, 0.0f, 0.0f));
+		} else {
+			se_shader_set_vec3(obj_shader, "u_color", &s_vec3(0.0f, 1.0f, 0.0f));
+		}
 		se_object_2d_set_position(object, &body->position);
 		se_object_2d_set_scale(object, &s_vec2(0.06f, 0.06f));
 		se_scene_2d_add_object(scene, object);

@@ -46,6 +46,7 @@ Render three windows in one context with per-window clear colors.
 
 ## Related API links
 
+- [Source code: `examples/advanced/multi_window.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/multi_window.c)
 - [Path: Window](../../path/window.md)
 - [Module guide: se_window](../../module-guides/se-window.md)
 - [Module guide: se_graphics](../../module-guides/se-graphics.md)

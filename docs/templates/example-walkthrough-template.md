@@ -28,4 +28,5 @@ One sentence goal.
 
 ## Related API links
 
+- [Source code: `examples/<target>.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/<target>.c)
 - [API link](../api-reference/modules/index.md)

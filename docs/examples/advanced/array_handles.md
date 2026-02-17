@@ -45,6 +45,7 @@ Reference operations for `s_array` and handle-based remove behavior.
 
 ## Related API links
 
+- [Source code: `examples/advanced/array_handles.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/array_handles.c)
 - [Path: Utility Path](../../path/utilities.md)
 - [Glossary: handle](../../glossary/terms.md#handle)
 - [API: se_defines.h](../../api-reference/modules/se_defines.md)

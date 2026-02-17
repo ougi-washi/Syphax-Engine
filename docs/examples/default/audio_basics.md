@@ -46,6 +46,7 @@ Play clips and stream looped audio with bus-level volume control.
 
 ## Related API links
 
+- [Source code: `examples/audio_basics.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/audio_basics.c)
 - [Path: Audio](../../path/audio.md)
 - [Module guide: se_audio](../../module-guides/se-audio.md)
 - [API: se_audio.h](../../api-reference/modules/se_audio.md)

@@ -45,6 +45,7 @@ Build a small UI with two buttons and text updates from callbacks.
 
 ## Related API links
 
+- [Source code: `examples/ui_basics.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/ui_basics.c)
 - [Path: UI](../../path/ui.md)
 - [Module guide: se_ui](../../module-guides/se-ui.md)
 - [API: se_ui.h](../../api-reference/modules/se_ui.md)

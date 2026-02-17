@@ -45,6 +45,7 @@ Enable trace and overlay diagnostics and inspect frame timing lines.
 
 ## Related API links
 
+- [Source code: `examples/advanced/debug_tools.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/debug_tools.c)
 - [Path: Debug](../../path/debug.md)
 - [Module guide: se_debug](../../module-guides/se-debug.md)
 - [API: se_debug.h](../../api-reference/modules/se_debug.md)

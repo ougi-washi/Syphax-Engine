@@ -171,20 +171,24 @@ button:focus-visible {
     max-height: calc(100vh - var(--md-header-height, 2.4rem) - 1rem);
   }
 
-  .md-sidebar--primary .md-sidebar__inner {
+  .md-sidebar--primary .md-sidebar__scrollwrap {
     box-sizing: border-box;
-    max-height: 100%;
+    max-height: calc(100vh - var(--md-header-height, 2.4rem) - 2.3rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     background: #0f1319;
     border: 1px solid var(--sx-border);
     border-radius: var(--sx-radius);
-    padding: 0.45rem 0.35rem;
+    padding: 0.45rem 0.35rem 1rem;
   }
 
-  .md-sidebar--primary .md-sidebar__scrollwrap {
-    max-height: calc(100vh - var(--md-header-height, 2.4rem) - 2.3rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-right: 0.2rem;
-    padding-bottom: 1.2rem;
+  .md-sidebar--primary .md-sidebar__inner {
+    box-sizing: border-box;
+    min-height: 100%;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
   }
 }

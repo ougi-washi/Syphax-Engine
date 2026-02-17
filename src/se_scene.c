@@ -1093,7 +1093,6 @@ void se_scene_2d_draw(const se_scene_2d_handle scene, const se_window_handle win
 	se_scene_2d_render_to_buffer(scene);
 	se_render_clear();
 	se_scene_2d_render_to_screen(scene, window);
-	se_window_render_screen(window);
 }
 
 void se_scene_2d_add_object(const se_scene_2d_handle scene, const se_object_2d_handle object) {
@@ -1492,7 +1491,7 @@ void se_scene_3d_render_to_screen(const se_scene_3d_handle scene, const se_windo
 void se_scene_3d_draw(const se_scene_3d_handle scene, const se_window_handle window) {
 	se_scene_3d_render_to_buffer(scene);
 	se_scene_3d_render_to_screen(scene, window);
-	se_window_render_screen(window);
+	//se_window_render_screen(window);
 }
 
 void se_scene_3d_add_object(const se_scene_3d_handle scene, const se_object_3d_handle object) {

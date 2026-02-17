@@ -46,6 +46,7 @@ Load and inspect a 3D model with a camera controller.
 
 ## Related API links
 
+- [Source code: `examples/model_viewer.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/model_viewer.c)
 - [Path: Model](../../path/model.md)
 - [Module guide: se_model](../../module-guides/se-model.md)
 - [API: se_model.h](../../api-reference/modules/se_model.md)

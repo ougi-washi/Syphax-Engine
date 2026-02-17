@@ -46,6 +46,7 @@ Advanced UI interactions with dynamic layout and widget states.
 
 ## Related API links
 
+- [Source code: `examples/advanced/ui_showcase.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/ui_showcase.c)
 - [Path: UI](../../path/ui.md)
 - [Module guide: se_ui](../../module-guides/se-ui.md)
 - [Default example: ui_basics](../default/ui_basics.md)

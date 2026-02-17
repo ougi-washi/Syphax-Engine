@@ -44,6 +44,7 @@ Run a 3D rigid-body simulation and update instance transforms.
 
 ## Related API links
 
+- [Source code: `examples/physics3d_playground.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/physics3d_playground.c)
 - [Path: Physics](../../path/physics.md)
 - [Module guide: se_physics](../../module-guides/se-physics.md)
 - [API: se_physics.h](../../api-reference/modules/se_physics.md)

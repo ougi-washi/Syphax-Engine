@@ -46,6 +46,7 @@ Validate resource ownership and context teardown reports.
 
 ## Related API links
 
+- [Source code: `examples/advanced/context_lifecycle.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/context_lifecycle.c)
 - [Path: Window](../../path/window.md)
 - [Module guide: se_window](../../module-guides/se-window.md)
 - [Module guide: se_framebuffer](../../module-guides/se-framebuffer.md)

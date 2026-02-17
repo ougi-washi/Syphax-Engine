@@ -45,6 +45,7 @@ Deterministic simulation starter with component and event registration.
 
 ## Related API links
 
+- [Source code: `examples/advanced/simulation_intro.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/simulation_intro.c)
 - [Path: Simulation](../../path/simulation.md)
 - [Module guide: se_simulation](../../module-guides/se-simulation.md)
 - [API: se_simulation.h](../../api-reference/modules/se_simulation.md)

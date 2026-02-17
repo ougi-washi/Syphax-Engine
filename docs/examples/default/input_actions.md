@@ -46,6 +46,7 @@ Bind keyboard and mouse inputs to actions and move a 2D actor.
 
 ## Related API links
 
+- [Source code: `examples/input_actions.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/input_actions.c)
 - [Path: Input](../../path/input.md)
 - [Module guide: se_input](../../module-guides/se-input.md)
 - [API: se_input.h](../../api-reference/modules/se_input.md)

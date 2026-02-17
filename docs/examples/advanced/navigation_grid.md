@@ -45,6 +45,7 @@ Run pathfinding and raycast queries over a blocked grid.
 
 ## Related API links
 
+- [Source code: `examples/advanced/navigation_grid.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/navigation_grid.c)
 - [Path: Navigation](../../path/navigation.md)
 - [Module guide: se_navigation](../../module-guides/se-navigation.md)
 - [Glossary: raycast](../../glossary/terms.md#raycast)

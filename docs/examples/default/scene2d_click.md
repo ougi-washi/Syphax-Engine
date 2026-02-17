@@ -44,6 +44,7 @@ Pick an object with pointer input and update shader color on click.
 
 ## Related API links
 
+- [Source code: `examples/scene2d_click.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/scene2d_click.c)
 - [Path: Scene](../../path/scene.md)
 - [Module guide: se_scene](../../module-guides/se-scene.md)
 - [API: se_scene.h](../../api-reference/modules/se_scene.md)
