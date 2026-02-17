@@ -10,8 +10,7 @@ prerequisites:
 > Scope: advanced
 
 <picture>
-  <source srcset="../../assets/img/examples/advanced/array_handles.png" type="image/png">
-  <img src="../../assets/img/examples/advanced/array_handles.svg" alt="array_handles preview image">
+  <img src="../../../assets/img/examples/advanced/array_handles.svg" alt="array_handles preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

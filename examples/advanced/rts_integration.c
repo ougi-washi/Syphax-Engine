@@ -3,7 +3,6 @@
 #include "se_scene.h"
 #include "se_graphics.h"
 #include "se_shader.h"
-#include "se_debug.h"
 #include "se_text.h"
 #include "se_ui.h"
 #include "se_window.h"
@@ -37,6 +36,9 @@
 #define RTS_CAMERA_DEFAULT_DISTANCE 24.0f
 
 #define RTS_LOG_PREFIX "99_game :: "
+#define RTS_ENABLE_LOGS 0
+#define RTS_ENABLE_DEBUG_UI 0
+#define RTS_ENABLE_CHECKS 0
 
 typedef enum {
 	RTS_TEAM_ALLY = 0,
@@ -315,7 +317,6 @@ typedef struct {
 	const rts_game *game;
 } rts_pick_filter_state;
 
-static void rts_autotest_mark_system(rts_game *game, const rts_autotest_system system);
 static void rts_update_match_result(rts_game *game);
 
 static f32 rts_clampf(const f32 value, const f32 min_value, const f32 max_value) {
@@ -358,47 +359,34 @@ static rts_unit_kind rts_pick_unit_kind_from_object(const rts_game *game, const 
 }
 
 static void rts_log(const c8 *fmt, ...) {
+#if RTS_ENABLE_LOGS
 	c8 message[1024] = {0};
 	va_list args;
 	va_start(args, fmt);
 	vsnprintf(message, sizeof(message), fmt, args);
 	va_end(args);
 	se_log("%s%s", RTS_LOG_PREFIX, message);
-}
-
-static b8 rts_env_flag_enabled(const c8 *key) {
-	if (!key) {
-		return false;
-	}
-	const c8 *value = getenv(key);
-	if (!value || value[0] == '\0') {
-		return false;
-	}
-	if (strcmp(value, "0") == 0 ||
-		strcmp(value, "false") == 0 ||
-		strcmp(value, "off") == 0 ||
-		strcmp(value, "no") == 0) {
-		return false;
-	}
-	return true;
-}
-
-static b8 rts_terminal_allow_logs(void) {
-	return
-		rts_env_flag_enabled("SE_TERMINAL_ALLOW_LOGS") ||
-		rts_env_flag_enabled("SE_TERMINAL_ALLOW_STDOUT_LOGS");
+#else
+	(void)fmt;
+#endif
 }
 
 static void rts_set_command_line(rts_game *game, const c8 *fmt, ...) {
 	if (!game || !fmt) {
 		return;
 	}
+#if RTS_ENABLE_DEBUG_UI
 	va_list args;
 	va_start(args, fmt);
 	vsnprintf(game->command_line, sizeof(game->command_line), fmt, args);
 	va_end(args);
 	game->command_line_timer = 3.0f;
 	rts_log("%s", game->command_line);
+#else
+	(void)fmt;
+	game->command_line[0] = '\0';
+	game->command_line_timer = 0.0f;
+#endif
 }
 
 static rts_team rts_unit_kind_team(const rts_unit_kind kind) {
@@ -672,37 +660,6 @@ static b8 rts_ray_hits_sphere(const s_vec3 *ray_origin, const s_vec3 *ray_dir, c
 	return true;
 }
 
-static void rts_perf_find_bottleneck(const se_debug_frame_timing *timing, const c8 **out_name, f64 *out_ms) {
-	if (!out_name || !out_ms) {
-		return;
-	}
-	*out_name = "none";
-	*out_ms = 0.0;
-	if (!timing) {
-		return;
-	}
-	const struct {
-		const c8 *name;
-		f64 value;
-	} candidates[] = {
-		{"scene3d", timing->scene3d_ms},
-		{"text", timing->text_ms},
-		{"present", timing->window_present_ms},
-		{"scene2d", timing->scene2d_ms},
-		{"ui", timing->ui_ms},
-		{"input", timing->input_ms},
-		{"window_update", timing->window_update_ms},
-		{"navigation", timing->navigation_ms},
-		{"other", timing->other_ms}
-	};
-	for (sz i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
-		if (candidates[i].value > *out_ms) {
-			*out_ms = candidates[i].value;
-			*out_name = candidates[i].name;
-		}
-	}
-}
-
 static b8 rts_world_to_screen(rts_game *game, const s_vec3 *world, f32 *out_x, f32 *out_y) {
 	if (!game || game->window == S_HANDLE_NULL || !world || !out_x || !out_y) {
 		return false;
@@ -933,10 +890,6 @@ static b8 rts_init_hud_scene(rts_game *game) {
 }
 
 static void rts_update_minimap_ui(rts_game *game) {
-	if (game && game->autotest.enabled) {
-		game->autotest.saw_minimap_update = true;
-		rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_MINIMAP);
-	}
 	if (!game || game->headless_mode || game->hud_scene == S_HANDLE_NULL) {
 		return;
 	}
@@ -1525,292 +1478,6 @@ static i32 rts_find_nearest_resource_index(const rts_game *game, const s_vec3 *p
 		}
 	}
 	return best_index;
-}
-
-static const c8 *rts_autotest_system_name(const rts_autotest_system system) {
-	switch (system) {
-		case RTS_AUTOTEST_SYSTEM_SIMULATOR: return "simulator";
-		case RTS_AUTOTEST_SYSTEM_CAMERA: return "camera";
-		case RTS_AUTOTEST_SYSTEM_PLAYER_INPUT: return "player_input";
-		case RTS_AUTOTEST_SYSTEM_ENEMY_AI: return "enemy_ai";
-		case RTS_AUTOTEST_SYSTEM_UNITS: return "units";
-		case RTS_AUTOTEST_SYSTEM_NAVIGATION: return "navigation";
-		case RTS_AUTOTEST_SYSTEM_BUILDINGS: return "buildings";
-		case RTS_AUTOTEST_SYSTEM_SELECTION: return "selection";
-		case RTS_AUTOTEST_SYSTEM_VISUALS: return "visuals";
-		case RTS_AUTOTEST_SYSTEM_BUILD_PREVIEW: return "build_preview";
-		case RTS_AUTOTEST_SYSTEM_MINIMAP: return "minimap";
-		case RTS_AUTOTEST_SYSTEM_RENDER: return "render";
-		case RTS_AUTOTEST_SYSTEM_VALIDATE: return "validate";
-		default: return "unknown";
-	}
-}
-
-static void rts_autotest_mark_system(rts_game *game, const rts_autotest_system system) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	if (system < 0 || system >= RTS_AUTOTEST_SYSTEM_COUNT) {
-		return;
-	}
-	game->autotest.system_call_count[system]++;
-}
-
-static void rts_autotest_fail(rts_game *game, const c8 *fmt, ...) {
-	if (!game || !game->autotest.enabled || !fmt) {
-		return;
-	}
-	game->autotest.failures++;
-	game->validations_failed = true;
-
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(game->autotest.failure_reason, sizeof(game->autotest.failure_reason), fmt, args);
-	va_end(args);
-
-	rts_log("autotest failed: %s", game->autotest.failure_reason);
-	if (game->autotest.strict_fail_fast) {
-		if (game->window != S_HANDLE_NULL && !game->headless_mode) {
-			se_window_set_should_close(game->window, true);
-		}
-		game->simulator.enabled = false;
-	}
-}
-
-static void rts_autotest_capture_baseline(rts_game *game) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	rts_autotest_state *autotest = &game->autotest;
-	autotest->initial_ally_workers = rts_count_units(game, RTS_TEAM_ALLY, RTS_UNIT_ROLE_WORKER);
-	autotest->initial_ally_soldiers = rts_count_units(game, RTS_TEAM_ALLY, RTS_UNIT_ROLE_SOLDIER);
-	autotest->initial_enemy_workers = rts_count_units(game, RTS_TEAM_ENEMY, RTS_UNIT_ROLE_WORKER);
-	autotest->initial_enemy_soldiers = rts_count_units(game, RTS_TEAM_ENEMY, RTS_UNIT_ROLE_SOLDIER);
-	autotest->initial_ally_resources = game->team_resources[RTS_TEAM_ALLY];
-	autotest->initial_enemy_resources = game->team_resources[RTS_TEAM_ENEMY];
-	autotest->max_ally_resources = autotest->initial_ally_resources;
-	autotest->initial_camera_x = game->camera_target.x;
-	autotest->initial_camera_z = game->camera_target.z;
-	autotest->initial_camera_distance = game->camera_distance;
-
-	const rts_building *enemy_hq = rts_find_primary_building(game, RTS_TEAM_ENEMY, RTS_BUILDING_TYPE_HQ);
-	const rts_building *ally_hq = rts_find_primary_building(game, RTS_TEAM_ALLY, RTS_BUILDING_TYPE_HQ);
-	autotest->min_enemy_hq_hp = enemy_hq ? enemy_hq->health : 0.0f;
-	autotest->min_ally_hq_hp = ally_hq ? ally_hq->health : 0.0f;
-
-	autotest->min_resource_amount = 1e30f;
-	for (i32 i = 0; i < RTS_MAX_RESOURCES; ++i) {
-		const rts_resource_node *resource = &game->resources[i];
-		if (resource->max_amount <= 0.0f) {
-			continue;
-		}
-		autotest->min_resource_amount = s_min(autotest->min_resource_amount, resource->amount);
-	}
-	if (autotest->min_resource_amount > 9e29f) {
-		autotest->min_resource_amount = 0.0f;
-	}
-	autotest->initial_min_resource_amount = autotest->min_resource_amount;
-}
-
-static void rts_autotest_sample_state(rts_game *game) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	rts_autotest_state *autotest = &game->autotest;
-	autotest->max_ally_resources = s_max(autotest->max_ally_resources, game->team_resources[RTS_TEAM_ALLY]);
-
-	const rts_building *enemy_hq = rts_find_primary_building(game, RTS_TEAM_ENEMY, RTS_BUILDING_TYPE_HQ);
-	const rts_building *ally_hq = rts_find_primary_building(game, RTS_TEAM_ALLY, RTS_BUILDING_TYPE_HQ);
-	if (enemy_hq) {
-		autotest->min_enemy_hq_hp = s_min(autotest->min_enemy_hq_hp, enemy_hq->health);
-		if (enemy_hq->health < enemy_hq->max_health - 0.1f) {
-			autotest->saw_building_damage = true;
-		}
-	}
-	if (ally_hq) {
-		autotest->min_ally_hq_hp = s_min(autotest->min_ally_hq_hp, ally_hq->health);
-		if (ally_hq->health < ally_hq->max_health - 0.1f) {
-			autotest->saw_building_damage = true;
-		}
-	}
-
-	for (i32 i = 0; i < RTS_MAX_RESOURCES; ++i) {
-		const rts_resource_node *resource = &game->resources[i];
-		if (resource->max_amount <= 0.0f) {
-			continue;
-		}
-		autotest->min_resource_amount = s_min(autotest->min_resource_amount, resource->amount);
-	}
-
-	const i32 ally_workers = rts_count_units(game, RTS_TEAM_ALLY, RTS_UNIT_ROLE_WORKER);
-	const i32 ally_soldiers = rts_count_units(game, RTS_TEAM_ALLY, RTS_UNIT_ROLE_SOLDIER);
-	const i32 enemy_workers = rts_count_units(game, RTS_TEAM_ENEMY, RTS_UNIT_ROLE_WORKER);
-	const i32 enemy_soldiers = rts_count_units(game, RTS_TEAM_ENEMY, RTS_UNIT_ROLE_SOLDIER);
-	if (ally_workers > autotest->initial_ally_workers) {
-		autotest->saw_worker_train_success = true;
-	}
-	if (ally_soldiers > autotest->initial_ally_soldiers) {
-		autotest->saw_soldier_train_success = true;
-	}
-	if (enemy_workers > autotest->initial_enemy_workers || enemy_soldiers > autotest->initial_enemy_soldiers) {
-		autotest->saw_enemy_train_success = true;
-	}
-
-	const f32 camera_target_delta =
-		fabsf(game->camera_target.x - autotest->initial_camera_x) +
-		fabsf(game->camera_target.z - autotest->initial_camera_z);
-	const f32 camera_distance_delta = fabsf(game->camera_distance - autotest->initial_camera_distance);
-	if (camera_target_delta > 0.35f || camera_distance_delta > 0.30f) {
-		autotest->saw_camera_update = true;
-	}
-}
-
-static void rts_autotest_checkpoint(rts_game *game, const u32 checkpoint_index, const f32 deadline, const b8 condition, const c8 *label) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	if (checkpoint_index >= 63) {
-		return;
-	}
-	rts_autotest_state *autotest = &game->autotest;
-	const u64 mask = 1ull << checkpoint_index;
-	if ((autotest->checkpoints_mask & mask) != 0ull) {
-		return;
-	}
-	if (game->simulator.total_time < deadline) {
-		return;
-	}
-	autotest->checkpoints_mask |= mask;
-	if (!condition) {
-		rts_autotest_fail(game, "checkpoint '%s' not met by %.2fs", label ? label : "unknown", deadline);
-		return;
-	}
-	autotest->checkpoints_passed++;
-	rts_log("autotest checkpoint ok: %s @%.2fs", label ? label : "unknown", game->simulator.total_time);
-}
-
-static void rts_autotest_check_progress(rts_game *game) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	rts_autotest_sample_state(game);
-
-	rts_autotest_checkpoint(game, 0, 0.90f, game->autotest.saw_worker_select, "worker select");
-	rts_autotest_checkpoint(game, 1, 2.00f, game->autotest.saw_gather_order, "gather order");
-	rts_autotest_checkpoint(game, 2, 3.60f, game->autotest.saw_build_attempt, "build attempt");
-	rts_autotest_checkpoint(game, 3, 5.10f, game->autotest.saw_worker_train_attempt, "worker train attempt");
-	rts_autotest_checkpoint(game, 4, 7.20f, game->autotest.saw_soldier_train_attempt, "soldier train attempt");
-	rts_autotest_checkpoint(game, 5, 8.40f, game->autotest.saw_attack_order, "attack order");
-	rts_autotest_checkpoint(game, 6, 10.5f, game->autotest.saw_build_success, "build success");
-	rts_autotest_checkpoint(game, 7, 12.0f, game->autotest.saw_resource_harvest, "resource harvest");
-	rts_autotest_checkpoint(game, 8, 14.0f, game->autotest.saw_resource_deposit, "resource deposit");
-	rts_autotest_checkpoint(game, 9, 11.5f, game->autotest.saw_enemy_wave_command, "enemy wave command");
-	rts_autotest_checkpoint(game, 10, 20.0f, game->autotest.saw_unit_damage || game->autotest.saw_building_damage, "combat damage");
-	rts_autotest_checkpoint(game, 11, 16.0f, game->autotest.saw_validation_pass, "state validation pass");
-	rts_autotest_checkpoint(
-		game,
-		12,
-		16.0f,
-		game->autotest.saw_worker_train_success && game->autotest.saw_soldier_train_success && game->autotest.saw_enemy_train_success,
-		"training growth");
-
-	if (game->autotest.full_systems_required) {
-		rts_autotest_checkpoint(game, 13, 2.0f, game->autotest.saw_camera_update, "camera updates");
-		rts_autotest_checkpoint(game, 14, 4.0f, game->autotest.saw_minimap_update, "minimap updates");
-		rts_autotest_checkpoint(game, 15, 4.0f, game->autotest.saw_build_preview_update, "build preview updates");
-		rts_autotest_checkpoint(game, 16, 4.0f, game->autotest.saw_text_render, "overlay text render");
-	}
-}
-
-static void rts_autotest_log_summary(const rts_game *game) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	rts_log(
-		"autotest summary: checkpoints=%d failures=%d harvest=%d deposit=%d build=%d worker_train=%d soldier_train=%d enemy_train=%d damage(unit=%d building=%d) deaths(unit=%d building=%d) camera=%d minimap=%d preview=%d text=%d",
-		game->autotest.checkpoints_passed,
-		game->autotest.failures,
-		game->autotest.saw_resource_harvest ? 1 : 0,
-		game->autotest.saw_resource_deposit ? 1 : 0,
-		game->autotest.saw_build_success ? 1 : 0,
-		game->autotest.saw_worker_train_success ? 1 : 0,
-		game->autotest.saw_soldier_train_success ? 1 : 0,
-		game->autotest.saw_enemy_train_success ? 1 : 0,
-		game->autotest.saw_unit_damage ? 1 : 0,
-		game->autotest.saw_building_damage ? 1 : 0,
-		game->autotest.saw_unit_death ? 1 : 0,
-		game->autotest.saw_building_death ? 1 : 0,
-		game->autotest.saw_camera_update ? 1 : 0,
-		game->autotest.saw_minimap_update ? 1 : 0,
-		game->autotest.saw_build_preview_update ? 1 : 0,
-		game->autotest.saw_text_render ? 1 : 0);
-
-	c8 system_buf[768] = {0};
-	sz offset = 0;
-	for (i32 i = 0; i < RTS_AUTOTEST_SYSTEM_COUNT; ++i) {
-		const c8 *name = rts_autotest_system_name((rts_autotest_system)i);
-		const i32 calls = game->autotest.system_call_count[i];
-		const i32 wrote = snprintf(system_buf + offset, sizeof(system_buf) - offset, "%s%s=%d", (i == 0) ? "" : " ", name, calls);
-		if (wrote <= 0 || (sz)wrote >= sizeof(system_buf) - offset) {
-			break;
-		}
-		offset += (sz)wrote;
-	}
-	rts_log("autotest systems: %s", system_buf[0] ? system_buf : "n/a");
-}
-
-static void rts_autotest_finalize(rts_game *game) {
-	if (!game || !game->autotest.enabled) {
-		return;
-	}
-	if (game->autotest.failures > 0) {
-		rts_autotest_log_summary(game);
-		return;
-	}
-	const f32 stop_after = game->simulator.stop_after_seconds;
-	const b8 expect_move = stop_after >= 8.0f;
-	const b8 expect_attack = stop_after >= 8.2f;
-	const b8 expect_training = stop_after >= 11.5f;
-	const b8 expect_economy = stop_after >= 13.5f;
-	const b8 expect_combat = stop_after >= 19.5f;
-	const b8 expect_validation = stop_after >= 15.5f;
-
-	rts_autotest_check_progress(game);
-	for (i32 i = 0; i < RTS_AUTOTEST_SYSTEM_COUNT; ++i) {
-		if (game->autotest.system_call_count[i] <= 0) {
-			const b8 optional_system =
-				(i == RTS_AUTOTEST_SYSTEM_MINIMAP || i == RTS_AUTOTEST_SYSTEM_RENDER) && !game->autotest.full_systems_required;
-			if (!optional_system) {
-				rts_autotest_fail(game, "system '%s' was never executed", rts_autotest_system_name((rts_autotest_system)i));
-				break;
-			}
-		}
-	}
-
-	if (expect_move && !game->autotest.saw_move_order) {
-		rts_autotest_fail(game, "move order path was not exercised");
-	}
-	if (expect_attack && !game->autotest.saw_attack_order) {
-		rts_autotest_fail(game, "attack order path was not exercised");
-	}
-	if (expect_economy && game->autotest.min_resource_amount >= game->autotest.initial_min_resource_amount - 0.01f && !game->autotest.saw_resource_harvest) {
-		rts_autotest_fail(game, "resources were not consumed from any node");
-	}
-	if (expect_training && (!game->autotest.saw_worker_train_success || !game->autotest.saw_soldier_train_success || !game->autotest.saw_enemy_train_success)) {
-		rts_autotest_fail(game, "unit training coverage incomplete");
-	}
-	if (expect_combat && !game->autotest.saw_unit_damage && !game->autotest.saw_building_damage) {
-		rts_autotest_fail(game, "no combat damage observed");
-	}
-	if (expect_validation && !game->autotest.saw_validation_pass) {
-		rts_autotest_fail(game, "state validator never passed");
-	}
-	if (game->autotest.full_systems_required &&
-		(!game->autotest.saw_camera_update || !game->autotest.saw_minimap_update || !game->autotest.saw_build_preview_update || !game->autotest.saw_text_render)) {
-		rts_autotest_fail(game, "window-system coverage incomplete (camera/minimap/preview/text)");
-	}
-
-	rts_autotest_log_summary(game);
 }
 
 static rts_unit_target rts_find_nearest_enemy_unit(rts_game *game, const rts_team team, const s_vec3 *from, const f32 max_distance) {
@@ -3016,18 +2683,9 @@ static void rts_handle_player_input(rts_game *game) {
 		return;
 	}
 
-	if (se_window_is_key_pressed(game->window, SE_KEY_F1)) {
-		game->show_debug_overlay = !game->show_debug_overlay;
-		rts_set_command_line(game, "Debug details %s", game->show_debug_overlay ? "ON" : "OFF");
-	}
 	if (se_window_is_key_pressed(game->window, SE_KEY_F2)) {
 		game->show_minimap_ui = !game->show_minimap_ui;
 		rts_set_command_line(game, "Minimap UI %s", game->show_minimap_ui ? "ON" : "OFF");
-	}
-	if (se_window_is_key_pressed(game->window, SE_KEY_F3)) {
-		game->track_system_timing = !game->track_system_timing;
-		game->next_system_timing_log_time = game->sim_time + 0.25f;
-		rts_set_command_line(game, "System timing tracker %s", game->track_system_timing ? "ON" : "OFF");
 	}
 	if (se_window_is_key_pressed(game->window, SE_KEY_SPACE)) {
 		game->simulator.enabled = !game->simulator.enabled;
@@ -3200,7 +2858,7 @@ static void rts_run_input_simulator(rts_game *game, const f32 dt) {
 	rts_building *ally_hq = rts_find_primary_building(game, RTS_TEAM_ALLY, RTS_BUILDING_TYPE_HQ);
 	rts_building *enemy_hq = rts_find_primary_building(game, RTS_TEAM_ENEMY, RTS_BUILDING_TYPE_HQ);
 
-	const b8 deterministic_actions = game->headless_mode || game->autotest.enabled;
+	const b8 deterministic_actions = game->headless_mode;
 	if (deterministic_actions) {
 		if (!game->headless_mode && game->window != S_HANDLE_NULL) {
 			rts_sim_clear_controls(game);
@@ -3393,59 +3051,6 @@ static void rts_run_input_simulator(rts_game *game, const f32 dt) {
 	}
 }
 
-static void rts_validate_state(rts_game *game) {
-	if (!game) {
-		return;
-	}
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_VALIDATE);
-	b8 ok = true;
-
-	if (game->team_resources[RTS_TEAM_ALLY] < -0.01f || game->team_resources[RTS_TEAM_ENEMY] < -0.01f) {
-		rts_log("validation failed: resource below zero");
-		ok = false;
-	}
-
-	for (i32 kind = 0; kind < RTS_UNIT_KIND_COUNT; ++kind) {
-		for (i32 i = 0; i < RTS_MAX_UNITS_PER_KIND; ++i) {
-			const rts_unit *unit = &game->units[kind][i];
-			if (!unit->active) {
-				continue;
-			}
-			if (unit->health <= 0.0f) {
-				rts_log("validation failed: active unit with hp<=0 (serial=%d)", unit->serial);
-				ok = false;
-			}
-			if (fabsf(unit->position.x) > RTS_MAP_HALF_SIZE + 2.0f || fabsf(unit->position.z) > RTS_MAP_HALF_SIZE + 2.0f) {
-				rts_log("validation failed: unit out of bounds (serial=%d)", unit->serial);
-				ok = false;
-			}
-		}
-	}
-
-	i32 selection_count = 0;
-	for (i32 i = 0; i < RTS_MAX_UNITS_PER_KIND; ++i) {
-		const rts_unit *worker = &game->units[RTS_UNIT_KIND_ALLY_WORKER][i];
-		const rts_unit *soldier = &game->units[RTS_UNIT_KIND_ALLY_SOLDIER][i];
-		if (worker->active && worker->selected) {
-			selection_count++;
-		}
-		if (soldier->active && soldier->selected) {
-			selection_count++;
-		}
-	}
-	if (selection_count != game->selected_count) {
-		rts_log("validation failed: selected count mismatch");
-		game->selected_count = selection_count;
-		ok = false;
-	}
-
-	if (!ok) {
-		game->validations_failed = true;
-	} else if (game->autotest.enabled) {
-		game->autotest.saw_validation_pass = true;
-	}
-}
-
 static b8 rts_team_defeated(rts_game *game, const rts_team team) {
 	if (rts_find_primary_building(game, team, RTS_BUILDING_TYPE_HQ)) {
 		return false;
@@ -3473,38 +3078,18 @@ static void rts_step_simulation(rts_game *game, const f32 dt) {
 		game->command_line_timer -= dt;
 	}
 
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_SIMULATOR);
 	rts_run_input_simulator(game, dt);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_CAMERA);
 	rts_update_camera(game, dt);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_PLAYER_INPUT);
 	rts_handle_player_input(game);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_ENEMY_AI);
 	rts_update_enemy_ai(game, dt);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_UNITS);
 	rts_update_units(game, dt);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_NAVIGATION);
 	rts_resolve_unit_navigation(game, dt);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_BUILDINGS);
 	rts_update_buildings(game, dt);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_SELECTION);
 	rts_recount_selection(game);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_VISUALS);
 	rts_update_visuals(game);
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_BUILD_PREVIEW);
 	rts_update_build_preview_visual(game);
 	rts_update_minimap_ui(game);
 	rts_update_match_result(game);
-}
-
-static void rts_step_validation_checkpoint(rts_game *game) {
-	if (!game) {
-		return;
-	}
-	if ((game->frame_index % 30) == 0) {
-		rts_validate_state(game);
-		rts_autotest_check_progress(game);
-	}
 }
 
 static void rts_update_match_result(rts_game *game) {
@@ -3514,209 +3099,19 @@ static void rts_update_match_result(rts_game *game) {
 	if (rts_team_defeated(game, RTS_TEAM_ENEMY)) {
 		game->match_result = 1;
 		rts_set_command_line(game, "Victory");
-		if (game->window != S_HANDLE_NULL && game->simulator.enabled && !game->autotest.enabled) {
+		if (game->window != S_HANDLE_NULL && game->simulator.enabled) {
 			se_window_set_should_close(game->window, true);
 		}
 	} else if (rts_team_defeated(game, RTS_TEAM_ALLY)) {
 		game->match_result = -1;
 		rts_set_command_line(game, "Defeat");
-		if (game->window != S_HANDLE_NULL && game->simulator.enabled && !game->autotest.enabled) {
+		if (game->window != S_HANDLE_NULL && game->simulator.enabled) {
 			se_window_set_should_close(game->window, true);
 		}
 	}
 }
 
-static b8 rts_world_to_ndc(rts_game *game, const s_vec3 *world, s_vec2 *out_ndc) {
-	if (!game || !world || !out_ndc || game->scene == S_HANDLE_NULL) {
-		return false;
-	}
-	const se_camera_handle camera = se_scene_3d_get_camera(game->scene);
-	if (camera == S_HANDLE_NULL) {
-		return false;
-	}
-	return se_ui_world_to_ndc(camera, world, out_ndc);
-}
-
-static void rts_make_health_bar(const f32 ratio, c8 *out_bar, const i32 bar_len) {
-	if (!out_bar || bar_len <= 0) {
-		return;
-	}
-	const f32 clamped = rts_clampf(ratio, 0.0f, 1.0f);
-	const i32 filled = (i32)roundf(clamped * (f32)bar_len);
-	for (i32 i = 0; i < bar_len; ++i) {
-		out_bar[i] = (i < filled) ? '#' : '-';
-	}
-	out_bar[bar_len] = '\0';
-}
-
-static void rts_render_health_labels(rts_game *game) {
-	if (!game || !game->text_handle || game->font == S_HANDLE_NULL || game->headless_mode) {
-		return;
-	}
-	c8 label[96] = {0};
-	c8 bar[12] = {0};
-
-	for (i32 kind = 0; kind < RTS_UNIT_KIND_COUNT; ++kind) {
-		for (i32 i = 0; i < RTS_MAX_UNITS_PER_KIND; ++i) {
-			const rts_unit *unit = &game->units[kind][i];
-			if (!unit->active) {
-				continue;
-			}
-			if (!unit->selected && unit->health >= unit->max_health - 0.1f) {
-				continue;
-			}
-			s_vec3 world = unit->position;
-			world.y = rts_unit_scale(unit->role, false).y * 2.2f + 0.35f;
-			s_vec2 ndc = {0};
-			if (!rts_world_to_ndc(game, &world, &ndc)) {
-				continue;
-			}
-			rts_make_health_bar(unit->health / unit->max_health, bar, 8);
-			snprintf(label, sizeof(label), "%c[%s] %3.0f", unit->team == RTS_TEAM_ALLY ? 'A' : 'E', bar, unit->health);
-			se_text_render(game->text_handle, game->font, label, &ndc, &s_vec2(0.62f, 0.62f), 0.045f);
-		}
-	}
-
-	for (i32 kind = 0; kind < RTS_BUILDING_KIND_COUNT; ++kind) {
-		for (i32 i = 0; i < RTS_MAX_BUILDINGS_PER_KIND; ++i) {
-			const rts_building *building = &game->buildings[kind][i];
-			if (!building->active) {
-				continue;
-			}
-			if (building->type != RTS_BUILDING_TYPE_HQ && building->health >= building->max_health - 0.1f) {
-				continue;
-			}
-			s_vec3 world = building->position;
-			world.y = rts_building_scale(building->type).y * 2.0f + 0.6f;
-			s_vec2 ndc = {0};
-			if (!rts_world_to_ndc(game, &world, &ndc)) {
-				continue;
-			}
-			rts_make_health_bar(building->health / building->max_health, bar, 8);
-			snprintf(label, sizeof(label), "%c%s [%s]", building->team == RTS_TEAM_ALLY ? 'A' : 'E', building->type == RTS_BUILDING_TYPE_HQ ? "HQ" : "B", bar);
-			se_text_render(game->text_handle, game->font, label, &ndc, &s_vec2(0.75f, 0.75f), 0.045f);
-		}
-	}
-}
-
-static void rts_render_overlay(rts_game *game) {
-	if (game && game->headless_mode) {
-		return;
-	}
-	if (!game || !game->text_handle || game->font == S_HANDLE_NULL) {
-		return;
-	}
-	if (game->autotest.enabled) {
-		game->autotest.saw_text_render = true;
-	}
-
-	const i32 ally_workers = rts_count_units(game, RTS_TEAM_ALLY, RTS_UNIT_ROLE_WORKER);
-	const i32 ally_soldiers = rts_count_units(game, RTS_TEAM_ALLY, RTS_UNIT_ROLE_SOLDIER);
-	const i32 enemy_workers = rts_count_units(game, RTS_TEAM_ENEMY, RTS_UNIT_ROLE_WORKER);
-	const i32 enemy_soldiers = rts_count_units(game, RTS_TEAM_ENEMY, RTS_UNIT_ROLE_SOLDIER);
-	const f64 fps = se_window_get_fps(game->window);
-	se_debug_frame_timing frame_timing = {0};
-	(void)se_debug_get_last_frame_timing(&frame_timing);
-	se_debug_system_stats debug_stats = {0};
-	(void)se_debug_collect_stats(game->window, NULL, &debug_stats);
-	c8 timing_lines[512] = {0};
-	se_debug_dump_last_frame_timing_lines(timing_lines, sizeof(timing_lines));
-	const c8 *build_mode = "NONE";
-	if (game->build_mode == RTS_BUILD_MODE_BARRACKS) {
-		build_mode = "BARRACKS";
-	} else if (game->build_mode == RTS_BUILD_MODE_TOWER) {
-		build_mode = "TOWER";
-	}
-
-	c8 text[RTS_UI_TEXT_BUFFER] = {0};
-	snprintf(
-		text,
-		sizeof(text),
-		"99_game :: RTS 3D Sandbox\n"
-		"FPS: %6.2f   Time: %6.1f   Sim: %s phase %d\n"
-		"Resources -> Ally: %6.0f  Enemy: %6.0f\n"
-		"Ally Units: workers=%d soldiers=%d selected=%d\n"
-		"Enemy Units: workers=%d soldiers=%d\n"
-		"Frame(ms): total=%.2f upd=%.2f in=%.2f s2=%.2f s3=%.2f txt=%.2f ui=%.2f nav=%.2f prs=%.2f oth=%.2f\n"
-		"Engine: win=%u cam=%u sc2=%u sc3=%u obj2=%u obj3=%u ui=%u traces=%u\n"
-		"Camera: target(%6.2f %6.2f) yaw=%6.2f pitch=%5.2f dist=%5.2f\n"
-		"Mouse Ground: %7.2f %7.2f valid=%d   Build:%s preview:%s reason:%s\n"
-		"%s\n"
-		"Msg: %s\n"
-		"Controls: LMB select  RMB command  WASD+Arrows pan  MMB drag camera  wheel zoom  (angle fixed)\n"
-		"F focus selected  H center HQ  R reset camera  F2 minimap toggle  click minimap to move camera\n"
-		"1 workers 2 soldiers 3 all 0 clear  U worker  I soldier  B barracks  T tower  G gather  M move  V attack-move\n"
-		"Build mode: LMB place  RMB/ESC cancel   Minimap: cyan ally / red enemy / gold resources\n",
-		fps,
-		game->sim_time,
-		game->simulator.enabled ? "ON" : "OFF",
-		game->simulator.phase,
-		game->team_resources[RTS_TEAM_ALLY],
-		game->team_resources[RTS_TEAM_ENEMY],
-		ally_workers,
-		ally_soldiers,
-		game->selected_count,
-		enemy_workers,
-		enemy_soldiers,
-		frame_timing.frame_ms,
-		frame_timing.window_update_ms,
-		frame_timing.input_ms,
-		frame_timing.scene2d_ms,
-		frame_timing.scene3d_ms,
-		frame_timing.text_ms,
-		frame_timing.ui_ms,
-		frame_timing.navigation_ms,
-		frame_timing.window_present_ms,
-		frame_timing.other_ms,
-		debug_stats.window_count,
-		debug_stats.camera_count,
-		debug_stats.scene2d_count,
-		debug_stats.scene3d_count,
-		debug_stats.object2d_count,
-		debug_stats.object3d_count,
-		debug_stats.ui_element_count,
-		debug_stats.navigation_trace_count,
-		game->camera_target.x,
-		game->camera_target.z,
-		game->camera_yaw,
-		game->camera_pitch,
-		game->camera_distance,
-		game->mouse_world.x,
-		game->mouse_world.z,
-		game->mouse_world_valid ? 1 : 0,
-		build_mode,
-		game->build_mode == RTS_BUILD_MODE_NONE ? "-" : (game->build_preview_valid ? "VALID" : "BLOCKED"),
-		game->build_mode == RTS_BUILD_MODE_NONE ? "-" : (game->build_preview_valid ? "-" : (game->build_block_reason[0] ? game->build_block_reason : "blocked")),
-		timing_lines,
-		game->command_line_timer > 0.0f ? game->command_line : "-");
-
-	if (!game->show_debug_overlay) {
-		snprintf(
-			text,
-			sizeof(text),
-			"99_game :: Ally %.0f  Enemy %.0f  Selected %d  Build %s  Sim %s\n"
-			"Frame %.2fms (s3=%.2f, prs=%.2f, txt=%.2f) traces=%u  F3 track %s\n"
-			"SPACE simulator, F1 details, ESC quit\n"
-			"%s",
-			game->team_resources[RTS_TEAM_ALLY],
-			game->team_resources[RTS_TEAM_ENEMY],
-			game->selected_count,
-			build_mode,
-			game->simulator.enabled ? "ON" : "OFF",
-			frame_timing.frame_ms,
-			frame_timing.scene3d_ms,
-			frame_timing.window_present_ms,
-			frame_timing.text_ms,
-			debug_stats.navigation_trace_count,
-			game->track_system_timing ? "ON" : "OFF",
-			game->command_line_timer > 0.0f ? game->command_line : "");
-	}
-
-	se_text_render(game->text_handle, game->font, text, &s_vec2(-0.98f, 0.94f), &s_vec2(1.0f, 1.0f), 0.053f);
-}
-
 static void rts_render_frame(rts_game *game) {
-	rts_autotest_mark_system(game, RTS_AUTOTEST_SYSTEM_RENDER);
 	if (!game || game->headless_mode) {
 		return;
 	}
@@ -3730,8 +3125,6 @@ static void rts_render_frame(rts_game *game) {
 		se_render_set_background_color(scene_bg);
 		se_scene_2d_render_to_screen(game->hud_scene, game->window);
 	}
-	rts_render_overlay(game);
-	rts_render_health_labels(game);
 	se_window_render_screen(game->window);
 }
 
@@ -3804,7 +3197,6 @@ static void rts_seed_world(rts_game *game) {
 		game->camera_target.x,
 		game->camera_target.z);
 
-	rts_autotest_capture_baseline(game);
 	rts_set_command_line(game, "RTS ready");
 }
 
@@ -3817,44 +3209,24 @@ static int rts_run_headless_simulation(rts_game *game) {
 		game->simulator.enabled = true;
 	}
 	if (game->simulator.stop_after_seconds <= 0.0f) {
-		game->simulator.stop_after_seconds = game->autotest.enabled ? 24.0f : 20.0f;
+		game->simulator.stop_after_seconds = 20.0f;
 	}
 	game->simulator.next_status_print = 1.0f;
 	game->camera_target = s_vec3(0.0f, 0.0f, 0.0f);
 
 	rts_reset_slots(game);
 	rts_seed_world(game);
-	if (game->autotest.enabled) {
-		game->autotest.full_systems_required = false;
-	}
 	rts_log("running headless simulation for %.1fs", game->simulator.stop_after_seconds);
 
-	const f32 dt = (game->autotest.enabled && game->autotest.fixed_dt > 0.0001f) ? game->autotest.fixed_dt : (1.0f / 60.0f);
+	const f32 dt = 1.0f / 60.0f;
 	while (game->simulator.total_time < game->simulator.stop_after_seconds) {
 		rts_step_simulation(game, dt);
 		rts_render_frame(game);
-		rts_step_validation_checkpoint(game);
-		if (game->autotest.enabled && game->validations_failed && game->autotest.strict_fail_fast) {
-			break;
-		}
-
-		if (!game->autotest.enabled && game->match_result != 0) {
+		if (game->match_result != 0) {
 			break;
 		}
 	}
-	rts_autotest_finalize(game);
-
-	const rts_building *ally_hq = rts_find_primary_building(game, RTS_TEAM_ALLY, RTS_BUILDING_TYPE_HQ);
-	const rts_building *enemy_hq = rts_find_primary_building(game, RTS_TEAM_ENEMY, RTS_BUILDING_TYPE_HQ);
-	rts_log(
-		"hq_hp ally=%s%.1f enemy=%s%.1f",
-		ally_hq ? "" : "NA/",
-		ally_hq ? ally_hq->health : 0.0f,
-		enemy_hq ? "" : "NA/",
-		enemy_hq ? enemy_hq->health : 0.0f);
-
-	rts_log("headless finished at t=%.2f, validations=%s", game->simulator.total_time, game->validations_failed ? "FAILED" : "OK");
-	return game->validations_failed ? 2 : 0;
+	return 0;
 }
 
 static int rts_fail_runtime(rts_game *game, const c8 *reason) {
@@ -3873,60 +3245,28 @@ static int rts_fail_runtime(rts_game *game, const c8 *reason) {
 }
 
 int main(int argc, char **argv) {
-	printf("advanced/rts_integration :: Advanced example (reference)\n");
 	rts_game game = {0};
 	game.camera_target = s_vec3(0.0f, 0.0f, 0.0f);
 	game.camera_yaw = RTS_CAMERA_DEFAULT_YAW;
 	game.camera_pitch = RTS_CAMERA_DEFAULT_PITCH;
 	game.camera_distance = 38.0f;
-	game.show_debug_overlay = false;
 	game.show_minimap_ui = true;
-	game.track_system_timing = true;
 	game.simulator.enabled = false;
 	game.simulator.stop_after_seconds = 0.0f;
 	game.simulator.next_status_print = 1.0f;
-	game.autotest.enabled = false;
-	game.autotest.strict_fail_fast = true;
-	game.autotest.fixed_dt = 1.0f / 90.0f;
-	game.autotest.sim_substeps_per_frame = 6;
 	game.command_line[0] = '\0';
-	game.next_system_timing_log_time = 1.0f;
 	b8 headless_requested = false;
-	b8 perf_check_enabled = false;
-	b8 perf_assert_enabled = true;
-	b8 perf_flag_explicit = false;
 	b8 shader_hot_reload_enabled = false;
-	f64 perf_fps_ema = 280.0;
-	f64 perf_worst_ema = 10000.0;
-	i32 perf_below_ema_frames = 0;
-	const f64 perf_warmup_seconds = 2.0;
-	f64 perf_next_log_time = perf_warmup_seconds;
 
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "--autotest") == 0) {
 			game.simulator.enabled = true;
-			game.autotest.enabled = true;
 		}
 		if (strcmp(argv[i], "--sim") == 0) {
 			game.simulator.enabled = true;
 		}
 		if (strcmp(argv[i], "--headless") == 0) {
 			headless_requested = true;
-		}
-		if (strcmp(argv[i], "--perf") == 0) {
-			perf_flag_explicit = true;
-			perf_check_enabled = true;
-		}
-		if (strcmp(argv[i], "--track-systems") == 0) {
-			game.track_system_timing = true;
-		}
-		if (strcmp(argv[i], "--no-track-systems") == 0) {
-			game.track_system_timing = false;
-		}
-		if (strcmp(argv[i], "--perf-no-assert") == 0) {
-			perf_flag_explicit = true;
-			perf_check_enabled = true;
-			perf_assert_enabled = false;
 		}
 		if (strcmp(argv[i], "--hot-reload") == 0) {
 			shader_hot_reload_enabled = true;
@@ -3935,34 +3275,8 @@ int main(int argc, char **argv) {
 			game.simulator.enabled = true;
 			game.simulator.stop_after_seconds = (f32)atof(argv[i] + 10);
 		}
-		if (strncmp(argv[i], "--autotest-steps=", 17) == 0) {
-			game.autotest.sim_substeps_per_frame = s_max(1, atoi(argv[i] + 17));
-		}
-		if (strncmp(argv[i], "--autotest-dt=", 14) == 0) {
-			const f32 parsed_dt = (f32)atof(argv[i] + 14);
-			game.autotest.fixed_dt = rts_clampf(parsed_dt, 0.001f, 0.05f);
-		}
 	}
-	const b8 terminal_render_active =
-		rts_env_flag_enabled("SE_TERMINAL_RENDER") ||
-		rts_env_flag_enabled("SE_TERMINAL_MIRROR") ||
-		rts_env_flag_enabled("SE_WINDOW_TERMINAL");
-	const b8 terminal_allow_logs = rts_terminal_allow_logs();
-	if (terminal_render_active && !terminal_allow_logs) {
-		// In terminal render mode, periodic stdout logs cause visible scene jitter.
-		game.track_system_timing = false;
-		game.simulator.next_status_print = 999999.0f;
-	}
-	if (game.autotest.enabled) {
-		game.autotest.full_systems_required = !headless_requested;
-		if (!perf_flag_explicit) {
-			perf_check_enabled = false;
-		}
-	}
-	if (game.autotest.enabled && game.simulator.stop_after_seconds <= 0.0f) {
-		game.simulator.stop_after_seconds = 24.0f;
-	}
-	if (!game.autotest.enabled && game.simulator.enabled && game.simulator.stop_after_seconds <= 0.0f) {
+	if (game.simulator.enabled && game.simulator.stop_after_seconds <= 0.0f) {
 		game.simulator.stop_after_seconds = 40.0f;
 	}
 
@@ -3990,19 +3304,6 @@ int main(int argc, char **argv) {
 	se_window_set_vsync(game.window, false);
 	se_window_set_target_fps(game.window, 240);
 	se_render_set_background_color(s_vec4(0.045f, 0.053f, 0.058f, 1.0f));
-	se_debug_set_overlay_enabled(false);
-	if (perf_check_enabled) {
-		rts_log("perf gate enabled (target=280, assert<260 after warmup)");
-	}
-
-	game.text_handle = se_text_handle_create(0);
-	if (!game.text_handle) {
-		return rts_fail_runtime(&game, "failed to create text handle");
-	}
-	game.font = se_font_load(game.text_handle, SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 26.0f);
-	if (game.font == S_HANDLE_NULL) {
-		return rts_fail_runtime(&game, "failed to load font");
-	}
 
 	rts_reset_slots(&game);
 	if (!rts_init_rendering(&game)) {
@@ -4025,11 +3326,8 @@ int main(int argc, char **argv) {
 
 		f32 frame_dt = (f32)se_window_get_delta_time(game.window);
 		frame_dt = rts_clampf(frame_dt, 0.0005f, 0.05f);
-		const i32 sim_steps = (game.autotest.enabled && game.simulator.enabled) ? s_max(1, game.autotest.sim_substeps_per_frame) : 1;
-		const f32 sim_dt =
-			(game.autotest.enabled && game.simulator.enabled && game.autotest.fixed_dt > 0.0001f)
-				? game.autotest.fixed_dt
-				: frame_dt;
+		const i32 sim_steps = 1;
+		const f32 sim_dt = frame_dt;
 
 		for (i32 step = 0; step < sim_steps && !se_window_should_close(game.window); ++step) {
 			rts_step_simulation(&game, sim_dt);
@@ -4041,74 +3339,11 @@ int main(int argc, char **argv) {
 					shader_reload_accumulator = 0.0;
 				}
 			}
-			rts_step_validation_checkpoint(&game);
-
-			if (game.autotest.enabled && game.validations_failed && game.autotest.strict_fail_fast) {
-				se_window_set_should_close(game.window, true);
-				break;
-			}
 		}
 
 		rts_render_frame(&game);
-		if (game.track_system_timing && game.sim_time >= game.next_system_timing_log_time) {
-			game.next_system_timing_log_time = game.sim_time + 1.0f;
-			c8 timing_lines[512] = {0};
-			se_debug_dump_last_frame_timing_lines(timing_lines, sizeof(timing_lines));
-			rts_log("systems ms:\n%s", timing_lines);
-		}
-
-		if (perf_check_enabled && game.sim_time >= perf_warmup_seconds) {
-			const f64 fps = se_window_get_fps(game.window);
-			perf_fps_ema = perf_fps_ema * 0.92 + fps * 0.08;
-			if (perf_fps_ema < perf_worst_ema) {
-				perf_worst_ema = perf_fps_ema;
-			}
-
-			se_debug_frame_timing timing = {0};
-			(void)se_debug_get_last_frame_timing(&timing);
-			const c8 *bottleneck_name = "none";
-			f64 bottleneck_ms = 0.0;
-			rts_perf_find_bottleneck(&timing, &bottleneck_name, &bottleneck_ms);
-
-			if (perf_fps_ema < 260.0) {
-				perf_below_ema_frames++;
-				if (game.sim_time >= perf_next_log_time) {
-					perf_next_log_time = game.sim_time + 0.5;
-					c8 timing_text[320] = {0};
-					se_debug_dump_last_frame_timing(timing_text, sizeof(timing_text));
-					rts_log(
-						"perf low: fps=%.2f ema=%.2f worst=%.2f bottleneck=%s %.3fms %s",
-						fps,
-						perf_fps_ema,
-						perf_worst_ema,
-						bottleneck_name,
-						bottleneck_ms,
-						timing_text);
-				}
-			} else {
-				perf_below_ema_frames = 0;
-			}
-
-			if (perf_assert_enabled) {
-				s_assertf(
-					perf_below_ema_frames < 90,
-					"99_game perf assertion failed: fps ema %.2f < 260 (target 280), bottleneck=%s %.3fms",
-					perf_fps_ema,
-					bottleneck_name,
-					bottleneck_ms);
-			}
-		}
-		if (game.autotest.enabled && game.validations_failed && game.autotest.strict_fail_fast) {
-			break;
-		}
 	}
-
-	rts_autotest_finalize(&game);
-	if (perf_check_enabled) {
-		rts_log("perf summary: worst ema fps=%.2f", perf_worst_ema);
-	}
-	rts_log("finished, validations=%s", game.validations_failed ? "FAILED" : "OK");
 
 	rts_shutdown_runtime(&game);
-	return game.validations_failed ? 2 : 0;
+	return 0;
 }

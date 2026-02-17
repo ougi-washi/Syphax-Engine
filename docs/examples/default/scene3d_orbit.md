@@ -8,8 +8,8 @@ prerequisites:
 # scene3d_orbit
 
 <picture>
-  <source srcset="../../assets/img/examples/default/scene3d_orbit.png" type="image/png">
-  <img src="../../assets/img/examples/default/scene3d_orbit.svg" alt="scene3d_orbit preview image">
+  <source srcset="../../../assets/img/examples/default/scene3d_orbit.png" type="image/png">
+  <img src="../../../assets/img/examples/default/scene3d_orbit.svg" alt="scene3d_orbit preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

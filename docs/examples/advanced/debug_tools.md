@@ -10,8 +10,8 @@ prerequisites:
 > Scope: advanced
 
 <picture>
-  <source srcset="../../assets/img/examples/advanced/debug_tools.png" type="image/png">
-  <img src="../../assets/img/examples/advanced/debug_tools.svg" alt="debug_tools preview image">
+  <source srcset="../../../assets/img/examples/advanced/debug_tools.png" type="image/png">
+  <img src="../../../assets/img/examples/advanced/debug_tools.svg" alt="debug_tools preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

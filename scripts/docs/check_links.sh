@@ -82,6 +82,19 @@ def resolve_local_link(src_file: str, target: str) -> Tuple[str, str]:
             resolved = index_candidate
 
     resolved = os.path.normpath(resolved)
+
+    # Docs example pages are rendered under an extra directory level
+    # (e.g. /examples/default/<page>/), so static assets intentionally use
+    # ../../../assets/... in markdown. Validate those against docs/assets.
+    if (
+        not os.path.exists(resolved)
+        and path_part.startswith("../../../assets/")
+        and os.path.normpath(src_file).startswith(os.path.join(docs_dir, "examples"))
+    ):
+        fallback = os.path.normpath(os.path.join(docs_dir, path_part[len("../../../"):]))
+        if os.path.exists(fallback):
+            resolved = fallback
+
     return resolved, anchor
 
 

@@ -8,8 +8,8 @@ prerequisites:
 # hello_text
 
 <picture>
-  <source srcset="../../assets/img/examples/default/hello_text.png" type="image/png">
-  <img src="../../assets/img/examples/default/hello_text.svg" alt="hello_text preview image">
+  <source srcset="../../../assets/img/examples/default/hello_text.png" type="image/png">
+  <img src="../../../assets/img/examples/default/hello_text.svg" alt="hello_text preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

@@ -8,8 +8,8 @@ prerequisites:
 # ui_basics
 
 <picture>
-  <source srcset="../../assets/img/examples/default/ui_basics.png" type="image/png">
-  <img src="../../assets/img/examples/default/ui_basics.svg" alt="ui_basics preview image">
+  <source srcset="../../../assets/img/examples/default/ui_basics.png" type="image/png">
+  <img src="../../../assets/img/examples/default/ui_basics.svg" alt="ui_basics preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

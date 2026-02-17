@@ -8,8 +8,8 @@ prerequisites:
 # model_viewer
 
 <picture>
-  <source srcset="../../assets/img/examples/default/model_viewer.png" type="image/png">
-  <img src="../../assets/img/examples/default/model_viewer.svg" alt="model_viewer preview image">
+  <source srcset="../../../assets/img/examples/default/model_viewer.png" type="image/png">
+  <img src="../../../assets/img/examples/default/model_viewer.svg" alt="model_viewer preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

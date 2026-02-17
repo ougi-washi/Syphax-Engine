@@ -8,8 +8,8 @@ prerequisites:
 # scene2d_click
 
 <picture>
-  <source srcset="../../assets/img/examples/default/scene2d_click.png" type="image/png">
-  <img src="../../assets/img/examples/default/scene2d_click.svg" alt="scene2d_click preview image">
+  <source srcset="../../../assets/img/examples/default/scene2d_click.png" type="image/png">
+  <img src="../../../assets/img/examples/default/scene2d_click.svg" alt="scene2d_click preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

@@ -10,8 +10,7 @@ prerequisites:
 > Scope: advanced
 
 <picture>
-  <source srcset="../../assets/img/examples/advanced/simulation_advanced.png" type="image/png">
-  <img src="../../assets/img/examples/advanced/simulation_advanced.svg" alt="simulation_advanced preview image">
+  <img src="../../../assets/img/examples/advanced/simulation_advanced.svg" alt="simulation_advanced preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

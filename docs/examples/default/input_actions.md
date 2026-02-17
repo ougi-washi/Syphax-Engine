@@ -8,8 +8,8 @@ prerequisites:
 # input_actions
 
 <picture>
-  <source srcset="../../assets/img/examples/default/input_actions.png" type="image/png">
-  <img src="../../assets/img/examples/default/input_actions.svg" alt="input_actions preview image">
+  <source srcset="../../../assets/img/examples/default/input_actions.png" type="image/png">
+  <img src="../../../assets/img/examples/default/input_actions.svg" alt="input_actions preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*

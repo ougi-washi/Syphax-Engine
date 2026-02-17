@@ -8,8 +8,8 @@ prerequisites:
 # scene2d_instancing
 
 <picture>
-  <source srcset="../../assets/img/examples/default/scene2d_instancing.png" type="image/png">
-  <img src="../../assets/img/examples/default/scene2d_instancing.svg" alt="scene2d_instancing preview image">
+  <source srcset="../../../assets/img/examples/default/scene2d_instancing.png" type="image/png">
+  <img src="../../../assets/img/examples/default/scene2d_instancing.svg" alt="scene2d_instancing preview image">
 </picture>
 
 *Caption: live runtime capture if available; falls back to placeholder preview card.*
