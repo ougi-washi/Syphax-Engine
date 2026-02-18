@@ -126,7 +126,7 @@ typedef s_array(se_scene_2d_handle, se_scenes_2d_ptr);
 typedef struct se_scene_3d {
 	se_objects_3d_ptr objects;
 	se_camera_handle camera;
-	se_render_buffers_ptr post_process;
+	se_render_buffers_ptr post_process; // still wip
 	se_shader_handle output_shader;
 	se_framebuffer_handle output;
 	se_scene_debug_markers debug_markers;

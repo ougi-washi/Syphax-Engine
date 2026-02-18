@@ -1,18 +1,11 @@
 // Syphax-Engine - Ougi Washi
 
-#include "se_audio.h"
 #include "se_camera.h"
 #include "se_editor.h"
 #include "se_graphics.h"
-#include "se_input.h"
-#include "se_navigation.h"
-#include "se_physics.h"
 #include "se_scene.h"
-#include "se_simulation.h"
-#include "se_text.h"
-#include "se_texture.h"
+#include "se_shader.h"
 #include "se_ui.h"
-#include "se_vfx.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -21,658 +14,1161 @@
 #define SHOWCASE_WIDTH 1400
 #define SHOWCASE_HEIGHT 860
 
+#define EDITOR_2D_GIZMO_HANDLE_OFFSET 0.14f
+#define EDITOR_2D_GIZMO_HANDLE_SIZE 0.024f
+#define EDITOR_2D_GIZMO_PICK_RADIUS 0.050f
+#define EDITOR_2D_PICK_FALLBACK_RADIUS 0.12f
+#define EDITOR_3D_GIZMO_AXIS_LENGTH 1.25f
+#define EDITOR_3D_GIZMO_PICK_THRESHOLD_PX 12.0f
+#define EDITOR_3D_PICK_RADIUS 1.10f
+#define EDITOR_3D_PICK_FALLBACK_RADIUS_MIN 0.70f
+
+typedef enum {
+	EDITOR_TARGET_SCENE_2D = 0,
+	EDITOR_TARGET_SCENE_3D
+} editor_target;
+
+typedef enum {
+	EDITOR_GIZMO_AXIS_NONE = 0,
+	EDITOR_GIZMO_AXIS_FREE,
+	EDITOR_GIZMO_AXIS_X,
+	EDITOR_GIZMO_AXIS_Y,
+	EDITOR_GIZMO_AXIS_Z
+} editor_gizmo_axis;
+
+typedef struct {
+	se_object_2d_handle handle;
+	s_vec3 base_color;
+} editor_object_2d_slot;
+typedef s_array(editor_object_2d_slot, editor_object_2d_slots);
+
+typedef struct {
+	se_object_3d_handle handle;
+} editor_object_3d_slot;
+typedef s_array(editor_object_3d_slot, editor_object_3d_slots);
+
 typedef struct {
 	se_context* context;
 	se_window_handle window;
-	se_input_handle* input;
 	se_editor* editor;
 
 	se_scene_2d_handle scene_2d;
-	se_object_2d_handle object_2d;
-
 	se_scene_3d_handle scene_3d;
-	se_object_3d_handle object_3d;
-	se_instance_id object_3d_instance;
-	se_camera_handle camera;
-	se_model_handle model;
-	se_shader_handle shader;
+	se_camera_handle camera_3d;
+	se_camera_controller* camera_controller;
+	se_model_handle cube_model;
 
 	se_ui_handle ui;
 	se_ui_widget_handle ui_panel;
-	se_ui_widget_handle ui_label;
-	se_ui_widget_handle ui_subtitle;
-	se_ui_widget_handle ui_metrics;
-	se_ui_widget_handle ui_controls_row_a;
-	se_ui_widget_handle ui_controls_row_b;
-	se_ui_widget_handle ui_button_apply;
-	se_ui_widget_handle ui_button_queue;
-	se_ui_widget_handle ui_button_counts;
-	se_ui_widget_handle ui_button_diag;
-	se_ui_widget_handle ui_button_play;
+	se_ui_widget_handle ui_title;
+	se_ui_widget_handle ui_status;
 
-	se_text_handle* text;
-	se_font_handle font;
+	editor_object_2d_slots objects_2d;
+	editor_object_3d_slots objects_3d;
 
-	se_vfx_2d_handle vfx_2d;
-	se_vfx_emitter_2d_handle emitter_2d;
-	se_vfx_3d_handle vfx_3d;
-	se_vfx_emitter_3d_handle emitter_3d;
+	se_object_2d_handle gizmo_2d_center;
+	se_object_2d_handle gizmo_2d_x;
+	se_object_2d_handle gizmo_2d_y;
 
-	se_texture_handle texture;
-	se_framebuffer_handle framebuffer;
-	se_render_buffer_handle render_buffer;
+	se_object_2d_handle selected_2d;
+	se_object_3d_handle selected_3d;
 
-	se_audio_engine* audio;
-	se_audio_clip* clip;
-	se_audio_stream* stream;
-	se_audio_capture* capture;
+	editor_target target;
+	editor_gizmo_axis active_axis;
+	b8 dragging;
 
-	se_navigation_grid navigation;
-	b8 navigation_ready;
+	s_vec2 drag_start_mouse_ndc;
+	s_vec2 drag_start_pos_2d;
+	s_vec3 drag_start_pos_3d;
+	s_vec3 drag_axis_world;
+	s_vec3 drag_plane_point;
+	s_vec3 drag_plane_normal;
+	s_vec3 drag_start_hit_world;
+	f32 drag_axis_param_start;
 
-	se_physics_world_2d* physics_2d;
-	se_physics_body_2d* body_2d;
-	se_physics_world_3d* physics_3d;
-	se_physics_body_3d* body_3d;
-
-	se_simulation_handle simulation;
-
+	f64 next_status_time;
 	u64 frame_index;
-	f64 next_diagnostics_time;
-	f64 next_ui_metrics_time;
-	b8 batch_applied;
-	b8 ui_request_apply_batch;
-	b8 ui_request_queue_batch;
-	b8 ui_request_print_counts;
-	b8 ui_request_print_diagnostics;
-	b8 ui_request_play_clip;
 } editor_showcase_app;
 
-static const u8 se_example_png_1x1_rgba[] = {
-	0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-	0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-	0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-	0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41,
-	0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0xF0,
-	0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99,
-	0x3D, 0x1D, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
-	0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
-};
-
-static s_mat4 showcase_make_box_transform(const s_vec3* position, const s_vec3* half_extents) {
-	s_mat4 transform = s_mat4_identity;
-	transform = s_mat4_scale(&transform, &s_vec3(half_extents->x * 2.0f, half_extents->y * 2.0f, half_extents->z * 2.0f));
-	s_mat4_set_translation(&transform, position);
-	return transform;
-}
-
-static void showcase_report_editor_failure(const c8* command) {
-	printf("editor_showcase :: command failed: %s (%s)\n", command, se_result_str(se_get_last_error()));
-}
-
-#define SHOWCASE_TRY_EDITOR(_command_expr) \
-	do { \
-		if (!(_command_expr)) { \
-			showcase_report_editor_failure(#_command_expr); \
-		} \
-	} while (0)
-
-static void showcase_print_counts(se_editor* editor) {
-	se_editor_counts counts = {0};
-	if (!editor || !se_editor_collect_counts(editor, &counts)) {
-		printf("editor_showcase :: collect_counts failed (%s)\n", se_result_str(se_get_last_error()));
-		return;
+static f32 editor_clampf(const f32 value, const f32 min_value, const f32 max_value) {
+	if (value < min_value) {
+		return min_value;
 	}
-	printf(
-		"editor_showcase :: counts windows=%u cameras=%u scene2d=%u scene3d=%u ui=%u vfx2d=%u vfx3d=%u sim=%u audio(clips=%u streams=%u captures=%u) physics(2d=%u 3d=%u) queued=%u\n",
-		counts.windows,
-		counts.cameras,
-		counts.scenes_2d,
-		counts.scenes_3d,
-		counts.uis,
-		counts.vfx_2d,
-		counts.vfx_3d,
-		counts.simulations,
-		counts.audio_clips,
-		counts.audio_streams,
-		counts.audio_captures,
-		counts.physics_2d_bodies,
-		counts.physics_3d_bodies,
-		counts.queued_commands);
-}
-
-static b8 showcase_find_item_by_category_name(se_editor* editor, const c8* category_name, s_handle handle, se_editor_item* out_item) {
-	const se_editor_category category = se_editor_category_from_name(category_name);
-	if (!editor || !category_name || !out_item || category == SE_EDITOR_CATEGORY_COUNT) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	return se_editor_find_item(editor, category, handle, out_item);
-}
-
-static void showcase_print_category_parse_demo(void) {
-	printf(
-		"editor_showcase :: category parser scene_2d=%s scene-3d=%s ui_widget=%s physics-2d-body=%s\n",
-		se_editor_category_name(se_editor_category_from_name("scene_2d")),
-		se_editor_category_name(se_editor_category_from_name("Scene-3D")),
-		se_editor_category_name(se_editor_category_from_name("ui_widget")),
-		se_editor_category_name(se_editor_category_from_name("Physics-2D-Body")));
-}
-
-static f32 showcase_clamp01(f32 value) {
-	if (value < 0.0f) {
-		return 0.0f;
-	}
-	if (value > 1.0f) {
-		return 1.0f;
+	if (value > max_value) {
+		return max_value;
 	}
 	return value;
 }
 
-static s_vec4 showcase_color_shift(const s_vec4 color, f32 delta) {
-	return s_vec4(
-		showcase_clamp01(color.x + delta),
-		showcase_clamp01(color.y + delta),
-		showcase_clamp01(color.z + delta),
-		color.w);
+static f32 editor_distance_vec2(const s_vec2* a, const s_vec2* b) {
+	const s_vec2 delta = s_vec2_sub(a, b);
+	return s_vec2_length(&delta);
 }
 
-static void showcase_style_panel(editor_showcase_app* app) {
-	se_ui_style style = SE_UI_STYLE_DEFAULT;
-	if (!app || app->ui == S_HANDLE_NULL || app->ui_panel == S_HANDLE_NULL) {
+static f32 editor_distance_point_segment(const s_vec2* point, const s_vec2* a, const s_vec2* b) {
+	const s_vec2 ab = s_vec2_sub(b, a);
+	const f32 ab_len2 = s_vec2_dot(&ab, &ab);
+	if (ab_len2 <= 0.000001f) {
+		return editor_distance_vec2(point, a);
+	}
+	const s_vec2 ap = s_vec2_sub(point, a);
+	f32 t = s_vec2_dot(&ap, &ab) / ab_len2;
+	t = editor_clampf(t, 0.0f, 1.0f);
+	const s_vec2 projected = s_vec2(a->x + ab.x * t, a->y + ab.y * t);
+	return editor_distance_vec2(point, &projected);
+}
+
+static s_vec3 editor_color_from_index(const u32 index) {
+	const f32 i = (f32)index;
+	const f32 r = 0.28f + 0.58f * fabsf(sinf(i * 1.11f + 0.23f));
+	const f32 g = 0.24f + 0.62f * fabsf(sinf(i * 1.47f + 1.19f));
+	const f32 b = 0.30f + 0.55f * fabsf(sinf(i * 1.73f + 2.41f));
+	return s_vec3(r, g, b);
+}
+
+static b8 editor_get_mouse_framebuffer(editor_showcase_app* app, s_vec2* out_mouse, f32* out_width, f32* out_height) {
+	u32 framebuffer_width = 0;
+	u32 framebuffer_height = 0;
+	f32 mouse_x = 0.0f;
+	f32 mouse_y = 0.0f;
+	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
+	if (!app || app->window == S_HANDLE_NULL) {
+		return false;
+	}
+	se_window_get_framebuffer_size(app->window, &framebuffer_width, &framebuffer_height);
+	if (framebuffer_width <= 1u || framebuffer_height <= 1u) {
+		return false;
+	}
+	mouse_x = se_window_get_mouse_position_x(app->window);
+	mouse_y = se_window_get_mouse_position_y(app->window);
+	if (!se_window_window_to_framebuffer(app->window, mouse_x, mouse_y, &mouse_framebuffer)) {
+		mouse_framebuffer = s_vec2(mouse_x, mouse_y);
+	}
+	if (out_mouse) {
+		*out_mouse = mouse_framebuffer;
+	}
+	if (out_width) {
+		*out_width = (f32)framebuffer_width;
+	}
+	if (out_height) {
+		*out_height = (f32)framebuffer_height;
+	}
+	return true;
+}
+
+static void editor_log_error(const c8* label) {
+	printf("editor_showcase :: %s failed (%s)\n", label, se_result_str(se_get_last_error()));
+}
+
+static b8 editor_apply_scene_2d_action(editor_showcase_app* app, const c8* action, se_object_2d_handle object) {
+	se_editor_item scene_item = {0};
+	se_editor_value value = se_editor_value_handle(object);
+	if (!app || app->scene_2d == S_HANDLE_NULL) {
+		return false;
+	}
+	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SCENE_2D, app->scene_2d, &scene_item)) {
+		if (se_editor_apply_action(app->editor, &scene_item, action, &value, NULL)) {
+			return true;
+		}
+		editor_log_error(action);
+	}
+	if (strcmp(action, "add_object") == 0) {
+		se_scene_2d_add_object(app->scene_2d, object);
+		return true;
+	}
+	if (strcmp(action, "remove_object") == 0) {
+		se_scene_2d_remove_object(app->scene_2d, object);
+		return true;
+	}
+	return false;
+}
+
+static b8 editor_apply_scene_3d_action(editor_showcase_app* app, const c8* action, se_object_3d_handle object) {
+	se_editor_item scene_item = {0};
+	se_editor_value value = se_editor_value_handle(object);
+	if (!app || app->scene_3d == S_HANDLE_NULL) {
+		return false;
+	}
+	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SCENE_3D, app->scene_3d, &scene_item)) {
+		if (se_editor_apply_action(app->editor, &scene_item, action, &value, NULL)) {
+			return true;
+		}
+		editor_log_error(action);
+	}
+	if (strcmp(action, "add_object") == 0) {
+		se_scene_3d_add_object(app->scene_3d, object);
+		return true;
+	}
+	if (strcmp(action, "remove_object") == 0) {
+		se_scene_3d_remove_object(app->scene_3d, object);
+		return true;
+	}
+	return false;
+}
+
+static b8 editor_apply_object_2d_position(editor_showcase_app* app, const se_object_2d_handle object, const s_vec2* position) {
+	se_editor_item item = {0};
+	se_editor_value value = se_editor_value_vec2(*position);
+	if (!app || object == S_HANDLE_NULL || !position) {
+		return false;
+	}
+	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_OBJECT_2D, object, &item)) {
+		if (se_editor_apply_set(app->editor, &item, "position", &value)) {
+			return true;
+		}
+		editor_log_error("set object_2d position");
+	}
+	se_object_2d_set_position(object, position);
+	return true;
+}
+
+static b8 editor_apply_object_3d_transform(editor_showcase_app* app, const se_object_3d_handle object, const s_mat4* transform) {
+	se_editor_item item = {0};
+	se_editor_value value = se_editor_value_mat4(*transform);
+	if (!app || object == S_HANDLE_NULL || !transform) {
+		return false;
+	}
+	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_OBJECT_3D, object, &item)) {
+		if (se_editor_apply_set(app->editor, &item, "transform", &value)) {
+			return true;
+		}
+		editor_log_error("set object_3d transform");
+	}
+	se_object_3d_set_transform(object, transform);
+	return true;
+}
+
+static void editor_remove_object_2d_slot(editor_showcase_app* app, const se_object_2d_handle handle) {
+	if (!app || handle == S_HANDLE_NULL) {
 		return;
 	}
-	style.normal.background_color = s_vec4(0.02f, 0.04f, 0.07f, 1.00f);
-	style.normal.border_color = s_vec4(0.15f, 0.60f, 0.82f, 1.00f);
-	style.normal.text_color = s_vec4(0.96f, 0.98f, 1.00f, 1.00f);
-	style.normal.border_width = 0.005f;
-	style.hovered = style.normal;
-	style.pressed = style.normal;
-	style.disabled = style.normal;
-	style.focused = style.normal;
-	(void)se_ui_widget_set_style(app->ui, app->ui_panel, &style);
+	for (sz i = 0; i < s_array_get_size(&app->objects_2d); ++i) {
+		editor_object_2d_slot* slot = s_array_get(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
+		if (slot && slot->handle == handle) {
+			s_array_remove(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
+			return;
+		}
+	}
 }
 
-static void showcase_style_button(se_ui_handle ui, se_ui_widget_handle widget, s_vec4 base_bg, s_vec4 border, s_vec4 text_color) {
-	se_ui_style style = SE_UI_STYLE_DEFAULT;
-	if (ui == S_HANDLE_NULL || widget == S_HANDLE_NULL) {
+static void editor_remove_object_3d_slot(editor_showcase_app* app, const se_object_3d_handle handle) {
+	if (!app || handle == S_HANDLE_NULL) {
 		return;
 	}
-	style.normal.background_color = base_bg;
-	style.normal.border_color = border;
-	style.normal.text_color = text_color;
-	style.normal.border_width = 0.0040f;
-	style.hovered = style.normal;
-	style.hovered.background_color = showcase_color_shift(base_bg, 0.06f);
-	style.hovered.border_color = showcase_color_shift(border, 0.04f);
-	style.pressed = style.normal;
-	style.pressed.background_color = showcase_color_shift(base_bg, -0.06f);
-	style.pressed.border_color = showcase_color_shift(border, -0.04f);
-	style.disabled = style.normal;
-	style.disabled.background_color = showcase_color_shift(base_bg, -0.10f);
-	style.disabled.background_color.w = 1.00f;
-	style.disabled.border_color = showcase_color_shift(border, -0.08f);
-	style.disabled.border_color.w = 0.70f;
-	style.disabled.text_color = showcase_color_shift(text_color, -0.30f);
-	style.focused = style.normal;
-	style.focused.border_color = showcase_color_shift(border, 0.10f);
-	style.focused.border_width = 0.0052f;
-	(void)se_ui_widget_set_style(ui, widget, &style);
-}
-
-static void showcase_on_click_apply(const se_ui_click_event* event, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	(void)event;
-	if (app) {
-		app->ui_request_apply_batch = true;
+	for (sz i = 0; i < s_array_get_size(&app->objects_3d); ++i) {
+		editor_object_3d_slot* slot = s_array_get(&app->objects_3d, s_array_handle(&app->objects_3d, (u32)i));
+		if (slot && slot->handle == handle) {
+			s_array_remove(&app->objects_3d, s_array_handle(&app->objects_3d, (u32)i));
+			return;
+		}
 	}
 }
 
-static void showcase_on_click_queue(const se_ui_click_event* event, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	(void)event;
-	if (app) {
-		app->ui_request_queue_batch = true;
+static b8 editor_contains_object_3d(const editor_showcase_app* app, const se_object_3d_handle handle) {
+	if (!app || handle == S_HANDLE_NULL) {
+		return false;
 	}
+	for (sz i = 0; i < s_array_get_size(&app->objects_3d); ++i) {
+		const editor_object_3d_slot* slot = s_array_get((editor_object_3d_slots*)&app->objects_3d, s_array_handle((editor_object_3d_slots*)&app->objects_3d, (u32)i));
+		if (slot && slot->handle == handle) {
+			return true;
+		}
+	}
+	return false;
 }
 
-static void showcase_on_click_counts(const se_ui_click_event* event, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	(void)event;
-	if (app) {
-		app->ui_request_print_counts = true;
+static b8 editor_ray_hits_sphere(const s_vec3* ray_origin, const s_vec3* ray_dir, const s_vec3* center, const f32 radius, f32* out_t) {
+	s_vec3 offset = s_vec3(0.0f, 0.0f, 0.0f);
+	f32 b = 0.0f;
+	f32 c = 0.0f;
+	f32 discriminant = 0.0f;
+	f32 t = 0.0f;
+	if (!ray_origin || !ray_dir || !center || radius <= 0.0f) {
+		return false;
 	}
+	offset = s_vec3_sub(ray_origin, center);
+	b = s_vec3_dot(&offset, ray_dir);
+	c = s_vec3_dot(&offset, &offset) - radius * radius;
+	discriminant = b * b - c;
+	if (discriminant < 0.0f) {
+		return false;
+	}
+	t = -b - sqrtf(discriminant);
+	if (t < 0.0f) {
+		t = -b + sqrtf(discriminant);
+	}
+	if (t < 0.0f) {
+		return false;
+	}
+	if (out_t) {
+		*out_t = t;
+	}
+	return true;
 }
 
-static void showcase_on_click_diagnostics(const se_ui_click_event* event, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	(void)event;
-	if (app) {
-		app->ui_request_print_diagnostics = true;
-	}
-}
-
-static void showcase_on_click_play(const se_ui_click_event* event, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	(void)event;
-	if (app) {
-		app->ui_request_play_clip = true;
-	}
-}
-
-static void showcase_style_ui(editor_showcase_app* app) {
-	if (!app || app->ui == S_HANDLE_NULL) {
+static void editor_delete_object_2d(editor_showcase_app* app, const se_object_2d_handle handle) {
+	se_shader_handle shader = S_HANDLE_NULL;
+	if (!app || handle == S_HANDLE_NULL) {
 		return;
 	}
-	showcase_style_panel(app);
-	if (app->ui_subtitle != S_HANDLE_NULL) {
-		(void)se_ui_widget_use_style_preset(app->ui, app->ui_subtitle, SE_UI_STYLE_PRESET_TEXT_MUTED);
+	shader = se_object_2d_get_shader(handle);
+	(void)editor_apply_scene_2d_action(app, "remove_object", handle);
+	se_object_2d_destroy(handle);
+	if (shader != S_HANDLE_NULL) {
+		se_shader_destroy(shader);
 	}
-	if (app->ui_metrics != S_HANDLE_NULL) {
-		(void)se_ui_widget_use_style_preset(app->ui, app->ui_metrics, SE_UI_STYLE_PRESET_TEXT_MUTED);
-	}
-	showcase_style_button(app->ui, app->ui_button_apply, s_vec4(0.08f, 0.38f, 0.46f, 0.94f), s_vec4(0.22f, 0.72f, 0.78f, 1.00f), s_vec4(0.96f, 0.99f, 1.00f, 1.00f));
-	showcase_style_button(app->ui, app->ui_button_queue, s_vec4(0.05f, 0.26f, 0.42f, 1.00f), s_vec4(0.18f, 0.56f, 0.78f, 1.00f), s_vec4(0.92f, 0.98f, 1.00f, 1.00f));
-	showcase_style_button(app->ui, app->ui_button_counts, s_vec4(0.13f, 0.16f, 0.30f, 1.00f), s_vec4(0.32f, 0.42f, 0.72f, 1.00f), s_vec4(0.90f, 0.92f, 0.98f, 1.00f));
-	showcase_style_button(app->ui, app->ui_button_diag, s_vec4(0.18f, 0.14f, 0.33f, 1.00f), s_vec4(0.42f, 0.34f, 0.74f, 1.00f), s_vec4(0.95f, 0.92f, 1.00f, 1.00f));
-	showcase_style_button(app->ui, app->ui_button_play, s_vec4(0.34f, 0.17f, 0.08f, 1.00f), s_vec4(0.78f, 0.44f, 0.18f, 1.00f), s_vec4(1.00f, 0.96f, 0.90f, 1.00f));
-
-	if (app->ui_button_apply != S_HANDLE_NULL) {
-		(void)se_ui_widget_set_alignment(app->ui, app->ui_button_apply, SE_UI_ALIGN_START, SE_UI_ALIGN_CENTER);
-	}
-	if (app->ui_button_queue != S_HANDLE_NULL) {
-		(void)se_ui_widget_set_alignment(app->ui, app->ui_button_queue, SE_UI_ALIGN_START, SE_UI_ALIGN_CENTER);
-	}
-	if (app->ui_button_counts != S_HANDLE_NULL) {
-		(void)se_ui_widget_set_alignment(app->ui, app->ui_button_counts, SE_UI_ALIGN_START, SE_UI_ALIGN_CENTER);
-	}
-	if (app->ui_button_diag != S_HANDLE_NULL) {
-		(void)se_ui_widget_set_alignment(app->ui, app->ui_button_diag, SE_UI_ALIGN_START, SE_UI_ALIGN_CENTER);
-	}
-	if (app->ui_button_play != S_HANDLE_NULL) {
-		(void)se_ui_widget_set_alignment(app->ui, app->ui_button_play, SE_UI_ALIGN_START, SE_UI_ALIGN_CENTER);
+	editor_remove_object_2d_slot(app, handle);
+	if (app->selected_2d == handle) {
+		app->selected_2d = S_HANDLE_NULL;
 	}
 }
 
-static void showcase_update_ui_status(editor_showcase_app* app) {
-	c8 title_text[SE_MAX_PATH_LENGTH] = {0};
-	c8 metrics_text[SE_MAX_PATH_LENGTH] = {0};
+static void editor_delete_object_3d(editor_showcase_app* app, const se_object_3d_handle handle) {
+	if (!app || handle == S_HANDLE_NULL) {
+		return;
+	}
+	(void)editor_apply_scene_3d_action(app, "remove_object", handle);
+	se_object_3d_destroy(handle);
+	editor_remove_object_3d_slot(app, handle);
+	if (app->selected_3d == handle) {
+		app->selected_3d = S_HANDLE_NULL;
+	}
+}
+
+static se_object_2d_handle editor_spawn_object_2d(editor_showcase_app* app, const s_vec2* position) {
+	editor_object_2d_slot slot = {0};
+	se_object_2d_handle handle = S_HANDLE_NULL;
+	se_shader_handle shader = S_HANDLE_NULL;
+	s_vec2 object_scale = s_vec2(0.10f, 0.10f);
+	if (!app || app->scene_2d == S_HANDLE_NULL || !position) {
+		return S_HANDLE_NULL;
+	}
+	handle = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
+	if (handle == S_HANDLE_NULL) {
+		editor_log_error("create object_2d");
+		return S_HANDLE_NULL;
+	}
+	se_object_2d_set_scale(handle, &object_scale);
+	(void)editor_apply_object_2d_position(app, handle, position);
+	if (!editor_apply_scene_2d_action(app, "add_object", handle)) {
+		se_object_2d_destroy(handle);
+		return S_HANDLE_NULL;
+	}
+	slot.handle = handle;
+	slot.base_color = editor_color_from_index((u32)s_array_get_size(&app->objects_2d));
+	s_array_add(&app->objects_2d, slot);
+	shader = se_object_2d_get_shader(handle);
+	if (shader != S_HANDLE_NULL) {
+		se_shader_set_vec3(shader, "u_color", &slot.base_color);
+	}
+	return handle;
+}
+
+static se_object_3d_handle editor_spawn_object_3d(editor_showcase_app* app, const s_vec3* position) {
+	editor_object_3d_slot slot = {0};
+	se_object_3d_handle handle = S_HANDLE_NULL;
+	s_mat4 transform = s_mat4_identity;
+	const s_vec3 object_scale = s_vec3(0.36f, 0.36f, 0.36f);
+	if (!app || app->scene_3d == S_HANDLE_NULL || app->cube_model == S_HANDLE_NULL || !position) {
+		return S_HANDLE_NULL;
+	}
+	transform = s_mat4_scale(&transform, &object_scale);
+	s_mat4_set_translation(&transform, position);
+	handle = se_object_3d_create(app->cube_model, &transform, 0);
+	if (handle == S_HANDLE_NULL) {
+		editor_log_error("create object_3d");
+		return S_HANDLE_NULL;
+	}
+	if (!editor_apply_scene_3d_action(app, "add_object", handle)) {
+		se_object_3d_destroy(handle);
+		return S_HANDLE_NULL;
+	}
+	slot.handle = handle;
+	s_array_add(&app->objects_3d, slot);
+	return handle;
+}
+
+static s_vec3 editor_get_selected_3d_position(editor_showcase_app* app) {
+	s_mat4 transform = s_mat4_identity;
+	if (!app || app->selected_3d == S_HANDLE_NULL) {
+		return s_vec3(0.0f, 0.0f, 0.0f);
+	}
+	transform = se_object_3d_get_transform(app->selected_3d);
+	return s_mat4_get_translation(&transform);
+}
+
+static b8 editor_pick_filter_scene_2d(const se_object_2d_handle object, void* user_data) {
+	editor_showcase_app* app = (editor_showcase_app*)user_data;
+	if (!app) {
+		return false;
+	}
+	if (object == app->gizmo_2d_center || object == app->gizmo_2d_x || object == app->gizmo_2d_y) {
+		return false;
+	}
+	return true;
+}
+
+static b8 editor_pick_filter_scene_3d(const se_object_3d_handle object, void* user_data) {
+	editor_showcase_app* app = (editor_showcase_app*)user_data;
+	if (!app) {
+		return false;
+	}
+	return editor_contains_object_3d(app, object);
+}
+
+static se_object_2d_handle editor_pick_scene_object_2d(editor_showcase_app* app) {
+	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
+	se_object_2d_handle picked = S_HANDLE_NULL;
+	f32 best_distance = EDITOR_2D_PICK_FALLBACK_RADIUS;
+	if (!app || app->scene_2d == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+	se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+	if (se_scene_2d_pick_object(app->scene_2d, &mouse_ndc, editor_pick_filter_scene_2d, app, &picked)) {
+		return picked;
+	}
+	for (sz i = 0; i < s_array_get_size(&app->objects_2d); ++i) {
+		const editor_object_2d_slot* slot = s_array_get(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
+		if (!slot || slot->handle == S_HANDLE_NULL) {
+			continue;
+		}
+		const s_vec2 position = se_object_2d_get_position(slot->handle);
+		const f32 distance = editor_distance_vec2(&mouse_ndc, &position);
+		if (distance <= best_distance) {
+			best_distance = distance;
+			picked = slot->handle;
+		}
+	}
+	if (picked != S_HANDLE_NULL) {
+		return picked;
+	}
+	return S_HANDLE_NULL;
+}
+
+static se_object_3d_handle editor_pick_scene_object_3d(editor_showcase_app* app) {
+	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
+	se_object_3d_handle picked = S_HANDLE_NULL;
+	f32 viewport_width = 0.0f;
+	f32 viewport_height = 0.0f;
+	if (!app || app->scene_3d == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
+		return S_HANDLE_NULL;
+	}
+	if (se_scene_3d_pick_object_screen(
+			app->scene_3d,
+			mouse_framebuffer.x,
+			mouse_framebuffer.y,
+			viewport_width,
+			viewport_height,
+			EDITOR_3D_PICK_RADIUS,
+				editor_pick_filter_scene_3d,
+				app,
+				&picked,
+				NULL)) {
+		return picked;
+	}
+	{
+		s_vec3 ray_origin = s_vec3(0.0f, 0.0f, 0.0f);
+		s_vec3 ray_dir = s_vec3(0.0f, 0.0f, -1.0f);
+		f32 best_t = 1e30f;
+		if (se_camera_screen_to_ray(
+				app->camera_3d,
+				mouse_framebuffer.x,
+				mouse_framebuffer.y,
+				viewport_width,
+				viewport_height,
+				&ray_origin,
+				&ray_dir)) {
+			for (sz i = 0; i < s_array_get_size(&app->objects_3d); ++i) {
+				const editor_object_3d_slot* slot = s_array_get(&app->objects_3d, s_array_handle(&app->objects_3d, (u32)i));
+				s_mat4 transform = s_mat4_identity;
+				s_vec3 center = s_vec3(0.0f, 0.0f, 0.0f);
+				s_vec3 scale = s_vec3(1.0f, 1.0f, 1.0f);
+				f32 scale_max = 1.0f;
+				f32 radius = 1.0f;
+				f32 t = 0.0f;
+				if (!slot || slot->handle == S_HANDLE_NULL) {
+					continue;
+				}
+				transform = se_object_3d_get_transform(slot->handle);
+				center = s_mat4_get_translation(&transform);
+				scale = s_mat4_get_scale(&transform);
+				scale_max = s_max(scale.x, s_max(scale.y, scale.z));
+				radius = s_max(EDITOR_3D_PICK_FALLBACK_RADIUS_MIN, scale_max * 1.65f);
+				if (editor_ray_hits_sphere(&ray_origin, &ray_dir, &center, radius, &t) && t < best_t) {
+					best_t = t;
+					picked = slot->handle;
+				}
+			}
+		}
+	}
+	if (picked != S_HANDLE_NULL) {
+		return picked;
+	}
+	return S_HANDLE_NULL;
+}
+
+static editor_gizmo_axis editor_pick_2d_gizmo_axis(editor_showcase_app* app, const s_vec2* mouse_ndc) {
+	s_vec2 selected_pos = s_vec2(0.0f, 0.0f);
+	s_vec2 x_handle_pos = s_vec2(0.0f, 0.0f);
+	s_vec2 y_handle_pos = s_vec2(0.0f, 0.0f);
+	if (!app || app->selected_2d == S_HANDLE_NULL || !mouse_ndc) {
+		return EDITOR_GIZMO_AXIS_NONE;
+	}
+	selected_pos = se_object_2d_get_position(app->selected_2d);
+	x_handle_pos = s_vec2(selected_pos.x + EDITOR_2D_GIZMO_HANDLE_OFFSET, selected_pos.y);
+	y_handle_pos = s_vec2(selected_pos.x, selected_pos.y + EDITOR_2D_GIZMO_HANDLE_OFFSET);
+	if (editor_distance_vec2(mouse_ndc, &x_handle_pos) <= EDITOR_2D_GIZMO_PICK_RADIUS) {
+		return EDITOR_GIZMO_AXIS_X;
+	}
+	if (editor_distance_vec2(mouse_ndc, &y_handle_pos) <= EDITOR_2D_GIZMO_PICK_RADIUS) {
+		return EDITOR_GIZMO_AXIS_Y;
+	}
+	if (editor_distance_vec2(mouse_ndc, &selected_pos) <= EDITOR_2D_GIZMO_PICK_RADIUS) {
+		return EDITOR_GIZMO_AXIS_FREE;
+	}
+	return EDITOR_GIZMO_AXIS_NONE;
+}
+
+static editor_gizmo_axis editor_pick_3d_gizmo_axis(editor_showcase_app* app, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
+	s_vec3 object_pos = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec2 center_screen = s_vec2(0.0f, 0.0f);
+	editor_gizmo_axis best_axis = EDITOR_GIZMO_AXIS_NONE;
+	f32 best_distance = 1e30f;
+	if (!app || app->selected_3d == S_HANDLE_NULL || app->camera_3d == S_HANDLE_NULL || !mouse_framebuffer) {
+		return EDITOR_GIZMO_AXIS_NONE;
+	}
+	object_pos = editor_get_selected_3d_position(app);
+	if (!se_camera_world_to_screen(app->camera_3d, &object_pos, viewport_width, viewport_height, &center_screen)) {
+		return EDITOR_GIZMO_AXIS_NONE;
+	}
+	if (editor_distance_vec2(mouse_framebuffer, &center_screen) <= EDITOR_3D_GIZMO_PICK_THRESHOLD_PX) {
+		return EDITOR_GIZMO_AXIS_FREE;
+	}
+
+	{
+		const s_vec3 axis_dirs[3] = {
+			s_vec3(1.0f, 0.0f, 0.0f),
+			s_vec3(0.0f, 1.0f, 0.0f),
+			s_vec3(0.0f, 0.0f, 1.0f)
+		};
+		const editor_gizmo_axis axes[3] = {
+			EDITOR_GIZMO_AXIS_X,
+			EDITOR_GIZMO_AXIS_Y,
+			EDITOR_GIZMO_AXIS_Z
+		};
+		for (u32 i = 0; i < 3u; ++i) {
+			s_vec2 endpoint_screen = s_vec2(0.0f, 0.0f);
+			s_vec3 endpoint_world = s_vec3_add(&object_pos, &s_vec3_muls(&axis_dirs[i], EDITOR_3D_GIZMO_AXIS_LENGTH));
+			if (!se_camera_world_to_screen(app->camera_3d, &endpoint_world, viewport_width, viewport_height, &endpoint_screen)) {
+				continue;
+			}
+			const f32 distance = editor_distance_point_segment(mouse_framebuffer, &center_screen, &endpoint_screen);
+			if (distance < best_distance) {
+				best_distance = distance;
+				best_axis = axes[i];
+			}
+		}
+	}
+
+	if (best_distance <= EDITOR_3D_GIZMO_PICK_THRESHOLD_PX) {
+		return best_axis;
+	}
+	return EDITOR_GIZMO_AXIS_NONE;
+}
+
+static void editor_begin_drag_2d(editor_showcase_app* app, const editor_gizmo_axis axis) {
+	if (!app || app->selected_2d == S_HANDLE_NULL) {
+		return;
+	}
+	app->active_axis = axis;
+	app->dragging = true;
+	se_window_get_mouse_position_normalized(app->window, &app->drag_start_mouse_ndc);
+	app->drag_start_pos_2d = se_object_2d_get_position(app->selected_2d);
+}
+
+static void editor_update_drag_2d(editor_showcase_app* app) {
+	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
+	s_vec2 delta = s_vec2(0.0f, 0.0f);
+	s_vec2 new_position = s_vec2(0.0f, 0.0f);
+	if (!app || !app->dragging || app->selected_2d == S_HANDLE_NULL) {
+		return;
+	}
+	se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+	delta = s_vec2_sub(&mouse_ndc, &app->drag_start_mouse_ndc);
+	new_position = s_vec2_add(&app->drag_start_pos_2d, &delta);
+	if (app->active_axis == EDITOR_GIZMO_AXIS_X) {
+		new_position.y = app->drag_start_pos_2d.y;
+	} else if (app->active_axis == EDITOR_GIZMO_AXIS_Y) {
+		new_position.x = app->drag_start_pos_2d.x;
+	}
+	new_position.x = editor_clampf(new_position.x, -0.94f, 0.94f);
+	new_position.y = editor_clampf(new_position.y, -0.92f, 0.92f);
+	(void)editor_apply_object_2d_position(app, app->selected_2d, &new_position);
+}
+
+static void editor_begin_drag_3d(editor_showcase_app* app, const editor_gizmo_axis axis, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
+	se_camera* camera_ptr = NULL;
+	s_vec3 camera_forward = s_vec3(0.0f, 0.0f, -1.0f);
+	s_vec3 side = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 plane_hit = s_vec3(0.0f, 0.0f, 0.0f);
+	if (!app || app->selected_3d == S_HANDLE_NULL || !mouse_framebuffer) {
+		return;
+	}
+	app->dragging = true;
+	app->active_axis = axis;
+	app->drag_start_pos_3d = editor_get_selected_3d_position(app);
+	app->drag_plane_point = app->drag_start_pos_3d;
+	app->drag_plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	app->drag_start_hit_world = app->drag_start_pos_3d;
+	app->drag_axis_param_start = 0.0f;
+	app->drag_axis_world = s_vec3(0.0f, 0.0f, 0.0f);
+
+	camera_ptr = se_camera_get(app->camera_3d);
+	if (camera_ptr) {
+		camera_forward = s_vec3_sub(&camera_ptr->target, &camera_ptr->position);
+		camera_forward = s_vec3_normalize(&camera_forward);
+	}
+
+	if (axis == EDITOR_GIZMO_AXIS_X) {
+		app->drag_axis_world = s_vec3(1.0f, 0.0f, 0.0f);
+	} else if (axis == EDITOR_GIZMO_AXIS_Y) {
+		app->drag_axis_world = s_vec3(0.0f, 1.0f, 0.0f);
+	} else if (axis == EDITOR_GIZMO_AXIS_Z) {
+		app->drag_axis_world = s_vec3(0.0f, 0.0f, 1.0f);
+	}
+
+	if (axis == EDITOR_GIZMO_AXIS_FREE) {
+		if (se_camera_screen_to_plane(
+				app->camera_3d,
+				mouse_framebuffer->x,
+				mouse_framebuffer->y,
+				viewport_width,
+				viewport_height,
+				&app->drag_plane_point,
+				&app->drag_plane_normal,
+				&plane_hit)) {
+			app->drag_start_hit_world = plane_hit;
+		}
+		return;
+	}
+
+	side = s_vec3_cross(&app->drag_axis_world, &camera_forward);
+	if (s_vec3_length(&side) < 0.0001f) {
+		side = s_vec3_cross(&app->drag_axis_world, &s_vec3(0.0f, 1.0f, 0.0f));
+	}
+	if (s_vec3_length(&side) < 0.0001f) {
+		side = s_vec3_cross(&app->drag_axis_world, &s_vec3(1.0f, 0.0f, 0.0f));
+	}
+	side = s_vec3_normalize(&side);
+	app->drag_plane_normal = s_vec3_cross(&side, &app->drag_axis_world);
+	app->drag_plane_normal = s_vec3_normalize(&app->drag_plane_normal);
+	if (s_vec3_length(&app->drag_plane_normal) < 0.0001f) {
+		app->drag_plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	}
+	if (se_camera_screen_to_plane(
+			app->camera_3d,
+			mouse_framebuffer->x,
+			mouse_framebuffer->y,
+			viewport_width,
+			viewport_height,
+			&app->drag_plane_point,
+			&app->drag_plane_normal,
+			&plane_hit)) {
+		const s_vec3 rel = s_vec3_sub(&plane_hit, &app->drag_plane_point);
+		app->drag_axis_param_start = s_vec3_dot(&rel, &app->drag_axis_world);
+	}
+}
+
+static void editor_update_drag_3d(editor_showcase_app* app, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
+	s_vec3 plane_hit = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 new_position = s_vec3(0.0f, 0.0f, 0.0f);
+	s_mat4 transform = s_mat4_identity;
+	if (!app || !app->dragging || app->selected_3d == S_HANDLE_NULL || !mouse_framebuffer) {
+		return;
+	}
+	if (!se_camera_screen_to_plane(
+			app->camera_3d,
+			mouse_framebuffer->x,
+			mouse_framebuffer->y,
+			viewport_width,
+			viewport_height,
+			&app->drag_plane_point,
+			&app->drag_plane_normal,
+			&plane_hit)) {
+		return;
+	}
+
+	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
+		const s_vec3 delta = s_vec3_sub(&plane_hit, &app->drag_start_hit_world);
+		new_position = s_vec3_add(&app->drag_start_pos_3d, &delta);
+	} else {
+		const s_vec3 rel = s_vec3_sub(&plane_hit, &app->drag_plane_point);
+		const f32 axis_param = s_vec3_dot(&rel, &app->drag_axis_world);
+		const f32 axis_delta = axis_param - app->drag_axis_param_start;
+		new_position = s_vec3_add(&app->drag_start_pos_3d, &s_vec3_muls(&app->drag_axis_world, axis_delta));
+	}
+	transform = se_object_3d_get_transform(app->selected_3d);
+	s_mat4_set_translation(&transform, &new_position);
+	(void)editor_apply_object_3d_transform(app, app->selected_3d, &transform);
+}
+
+static void editor_end_drag(editor_showcase_app* app) {
+	if (!app) {
+		return;
+	}
+	app->dragging = false;
+	app->active_axis = EDITOR_GIZMO_AXIS_NONE;
+}
+
+static void editor_set_2d_object_color(const se_object_2d_handle object, const s_vec3* color) {
+	se_shader_handle shader = S_HANDLE_NULL;
+	if (object == S_HANDLE_NULL || !color) {
+		return;
+	}
+	shader = se_object_2d_get_shader(object);
+	if (shader != S_HANDLE_NULL) {
+		se_shader_set_vec3(shader, "u_color", color);
+	}
+}
+
+static void editor_update_2d_object_colors(editor_showcase_app* app) {
+	if (!app) {
+		return;
+	}
+	for (sz i = 0; i < s_array_get_size(&app->objects_2d); ++i) {
+		editor_object_2d_slot* slot = s_array_get(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
+		s_vec3 color = s_vec3(0.9f, 0.9f, 0.9f);
+		if (!slot || slot->handle == S_HANDLE_NULL) {
+			continue;
+		}
+		color = slot->base_color;
+		if (slot->handle == app->selected_2d) {
+			color = s_vec3(
+				editor_clampf(color.x + 0.18f, 0.0f, 1.0f),
+				editor_clampf(color.y + 0.18f, 0.0f, 1.0f),
+				editor_clampf(color.z + 0.18f, 0.0f, 1.0f));
+		}
+		editor_set_2d_object_color(slot->handle, &color);
+	}
+}
+
+static void editor_update_2d_gizmo_visuals(editor_showcase_app* app) {
+	s_vec2 hidden = s_vec2(-3.0f, -3.0f);
+	s_vec2 selected_pos = s_vec2(0.0f, 0.0f);
+	s_vec2 x_handle_pos = s_vec2(0.0f, 0.0f);
+	s_vec2 y_handle_pos = s_vec2(0.0f, 0.0f);
+	s_vec2 center_scale = s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE);
+	s_vec2 axis_scale = s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE * 0.9f, EDITOR_2D_GIZMO_HANDLE_SIZE * 0.9f);
+	s_vec3 color_center = s_vec3(0.95f, 0.88f, 0.15f);
+	s_vec3 color_x = s_vec3(0.92f, 0.24f, 0.21f);
+	s_vec3 color_y = s_vec3(0.20f, 0.88f, 0.38f);
+	if (!app) {
+		return;
+	}
+	if (app->selected_2d == S_HANDLE_NULL || app->target != EDITOR_TARGET_SCENE_2D) {
+		se_object_2d_set_position(app->gizmo_2d_center, &hidden);
+		se_object_2d_set_position(app->gizmo_2d_x, &hidden);
+		se_object_2d_set_position(app->gizmo_2d_y, &hidden);
+		return;
+	}
+	selected_pos = se_object_2d_get_position(app->selected_2d);
+	x_handle_pos = s_vec2(selected_pos.x + EDITOR_2D_GIZMO_HANDLE_OFFSET, selected_pos.y);
+	y_handle_pos = s_vec2(selected_pos.x, selected_pos.y + EDITOR_2D_GIZMO_HANDLE_OFFSET);
+	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE && app->dragging) {
+		center_scale = s_vec2(center_scale.x * 1.35f, center_scale.y * 1.35f);
+		color_center = s_vec3(1.0f, 0.98f, 0.38f);
+	}
+	if (app->active_axis == EDITOR_GIZMO_AXIS_X && app->dragging) {
+		axis_scale = s_vec2(axis_scale.x * 1.35f, axis_scale.y * 1.35f);
+		color_x = s_vec3(1.0f, 0.50f, 0.42f);
+	}
+	if (app->active_axis == EDITOR_GIZMO_AXIS_Y && app->dragging) {
+		axis_scale = s_vec2(axis_scale.x * 1.35f, axis_scale.y * 1.35f);
+		color_y = s_vec3(0.45f, 1.0f, 0.56f);
+	}
+	se_object_2d_set_position(app->gizmo_2d_center, &selected_pos);
+	se_object_2d_set_position(app->gizmo_2d_x, &x_handle_pos);
+	se_object_2d_set_position(app->gizmo_2d_y, &y_handle_pos);
+	se_object_2d_set_scale(app->gizmo_2d_center, &center_scale);
+	se_object_2d_set_scale(app->gizmo_2d_x, &axis_scale);
+	se_object_2d_set_scale(app->gizmo_2d_y, &axis_scale);
+	editor_set_2d_object_color(app->gizmo_2d_center, &color_center);
+	editor_set_2d_object_color(app->gizmo_2d_x, &color_x);
+	editor_set_2d_object_color(app->gizmo_2d_y, &color_y);
+}
+
+static void editor_draw_3d_helpers(editor_showcase_app* app) {
+	if (!app || app->scene_3d == S_HANDLE_NULL || app->target != EDITOR_TARGET_SCENE_3D) {
+		return;
+	}
+	se_scene_3d_clear_debug_markers(app->scene_3d);
+
+	for (i32 i = -8; i <= 8; ++i) {
+		s_vec4 line_color = s_vec4(0.22f, 0.24f, 0.30f, 1.0f);
+		s_vec3 a = s_vec3((f32)i, 0.0f, -8.0f);
+		s_vec3 b = s_vec3((f32)i, 0.0f, 8.0f);
+		s_vec3 c = s_vec3(-8.0f, 0.0f, (f32)i);
+		s_vec3 d = s_vec3(8.0f, 0.0f, (f32)i);
+		if (i == 0) {
+			line_color = s_vec4(0.34f, 0.38f, 0.46f, 1.0f);
+		}
+		se_scene_3d_debug_line(app->scene_3d, &a, &b, &line_color);
+		se_scene_3d_debug_line(app->scene_3d, &c, &d, &line_color);
+	}
+
+	if (app->selected_3d != S_HANDLE_NULL) {
+		const s_vec3 origin = editor_get_selected_3d_position(app);
+		const s_vec4 color_x = s_vec4(0.95f, 0.28f, 0.26f, 1.0f);
+		const s_vec4 color_y = s_vec4(0.24f, 0.92f, 0.38f, 1.0f);
+		const s_vec4 color_z = s_vec4(0.34f, 0.62f, 0.95f, 1.0f);
+		s_vec4 color_center = s_vec4(0.98f, 0.88f, 0.25f, 1.0f);
+		s_vec3 x_end = s_vec3_add(&origin, &s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH, 0.0f, 0.0f));
+		s_vec3 y_end = s_vec3_add(&origin, &s_vec3(0.0f, EDITOR_3D_GIZMO_AXIS_LENGTH, 0.0f));
+		s_vec3 z_end = s_vec3_add(&origin, &s_vec3(0.0f, 0.0f, EDITOR_3D_GIZMO_AXIS_LENGTH));
+		if (app->active_axis == EDITOR_GIZMO_AXIS_X && app->dragging) {
+			color_center = s_vec4(1.0f, 0.60f, 0.42f, 1.0f);
+		}
+		if (app->active_axis == EDITOR_GIZMO_AXIS_Y && app->dragging) {
+			color_center = s_vec4(0.56f, 1.0f, 0.62f, 1.0f);
+		}
+		if (app->active_axis == EDITOR_GIZMO_AXIS_Z && app->dragging) {
+			color_center = s_vec4(0.58f, 0.76f, 1.0f, 1.0f);
+		}
+		if (app->active_axis == EDITOR_GIZMO_AXIS_FREE && app->dragging) {
+			color_center = s_vec4(1.0f, 0.95f, 0.55f, 1.0f);
+		}
+		se_scene_3d_debug_line(app->scene_3d, &origin, &x_end, &color_x);
+		se_scene_3d_debug_line(app->scene_3d, &origin, &y_end, &color_y);
+		se_scene_3d_debug_line(app->scene_3d, &origin, &z_end, &color_z);
+		se_scene_3d_debug_sphere(app->scene_3d, &origin, 0.10f, &color_center);
+	}
+}
+
+static void editor_update_ui_status(editor_showcase_app* app) {
+	c8 status[512] = {0};
+	const c8* target_name = "scene_2d";
+	const c8* axis_name = "none";
 	f64 now = 0.0;
-	se_editor_counts counts = {0};
-	se_editor_diagnostics diagnostics = {0};
-	b8 has_counts = false;
-	b8 has_diagnostics = false;
-	if (!app || app->ui == S_HANDLE_NULL || app->ui_label == S_HANDLE_NULL) {
+	if (!app || app->ui == S_HANDLE_NULL || app->ui_status == S_HANDLE_NULL) {
 		return;
 	}
 	now = se_window_get_time(app->window);
-	snprintf(
-		title_text,
-		sizeof(title_text),
-		"Syphax Editor  |  %.0f FPS  |  frame %llu",
-		se_window_get_fps(app->window),
-		(unsigned long long)app->frame_index);
-	(void)se_ui_widget_set_text(app->ui, app->ui_label, title_text);
-
-	if (app->ui_metrics == S_HANDLE_NULL || now < app->next_ui_metrics_time) {
+	if (now < app->next_status_time) {
 		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		target_name = "scene_3d";
+	}
+	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
+		axis_name = "free";
+	} else if (app->active_axis == EDITOR_GIZMO_AXIS_X) {
+		axis_name = "x";
+	} else if (app->active_axis == EDITOR_GIZMO_AXIS_Y) {
+		axis_name = "y";
+	} else if (app->active_axis == EDITOR_GIZMO_AXIS_Z) {
+		axis_name = "z";
+	}
+	snprintf(
+		status,
+		sizeof(status),
+		"Mode=%s | Drag=%s axis=%s | selected2d=%llu selected3d=%llu | objects2d=%zu objects3d=%zu | Tab switch mode | N add | Delete remove | LMB select/drag gizmo",
+		target_name,
+		app->dragging ? "on" : "off",
+		axis_name,
+		(unsigned long long)app->selected_2d,
+		(unsigned long long)app->selected_3d,
+		s_array_get_size(&app->objects_2d),
+		s_array_get_size(&app->objects_3d));
+	(void)se_ui_widget_set_text(app->ui, app->ui_status, status);
+	app->next_status_time = now + 0.08;
+}
+
+static b8 editor_setup_ui(editor_showcase_app* app) {
+	se_ui_style panel_style = SE_UI_STYLE_DEFAULT;
+	if (!app || app->window == S_HANDLE_NULL) {
+		return false;
+	}
+	app->ui = se_ui_create(app->window, 64);
+	if (app->ui == S_HANDLE_NULL) {
+		return false;
+	}
+
+	se_ui_widget_handle root = se_ui_create_root(app->ui);
+	app->ui_panel = se_ui_add_panel(root, {
+		.id = "editor_hud",
+		.position = s_vec2(0.012f, 0.012f),
+		.size = s_vec2(0.976f, 0.095f)
+	});
+	se_ui_vstack(app->ui, app->ui_panel, 0.005f, se_ui_edge_all(0.008f));
+
+	app->ui_title = se_ui_add_text(app->ui_panel, {
+		.id = "editor_title",
+		.text = "Advanced Editor Showcase | 2D+3D Scene Editing",
+		.size = s_vec2(0.95f, 0.038f),
+		.font_size = 20.0f
+	});
+
+	app->ui_status = se_ui_add_text(app->ui_panel, {
+		.id = "editor_status",
+		.text = "Initializing editor state...",
+		.size = s_vec2(0.95f, 0.032f),
+		.font_size = 14.0f
+	});
+
+	panel_style.normal.background_color = s_vec4(0.03f, 0.06f, 0.10f, 0.92f);
+	panel_style.normal.border_color = s_vec4(0.21f, 0.63f, 0.84f, 1.0f);
+	panel_style.normal.text_color = s_vec4(0.94f, 0.98f, 1.0f, 1.0f);
+	panel_style.normal.border_width = 0.004f;
+	panel_style.hovered = panel_style.normal;
+	panel_style.pressed = panel_style.normal;
+	panel_style.disabled = panel_style.normal;
+	panel_style.focused = panel_style.normal;
+	(void)se_ui_widget_set_style(app->ui, app->ui_panel, &panel_style);
+	return true;
+}
+
+static b8 editor_setup_scenes(editor_showcase_app* app) {
+	se_camera_controller_params camera_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
+	se_editor_config editor_config = SE_EDITOR_CONFIG_DEFAULTS;
+	if (!app) {
+		return false;
+	}
+	app->scene_2d = se_scene_2d_create(&s_vec2((f32)SHOWCASE_WIDTH, (f32)SHOWCASE_HEIGHT), 128);
+	if (app->scene_2d == S_HANDLE_NULL) {
+		editor_log_error("create scene_2d");
+		return false;
+	}
+	se_scene_2d_set_auto_resize(app->scene_2d, app->window, &s_vec2(1.0f, 1.0f));
+
+	app->scene_3d = se_scene_3d_create_for_window(app->window, 128);
+	if (app->scene_3d == S_HANDLE_NULL) {
+		editor_log_error("create scene_3d");
+		return false;
+	}
+	app->camera_3d = se_scene_3d_get_camera(app->scene_3d);
+	if (app->camera_3d == S_HANDLE_NULL) {
+		editor_log_error("scene_3d camera");
+		return false;
+	}
+	se_camera_set_orbit_defaults(app->camera_3d, app->window, &s_vec3(0.0f, 0.5f, 0.0f), 7.5f);
+
+	camera_params.window = app->window;
+	camera_params.camera = app->camera_3d;
+	camera_params.movement_speed = 7.0f;
+	camera_params.mouse_x_speed = 0.0032f;
+	camera_params.mouse_y_speed = 0.0032f;
+	camera_params.preset = SE_CAMERA_CONTROLLER_PRESET_UE;
+	camera_params.look_toggle = false;
+	camera_params.lock_cursor_while_active = true;
+	app->camera_controller = se_camera_controller_create(&camera_params);
+
+	app->cube_model = se_model_load_obj_simple(
+		SE_RESOURCE_PUBLIC("models/cube.obj"),
+		SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
+		SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"));
+	if (app->cube_model == S_HANDLE_NULL) {
+		editor_log_error("load cube model");
+		return false;
+	}
+
+	editor_config.context = app->context;
+	editor_config.window = app->window;
+	app->editor = se_editor_create(&editor_config);
+	if (!app->editor) {
+		editor_log_error("create editor");
+		return false;
+	}
+
+	app->gizmo_2d_center = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
+	app->gizmo_2d_x = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
+	app->gizmo_2d_y = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
+	if (app->gizmo_2d_center == S_HANDLE_NULL || app->gizmo_2d_x == S_HANDLE_NULL || app->gizmo_2d_y == S_HANDLE_NULL) {
+		editor_log_error("create 2d gizmo objects");
+		return false;
+	}
+	se_object_2d_set_scale(app->gizmo_2d_center, &s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE));
+	se_object_2d_set_scale(app->gizmo_2d_x, &s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE));
+	se_object_2d_set_scale(app->gizmo_2d_y, &s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE));
+	se_scene_2d_add_object(app->scene_2d, app->gizmo_2d_center);
+	se_scene_2d_add_object(app->scene_2d, app->gizmo_2d_x);
+	se_scene_2d_add_object(app->scene_2d, app->gizmo_2d_y);
+	se_object_2d_set_position(app->gizmo_2d_center, &s_vec2(-3.0f, -3.0f));
+	se_object_2d_set_position(app->gizmo_2d_x, &s_vec2(-3.0f, -3.0f));
+	se_object_2d_set_position(app->gizmo_2d_y, &s_vec2(-3.0f, -3.0f));
+
+	app->selected_2d = editor_spawn_object_2d(app, &s_vec2(-0.60f, -0.30f));
+	(void)editor_spawn_object_2d(app, &s_vec2(-0.10f, -0.05f));
+	(void)editor_spawn_object_2d(app, &s_vec2(0.44f, 0.26f));
+
+	app->selected_3d = editor_spawn_object_3d(app, &s_vec3(-1.1f, 0.35f, -0.7f));
+	(void)editor_spawn_object_3d(app, &s_vec3(0.0f, 0.35f, 0.0f));
+	(void)editor_spawn_object_3d(app, &s_vec3(1.25f, 0.35f, 0.55f));
+
+	return true;
+}
+
+static b8 editor_screen_to_horizontal_plane(editor_showcase_app* app, const f32 plane_y, s_vec3* out_world) {
+	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
+	f32 viewport_width = 0.0f;
+	f32 viewport_height = 0.0f;
+	s_vec3 plane_point = s_vec3(0.0f, plane_y, 0.0f);
+	s_vec3 plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	if (!app || app->camera_3d == S_HANDLE_NULL || !out_world) {
+		return false;
+	}
+	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
+		return false;
+	}
+	return se_camera_screen_to_plane(
+		app->camera_3d,
+		mouse_framebuffer.x,
+		mouse_framebuffer.y,
+		viewport_width,
+		viewport_height,
+		&plane_point,
+		&plane_normal,
+		out_world);
+}
+
+static void editor_add_object_from_cursor(editor_showcase_app* app) {
+	if (!app) {
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_2D) {
+		s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
+		se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+		app->selected_2d = editor_spawn_object_2d(app, &mouse_ndc);
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		s_vec3 world = s_vec3(0.0f, 0.35f, 0.0f);
+		if (editor_screen_to_horizontal_plane(app, 0.35f, &world)) {
+			world.y = 0.35f;
+		}
+		app->selected_3d = editor_spawn_object_3d(app, &world);
+	}
+}
+
+static void editor_remove_selected_object(editor_showcase_app* app) {
+	if (!app) {
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_2D) {
+		editor_delete_object_2d(app, app->selected_2d);
+		return;
+	}
+	editor_delete_object_3d(app, app->selected_3d);
+}
+
+static b8 editor_is_alt_down(editor_showcase_app* app) {
+	if (!app) {
+		return false;
+	}
+	return se_window_is_key_down(app->window, SE_KEY_LEFT_ALT) || se_window_is_key_down(app->window, SE_KEY_RIGHT_ALT);
+}
+
+static void editor_update_scene_2d_interaction(editor_showcase_app* app) {
+	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
+	if (!app || app->target != EDITOR_TARGET_SCENE_2D) {
+		return;
+	}
+	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT)) {
+		editor_gizmo_axis axis = EDITOR_GIZMO_AXIS_NONE;
+		se_object_2d_handle picked = S_HANDLE_NULL;
+		se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+		axis = editor_pick_2d_gizmo_axis(app, &mouse_ndc);
+		if (axis != EDITOR_GIZMO_AXIS_NONE) {
+			editor_begin_drag_2d(app, axis);
+			return;
+		}
+		picked = editor_pick_scene_object_2d(app);
+		app->selected_2d = picked;
+		if (picked != S_HANDLE_NULL) {
+			editor_begin_drag_2d(app, EDITOR_GIZMO_AXIS_FREE);
+		}
+	}
+	if (app->dragging && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
+		editor_update_drag_2d(app);
+	}
+	if (app->dragging && se_window_is_mouse_released(app->window, SE_MOUSE_LEFT)) {
+		editor_end_drag(app);
+	}
+}
+
+static void editor_update_scene_3d_interaction(editor_showcase_app* app) {
+	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
+	f32 viewport_width = 0.0f;
+	f32 viewport_height = 0.0f;
+	if (!app || app->target != EDITOR_TARGET_SCENE_3D) {
+		return;
+	}
+	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
+		return;
+	}
+
+	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT) && !editor_is_alt_down(app)) {
+		editor_gizmo_axis axis = editor_pick_3d_gizmo_axis(app, &mouse_framebuffer, viewport_width, viewport_height);
+		if (axis != EDITOR_GIZMO_AXIS_NONE) {
+			editor_begin_drag_3d(app, axis, &mouse_framebuffer, viewport_width, viewport_height);
+			return;
+		}
+		app->selected_3d = editor_pick_scene_object_3d(app);
+		if (app->selected_3d != S_HANDLE_NULL) {
+			editor_begin_drag_3d(app, EDITOR_GIZMO_AXIS_FREE, &mouse_framebuffer, viewport_width, viewport_height);
+		}
+	}
+	if (app->dragging && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
+		editor_update_drag_3d(app, &mouse_framebuffer, viewport_width, viewport_height);
+	}
+	if (app->dragging && se_window_is_mouse_released(app->window, SE_MOUSE_LEFT)) {
+		editor_end_drag(app);
+	}
+}
+
+static void editor_cleanup(editor_showcase_app* app) {
+	if (!app) {
+		return;
+	}
+	if (app->camera_controller) {
+		se_camera_controller_destroy(app->camera_controller);
+		app->camera_controller = NULL;
 	}
 	if (app->editor) {
-		has_counts = se_editor_collect_counts(app->editor, &counts);
-		has_diagnostics = se_editor_collect_diagnostics(app->editor, &diagnostics);
+		se_editor_destroy(app->editor);
+		app->editor = NULL;
 	}
-	if (has_counts && has_diagnostics) {
-		snprintf(
-			metrics_text,
-			sizeof(metrics_text),
-			"CPU %.2f ms  GPU %.2f ms  |  obj2d %u  obj3d %u  sim %u  queue %u",
-			diagnostics.trace_cpu_ms_last_frame,
-			diagnostics.trace_gpu_ms_last_frame,
-			counts.objects_2d,
-			counts.objects_3d,
-			counts.simulations,
-			counts.queued_commands);
-	} else {
-		snprintf(metrics_text, sizeof(metrics_text), "Press buttons or keys (E/Q/C/D/Space) to drive the editor");
+	if (app->ui != S_HANDLE_NULL) {
+		se_ui_destroy(app->ui);
+		app->ui = S_HANDLE_NULL;
 	}
-	(void)se_ui_widget_set_text(app->ui, app->ui_metrics, metrics_text);
-	app->next_ui_metrics_time = now + 0.20;
-}
-
-static void showcase_play_clip_via_editor(editor_showcase_app* app) {
-	se_editor_item clip_item = {0};
-	se_editor_value play_value = se_editor_value_vec4(s_vec4(0.40f, 0.0f, 1.0f, (f32)SE_AUDIO_BUS_SFX));
-	if (!app || !app->editor) {
-		return;
+	if (app->scene_2d != S_HANDLE_NULL) {
+		se_scene_2d_destroy_full(app->scene_2d, true);
+		app->scene_2d = S_HANDLE_NULL;
 	}
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_AUDIO_CLIP, S_HANDLE_NULL, &clip_item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &clip_item, "play", &play_value, NULL));
+	if (app->scene_3d != S_HANDLE_NULL) {
+		se_scene_3d_destroy_full(app->scene_3d, true, true);
+		app->scene_3d = S_HANDLE_NULL;
 	}
-}
-
-static void showcase_print_category_property_counts(se_editor* editor) {
-	if (!editor) {
-		return;
+	s_array_clear(&app->objects_2d);
+	s_array_clear(&app->objects_3d);
+	if (app->context) {
+		se_context_destroy(app->context);
+		app->context = NULL;
 	}
-	for (u32 category = 0; category < (u32)SE_EDITOR_CATEGORY_COUNT; ++category) {
-		const se_editor_property* properties = NULL;
-		se_editor_item item = {0};
-		sz property_count = 0;
-		if (!se_editor_find_item(editor, (se_editor_category)category, S_HANDLE_NULL, &item)) {
-			continue;
-		}
-		if (!se_editor_collect_properties(editor, &item, &properties, &property_count)) {
-			continue;
-		}
-		printf("editor_showcase :: category=%s properties=%zu\n", se_editor_category_name((se_editor_category)category), property_count);
-		(void)properties;
-	}
-}
-
-static void showcase_print_diagnostics(se_editor* editor) {
-	se_editor_diagnostics diagnostics = {0};
-	if (!editor || !se_editor_collect_diagnostics(editor, &diagnostics)) {
-		printf("editor_showcase :: collect_diagnostics failed (%s)\n", se_result_str(se_get_last_error()));
-		return;
-	}
-	printf(
-		"editor_showcase :: frame_ms=%.3f trace(events=%llu total_stats=%u last_stats=%u threads=%u cpu_ms=%.3f gpu_ms=%.3f)\n",
-		diagnostics.frame_timing.frame_ms,
-		(unsigned long long)diagnostics.trace_event_count,
-		diagnostics.trace_stat_count_total,
-		diagnostics.trace_stat_count_last_frame,
-		diagnostics.trace_thread_count_last_frame,
-		diagnostics.trace_cpu_ms_last_frame,
-		diagnostics.trace_gpu_ms_last_frame);
-	if (diagnostics.has_audio_clip_bands) {
-		printf(
-			"editor_showcase :: audio_clip_bands low=%.3f mid=%.3f high=%.3f\n",
-			diagnostics.audio_clip_bands.low,
-			diagnostics.audio_clip_bands.mid,
-			diagnostics.audio_clip_bands.high);
-	}
-	if (diagnostics.has_audio_capture_bands) {
-		printf(
-			"editor_showcase :: audio_capture_bands low=%.3f mid=%.3f high=%.3f\n",
-			diagnostics.audio_capture_bands.low,
-			diagnostics.audio_capture_bands.mid,
-			diagnostics.audio_capture_bands.high);
-	}
-}
-
-static void showcase_apply_queue_demo(editor_showcase_app* app) {
-	se_editor_command command = {0};
-	const se_editor_command* queued_commands = NULL;
-	se_editor_item item = {0};
-	se_editor_value value = se_editor_value_none();
-	sz queue_count = 0;
-	u32 applied = 0;
-
-	if (!app || !app->editor) {
-		return;
-	}
-
-	se_editor_clear_queue(app->editor);
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_DEBUG, S_HANDLE_NULL, &item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_validate_item(app->editor, &item));
-		value = se_editor_value_bool(false);
-		command = se_editor_command_make_set(&item, "overlay_enabled", &value);
-		SHOWCASE_TRY_EDITOR(se_editor_queue_command(app->editor, &command));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_WINDOW, app->window, &item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_validate_item(app->editor, &item));
-		value = se_editor_value_uint(60u);
-		command = se_editor_command_make_set(&item, "target_fps", &value);
-		SHOWCASE_TRY_EDITOR(se_editor_queue_command(app->editor, &command));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_AUDIO, S_HANDLE_NULL, &item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_validate_item(app->editor, &item));
-		value = se_editor_value_float(0.92f);
-		command = se_editor_command_make_set(&item, "master_volume", &value);
-		SHOWCASE_TRY_EDITOR(se_editor_queue_command(app->editor, &command));
-	}
-
-	if (se_editor_get_queue(app->editor, &queued_commands, &queue_count)) {
-		printf("editor_showcase :: queue demo queued=%zu\n", queue_count);
-	}
-	(void)queued_commands;
-
-	if (se_editor_apply_queue(app->editor, &applied, true)) {
-		printf("editor_showcase :: queue demo applied=%u\n", applied);
-	}
-}
-
-static void showcase_apply_full_batch(editor_showcase_app* app) {
-	se_editor_item item = {0};
-	se_editor_value value = se_editor_value_none();
-	se_editor_value aux_value = se_editor_value_none();
-
-	if (!app || !app->editor) {
-		return;
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_BACKEND, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_vec4(s_vec4(0.07f, 0.10f, 0.14f, 1.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "render_set_background_color", &value));
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "render_set_blending", &value));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "reload_changed_shaders", NULL, NULL));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_DEBUG, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_int(SE_DEBUG_LEVEL_WARN);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "level", &value));
-		value = se_editor_value_bool(false);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "overlay_enabled", &value));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_WINDOW, app->window, &item)) {
-		value = se_editor_value_uint(60u);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "target_fps", &value));
-		value = se_editor_value_bool(false);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "raw_mouse_motion_enabled", &value));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_INPUT, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "enabled", &value));
-		value = se_editor_value_text("editor_showcase");
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "emit_text", &value, NULL));
-	}
-
-	if (app->camera != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_CAMERA, app->camera, &item)) {
-		value = se_editor_value_float(56.0f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "fov", &value));
-		value = se_editor_value_handle(app->window);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "set_aspect_from_window", &value, NULL));
-	}
-
-	if (app->scene_2d != S_HANDLE_NULL && showcase_find_item_by_category_name(app->editor, "scene_2d", app->scene_2d, &item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_validate_item(app->editor, &item));
-		value = se_editor_value_vec2(s_vec2(640.0f, 360.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "output_size", &value));
-		if (app->object_2d != S_HANDLE_NULL) {
-			value = se_editor_value_handle(app->object_2d);
-			SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "add_object", &value, NULL));
-		}
-	}
-
-	if (app->object_2d != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_OBJECT_2D, app->object_2d, &item)) {
-		value = se_editor_value_vec2(s_vec2(-0.58f, -0.30f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "position", &value));
-		value = se_editor_value_vec2(s_vec2(0.20f, 0.12f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "scale", &value));
-	}
-
-	if (app->scene_3d != S_HANDLE_NULL && showcase_find_item_by_category_name(app->editor, "Scene-3D", app->scene_3d, &item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_validate_item(app->editor, &item));
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "culling", &value));
-		if (app->render_buffer != S_HANDLE_NULL) {
-			value = se_editor_value_handle(app->render_buffer);
-			SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "add_post_process_buffer", &value, NULL));
-		}
-	}
-
-	if (app->object_3d != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_OBJECT_3D, app->object_3d, &item)) {
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "visible", &value));
-	}
-
-	if (app->ui != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_UI, app->ui, &item)) {
-		value = se_editor_value_bool(false);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "debug_overlay", &value));
-		value = se_editor_value_int(SE_UI_THEME_PRESET_DEFAULT);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "theme_preset", &value));
-	}
-
-	if (app->ui_label != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_UI_WIDGET, app->ui_label, &item)) {
-		value = se_editor_value_text("Editor is now driving all systems");
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "text", &value));
-		value = se_editor_value_int(4);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "z_order", &value));
-	}
-
-	if (app->vfx_2d != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_VFX_2D, app->vfx_2d, &item)) {
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "focused", &value));
-		if (app->emitter_2d != S_HANDLE_NULL) {
-			value = se_editor_value_handle(app->emitter_2d);
-			aux_value = se_editor_value_uint(24u);
-			SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "emitter_burst", &value, &aux_value));
-		}
-	}
-
-	if (app->vfx_3d != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_VFX_3D, app->vfx_3d, &item)) {
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "focused", &value));
-		if (app->emitter_3d != S_HANDLE_NULL) {
-			value = se_editor_value_handle(app->emitter_3d);
-			aux_value = se_editor_value_uint(16u);
-			SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "emitter_burst", &value, &aux_value));
-		}
-	}
-
-	if (app->simulation != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SIMULATION, app->simulation, &item)) {
-		value = se_editor_value_bool(true);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "focused", &value));
-		value = se_editor_value_uint(1u);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "step", &value, NULL));
-	}
-
-	if (app->model != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_MODEL, app->model, &item)) {
-		value = se_editor_value_vec3(s_vec3(1.005f, 1.0f, 1.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "scale", &value, NULL));
-	}
-
-	if (app->shader != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SHADER, app->shader, &item)) {
-		value = se_editor_value_bool(false);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "needs_reload", &value));
-		value = se_editor_value_float(0.5f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "uniform:u_time", &value));
-	}
-
-	if (app->framebuffer != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_FRAMEBUFFER, app->framebuffer, &item)) {
-		value = se_editor_value_vec2(s_vec2(420.0f, 240.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "size", &value));
-		value = se_editor_value_bool(false);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "auto_resize", &value));
-	}
-
-	if (app->render_buffer != S_HANDLE_NULL && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_RENDER_BUFFER, app->render_buffer, &item)) {
-		value = se_editor_value_vec2(s_vec2(0.96f, 0.96f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "scale", &value));
-		value = se_editor_value_vec2(s_vec2(0.01f, 0.01f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "position", &value));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_AUDIO, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_float(0.90f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "master_volume", &value));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_AUDIO_CLIP, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_float(0.70f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "volume", &value));
-		value = se_editor_value_vec4(s_vec4(0.45f, 0.0f, 1.0f, (f32)SE_AUDIO_BUS_SFX));
-		aux_value = se_editor_value_bool(false);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "play", &value, &aux_value));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_AUDIO_STREAM, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_float(0.28f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "volume", &value));
-		value = se_editor_value_double(0.0);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "seek", &value));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_AUDIO_CAPTURE, S_HANDLE_NULL, &item)) {
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "stop", NULL, NULL));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_NAVIGATION, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_float(0.55f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "cell_size", &value));
-		value = se_editor_value_vec3(s_vec3(4.0f, 4.0f, 1.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "set_cell_blocked", &value, NULL));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_PHYSICS_2D, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_vec2(s_vec2(0.0f, -2.8f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "gravity", &value));
-		value = se_editor_value_float(1.0f / 120.0f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "step", &value, NULL));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_PHYSICS_2D_BODY, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_vec2(s_vec2(0.0f, 1.6f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "apply_impulse", &value, NULL));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_PHYSICS_3D, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_vec3(s_vec3(0.0f, -4.0f, 0.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_set(app->editor, &item, "gravity", &value));
-		value = se_editor_value_float(1.0f / 120.0f);
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "step", &value, NULL));
-	}
-
-	if (se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, S_HANDLE_NULL, &item)) {
-		value = se_editor_value_vec3(s_vec3(0.0f, 2.5f, 0.0f));
-		SHOWCASE_TRY_EDITOR(se_editor_apply_action(app->editor, &item, "apply_impulse", &value, NULL));
-	}
-
-	showcase_style_ui(app);
-	showcase_apply_queue_demo(app);
 }
 
 int main(void) {
-	printf("advanced/editor_showcase :: Advanced editor integration example\n");
+	editor_showcase_app app = {0};
+	printf("advanced/editor_showcase :: Interactive scene editor example\n");
 	se_debug_set_level(SE_DEBUG_LEVEL_WARN);
 
-	editor_showcase_app app = {0};
-	s_vec3 box_half_extents = s_vec3(0.35f, 0.35f, 0.35f);
-	se_audio_config audio_config = SE_AUDIO_CONFIG_DEFAULTS;
-	se_audio_play_params stream_params = {
-		.volume = 0.30f,
-		.pan = 0.0f,
-		.pitch = 1.0f,
-		.looping = true,
-		.bus = SE_AUDIO_BUS_MUSIC
-	};
-	se_physics_world_params_2d physics_params_2d = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS;
-	se_physics_world_params_3d physics_params_3d = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
-	se_physics_body_params_2d body_params_2d = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
-	se_physics_body_params_3d body_params_3d = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
-	se_vfx_2d_params vfx_params_2d = SE_VFX_2D_PARAMS_DEFAULTS;
-	se_vfx_3d_params vfx_params_3d = SE_VFX_3D_PARAMS_DEFAULTS;
-	se_vfx_emitter_2d_params emitter_params_2d = SE_VFX_EMITTER_2D_PARAMS_DEFAULTS;
-	se_vfx_emitter_3d_params emitter_params_3d = SE_VFX_EMITTER_3D_PARAMS_DEFAULTS;
-	se_simulation_config simulation_config = SE_SIMULATION_CONFIG_DEFAULTS;
-	se_editor_config editor_config = SE_EDITOR_CONFIG_DEFAULTS;
+	s_array_init(&app.objects_2d);
+	s_array_init(&app.objects_3d);
+	app.target = EDITOR_TARGET_SCENE_2D;
+	app.active_axis = EDITOR_GIZMO_AXIS_NONE;
 
 	app.context = se_context_create();
 	if (!app.context) {
@@ -683,472 +1179,81 @@ int main(void) {
 	app.window = se_window_create("Syphax - Advanced Editor Showcase", SHOWCASE_WIDTH, SHOWCASE_HEIGHT);
 	if (app.window == S_HANDLE_NULL) {
 		printf("editor_showcase :: window unavailable (%s)\n", se_result_str(se_get_last_error()));
-		se_context_destroy(app.context);
+		editor_cleanup(&app);
 		return 0;
 	}
 	se_window_set_exit_key(app.window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(app.window, 60);
-	se_render_set_background_color(s_vec4(0.01f, 0.02f, 0.04f, 1.0f));
+	se_render_set_background_color(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
 
-	app.input = se_input_create(app.window, 128);
-	if (app.input) {
-		se_input_attach_window_text(app.input);
+	if (!editor_setup_ui(&app)) {
+		printf("editor_showcase :: ui setup failed (%s)\n", se_result_str(se_get_last_error()));
+		editor_cleanup(&app);
+		return 1;
 	}
-
-	app.scene_2d = se_scene_2d_create(&s_vec2((f32)SHOWCASE_WIDTH, (f32)SHOWCASE_HEIGHT), 16);
-	if (app.scene_2d != S_HANDLE_NULL) {
-		se_scene_2d_set_auto_resize(app.scene_2d, app.window, &s_vec2(1.0f, 1.0f));
-		app.object_2d = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d_inst/instance.glsl"), &s_mat3_identity, 8);
-		if (app.object_2d != S_HANDLE_NULL) {
-			s_mat3 transform = s_mat3_identity;
-			s_mat3_set_translation(&transform, &s_vec2(-0.60f, -0.26f));
-			se_object_2d_set_transform(app.object_2d, &transform);
-			app.shader = se_object_2d_get_shader(app.object_2d);
-			if (app.shader != S_HANDLE_NULL) {
-				se_shader_set_vec3(app.shader, "u_color", &s_vec3(0.2f, 0.8f, 0.7f));
-			}
-			se_scene_2d_add_object(app.scene_2d, app.object_2d);
-		}
-	}
-
-	app.scene_3d = se_scene_3d_create_for_window(app.window, 64);
-	if (app.scene_3d != S_HANDLE_NULL) {
-		app.model = se_model_load_obj_simple(
-			SE_RESOURCE_PUBLIC("models/cube.obj"),
-			SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
-			SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"));
-		if (app.model != S_HANDLE_NULL) {
-			app.object_3d = se_scene_3d_add_model(app.scene_3d, app.model, &s_mat4_identity);
-			if (app.object_3d != S_HANDLE_NULL) {
-				s_mat4 transform = showcase_make_box_transform(&s_vec3(0.0f, 0.35f, 0.0f), &box_half_extents);
-				app.object_3d_instance = se_object_3d_add_instance(app.object_3d, &transform, &s_mat4_identity);
-			}
-			if (app.shader == S_HANDLE_NULL && se_model_get_mesh_count(app.model) > 0u) {
-				app.shader = se_model_get_mesh_shader(app.model, 0u);
-			}
-		}
-		app.camera = se_scene_3d_get_camera(app.scene_3d);
-		if (app.camera == S_HANDLE_NULL) {
-			app.camera = se_camera_create();
-			if (app.camera != S_HANDLE_NULL) {
-				se_scene_3d_set_camera(app.scene_3d, app.camera);
-			}
-		}
-		if (app.camera != S_HANDLE_NULL) {
-			se_camera_set_aspect_from_window(app.camera, app.window);
-			se_camera* camera_ptr = se_camera_get(app.camera);
-			if (camera_ptr) {
-				camera_ptr->position = s_vec3(3.2f, 2.4f, 4.4f);
-				camera_ptr->target = s_vec3(0.0f, 0.35f, 0.0f);
-			}
-		}
-	}
-
-	app.ui = se_ui_create(app.window, 96);
-	if (app.ui != S_HANDLE_NULL) {
-		se_ui_widget_handle root = se_ui_create_root(app.ui);
-		se_ui_style root_style = SE_UI_STYLE_DEFAULT;
-		root_style.normal.background_color = s_vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		root_style.normal.border_color = s_vec4(0.0f, 0.0f, 0.0f, 0.0f);
-		root_style.normal.border_width = 0.0f;
-		root_style.hovered = root_style.normal;
-		root_style.pressed = root_style.normal;
-		root_style.disabled = root_style.normal;
-		root_style.focused = root_style.normal;
-		(void)se_ui_widget_set_style(app.ui, root, &root_style);
-
-		app.ui_panel = se_ui_add_panel(root, {
-			.id = "hud_panel",
-			.position = s_vec2(0.02f, 0.02f),
-			.size = s_vec2(0.44f, 0.18f)
-		});
-		(void)se_ui_widget_set_alignment(app.ui, app.ui_panel, SE_UI_ALIGN_START, SE_UI_ALIGN_START);
-		se_ui_vstack(app.ui, app.ui_panel, 0.006f, se_ui_edge_all(0.010f));
-		app.ui_label = se_ui_add_text(app.ui_panel, {
-			.id = "hud_title",
-			.text = "Syphax Editor Showcase",
-			.size = s_vec2(0.40f, 0.045f),
-			.font_size = 22.0f
-		});
-		app.ui_controls_row_a = se_ui_add_panel(app.ui_panel, {
-			.id = "hud_controls_row_a",
-			.size = s_vec2(0.40f, 0.046f)
-		});
-		(void)se_ui_widget_set_alignment(app.ui, app.ui_controls_row_a, SE_UI_ALIGN_START, SE_UI_ALIGN_START);
-		se_ui_hstack(app.ui, app.ui_controls_row_a, 0.010f, SE_UI_EDGE_ZERO);
-		app.ui_button_apply = se_ui_add_button(app.ui_controls_row_a, {
-			.id = "hud_apply",
-			.text = "Apply Batch",
-			.size = s_vec2(0.195f, 0.042f),
-			.font_size = 14.0f,
-			.on_click_fn = showcase_on_click_apply,
-			.on_click_data = &app
-		});
-		app.ui_button_queue = se_ui_add_button(app.ui_controls_row_a, {
-			.id = "hud_queue",
-			.text = "Queue Demo",
-			.size = s_vec2(0.195f, 0.042f),
-			.font_size = 14.0f,
-			.on_click_fn = showcase_on_click_queue,
-			.on_click_data = &app
-		});
-		app.ui_controls_row_b = se_ui_add_panel(app.ui_panel, {
-			.id = "hud_controls_row_b",
-			.size = s_vec2(0.40f, 0.046f)
-		});
-		(void)se_ui_widget_set_alignment(app.ui, app.ui_controls_row_b, SE_UI_ALIGN_START, SE_UI_ALIGN_START);
-		se_ui_hstack(app.ui, app.ui_controls_row_b, 0.010f, SE_UI_EDGE_ZERO);
-		app.ui_button_counts = se_ui_add_button(app.ui_controls_row_b, {
-			.id = "hud_counts",
-			.text = "Counts",
-			.size = s_vec2(0.125f, 0.042f),
-			.font_size = 14.0f,
-			.on_click_fn = showcase_on_click_counts,
-			.on_click_data = &app
-		});
-		app.ui_button_diag = se_ui_add_button(app.ui_controls_row_b, {
-			.id = "hud_diag",
-			.text = "Diagnostics",
-			.size = s_vec2(0.135f, 0.042f),
-			.font_size = 14.0f,
-			.on_click_fn = showcase_on_click_diagnostics,
-			.on_click_data = &app
-		});
-		app.ui_button_play = se_ui_add_button(app.ui_controls_row_b, {
-			.id = "hud_play",
-			.text = "Play Clip",
-			.size = s_vec2(0.125f, 0.042f),
-			.font_size = 14.0f,
-			.on_click_fn = showcase_on_click_play,
-			.on_click_data = &app
-		});
-		showcase_style_ui(&app);
-	}
-
-	app.text = se_text_handle_create(4u);
-	app.font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 30.0f);
-
-	audio_config.enable_capture = true;
-	app.audio = se_audio_init(&audio_config);
-	if (app.audio) {
-		app.clip = se_audio_clip_load(app.audio, SE_RESOURCE_PUBLIC("audio/chime.wav"));
-		app.stream = se_audio_stream_open(app.audio, SE_RESOURCE_PUBLIC("audio/loop.wav"), &stream_params);
-	}
-
-	if (app.audio) {
-		se_audio_capture_config capture_config = {0};
-		capture_config.device_index = 0u;
-		capture_config.sample_rate = 48000u;
-		capture_config.channels = 2u;
-		capture_config.frames_per_buffer = 512u;
-		app.capture = se_audio_capture_start(app.audio, &capture_config);
-	}
-
-	if (se_navigation_grid_create(&app.navigation, 28, 28, 0.5f, &s_vec2(-7.0f, -7.0f))) {
-		app.navigation_ready = true;
-	}
-
-	physics_params_2d.gravity = s_vec2(0.0f, -2.2f);
-	app.physics_2d = se_physics_world_2d_create(&physics_params_2d);
-	if (app.physics_2d) {
-		body_params_2d.type = SE_PHYSICS_BODY_DYNAMIC;
-		body_params_2d.position = s_vec2(-0.58f, -0.22f);
-		app.body_2d = se_physics_body_2d_create(app.physics_2d, &body_params_2d);
-		if (app.body_2d) {
-			se_physics_body_2d_add_box(app.body_2d, &s_vec2(0.0f, 0.0f), &s_vec2(0.12f, 0.08f), 0.0f, false);
-		}
-	}
-
-	physics_params_3d.gravity = s_vec3(0.0f, -3.0f, 0.0f);
-	app.physics_3d = se_physics_world_3d_create(&physics_params_3d);
-	if (app.physics_3d) {
-		body_params_3d.type = SE_PHYSICS_BODY_DYNAMIC;
-		body_params_3d.position = s_vec3(0.0f, 0.35f, 0.0f);
-		app.body_3d = se_physics_body_3d_create(app.physics_3d, &body_params_3d);
-		if (app.body_3d) {
-			se_physics_body_3d_add_box(app.body_3d, &s_vec3(0.0f, 0.0f, 0.0f), &box_half_extents, &s_vec3(0.0f, 0.0f, 0.0f), false);
-		}
-	}
-
-	simulation_config.max_entities = 128u;
-	simulation_config.max_events = 128u;
-	app.simulation = se_simulation_create(&simulation_config);
-
-	app.framebuffer = se_framebuffer_create(&s_vec2(512.0f, 288.0f));
-	app.render_buffer = se_render_buffer_create(512u, 288u, SE_RESOURCE_INTERNAL("shaders/render_quad_frag.glsl"));
-
-	app.texture = se_texture_load_from_memory(se_example_png_1x1_rgba, sizeof(se_example_png_1x1_rgba), SE_CLAMP);
-
-	vfx_params_2d.auto_resize_with_window = true;
-	vfx_params_3d.auto_resize_with_window = true;
-	app.vfx_2d = se_vfx_2d_create(&vfx_params_2d);
-	app.vfx_3d = se_vfx_3d_create(&vfx_params_3d);
-
-	if (app.vfx_2d != S_HANDLE_NULL) {
-		emitter_params_2d.position = s_vec2(0.55f, -0.70f);
-		emitter_params_2d.velocity = s_vec2(0.0f, 0.7f);
-		emitter_params_2d.spawn_rate = 20.0f;
-		emitter_params_2d.max_particles = 512u;
-		emitter_params_2d.texture = app.texture;
-		emitter_params_2d.size = 0.03f;
-		app.emitter_2d = se_vfx_2d_add_emitter(app.vfx_2d, &emitter_params_2d);
-	}
-
-	if (app.vfx_3d != S_HANDLE_NULL) {
-		emitter_params_3d.position = s_vec3(0.0f, 0.55f, 0.0f);
-		emitter_params_3d.velocity = s_vec3(0.0f, 0.8f, 0.0f);
-		emitter_params_3d.spawn_rate = 12.0f;
-		emitter_params_3d.max_particles = 384u;
-		emitter_params_3d.model = app.model;
-		emitter_params_3d.size = 0.10f;
-		app.emitter_3d = se_vfx_3d_add_emitter(app.vfx_3d, &emitter_params_3d);
-	}
-
-	editor_config.context = app.context;
-	editor_config.window = app.window;
-	editor_config.input = app.input;
-	editor_config.audio = app.audio;
-	editor_config.navigation = app.navigation_ready ? &app.navigation : NULL;
-	editor_config.physics_2d = app.physics_2d;
-	editor_config.physics_3d = app.physics_3d;
-	editor_config.focused_simulation = app.simulation;
-	editor_config.focused_vfx_2d = app.vfx_2d;
-	editor_config.focused_vfx_3d = app.vfx_3d;
-	app.editor = se_editor_create(&editor_config);
-	if (app.editor) {
-		if (app.clip) {
-			se_editor_track_audio_clip(app.editor, app.clip, "chime_clip");
-		}
-		if (app.stream) {
-			se_editor_track_audio_stream(app.editor, app.stream, "loop_stream");
-		}
-		if (app.capture) {
-			se_editor_track_audio_capture(app.editor, app.capture, "mic_capture");
-		}
-		showcase_print_category_parse_demo();
+	if (!editor_setup_scenes(&app)) {
+		printf("editor_showcase :: scene setup failed (%s)\n", se_result_str(se_get_last_error()));
+		editor_cleanup(&app);
+		return 1;
 	}
 
 	printf("editor_showcase controls:\n");
-	printf("  Mouse UI buttons: Apply Batch, Queue Demo, Counts, Diagnostics, Play Clip\n");
-	printf("  E: apply full editor command batch (all systems)\n");
-	printf("  Q: queue + apply command batch\n");
-	printf("  C: print editor counts + property coverage\n");
-	printf("  D: print editor diagnostics\n");
-	printf("  Space: play audio clip through editor API\n");
+	printf("  Tab: switch active editor target (scene_2d / scene_3d)\n");
+	printf("  Left Mouse: select and drag with gizmo handles\n");
+	printf("  N: add object at cursor\n");
+	printf("  Delete/Backspace: remove selected object\n");
+	printf("  3D camera: RMB fly + WASD, Alt+LMB orbit, Alt+MMB pan, Alt+RMB dolly\n");
 	printf("  Esc: quit\n");
 
-	app.next_diagnostics_time = 0.0;
 	while (!se_window_should_close(app.window)) {
+		const f32 dt = (f32)se_window_get_delta_time(app.window);
 		se_window_begin_frame(app.window);
 		app.frame_index++;
-		showcase_update_ui_status(&app);
 
-		if (app.input) {
-			se_input_tick(app.input);
-		}
-		if (app.audio) {
-			se_audio_update(app.audio);
-		}
-
-		const f32 dt = (f32)se_window_get_delta_time(app.window);
-		const f32 time_s = (f32)se_window_get_time(app.window);
-
-		if (app.camera != S_HANDLE_NULL) {
-			se_camera_set_aspect_from_window(app.camera, app.window);
-			se_camera* camera_ptr = se_camera_get(app.camera);
-			if (camera_ptr) {
-				camera_ptr->position = s_vec3(cosf(time_s * 0.35f) * 4.0f, 2.3f, sinf(time_s * 0.35f) * 4.0f);
-				camera_ptr->target = s_vec3(0.0f, 0.3f, 0.0f);
+		if (se_window_is_key_pressed(app.window, SE_KEY_TAB)) {
+			if (app.dragging) {
+				editor_end_drag(&app);
 			}
+			app.target = (app.target == EDITOR_TARGET_SCENE_2D) ? EDITOR_TARGET_SCENE_3D : EDITOR_TARGET_SCENE_2D;
+		}
+		if (se_window_is_key_pressed(app.window, SE_KEY_N)) {
+			editor_add_object_from_cursor(&app);
+		}
+		if (se_window_is_key_pressed(app.window, SE_KEY_DELETE) || se_window_is_key_pressed(app.window, SE_KEY_BACKSPACE)) {
+			editor_remove_selected_object(&app);
 		}
 
-		if (app.physics_2d) {
-			se_physics_world_2d_step(app.physics_2d, dt);
-			if (app.body_2d && app.object_2d != S_HANDLE_NULL) {
-				se_object_2d_set_position(app.object_2d, &app.body_2d->position);
-			}
+		if (app.target == EDITOR_TARGET_SCENE_3D && app.camera_controller && !app.dragging) {
+			se_camera_controller_set_enabled(app.camera_controller, true);
+			se_camera_controller_tick(app.camera_controller, dt);
+		} else if (app.camera_controller) {
+			se_camera_controller_set_enabled(app.camera_controller, false);
 		}
 
-		if (app.physics_3d) {
-			se_physics_world_3d_step(app.physics_3d, dt);
-			if (app.body_3d && app.object_3d != S_HANDLE_NULL) {
-				s_mat4 transform = showcase_make_box_transform(&app.body_3d->position, &box_half_extents);
-				se_object_3d_set_instance_transform(app.object_3d, app.object_3d_instance, &transform);
-			}
-		}
+		editor_update_scene_2d_interaction(&app);
+		editor_update_scene_3d_interaction(&app);
 
-		if (app.simulation != S_HANDLE_NULL && (app.frame_index % 6u) == 0u) {
-			se_simulation_step(app.simulation, 1u);
-		}
-
-		if (app.vfx_2d != S_HANDLE_NULL) {
-			se_vfx_2d_tick(app.vfx_2d, dt);
-			se_vfx_2d_render(app.vfx_2d, app.window);
-		}
-		if (app.vfx_3d != S_HANDLE_NULL && app.camera != S_HANDLE_NULL) {
-			se_vfx_3d_tick(app.vfx_3d, dt);
-			se_vfx_3d_render(app.vfx_3d, app.window, app.camera);
-		}
-
-		if (app.editor && !app.batch_applied && app.frame_index > 3u) {
-			showcase_apply_full_batch(&app);
-			app.batch_applied = true;
-			showcase_print_counts(app.editor);
-		}
-
-		if (se_window_is_key_pressed(app.window, SE_KEY_E)) {
-			app.ui_request_apply_batch = true;
-		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_Q)) {
-			app.ui_request_queue_batch = true;
-		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_C)) {
-			app.ui_request_print_counts = true;
-		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_D)) {
-			app.ui_request_print_diagnostics = true;
-		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_SPACE)) {
-			app.ui_request_play_clip = true;
-		}
-
-		if (app.editor && se_window_get_time(app.window) >= app.next_diagnostics_time) {
-			showcase_print_diagnostics(app.editor);
-			app.next_diagnostics_time = se_window_get_time(app.window) + 4.0;
-		}
+		editor_update_2d_object_colors(&app);
+		editor_update_2d_gizmo_visuals(&app);
+		editor_draw_3d_helpers(&app);
+		editor_update_ui_status(&app);
 
 		if (app.ui != S_HANDLE_NULL) {
 			se_ui_tick(app.ui);
 		}
-		if (app.editor && app.ui_request_apply_batch) {
-			showcase_apply_full_batch(&app);
-		}
-		if (app.editor && app.ui_request_queue_batch) {
-			showcase_apply_queue_demo(&app);
-		}
-		if (app.editor && app.ui_request_print_counts) {
-			showcase_print_counts(app.editor);
-			showcase_print_category_property_counts(app.editor);
-		}
-		if (app.editor && app.ui_request_print_diagnostics) {
-			showcase_print_diagnostics(app.editor);
-		}
-		if (app.editor && app.ui_request_play_clip) {
-			showcase_play_clip_via_editor(&app);
-		}
-		app.ui_request_apply_batch = false;
-		app.ui_request_queue_batch = false;
-		app.ui_request_print_counts = false;
-		app.ui_request_print_diagnostics = false;
-		app.ui_request_play_clip = false;
 
 		se_render_clear();
-		if (app.scene_3d != S_HANDLE_NULL) {
-			se_scene_3d_draw(app.scene_3d, app.window);
-		}
-		if (app.vfx_3d != S_HANDLE_NULL) {
-			se_vfx_3d_draw(app.vfx_3d, app.window);
-		}
-		if (app.scene_2d != S_HANDLE_NULL) {
+		if (app.target == EDITOR_TARGET_SCENE_2D) {
 			se_scene_2d_draw(app.scene_2d, app.window);
-		}
-		if (app.vfx_2d != S_HANDLE_NULL) {
-			se_vfx_2d_draw(app.vfx_2d, app.window);
+		} else {
+			se_scene_3d_draw(app.scene_3d, app.window);
 		}
 		if (app.ui != S_HANDLE_NULL) {
 			se_ui_draw(app.ui);
 		}
-		if (app.text && app.font != S_HANDLE_NULL) {
-			se_text_render(
-				app.text,
-				app.font,
-				"syphax-engine :: advanced/editor_showcase",
-				&s_vec2(-0.98f, -0.965f),
-				&s_vec2(0.018f, 0.018f),
-				0.018f);
-		}
-
 		se_window_end_frame(app.window);
 	}
 
-	if (app.editor) {
-		se_editor_destroy(app.editor);
-		app.editor = NULL;
-	}
-
-	if (app.vfx_2d != S_HANDLE_NULL) {
-		se_vfx_2d_destroy(app.vfx_2d);
-		app.vfx_2d = S_HANDLE_NULL;
-	}
-	if (app.vfx_3d != S_HANDLE_NULL) {
-		se_vfx_3d_destroy(app.vfx_3d);
-		app.vfx_3d = S_HANDLE_NULL;
-	}
-
-	if (app.ui != S_HANDLE_NULL) {
-		se_ui_destroy(app.ui);
-		app.ui = S_HANDLE_NULL;
-	}
-
-	if (app.text) {
-		se_text_handle_destroy(app.text);
-		app.text = NULL;
-	}
-	if (app.font != S_HANDLE_NULL) {
-		se_font_destroy(app.font);
-		app.font = S_HANDLE_NULL;
-	}
-
-	if (app.render_buffer != S_HANDLE_NULL) {
-		se_render_buffer_destroy(app.render_buffer);
-		app.render_buffer = S_HANDLE_NULL;
-	}
-	if (app.framebuffer != S_HANDLE_NULL) {
-		se_framebuffer_destroy(app.framebuffer);
-		app.framebuffer = S_HANDLE_NULL;
-	}
-
-	if (app.simulation != S_HANDLE_NULL) {
-		se_simulation_destroy(app.simulation);
-		app.simulation = S_HANDLE_NULL;
-	}
-
-	if (app.physics_2d) {
-		se_physics_world_2d_destroy(app.physics_2d);
-		app.physics_2d = NULL;
-	}
-	if (app.physics_3d) {
-		se_physics_world_3d_destroy(app.physics_3d);
-		app.physics_3d = NULL;
-	}
-
-	if (app.navigation_ready) {
-		se_navigation_grid_destroy(&app.navigation);
-		app.navigation_ready = false;
-	}
-
-	if (app.capture) {
-		se_audio_capture_stop(app.capture);
-		app.capture = NULL;
-	}
-	if (app.stream) {
-		se_audio_stream_close(app.stream);
-		app.stream = NULL;
-	}
-	if (app.clip && app.audio) {
-		se_audio_clip_unload(app.audio, app.clip);
-		app.clip = NULL;
-	}
-	if (app.audio) {
-		se_audio_shutdown(app.audio);
-		app.audio = NULL;
-	}
-
-	if (app.input) {
-		se_input_destroy(app.input);
-		app.input = NULL;
-	}
-
-	se_context_destroy(app.context);
+	editor_cleanup(&app);
 	return 0;
 }
