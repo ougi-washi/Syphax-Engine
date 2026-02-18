@@ -11,8 +11,9 @@ Generated API pages by public header.
 | [include/se_backend.h](se_backend.md) | 3 | 4 | 2 |
 | [include/se_camera.h](se_camera.md) | 40 | 1 | 6 |
 | [include/se_curve.h](se_curve.md) | 24 | 1 | 8 |
-| [include/se_debug.h](se_debug.md) | 21 | 2 | 4 |
+| [include/se_debug.h](se_debug.md) | 26 | 3 | 5 |
 | [include/se_defines.h](se_defines.md) | 6 | 1 | 0 |
+| [include/se_editor.h](se_editor.md) | 41 | 2 | 9 |
 | [include/se_ext.h](se_ext.md) | 3 | 1 | 0 |
 | [include/se_framebuffer.h](se_framebuffer.md) | 8 | 0 | 4 |
 | [include/se_graphics.h](se_graphics.md) | 9 | 0 | 0 |

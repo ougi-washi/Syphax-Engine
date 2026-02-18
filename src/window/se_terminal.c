@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef s_array(se_window_handle, se_windows_registry);
@@ -64,6 +65,47 @@ static volatile sig_atomic_t g_terminal_restore_emitted = 0;
 static b8 g_terminal_restore_hooks_installed = false;
 
 static void se_window_terminal_input_disable(void);
+
+static f64 se_window_terminal_now_seconds(void) {
+	struct timespec ts = {0};
+#if defined(CLOCK_MONOTONIC)
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+		return (f64)ts.tv_sec + (f64)ts.tv_nsec / 1000000000.0;
+	}
+#endif
+	timespec_get(&ts, TIME_UTC);
+	return (f64)ts.tv_sec + (f64)ts.tv_nsec / 1000000000.0;
+}
+
+static void se_window_terminal_sleep_seconds(const f64 seconds) {
+	if (seconds <= 0.0) {
+		return;
+	}
+	f64 remaining = seconds;
+	while (remaining > 0.0) {
+		struct timespec request = {0};
+		struct timespec leftover = {0};
+		request.tv_sec = (time_t)remaining;
+		request.tv_nsec = (long)((remaining - (f64)request.tv_sec) * 1000000000.0);
+		if (request.tv_nsec >= 1000000000L) {
+			request.tv_sec += 1;
+			request.tv_nsec -= 1000000000L;
+		}
+		if (request.tv_nsec < 0) {
+			request.tv_nsec = 0;
+		}
+		if (request.tv_sec == 0 && request.tv_nsec == 0) {
+			break;
+		}
+		if (nanosleep(&request, &leftover) == 0) {
+			break;
+		}
+		if (errno != EINTR) {
+			break;
+		}
+		remaining = (f64)leftover.tv_sec + (f64)leftover.tv_nsec / 1000000000.0;
+	}
+}
 
 static void se_window_terminal_write_restore_sequence(void) {
 	if (g_terminal_restore_emitted) {
@@ -693,7 +735,12 @@ se_window_handle se_window_create(const char* title, const u32 width, const u32 
 	new_window->vsync_enabled = false;
 	new_window->should_close = false;
 	new_window->target_fps = 30;
-	new_window->time.current = 0.0;
+	const f64 now = se_window_terminal_now_seconds();
+	new_window->time.current = now;
+	new_window->time.last_frame = now;
+	new_window->time.delta = 0.0;
+	new_window->time.frame_start = now;
+	new_window->frame_count = 0;
 
 	if (s_array_get_capacity(&windows_registry) == 0) {
 		s_array_init(&windows_registry);
@@ -733,8 +780,11 @@ void se_window_update(const se_window_handle window) {
 	window_ptr->scroll_dx = 0.0;
 	window_ptr->scroll_dy = 0.0;
 	window_ptr->time.last_frame = window_ptr->time.current;
-	window_ptr->time.current += 1.0 / (f64)window_ptr->target_fps;
+	window_ptr->time.current = se_window_terminal_now_seconds();
 	window_ptr->time.delta = window_ptr->time.current - window_ptr->time.last_frame;
+	if (window_ptr->time.delta <= 0.0 && window_ptr->target_fps > 0u) {
+		window_ptr->time.delta = 1.0 / (f64)window_ptr->target_fps;
+	}
 	window_ptr->time.frame_start = window_ptr->time.current;
 	window_ptr->frame_count++;
 	se_debug_trace_end("window_update");
@@ -774,10 +824,23 @@ void se_window_render_screen(const se_window_handle window) {
 		se_debug_frame_end();
 		return;
 	}
+	const f64 present_begin = se_window_terminal_now_seconds();
+	window_ptr->diagnostics.last_sleep_duration = 0.0;
+	if (!window_ptr->vsync_enabled && window_ptr->target_fps > 0u) {
+		const f64 target_frame_time = 1.0 / (f64)window_ptr->target_fps;
+		const f64 now = se_window_terminal_now_seconds();
+		const f64 elapsed = now - window_ptr->time.frame_start;
+		const f64 time_left = target_frame_time - elapsed;
+		if (time_left > 0.0) {
+			const f64 sleep_begin = se_window_terminal_now_seconds();
+			se_window_terminal_sleep_seconds(time_left);
+			const f64 sleep_end = se_window_terminal_now_seconds();
+			window_ptr->diagnostics.last_sleep_duration = s_max(0.0, sleep_end - sleep_begin);
+		}
+	}
 	se_window_terminal_present(window_ptr);
 	window_ptr->diagnostics.frames_presented++;
-	window_ptr->diagnostics.last_present_duration = 0.0;
-	window_ptr->diagnostics.last_sleep_duration = 0.0;
+	window_ptr->diagnostics.last_present_duration = s_max(0.0, se_window_terminal_now_seconds() - present_begin);
 	se_debug_trace_end("window_present");
 	se_debug_frame_end();
 }

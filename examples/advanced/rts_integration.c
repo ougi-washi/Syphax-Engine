@@ -6,6 +6,7 @@
 #include "se_text.h"
 #include "se_ui.h"
 #include "se_window.h"
+#include "se_debug.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -387,6 +388,31 @@ static void rts_set_command_line(rts_game *game, const c8 *fmt, ...) {
 	game->command_line[0] = '\0';
 	game->command_line_timer = 0.0f;
 #endif
+}
+
+static void rts_log_perf_summary(const rts_game *game, const c8 *stage) {
+	if (!game) {
+		return;
+	}
+	if (!game->perf_mode && !game->track_system_timing && !game->simulator.enabled) {
+		return;
+	}
+
+	c8 frame_timing_line[512] = {0};
+	c8 frame_timing_lines[768] = {0};
+	c8 trace_last_frame[4096] = {0};
+	c8 trace_all_frames[4096] = {0};
+
+	se_debug_dump_last_frame_timing(frame_timing_line, sizeof(frame_timing_line));
+	se_debug_dump_last_frame_timing_lines(frame_timing_lines, sizeof(frame_timing_lines));
+	se_debug_dump_trace_stats(trace_last_frame, sizeof(trace_last_frame), 16u, true);
+	se_debug_dump_trace_stats(trace_all_frames, sizeof(trace_all_frames), 16u, false);
+
+	se_log("%sperf summary (%s)", RTS_LOG_PREFIX, stage ? stage : "final");
+	se_log("%sframe timing: %s", RTS_LOG_PREFIX, frame_timing_line);
+	se_log("%sframe timing detail:\n%s", RTS_LOG_PREFIX, frame_timing_lines);
+	se_log("%strace last frame:\n%s", RTS_LOG_PREFIX, trace_last_frame);
+	se_log("%strace all frames:\n%s", RTS_LOG_PREFIX, trace_all_frames);
 }
 
 static rts_team rts_unit_kind_team(const rts_unit_kind kind) {
@@ -3190,7 +3216,6 @@ static void rts_render_frame(rts_game *game) {
 		se_render_set_background_color(scene_bg);
 		se_scene_2d_render_to_screen(game->hud_scene, game->window);
 	}
-	se_window_render_screen(game->window);
 }
 
 static void rts_spawn_units_near(rts_game *game, const rts_unit_kind kind, const s_vec3 *center, const i32 count, const f32 spread) {
@@ -3291,6 +3316,7 @@ static int rts_run_headless_simulation(rts_game *game) {
 			break;
 		}
 	}
+	rts_log_perf_summary(game, "headless");
 	return 0;
 }
 
@@ -3319,6 +3345,9 @@ int main(int argc, char **argv) {
 	game.simulator.enabled = false;
 	game.simulator.stop_after_seconds = 0.0f;
 	game.simulator.next_status_print = 1.0f;
+	game.perf_mode = false;
+	game.track_system_timing = false;
+	game.next_system_timing_log_time = 1.0f;
 	game.command_line[0] = '\0';
 	b8 headless_requested = false;
 	b8 shader_hot_reload_enabled = false;
@@ -3335,6 +3364,16 @@ int main(int argc, char **argv) {
 		}
 		if (strcmp(argv[i], "--hot-reload") == 0) {
 			shader_hot_reload_enabled = true;
+		}
+		if (strcmp(argv[i], "--track-systems") == 0) {
+			game.track_system_timing = true;
+		}
+		if (strcmp(argv[i], "--no-track-systems") == 0) {
+			game.track_system_timing = false;
+		}
+		if (strcmp(argv[i], "--perf") == 0 || strcmp(argv[i], "--perf-no-assert") == 0) {
+			game.perf_mode = true;
+			game.track_system_timing = true;
 		}
 		if (strncmp(argv[i], "--seconds=", 10) == 0) {
 			game.simulator.enabled = true;
@@ -3387,7 +3426,7 @@ int main(int argc, char **argv) {
 	f64 shader_reload_accumulator = 0.0;
 
 	while (!se_window_should_close(game.window)) {
-		se_window_tick(game.window);
+		se_window_begin_frame(game.window);
 
 		f32 frame_dt = (f32)se_window_get_delta_time(game.window);
 		frame_dt = rts_clampf(frame_dt, 0.0005f, 0.05f);
@@ -3407,8 +3446,20 @@ int main(int argc, char **argv) {
 		}
 
 		rts_render_frame(&game);
+		se_window_end_frame(game.window);
+
+		if (game.track_system_timing && game.sim_time >= game.next_system_timing_log_time) {
+			c8 frame_timing[512] = {0};
+			c8 trace_timing[2048] = {0};
+			se_debug_dump_last_frame_timing(frame_timing, sizeof(frame_timing));
+			se_debug_dump_trace_stats(trace_timing, sizeof(trace_timing), 6u, true);
+			se_log("%ssystem timing: %s", RTS_LOG_PREFIX, frame_timing);
+			se_log("%ssystem trace top:\n%s", RTS_LOG_PREFIX, trace_timing);
+			game.next_system_timing_log_time += 1.0f;
+		}
 	}
 
+	rts_log_perf_summary(&game, "runtime");
 	rts_shutdown_runtime(&game);
 	return 0;
 }

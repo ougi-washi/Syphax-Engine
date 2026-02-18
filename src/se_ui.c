@@ -65,7 +65,7 @@ typedef struct se_ui_widget {
 	se_ui_chars id;
 	f32 font_size;
 	u32 max_length;
-	u32 caret;
+	u32 cursor;
 	u32 selection_start;
 	u32 selection_end;
 	b8 submit_on_enter : 1;
@@ -87,7 +87,7 @@ typedef struct se_ui_widget {
 
 	se_object_2d_handle background_object;
 	se_object_2d_handle text_object;
-	se_object_2d_handle caret_object;
+	se_object_2d_handle cursor_object;
 	se_object_2d_handle selection_object;
 	se_object_2d_handle scrollbar_track_object;
 	se_object_2d_handle scrollbar_thumb_object;
@@ -111,8 +111,8 @@ typedef struct se_ui_root {
 	b8 text_bridge_owner : 1;
 	se_window_text_callback previous_text_callback;
 	void* previous_text_callback_data;
-	f64 caret_blink_accumulator;
-	b8 caret_visible : 1;
+	f64 cursor_blink_accumulator;
+	b8 cursor_visible : 1;
 	u64 next_creation_index;
 } se_ui_root;
 
@@ -122,7 +122,7 @@ typedef struct se_ui_root {
 #define SE_UI_TEXT_SCALE 1.0f
 #define SE_UI_LINE_OFFSET 0.03f
 #define SE_UI_TEXT_CHAR_WIDTH_FACTOR 0.0009f
-#define SE_UI_CARET_BLINK_SECONDS 0.5f
+#define SE_UI_CURSOR_BLINK_SECONDS 0.5f
 
 static b8 g_ui_debug_overlay_enabled = false;
 
@@ -313,7 +313,7 @@ static void se_ui_chars_set(se_ui_chars* chars, const c8* text) {
 	}
 }
 
-static b8 se_ui_chars_replace_range(se_ui_chars* chars, u32 start, u32 end, const c8* insert_text, const u32 max_length, u32* out_new_caret) {
+static b8 se_ui_chars_replace_range(se_ui_chars* chars, u32 start, u32 end, const c8* insert_text, const u32 max_length, u32* out_new_cursor) {
 	if (!chars) {
 		return false;
 	}
@@ -355,8 +355,8 @@ static b8 se_ui_chars_replace_range(se_ui_chars* chars, u32 start, u32 end, cons
 	}
 	temp[new_len] = '\0';
 	se_ui_chars_set(chars, temp);
-	if (out_new_caret) {
-		*out_new_caret = start + final_insert_len;
+	if (out_new_cursor) {
+		*out_new_cursor = start + final_insert_len;
 	}
 	return true;
 }
@@ -549,15 +549,15 @@ static void se_ui_update_text_proxy(const se_ui_widget* widget, const c8* displa
 	data->font = se_ui_font_cache_get(ctx, se_ui_chars_cstr(&widget->font_path), widget->font_size > 0.0f ? widget->font_size : 24.0f);
 }
 
-static void se_ui_textbox_build_display_text_with_caret(const c8* text, const u32 caret, c8* out_text, const sz out_size) {
+static void se_ui_textbox_build_display_text_with_cursor(const c8* text, const u32 cursor, c8* out_text, const sz out_size) {
 	if (!out_text || out_size == 0) {
 		return;
 	}
 	const c8* src = text ? text : "";
 	const sz len = strlen(src);
-	const sz caret_pos = (sz)s_min((u32)len, caret);
+	const sz cursor_pos = (sz)s_min((u32)len, cursor);
 	sz write = 0;
-	for (sz i = 0; i < caret_pos && write + 1 < out_size; ++i) {
+	for (sz i = 0; i < cursor_pos && write + 1 < out_size; ++i) {
 		out_text[write++] = src[i];
 	}
 	if (write + 1 < out_size) {
@@ -566,7 +566,7 @@ static void se_ui_textbox_build_display_text_with_caret(const c8* text, const u3
 			out_text[write++] = SE_TEXT_CURSOR_SENTINEL;
 		}
 	}
-	for (sz i = caret_pos; i < len && write + 1 < out_size; ++i) {
+	for (sz i = cursor_pos; i < len && write + 1 < out_size; ++i) {
 		out_text[write++] = src[i];
 	}
 	out_text[write] = '\0';
@@ -968,7 +968,7 @@ static void se_ui_widget_destroy_proxies(se_context* ctx, se_ui_root* root, se_u
 	}
 	se_ui_destroy_object(ctx, root, &widget->background_object);
 	se_ui_destroy_object(ctx, root, &widget->text_object);
-	se_ui_destroy_object(ctx, root, &widget->caret_object);
+	se_ui_destroy_object(ctx, root, &widget->cursor_object);
 	se_ui_destroy_object(ctx, root, &widget->selection_object);
 	se_ui_destroy_object(ctx, root, &widget->scrollbar_track_object);
 	se_ui_destroy_object(ctx, root, &widget->scrollbar_thumb_object);
@@ -1035,7 +1035,7 @@ static se_ui_widget_handle se_ui_widget_create_internal(se_ui_root* root, const 
 	}
 	if (type == SE_UI_WIDGET_TEXTBOX) {
 		widget->selection_object = se_ui_create_color_object(root);
-		widget->caret_object = se_ui_create_color_object(root);
+		widget->cursor_object = se_ui_create_color_object(root);
 	}
 	if (type == SE_UI_WIDGET_SCROLLBOX) {
 		widget->scrollbar_track_object = se_ui_create_color_object(root);
@@ -1653,7 +1653,7 @@ static void se_ui_rebuild_scene_draw_list(se_ui_root* root) {
 		if (widget->background_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->background_object);
 		if (widget->selection_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->selection_object);
 		if (widget->text_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->text_object);
-		if (widget->caret_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->caret_object);
+		if (widget->cursor_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->cursor_object);
 		if (widget->scrollbar_track_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->scrollbar_track_object);
 		if (widget->scrollbar_thumb_object != S_HANDLE_NULL) s_array_add(&scene->objects, widget->scrollbar_thumb_object);
 	}
@@ -1696,12 +1696,12 @@ static void se_ui_widget_update_visual_recursive(se_ui_root* root, const se_ui_w
 		if (widget->type == SE_UI_WIDGET_TEXTBOX && text_ptr[0] == '\0' && !widget->focused) {
 			text_ptr = se_ui_chars_cstr(&widget->placeholder);
 		}
-		c8 textbox_display_with_caret[SE_TEXT_CHAR_COUNT] = {0};
+		c8 textbox_display_with_cursor[SE_TEXT_CHAR_COUNT] = {0};
 		const c8* draw_text = text_ptr;
 		const u32 text_len = (u32)strlen(text_ptr);
 		if (widget->type == SE_UI_WIDGET_TEXTBOX && widget->focused) {
-			se_ui_textbox_build_display_text_with_caret(text_ptr, widget->caret, textbox_display_with_caret, sizeof(textbox_display_with_caret));
-			draw_text = textbox_display_with_caret;
+			se_ui_textbox_build_display_text_with_cursor(text_ptr, widget->cursor, textbox_display_with_cursor, sizeof(textbox_display_with_cursor));
+			draw_text = textbox_display_with_cursor;
 		}
 		const f32 x = se_ui_widget_text_start_x(widget, text_len);
 		const f32 y_center = (widget->content_bounds.min.y + widget->content_bounds.max.y) * 0.5f;
@@ -1729,8 +1729,8 @@ static void se_ui_widget_update_visual_recursive(se_ui_root* root, const se_ui_w
 		} else if (widget->selection_object != S_HANDLE_NULL) {
 			se_ui_object_set_visible(ctx, widget->selection_object, false);
 		}
-		if (widget->caret_object != S_HANDLE_NULL) {
-			se_ui_object_set_visible(ctx, widget->caret_object, false);
+		if (widget->cursor_object != S_HANDLE_NULL) {
+			se_ui_object_set_visible(ctx, widget->cursor_object, false);
 		}
 	}
 
@@ -1886,8 +1886,8 @@ static void se_ui_set_focus_internal(se_ui_root* root, const se_ui_widget_handle
 			}
 		}
 	}
-	root->caret_visible = true;
-	root->caret_blink_accumulator = 0.0;
+	root->cursor_visible = true;
+	root->cursor_blink_accumulator = 0.0;
 	se_ui_mark_visual_dirty_internal(root);
 }
 
@@ -2089,29 +2089,29 @@ static void se_ui_textbox_clear_selection(se_ui_widget* widget) {
 	if (!widget) {
 		return;
 	}
-	widget->selection_start = widget->caret;
-	widget->selection_end = widget->caret;
+	widget->selection_start = widget->cursor;
+	widget->selection_end = widget->cursor;
 }
 
-static void se_ui_textbox_move_caret(se_ui_widget* widget, const u32 new_caret, const b8 extend_selection) {
+static void se_ui_textbox_move_cursor(se_ui_widget* widget, const u32 new_cursor, const b8 extend_selection) {
 	if (!widget) {
 		return;
 	}
 	const u32 len = se_ui_chars_length(&widget->text);
-	const u32 clamped = (u32)s_min(new_caret, len);
+	const u32 clamped = (u32)s_min(new_cursor, len);
 	if (extend_selection) {
 		if (!se_ui_textbox_has_selection(widget)) {
-			widget->selection_start = widget->caret;
+			widget->selection_start = widget->cursor;
 		}
 		widget->selection_end = clamped;
 	} else {
 		widget->selection_start = clamped;
 		widget->selection_end = clamped;
 	}
-	widget->caret = clamped;
+	widget->cursor = clamped;
 }
 
-static u32 se_ui_textbox_caret_from_pointer(const se_ui_widget* widget, const s_vec2* pointer_ndc) {
+static u32 se_ui_textbox_cursor_from_pointer(const se_ui_widget* widget, const s_vec2* pointer_ndc) {
 	if (!widget || !pointer_ndc) {
 		return 0;
 	}
@@ -2122,14 +2122,14 @@ static u32 se_ui_textbox_caret_from_pointer(const se_ui_widget* widget, const s_
 	}
 	const f32 base_x = se_ui_widget_text_start_x(widget, text_len);
 	const f32 relative_x = (pointer_ndc->x - base_x) / char_w;
-	i32 caret = (i32)floorf(relative_x + 0.5f);
-	if (caret < 0) {
-		caret = 0;
+	i32 cursor = (i32)floorf(relative_x + 0.5f);
+	if (cursor < 0) {
+		cursor = 0;
 	}
-	if ((u32)caret > text_len) {
-		caret = (i32)text_len;
+	if ((u32)cursor > text_len) {
+		cursor = (i32)text_len;
 	}
-	return (u32)caret;
+	return (u32)cursor;
 }
 
 static b8 se_ui_handle_text_input_for_widget(se_ui_root* root, const se_ui_widget_handle widget_handle, const c8* utf8_text, const b8 fire_callback) {
@@ -2143,14 +2143,14 @@ static b8 se_ui_handle_text_input_for_widget(se_ui_root* root, const se_ui_widge
 	}
 	const u32 sel_a = (u32)s_min(widget->selection_start, widget->selection_end);
 	const u32 sel_b = (u32)s_max(widget->selection_start, widget->selection_end);
-	u32 new_caret = widget->caret;
-	if (!se_ui_chars_replace_range(&widget->text, sel_a, sel_b, utf8_text, widget->max_length, &new_caret)) {
+	u32 new_cursor = widget->cursor;
+	if (!se_ui_chars_replace_range(&widget->text, sel_a, sel_b, utf8_text, widget->max_length, &new_cursor)) {
 		return false;
 	}
-	widget->caret = new_caret;
+	widget->cursor = new_cursor;
 	se_ui_textbox_clear_selection(widget);
-	root->caret_visible = true;
-	root->caret_blink_accumulator = 0.0;
+	root->cursor_visible = true;
+	root->cursor_blink_accumulator = 0.0;
 	se_ui_mark_text_dirty_internal(root);
 	se_ui_mark_visual_dirty_internal(root);
 	if (fire_callback) {
@@ -2172,24 +2172,24 @@ static b8 se_ui_textbox_key_edit(se_ui_root* root, const se_ui_widget_handle tex
 	const b8 shift = se_window_is_key_down(root->window, SE_KEY_LEFT_SHIFT) || se_window_is_key_down(root->window, SE_KEY_RIGHT_SHIFT);
 
 	if (se_window_is_key_pressed(root->window, SE_KEY_LEFT)) {
-		if (widget->caret > 0) {
-			se_ui_textbox_move_caret(widget, widget->caret - 1, shift);
+		if (widget->cursor > 0) {
+			se_ui_textbox_move_cursor(widget, widget->cursor - 1, shift);
 			changed = true;
 		}
 	}
 	if (se_window_is_key_pressed(root->window, SE_KEY_RIGHT)) {
 		const u32 len = se_ui_chars_length(&widget->text);
-		if (widget->caret < len) {
-			se_ui_textbox_move_caret(widget, widget->caret + 1, shift);
+		if (widget->cursor < len) {
+			se_ui_textbox_move_cursor(widget, widget->cursor + 1, shift);
 			changed = true;
 		}
 	}
 	if (se_window_is_key_pressed(root->window, SE_KEY_HOME)) {
-		se_ui_textbox_move_caret(widget, 0, shift);
+		se_ui_textbox_move_cursor(widget, 0, shift);
 		changed = true;
 	}
 	if (se_window_is_key_pressed(root->window, SE_KEY_END)) {
-		se_ui_textbox_move_caret(widget, se_ui_chars_length(&widget->text), shift);
+		se_ui_textbox_move_cursor(widget, se_ui_chars_length(&widget->text), shift);
 		changed = true;
 	}
 
@@ -2197,17 +2197,17 @@ static b8 se_ui_textbox_key_edit(se_ui_root* root, const se_ui_widget_handle tex
 		const u32 len = se_ui_chars_length(&widget->text);
 		const u32 sel_a = (u32)s_min(widget->selection_start, widget->selection_end);
 		const u32 sel_b = (u32)s_max(widget->selection_start, widget->selection_end);
-		u32 new_caret = widget->caret;
+		u32 new_cursor = widget->cursor;
 		if (sel_b > sel_a) {
-			if (se_ui_chars_replace_range(&widget->text, sel_a, sel_b, "", widget->max_length, &new_caret)) {
+			if (se_ui_chars_replace_range(&widget->text, sel_a, sel_b, "", widget->max_length, &new_cursor)) {
 				changed = true;
 			}
-		} else if (widget->caret > 0 && len > 0) {
-			if (se_ui_chars_replace_range(&widget->text, widget->caret - 1, widget->caret, "", widget->max_length, &new_caret)) {
+		} else if (widget->cursor > 0 && len > 0) {
+			if (se_ui_chars_replace_range(&widget->text, widget->cursor - 1, widget->cursor, "", widget->max_length, &new_cursor)) {
 				changed = true;
 			}
 		}
-		widget->caret = new_caret;
+		widget->cursor = new_cursor;
 		se_ui_textbox_clear_selection(widget);
 	}
 
@@ -2215,17 +2215,17 @@ static b8 se_ui_textbox_key_edit(se_ui_root* root, const se_ui_widget_handle tex
 		const u32 len = se_ui_chars_length(&widget->text);
 		const u32 sel_a = (u32)s_min(widget->selection_start, widget->selection_end);
 		const u32 sel_b = (u32)s_max(widget->selection_start, widget->selection_end);
-		u32 new_caret = widget->caret;
+		u32 new_cursor = widget->cursor;
 		if (sel_b > sel_a) {
-			if (se_ui_chars_replace_range(&widget->text, sel_a, sel_b, "", widget->max_length, &new_caret)) {
+			if (se_ui_chars_replace_range(&widget->text, sel_a, sel_b, "", widget->max_length, &new_cursor)) {
 				changed = true;
 			}
-		} else if (widget->caret < len) {
-			if (se_ui_chars_replace_range(&widget->text, widget->caret, widget->caret + 1, "", widget->max_length, &new_caret)) {
+		} else if (widget->cursor < len) {
+			if (se_ui_chars_replace_range(&widget->text, widget->cursor, widget->cursor + 1, "", widget->max_length, &new_cursor)) {
 				changed = true;
 			}
 		}
-		widget->caret = new_caret;
+		widget->cursor = new_cursor;
 		se_ui_textbox_clear_selection(widget);
 	}
 
@@ -2236,8 +2236,8 @@ static b8 se_ui_textbox_key_edit(se_ui_root* root, const se_ui_widget_handle tex
 	}
 
 	if (changed) {
-		root->caret_visible = true;
-		root->caret_blink_accumulator = 0.0;
+		root->cursor_visible = true;
+		root->cursor_blink_accumulator = 0.0;
 		se_ui_mark_text_dirty_internal(root);
 		se_ui_mark_visual_dirty_internal(root);
 		se_ui_fire_change(widget, textbox);
@@ -2354,7 +2354,7 @@ se_ui_handle se_ui_create(const se_window_handle window, const u16 widget_capaci
 	}
 	memset(root, 0, sizeof(*root));
 	root->window = window;
-	root->caret_visible = true;
+	root->cursor_visible = true;
 	root->next_creation_index = 1;
 	s_array_init(&root->draw_order);
 	s_array_init(&root->deferred_ops);
@@ -2473,9 +2473,9 @@ void se_ui_tick(const se_ui_handle ui) {
 				se_ui_fire_press(root, hit, &pointer_ndc, true, SE_MOUSE_LEFT);
 				if (hit_widget->type == SE_UI_WIDGET_TEXTBOX) {
 					se_ui_set_focus_internal(root, hit);
-					se_ui_textbox_move_caret(hit_widget, se_ui_textbox_caret_from_pointer(hit_widget, &pointer_ndc), false);
-					root->caret_visible = true;
-					root->caret_blink_accumulator = 0.0;
+					se_ui_textbox_move_cursor(hit_widget, se_ui_textbox_cursor_from_pointer(hit_widget, &pointer_ndc), false);
+					root->cursor_visible = true;
+					root->cursor_blink_accumulator = 0.0;
 					se_ui_mark_visual_dirty_internal(root);
 				} else if (root->focused_widget != S_HANDLE_NULL) {
 					se_ui_set_focus_internal(root, S_HANDLE_NULL);
@@ -2548,15 +2548,15 @@ void se_ui_tick(const se_ui_handle ui) {
 	if (root->focused_widget != S_HANDLE_NULL) {
 		se_ui_widget* focused_widget = se_ui_widget_from_handle(ctx, root->focused_widget);
 		if (focused_widget && focused_widget->type == SE_UI_WIDGET_TEXTBOX && focused_widget->desc.enabled) {
-			root->caret_visible = true;
+			root->cursor_visible = true;
 			se_ui_mark_visual_dirty_internal(root);
-		} else if (!root->caret_visible) {
-			root->caret_visible = true;
+		} else if (!root->cursor_visible) {
+			root->cursor_visible = true;
 		}
-		root->caret_blink_accumulator = 0.0;
+		root->cursor_blink_accumulator = 0.0;
 	} else {
-		root->caret_visible = false;
-		root->caret_blink_accumulator = 0.0;
+		root->cursor_visible = false;
+		root->cursor_blink_accumulator = 0.0;
 	}
 
 	root->dispatching = false;
@@ -2837,9 +2837,9 @@ se_ui_widget_handle se_ui_textbox_add(const se_ui_handle ui, const se_ui_widget_
 	se_ui_chars_set(&widget_ptr->font_path, cfg->font_path ? cfg->font_path : SE_UI_DEFAULT_FONT_PATH);
 	se_ui_chars_set(&widget_ptr->text, cfg->text ? cfg->text : "");
 	se_ui_chars_set(&widget_ptr->placeholder, cfg->placeholder ? cfg->placeholder : "");
-	widget_ptr->caret = se_ui_chars_length(&widget_ptr->text);
-	widget_ptr->selection_start = widget_ptr->caret;
-	widget_ptr->selection_end = widget_ptr->caret;
+	widget_ptr->cursor = se_ui_chars_length(&widget_ptr->text);
+	widget_ptr->selection_start = widget_ptr->cursor;
+	widget_ptr->selection_end = widget_ptr->cursor;
 	se_ui_mark_text_dirty_internal(se_ui_root_from_handle(ctx, ui));
 	return widget;
 }
@@ -3932,7 +3932,7 @@ b8 se_ui_widget_set_text(const se_ui_handle ui, const se_ui_widget_handle widget
 		return true;
 	}
 	se_ui_chars_set(&widget_ptr->text, text);
-	widget_ptr->caret = se_ui_chars_length(&widget_ptr->text);
+	widget_ptr->cursor = se_ui_chars_length(&widget_ptr->text);
 	se_ui_textbox_clear_selection(widget_ptr);
 	se_ui_mark_text_dirty_internal(root);
 	se_ui_mark_visual_dirty_internal(root);

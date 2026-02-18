@@ -62,6 +62,7 @@ MODULE_OVERVIEW = {
     "se_curve": "Curve keyframe data and interpolation helpers.",
     "se_debug": "Logging, trace spans, overlays, and frame timing diagnostics.",
     "se_defines": "Global constants, resource scope macros, and engine-wide result codes.",
+    "se_editor": "Editor inspection, diagnostics, and runtime command APIs.",
     "se_ext": "Optional extension capability checks.",
     "se_framebuffer": "Framebuffer creation, binding, and resize lifecycle.",
     "se_graphics": "Render lifecycle helpers such as clear, blending, and context state.",
@@ -113,6 +114,7 @@ PATH_WALKTHROUGH = {
     "loader_se_gltf": "path/gltf.md",
     "se_math": "path/utilities.md",
     "se_defines": "path/utilities.md",
+    "se_editor": "path/utilities.md",
     "se_ext": "path/utilities.md",
     "se_quad": "path/utilities.md",
     "se_render_frame": "path/window.md",
@@ -177,6 +179,12 @@ def parse_top_level_declarations(source: str) -> List[Tuple[str, str]]:
 
         if not buffer:
             if not stripped:
+                pending_comment = []
+                continue
+            if re.match(r'^extern\s+"C"\s*\{\s*$', stripped):
+                pending_comment = []
+                continue
+            if stripped == "}":
                 pending_comment = []
                 continue
             if stripped.startswith("//"):

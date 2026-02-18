@@ -63,6 +63,18 @@ extern void se_debug_dump_last_frame_timing_lines(c8* out_buffer, const sz out_b
 
 No inline description found in header comments.
 
+### `se_debug_dump_trace_stats`
+
+<div class="api-signature">
+
+```c
+extern void se_debug_dump_trace_stats(c8* out_buffer, sz out_buffer_size, u32 max_entries, b8 last_frame_only);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_debug_frame_begin`
 
 <div class="api-signature">
@@ -129,6 +141,18 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_debug_get_trace_events(const se_debug_trace_event** out_events, sz* out_count);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_debug_get_trace_stats`
+
+<div class="api-signature">
+
+```c
+extern b8 se_debug_get_trace_stats(se_debug_trace_stat* out_stats, u32 max_stats, u32* out_count, b8 last_frame_only);
 ```
 
 </div>
@@ -231,12 +255,48 @@ extern void se_debug_trace_begin(const c8* name);
 
 No inline description found in header comments.
 
+### `se_debug_trace_begin_channel`
+
+<div class="api-signature">
+
+```c
+extern void se_debug_trace_begin_channel(const c8* name, const se_debug_trace_channel channel);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_debug_trace_channel_name`
+
+<div class="api-signature">
+
+```c
+extern const c8* se_debug_trace_channel_name(const se_debug_trace_channel channel);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_debug_trace_end`
 
 <div class="api-signature">
 
 ```c
 extern void se_debug_trace_end(const c8* name);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_debug_trace_end_channel`
+
+<div class="api-signature">
+
+```c
+extern void se_debug_trace_end_channel(const c8* name, const se_debug_trace_channel channel);
 ```
 
 </div>
@@ -293,6 +353,18 @@ typedef enum { SE_DEBUG_LEVEL_TRACE = 0, SE_DEBUG_LEVEL_DEBUG, SE_DEBUG_LEVEL_IN
 
 No inline description found in header comments.
 
+### `se_debug_trace_channel`
+
+<div class="api-signature">
+
+```c
+typedef enum { SE_DEBUG_TRACE_CHANNEL_DEFAULT = 0, SE_DEBUG_TRACE_CHANNEL_CPU = 1, SE_DEBUG_TRACE_CHANNEL_GPU = 2 } se_debug_trace_channel;
+```
+
+</div>
+
+No inline description found in header comments.
+
 ## Typedefs
 
 ### `se_debug_frame_timing`
@@ -336,7 +408,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { c8 name[64]; f64 begin_time; f64 end_time; f64 duration; b8 active : 1; } se_debug_trace_event;
+typedef struct { c8 name[64]; f64 begin_time; f64 end_time; f64 duration; u64 frame_index; u64 thread_id; u32 channel; u32 depth; b8 active : 1; } se_debug_trace_event;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_debug_trace_stat`
+
+<div class="api-signature">
+
+```c
+typedef struct { c8 name[64]; u64 frame_index; u64 thread_id; u64 call_count; u32 channel; f64 total_ms; f64 avg_ms; f64 max_ms; f64 frame_percent; } se_debug_trace_stat;
 ```
 
 </div>

@@ -175,7 +175,7 @@ i32 main(void) {
 	u64 frame_index = 0u;
 
 	while (!se_window_should_close(window)) {
-		se_window_tick(window);
+		se_window_begin_frame(window);
 		se_context_reload_changed_shaders();
 		scene_time = (f32)se_window_get_time(window);
 		se_camera_set_aspect_from_window(camera_handle, window);
@@ -228,7 +228,7 @@ i32 main(void) {
 		se_render_clear();
 		(void)se_vfx_3d_draw(vfx_3d, window);
 		(void)se_vfx_2d_draw(vfx_2d, window);
-		se_window_render_screen(window);
+		se_window_end_frame(window);
 	}
 
 	se_vfx_2d_destroy(vfx_2d);

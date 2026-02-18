@@ -1103,7 +1103,7 @@ i32 main(void) {
 	(void)se_ui_widget_set_alignment(ui, state.demo_button, SE_UI_ALIGN_STRETCH, SE_UI_ALIGN_CENTER);
 
 	state.textbox = se_ui_add_textbox(controls, {
-		.placeholder = "Type text, Enter to submit (supports selection + caret)",
+		.placeholder = "Type text, Enter to submit (supports selection + cursor)",
 		.size = s_vec2(0.42f, 0.055f),
 		.on_hover_start_fn = ui_on_hover_start,
 		.on_hover_start_data = &state,
@@ -1354,7 +1354,7 @@ i32 main(void) {
 	se_window_set_target_fps(window, 60);
 
 	while (!se_window_should_close(window)) {
-		se_window_tick(window);
+		se_window_begin_frame(window);
 		se_context_reload_changed_shaders();
 
 		if (se_window_is_key_pressed(window, SE_KEY_F1)) {
@@ -1408,7 +1408,7 @@ i32 main(void) {
 
 		se_render_clear();
 		se_ui_draw(ui);
-		se_window_render_screen(window);
+		se_window_end_frame(window);
 	}
 
 	se_ui_destroy(ui);

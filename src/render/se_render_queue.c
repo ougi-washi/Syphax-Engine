@@ -2,6 +2,7 @@
 
 #include "render/se_render_queue.h"
 
+#include "se_debug.h"
 #include "se_graphics.h"
 #include "syphax/s_thread.h"
 #include "window/se_window_backend_internal.h"
@@ -367,7 +368,9 @@ static void* se_render_queue_thread_main(void* user_data) {
 
 		if (sync_fn) {
 			const f64 execute_begin = se_render_queue_now_seconds();
+			se_debug_trace_begin_channel("render_queue_sync", SE_DEBUG_TRACE_CHANNEL_GPU);
 			sync_fn(sync_payload, sync_out_result);
+			se_debug_trace_end_channel("render_queue_sync", SE_DEBUG_TRACE_CHANNEL_GPU);
 			const f64 execute_end = se_render_queue_now_seconds();
 
 			s_mutex_lock(&runtime->mutex);
@@ -380,7 +383,9 @@ static void* se_render_queue_thread_main(void* user_data) {
 
 		if (packet_index >= 0) {
 			const f64 execute_begin = se_render_queue_now_seconds();
+			se_debug_trace_begin_channel("render_queue_execute", SE_DEBUG_TRACE_CHANNEL_GPU);
 			se_render_queue_execute_packet(&runtime->packets[(u32)packet_index]);
+			se_debug_trace_end_channel("render_queue_execute", SE_DEBUG_TRACE_CHANNEL_GPU);
 			const f64 execute_end = se_render_queue_now_seconds();
 			s_mutex_lock(&runtime->mutex);
 			runtime->last_execute_ms = (execute_end - execute_begin) * 1000.0;
@@ -389,7 +394,9 @@ static void* se_render_queue_thread_main(void* user_data) {
 
 		if (do_present) {
 			const f64 present_begin = se_render_queue_now_seconds();
+			se_debug_trace_begin_channel("render_queue_present", SE_DEBUG_TRACE_CHANNEL_GPU);
 			se_window_backend_render_thread_present(runtime->window);
+			se_debug_trace_end_channel("render_queue_present", SE_DEBUG_TRACE_CHANNEL_GPU);
 			const f64 present_end = se_render_queue_now_seconds();
 
 			s_mutex_lock(&runtime->mutex);

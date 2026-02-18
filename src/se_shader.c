@@ -8,9 +8,20 @@
 
 #define SE_UNIFORMS_MAX 128
 
+typedef struct {
+	u32 program;
+	c8 name[SE_MAX_NAME_LENGTH];
+	i32 location;
+} se_shader_uniform_location_cache_entry;
+typedef s_array(se_shader_uniform_location_cache_entry, se_shader_uniform_location_cache_entries);
+
+static se_shader_uniform_location_cache_entries g_uniform_location_cache = {0};
+
 static GLuint se_shader_compile(const char *source, GLenum type);
 static GLuint se_shader_create_program(const char *vertex_source, const char *fragment_source);
 static void se_shader_cleanup(se_shader *shader);
+static void se_shader_uniform_location_cache_remove_program(u32 program);
+static i32 se_shader_get_uniform_location_cached_program(u32 program, const c8* name);
 static char *se_shader_prepare_source(const char *source, GLenum type);
 static const char *se_shader_skip_bom(const char *source);
 static const char *se_shader_get_line_end(const char *line_start);
@@ -32,6 +43,51 @@ static se_shader* se_shader_from_handle_safe(const se_shader_handle shader) {
 		return NULL;
 	}
 	return se_shader_from_handle(ctx, shader);
+}
+
+static void se_shader_uniform_location_cache_ensure(void) {
+	if (s_array_get_capacity(&g_uniform_location_cache) == 0) {
+		s_array_init(&g_uniform_location_cache);
+	}
+}
+
+static i32 se_shader_get_uniform_location_cached_program(u32 program, const c8* name) {
+	if (program == 0 || !name) {
+		return -1;
+	}
+	se_shader_uniform_location_cache_ensure();
+	for (sz i = 0; i < s_array_get_size(&g_uniform_location_cache); ++i) {
+		se_shader_uniform_location_cache_entry* entry = s_array_get(&g_uniform_location_cache, s_array_handle(&g_uniform_location_cache, (u32)i));
+		if (!entry || entry->program != program) {
+			continue;
+		}
+		if (strcmp(entry->name, name) == 0) {
+			return entry->location;
+		}
+	}
+	const i32 location = (i32)glGetUniformLocation(program, name);
+	s_handle handle = s_array_increment(&g_uniform_location_cache);
+	se_shader_uniform_location_cache_entry* new_entry = s_array_get(&g_uniform_location_cache, handle);
+	if (new_entry) {
+		new_entry->program = program;
+		strncpy(new_entry->name, name, sizeof(new_entry->name) - 1);
+		new_entry->name[sizeof(new_entry->name) - 1] = '\0';
+		new_entry->location = location;
+	}
+	return location;
+}
+
+static void se_shader_uniform_location_cache_remove_program(u32 program) {
+	if (program == 0 || s_array_get_capacity(&g_uniform_location_cache) == 0) {
+		return;
+	}
+	for (sz i = s_array_get_size(&g_uniform_location_cache); i > 0; --i) {
+		se_shader_uniform_location_cache_entry* entry = s_array_get(&g_uniform_location_cache, s_array_handle(&g_uniform_location_cache, (u32)(i - 1)));
+		if (!entry || entry->program != program) {
+			continue;
+		}
+		s_array_remove(&g_uniform_location_cache, s_array_handle(&g_uniform_location_cache, (u32)(i - 1)));
+	}
 }
 
 static const char *se_shader_skip_bom(const char *source) {
@@ -401,8 +457,9 @@ static void se_shader_cleanup(se_shader *shader) {
 	s_array_clear(&shader->uniforms);
 	se_log("se_shader_cleanup :: shader: %p", (void*)shader);
 	if (shader->program) {
-	glDeleteProgram(shader->program);
-	shader->program = 0;
+		se_shader_uniform_location_cache_remove_program(shader->program);
+		glDeleteProgram(shader->program);
+		shader->program = 0;
 	}
 }
 
@@ -411,7 +468,7 @@ i32 se_shader_get_uniform_location(const se_shader_handle shader, const char *na
 	if (!shader_ptr || !name || shader_ptr->program == 0) {
 		return -1;
 	}
-	return (i32)glGetUniformLocation(shader_ptr->program, name);
+	return se_shader_get_uniform_location_cached_program(shader_ptr->program, name);
 }
 
 f32 *se_shader_get_uniform_float(const se_shader_handle shader, const char *name) {
@@ -621,6 +678,25 @@ se_uniforms *se_context_get_global_uniforms(void) {
 //}
 
 // Uniform functions
+static void se_uniform_reset_location_cache(se_uniform* uniform) {
+	if (!uniform) {
+		return;
+	}
+	uniform->location = -1;
+	uniform->location_cached = false;
+}
+
+static GLint se_shader_get_cached_uniform_location(se_shader* shader_ptr, se_uniform* uniform) {
+	if (!shader_ptr || shader_ptr->program == 0 || !uniform) {
+		return -1;
+	}
+	if (!uniform->location_cached) {
+		uniform->location = se_shader_get_uniform_location_cached_program(shader_ptr->program, uniform->name);
+		uniform->location_cached = true;
+	}
+	return uniform->location;
+}
+
 void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value) {
 	for (sz i = 0; i < s_array_get_size(uniforms); ++i) {
 		se_uniform *found_uniform = s_array_get(uniforms, s_array_handle(uniforms, (u32)i));
@@ -635,6 +711,7 @@ void se_uniform_set_float(se_uniforms *uniforms, const char *name, f32 value) {
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_FLOAT;
 	new_uniform->value.f = value;
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const s_vec2 *value) {
@@ -651,6 +728,7 @@ void se_uniform_set_vec2(se_uniforms *uniforms, const char *name, const s_vec2 *
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC2;
 	memcpy(&new_uniform->value.vec2, value, sizeof(s_vec2));
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const s_vec3 *value) {
@@ -670,6 +748,7 @@ void se_uniform_set_vec3(se_uniforms *uniforms, const char *name, const s_vec3 *
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC3;
 	memcpy(&new_uniform->value.vec3, value, sizeof(s_vec3));
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const s_vec4 *value) {
@@ -686,6 +765,7 @@ void se_uniform_set_vec4(se_uniforms *uniforms, const char *name, const s_vec4 *
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_VEC4;
 	memcpy(&new_uniform->value.vec4, value, sizeof(s_vec4));
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 value) {
@@ -702,6 +782,7 @@ void se_uniform_set_int(se_uniforms *uniforms, const char *name, i32 value) {
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_INT;
 	new_uniform->value.i = value;
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const s_mat3 *value) {
@@ -718,6 +799,7 @@ void se_uniform_set_mat3(se_uniforms *uniforms, const char *name, const s_mat3 *
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_MAT3;
 	memcpy(&new_uniform->value.mat3, value, sizeof(s_mat3));
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *value) {
@@ -734,6 +816,7 @@ void se_uniform_set_mat4(se_uniforms *uniforms, const char *name, const s_mat4 *
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_MAT4;
 	memcpy(&new_uniform->value.mat4, value, sizeof(s_mat4));
+	se_uniform_reset_location_cache(new_uniform);
 }
 
 void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 texture) {
@@ -752,6 +835,7 @@ void se_uniform_set_texture(se_uniforms *uniforms, const char *name, const u32 t
 	strncpy(new_uniform->name, name, sizeof(new_uniform->name) - 1);
 	new_uniform->type = SE_UNIFORM_TEXTURE;
 	new_uniform->value.texture = texture;
+	se_uniform_reset_location_cache(new_uniform);
 	se_log("se_uniform_set_texture :: added texture uniform: %s, id: %u, ptr: %p", name, texture, (void*)new_uniform);
 }
 
@@ -768,8 +852,11 @@ void se_uniform_apply(const se_shader_handle shader, const b8 update_global_unif
 	u32 texture_unit = 0;
 	for (sz i = 0; i < s_array_get_size(&shader_ptr->uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&shader_ptr->uniforms, s_array_handle(&shader_ptr->uniforms, (u32)i));
-		GLint location = glGetUniformLocation(shader_ptr->program, uniform->name);
-		if (location == -1) {
+		if (!uniform) {
+			continue;
+		}
+		const GLint location = se_shader_get_cached_uniform_location(shader_ptr, uniform);
+		if (location < 0) {
 			continue;
 		}
 		switch (uniform->type) {
@@ -810,8 +897,11 @@ void se_uniform_apply(const se_shader_handle shader, const b8 update_global_unif
 	// apply global uniforms
 	for (sz i = 0; i < s_array_get_size(&ctx->global_uniforms); ++i) {
 		se_uniform *uniform = s_array_get(&ctx->global_uniforms, s_array_handle(&ctx->global_uniforms, (u32)i));
-		GLint location = glGetUniformLocation(shader_ptr->program, uniform->name);
-		if (location == -1) {
+		if (!uniform) {
+			continue;
+		}
+		const GLint location = se_shader_get_uniform_location_cached_program(shader_ptr->program, uniform->name);
+		if (location < 0) {
 			continue;
 		}
 		switch (uniform->type) {

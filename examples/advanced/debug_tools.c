@@ -25,12 +25,12 @@ int main(void) {
 	se_debug_log(SE_DEBUG_LEVEL_INFO, SE_DEBUG_CATEGORY_CORE, "20_debug_tools started");
 
 	while (!se_window_should_close(window)) {
-		se_window_tick(window);
+		se_window_begin_frame(window);
 		se_context_reload_changed_shaders();
 		se_debug_trace_begin("20_debug_frame");
 		se_render_clear();
 		se_debug_trace_end("20_debug_frame");
-		se_window_render_screen(window);
+		se_window_end_frame(window);
 	}
 
 	const se_debug_trace_event* traces = NULL;

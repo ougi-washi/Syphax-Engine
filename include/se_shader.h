@@ -21,6 +21,8 @@ typedef enum {
 typedef struct se_uniform {
 	char name[SE_MAX_NAME_LENGTH];
 	se_uniform_type type;
+	i32 location;
+	b8 location_cached;
 	union {
 		f32 f;
 		s_vec2 vec2;

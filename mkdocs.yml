@@ -182,6 +182,7 @@ nav:
       - se_curve.h: api-reference/modules/se_curve.md
       - se_debug.h: api-reference/modules/se_debug.md
       - se_defines.h: api-reference/modules/se_defines.md
+      - se_editor.h: api-reference/modules/se_editor.md
       - se_ext.h: api-reference/modules/se_ext.md
       - se_framebuffer.h: api-reference/modules/se_framebuffer.md
       - se_graphics.h: api-reference/modules/se_graphics.md

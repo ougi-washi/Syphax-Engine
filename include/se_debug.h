@@ -29,13 +29,35 @@ typedef enum {
 
 typedef void (*se_debug_log_callback)(se_debug_level level, se_debug_category category, const c8* message, void* user_data);
 
+typedef enum {
+	SE_DEBUG_TRACE_CHANNEL_DEFAULT = 0,
+	SE_DEBUG_TRACE_CHANNEL_CPU = 1,
+	SE_DEBUG_TRACE_CHANNEL_GPU = 2
+} se_debug_trace_channel;
+
 typedef struct {
 	c8 name[64];
 	f64 begin_time;
 	f64 end_time;
 	f64 duration;
+	u64 frame_index;
+	u64 thread_id;
+	u32 channel;
+	u32 depth;
 	b8 active : 1;
 } se_debug_trace_event;
+
+typedef struct {
+	c8 name[64];
+	u64 frame_index;
+	u64 thread_id;
+	u64 call_count;
+	u32 channel;
+	f64 total_ms;
+	f64 avg_ms;
+	f64 max_ms;
+	f64 frame_percent;
+} se_debug_trace_stat;
 
 typedef struct {
 	se_window_diagnostics window;
@@ -77,7 +99,12 @@ extern b8 se_debug_validate(const b8 condition, const se_result error_code, cons
 
 extern void se_debug_trace_begin(const c8* name);
 extern void se_debug_trace_end(const c8* name);
+extern void se_debug_trace_begin_channel(const c8* name, const se_debug_trace_channel channel);
+extern void se_debug_trace_end_channel(const c8* name, const se_debug_trace_channel channel);
+extern const c8* se_debug_trace_channel_name(const se_debug_trace_channel channel);
 extern b8 se_debug_get_trace_events(const se_debug_trace_event** out_events, sz* out_count);
+extern b8 se_debug_get_trace_stats(se_debug_trace_stat* out_stats, u32 max_stats, u32* out_count, b8 last_frame_only);
+extern void se_debug_dump_trace_stats(c8* out_buffer, sz out_buffer_size, u32 max_entries, b8 last_frame_only);
 extern void se_debug_clear_trace_events(void);
 extern void se_debug_frame_begin(void);
 extern void se_debug_frame_end(void);

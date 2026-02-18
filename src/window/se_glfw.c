@@ -897,6 +897,12 @@ static void se_window_terminal_mirror_configure(void) {
 		return;
 	}
 	g_terminal_mirror.hide_window = se_window_env_flag_enabled("SE_TERMINAL_HIDE_WINDOW");
+	if (g_terminal_mirror.hide_window) {
+		fprintf(
+			stderr,
+			"se_window :: terminal hide mode enabled (SE_TERMINAL_HIDE_WINDOW=1), desktop window will be hidden. "
+			"Unset SE_TERMINAL_HIDE_WINDOW to show a normal window.\n");
+	}
 	g_terminal_mirror.target_fps = se_window_env_u32("SE_TERMINAL_FPS", 12, 1, 60);
 	g_terminal_mirror.frame_interval = 1.0 / (f64)g_terminal_mirror.target_fps;
 	g_terminal_mirror.forced_columns = se_window_env_u32("SE_TERMINAL_COLS", 0, 0, 240);
@@ -1539,7 +1545,9 @@ static void se_window_render_screen_internal(const se_window_handle window, se_w
 	se_debug_render_overlay(window, NULL);
 	se_window_docs_capture_present(window_ptr);
 	se_window_terminal_mirror_present(window_ptr);
+	se_debug_trace_begin_channel("window_present_gpu", SE_DEBUG_TRACE_CHANNEL_GPU);
 	glfwSwapBuffers((GLFWwindow*)window_ptr->handle);
+	se_debug_trace_end_channel("window_present_gpu", SE_DEBUG_TRACE_CHANNEL_GPU);
 	window_ptr->diagnostics.frames_presented++;
 	window_ptr->diagnostics.last_present_duration = glfwGetTime() - present_begin;
 	se_debug_trace_end("window_present");
