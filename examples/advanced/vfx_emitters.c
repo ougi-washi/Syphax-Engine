@@ -84,11 +84,8 @@ i32 main(void) {
 		return 1;
 	}
 	se_camera_set_aspect_from_window(camera_handle, window);
-	se_camera* camera = se_camera_get(camera_handle);
-	if (camera) {
-		camera->position = s_vec3(0.0f, 1.2f, 4.2f);
-		camera->target = s_vec3(0.0f, 0.6f, 0.0f);
-	}
+	se_camera_set_location(camera_handle, &s_vec3(0.0f, 1.2f, 4.2f));
+	se_camera_set_target(camera_handle, &s_vec3(0.0f, 0.6f, 0.0f));
 
 	se_vfx_2d_params vfx_2d_params = SE_VFX_2D_PARAMS_DEFAULTS;
 	vfx_2d_params.auto_resize_with_window = true;
@@ -180,11 +177,9 @@ i32 main(void) {
 		scene_time = (f32)se_window_get_time(window);
 		se_camera_set_aspect_from_window(camera_handle, window);
 
-		if (camera) {
-			const f32 orbit = scene_time * 0.55f;
-			camera->position = s_vec3(cosf(orbit) * 4.0f, 1.5f, sinf(orbit) * 4.0f);
-			camera->target = s_vec3(0.0f, 0.8f, 0.0f);
-		}
+		const f32 orbit = scene_time * 0.55f;
+		se_camera_set_location(camera_handle, &s_vec3(cosf(orbit) * 4.0f, 1.5f, sinf(orbit) * 4.0f));
+		se_camera_set_target(camera_handle, &s_vec3(0.0f, 0.8f, 0.0f));
 
 		if (se_window_is_key_pressed(window, SE_KEY_T)) {
 			simulation_enabled = !simulation_enabled;

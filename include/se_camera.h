@@ -30,6 +30,8 @@ extern s_mat4 se_camera_get_view_projection_matrix(const se_camera_handle camera
 extern s_vec3 se_camera_get_forward_vector(const se_camera_handle camera);
 extern s_vec3 se_camera_get_right_vector(const se_camera_handle camera);
 extern s_vec3 se_camera_get_up_vector(const se_camera_handle camera);
+extern void se_camera_set_location(const se_camera_handle camera, const s_vec3* location);
+extern void se_camera_set_target(const se_camera_handle camera, const s_vec3* target);
 extern void se_camera_set_perspective(const se_camera_handle camera, const f32 fov_degrees, const f32 near_plane, const f32 far_plane);
 extern void se_camera_set_orthographic(const se_camera_handle camera, const f32 ortho_height, const f32 near_plane, const f32 far_plane);
 extern void se_camera_set_aspect(const se_camera_handle camera, const f32 width, const f32 height);

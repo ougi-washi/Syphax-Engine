@@ -364,10 +364,12 @@ se_shader_handle se_shader_load(const char *vertex_file_path, const char *fragme
 
 	if (se_shader_load_internal(new_shader)) {
 		se_set_last_error(SE_RESULT_OK);
+		se_log("se_shader_load :: loaded shader: %s, %s", vertex_file_path, fragment_file_path);
 		return shader_handle;
 	}
 	s_array_remove(&ctx->shaders, shader_handle);
 	se_set_last_error(SE_RESULT_IO);
+	se_log("se_shader_load :: failed to load shader: %s, %s", vertex_file_path, fragment_file_path);
 	return S_HANDLE_NULL;
 }
 
@@ -392,6 +394,7 @@ se_shader_handle se_shader_load_from_memory(const char *vertex_source, const cha
 	if (new_shader->program == 0) {
 		s_array_remove(&ctx->shaders, shader_handle);
 		se_set_last_error(SE_RESULT_IO);
+		se_log("se_shader_load :: failed to create program: \nvertex: %s\nfragment: %s", vertex_source, fragment_source);
 		return S_HANDLE_NULL;
 	}
 
@@ -402,6 +405,7 @@ se_shader_handle se_shader_load_from_memory(const char *vertex_source, const cha
 	new_shader->fragment_mtime = 0;
 	new_shader->needs_reload = false;
 	se_set_last_error(SE_RESULT_OK);
+	se_log("se_shader_load_from_memory :: loaded shader from memory: %u", shader_handle);
 	return shader_handle;
 }
 
@@ -431,8 +435,8 @@ b8 se_shader_reload_if_changed(const se_shader_handle shader) {
 
 	if (vertex_mtime != shader_ptr->vertex_mtime ||
 		fragment_mtime != shader_ptr->fragment_mtime) {
-	se_log("se_shader_reload_if_changed :: reloading shader: %s, %s", shader_ptr->vertex_path, shader_ptr->fragment_path);
-	return se_shader_load_internal(shader_ptr);
+		se_log("se_shader_reload_if_changed :: reloading shader: %s, %s", shader_ptr->vertex_path, shader_ptr->fragment_path);
+		return se_shader_load_internal(shader_ptr);
 	}
 
 	return false;

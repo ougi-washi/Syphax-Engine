@@ -144,6 +144,22 @@ s_vec3 se_camera_get_up_vector(const se_camera_handle camera) {
 	return s_vec3_divs(&up, length);
 }
 
+void se_camera_set_location(const se_camera_handle camera, const s_vec3* location) {
+	se_camera* camera_ptr = se_camera_require(camera);
+	if (!camera_ptr || !location) {
+		return;
+	}
+	camera_ptr->position = *location;
+}
+
+void se_camera_set_target(const se_camera_handle camera, const s_vec3* target) {
+	se_camera* camera_ptr = se_camera_require(camera);
+	if (!camera_ptr || !target) {
+		return;
+	}
+	camera_ptr->target = *target;
+}
+
 void se_camera_set_perspective(const se_camera_handle camera, const f32 fov_degrees, const f32 near_plane, const f32 far_plane) {
 	se_camera* camera_ptr = se_camera_require(camera);
 	if (!camera_ptr || near_plane <= 0.0f || far_plane <= near_plane || fov_degrees <= 1.0f || fov_degrees >= 179.0f) {

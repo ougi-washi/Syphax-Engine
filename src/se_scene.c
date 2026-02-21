@@ -1457,6 +1457,7 @@ void se_scene_3d_render_to_buffer(const se_scene_3d_handle scene) {
 
 			se_shader_handle shader = mesh->shader;
 			if (shader == S_HANDLE_NULL) {
+				se_log("se_scene_3d_render_to_buffer :: mesh->shader is null");
 				continue;
 			}
 
@@ -1491,7 +1492,7 @@ void se_scene_3d_render_to_screen(const se_scene_3d_handle scene, const se_windo
 void se_scene_3d_draw(const se_scene_3d_handle scene, const se_window_handle window) {
 	se_scene_3d_render_to_buffer(scene);
 	se_scene_3d_render_to_screen(scene, window);
-	se_window_render_screen(window); // TODO: Check if this is causing some flickering
+	//se_window_render_screen(window); // TODO: Check if this is causing some flickering
 }
 
 void se_scene_3d_add_object(const se_scene_3d_handle scene, const se_object_3d_handle object) {

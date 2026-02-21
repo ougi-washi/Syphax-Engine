@@ -573,6 +573,7 @@ se_model_handle se_model_load_obj_simple_ex(const char *obj_path, const char *ve
 	}
 
 	se_set_last_error(SE_RESULT_OK);
+	se_log("se_model_load_obj_simple_ex :: loaded model: %s", obj_path);
 	return model;
 }
 

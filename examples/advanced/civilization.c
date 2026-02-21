@@ -10,11 +10,6 @@
 #define MAX_BUILDINGS 	1024 * 1024
 #define MAX_UNITS 		1024 * 1024
 
-typedef struct landscape_t {
-    se_model_handle model;
-    se_object_3d_handle object;
-} landscape_t;
-
 typedef enum building_type_t {
     BUILDING_RESIDENCE_T0,
     BUILDING_RESIDENCE_T1,
@@ -54,19 +49,14 @@ typedef struct unit_t {
     se_instance_id id;
 } unit_t;
 
-static se_model_handle load_model(const c8 *landscape_path, const c8 *fs_path) {
-    se_model_handle model = se_model_load_obj_simple(landscape_path, SE_RESOURCE_PUBLIC("shaders/scene_3d_vertex.glsl"), fs_path);
-    if (model == S_HANDLE_NULL) {
-        se_log("civilization :: failed to load model %s", landscape_path);
-    }
-    return model;
-}
-
 typedef struct world_t {
     se_scene_3d_handle scene;
-    landscape_t landscape;
+
+    se_object_3d_handle landscape;
     se_object_3d_handle buildings;
     se_object_3d_handle units;
+	
+	se_model_handle landscape_model;
     se_model_handle building_model;
     se_model_handle unit_model;
 } world_t;
@@ -76,11 +66,7 @@ static se_object_3d_handle create_object(world_t *world, const se_model_handle m
         return S_HANDLE_NULL;
     }
     const s_mat4 transform = s_mat4_identity;
-    se_object_3d_handle object = se_object_3d_create(model, &transform, max_instances);
-    if (object != S_HANDLE_NULL) {
-        se_scene_3d_add_object(world->scene, object);
-    }
-    return object;
+    return se_object_3d_create(model, &transform, max_instances);
 }
 
 typedef struct ui_t {
@@ -95,41 +81,35 @@ void init_world(world_t *world, se_window_handle window) {
         se_log("civilization :: failed to create 3D scene");
         return;
     }
-    world->landscape.model = load_model(SE_RESOURCE_PUBLIC("models/cube.obj"), SE_RESOURCE_PUBLIC("shaders/scene_3d_fragment.glsl"));
-    world->building_model = load_model(SE_RESOURCE_PUBLIC("models/cube.obj"), SE_RESOURCE_PUBLIC("shaders/scene_3d_fragment.glsl"));
-    world->unit_model = load_model(SE_RESOURCE_PUBLIC("models/sphere.obj"), SE_RESOURCE_PUBLIC("shaders/scene_3d_fragment.glsl"));
-    world->landscape.object = create_object(world, world->landscape.model, 1);
+
+	world->landscape_model = se_model_load_obj_simple(	SE_RESOURCE_PUBLIC("models/plane.obj"), 
+														SE_RESOURCE_EXAMPLE("civilization/landscape_vs.glsl"), 
+														SE_RESOURCE_EXAMPLE("civilization/landscape_fs.glsl"));
+	world->building_model = se_model_load_obj_simple(	SE_RESOURCE_PUBLIC("models/cube.obj"),
+														SE_RESOURCE_EXAMPLE("civilization/building_vs.glsl"),
+														SE_RESOURCE_EXAMPLE("civilization/building_fs.glsl"));
+	world->unit_model = se_model_load_obj_simple(		SE_RESOURCE_PUBLIC("models/sphere.obj"),
+														SE_RESOURCE_EXAMPLE("civilization/unit_vs.glsl"),
+														SE_RESOURCE_EXAMPLE("civilization/unit_fs.glsl"));
+
+	world->landscape = create_object(world, world->landscape_model, 0);
     world->buildings = create_object(world, world->building_model, MAX_BUILDINGS);
     world->units = create_object(world, world->unit_model, MAX_UNITS);
 
-    //if (world->landscape.object != S_HANDLE_NULL) {
-    //    s_mat4 transform = s_mat4_identity;
-    //    s_mat4_set_scale(&transform, &s_vec3(36.0f, 0.2f, 36.0f));
-    //    s_mat4_set_translation(&transform, &s_vec3(0.0f, -1.0f, 0.0f));
-    //    add_instance_safe(world->landscape.object, &transform);
-    //}
+	se_scene_3d_handle scene = world->scene;
+	
+	se_scene_3d_add_object(scene, world->landscape);
+	se_scene_3d_add_object(scene, world->buildings);
+	se_scene_3d_add_object(scene, world->units);
 
-    if (world->scene != S_HANDLE_NULL) {
-        se_camera_handle camera = se_scene_3d_get_camera(world->scene);
-        if (camera != S_HANDLE_NULL) {
-            const s_vec3 pivot = s_vec3(0.0f, 0.5f, 0.0f);
-            se_camera_set_orbit_defaults(camera, window, &pivot, 18.0f);
-        }
-    }
+	se_camera_handle camera = se_scene_3d_get_camera(scene);
+	se_camera_set_location(camera, &s_vec3(5.0f, 5.0f, 5.0f));
+	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
 }
 
 void render_world(world_t *world, se_window_handle window) {
 	se_debug_trace_begin("render_world");
 
-	if (world->scene == S_HANDLE_NULL) {
-		se_debug_trace_end("render_world");
-		return;
-	}
-
-	se_camera_handle camera = se_scene_3d_get_camera(world->scene);
-	if (camera != S_HANDLE_NULL) {
-		se_camera_set_aspect_from_window(camera, window);
-	}
 	se_scene_3d_draw(world->scene, window);
 
 	se_debug_trace_end("render_world");
@@ -152,6 +132,7 @@ i32 main() {
         se_render_clear();
 	    se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
         render_world(&world, window);
+		render_ui(window);
         se_debug_render_overlay(window, NULL);
     );
 
