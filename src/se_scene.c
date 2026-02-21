@@ -33,6 +33,96 @@ static se_model* se_model_from_handle(se_context *ctx, const se_model_handle mod
 	return s_array_get(&ctx->models, model);
 }
 
+static s_vec3 se_mat4_extract_basis_scale(const s_mat4 *transform) {
+	if (!transform) {
+		return s_vec3(1.0f, 1.0f, 1.0f);
+	}
+
+	const f32 sx = sqrtf((transform->m[0][0] * transform->m[0][0]) +
+		(transform->m[0][1] * transform->m[0][1]) +
+		(transform->m[0][2] * transform->m[0][2]));
+	const f32 sy = sqrtf((transform->m[1][0] * transform->m[1][0]) +
+		(transform->m[1][1] * transform->m[1][1]) +
+		(transform->m[1][2] * transform->m[1][2]));
+	const f32 sz = sqrtf((transform->m[2][0] * transform->m[2][0]) +
+		(transform->m[2][1] * transform->m[2][1]) +
+		(transform->m[2][2] * transform->m[2][2]));
+	return s_vec3(sx, sy, sz);
+}
+
+static s_mat4 se_mat4_extract_rotation(const s_mat4 *transform, const s_vec3 *scale) {
+	s_mat4 rotation = s_mat4_identity;
+	if (!transform || !scale) {
+		return rotation;
+	}
+
+	const f32 epsilon = 0.000001f;
+
+	if (fabsf(scale->x) > epsilon) {
+		rotation.m[0][0] = transform->m[0][0] / scale->x;
+		rotation.m[0][1] = transform->m[0][1] / scale->x;
+		rotation.m[0][2] = transform->m[0][2] / scale->x;
+	}
+	if (fabsf(scale->y) > epsilon) {
+		rotation.m[1][0] = transform->m[1][0] / scale->y;
+		rotation.m[1][1] = transform->m[1][1] / scale->y;
+		rotation.m[1][2] = transform->m[1][2] / scale->y;
+	}
+	if (fabsf(scale->z) > epsilon) {
+		rotation.m[2][0] = transform->m[2][0] / scale->z;
+		rotation.m[2][1] = transform->m[2][1] / scale->z;
+		rotation.m[2][2] = transform->m[2][2] / scale->z;
+	}
+	return rotation;
+}
+
+static s_mat4 se_mat4_rotation_xyz(const s_vec3 *rotation) {
+	if (!rotation) {
+		return s_mat4_identity;
+	}
+
+	const f32 cx = cosf(rotation->x);
+	const f32 sx = sinf(rotation->x);
+	const f32 cy = cosf(rotation->y);
+	const f32 sy = sinf(rotation->y);
+	const f32 cz = cosf(rotation->z);
+	const f32 sz = sinf(rotation->z);
+
+	return s_mat4(
+		cy * cz,
+		(sx * sy * cz) + (cx * sz),
+		(-cx * sy * cz) + (sx * sz),
+		0.0f,
+
+		-cy * sz,
+		(-sx * sy * sz) + (cx * cz),
+		(cx * sy * sz) + (sx * cz),
+		0.0f,
+
+		sy,
+		-sx * cy,
+		cx * cy,
+		0.0f,
+
+		0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+static void se_mat4_apply_basis_scale(s_mat4 *transform, const s_vec3 *scale) {
+	if (!transform || !scale) {
+		return;
+	}
+
+	transform->m[0][0] *= scale->x;
+	transform->m[0][1] *= scale->x;
+	transform->m[0][2] *= scale->x;
+	transform->m[1][0] *= scale->y;
+	transform->m[1][1] *= scale->y;
+	transform->m[1][2] *= scale->y;
+	transform->m[2][0] *= scale->z;
+	transform->m[2][1] *= scale->z;
+	transform->m[2][2] *= scale->z;
+}
+
 static b8 se_object_2d_handle_exists(const se_context* ctx, const se_object_2d_handle handle) {
 	return ctx && handle != S_HANDLE_NULL && s_array_get((se_objects_2d*)&ctx->objects_2d, handle) != NULL;
 }
@@ -1887,6 +1977,38 @@ void se_object_3d_set_transform(const se_object_3d_handle object, const s_mat4 *
 	s_assertf(object_ptr, "se_object_3d_set_transform :: object is null");
 	s_assertf(transform, "se_object_3d_set_transform :: transform is null");
 	object_ptr->transform = *transform;
+	se_object_3d_set_instances_dirty(object, true);
+}
+
+void se_object_3d_set_rotation(const se_object_3d_handle object, const s_vec3 *rotation) {
+	se_context *ctx = se_current_context();
+	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
+	s_assertf(object_ptr, "se_object_3d_set_rotation :: object is null");
+	s_assertf(rotation, "se_object_3d_set_rotation :: rotation is null");
+
+	const s_vec3 location = s_mat4_get_translation(&object_ptr->transform);
+	const s_vec3 current_scale = se_mat4_extract_basis_scale(&object_ptr->transform);
+	s_mat4 transform = se_mat4_rotation_xyz(rotation);
+	se_mat4_apply_basis_scale(&transform, &current_scale);
+	s_mat4_set_translation(&transform, &location);
+
+	object_ptr->transform = transform;
+	se_object_3d_set_instances_dirty(object, true);
+}
+
+void se_object_3d_set_scale(const se_object_3d_handle object, const s_vec3 *scale) {
+	se_context *ctx = se_current_context();
+	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
+	s_assertf(object_ptr, "se_object_3d_set_scale :: object is null");
+	s_assertf(scale, "se_object_3d_set_scale :: scale is null");
+
+	const s_vec3 location = s_mat4_get_translation(&object_ptr->transform);
+	const s_vec3 current_scale = se_mat4_extract_basis_scale(&object_ptr->transform);
+	s_mat4 transform = se_mat4_extract_rotation(&object_ptr->transform, &current_scale);
+	se_mat4_apply_basis_scale(&transform, scale);
+	s_mat4_set_translation(&transform, &location);
+
+	object_ptr->transform = transform;
 	se_object_3d_set_instances_dirty(object, true);
 }
 

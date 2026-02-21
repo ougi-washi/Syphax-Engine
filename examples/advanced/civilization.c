@@ -9,6 +9,7 @@
 
 #define MAX_BUILDINGS 	1024 * 1024
 #define MAX_UNITS 		1024 * 1024
+#define LANDSCAPE_SIZE	1024
 
 typedef enum building_type_t {
     BUILDING_RESIDENCE_T0,
@@ -97,13 +98,15 @@ void init_world(world_t *world, se_window_handle window) {
     world->units = create_object(world, world->unit_model, MAX_UNITS);
 
 	se_scene_3d_handle scene = world->scene;
-	
+
 	se_scene_3d_add_object(scene, world->landscape);
 	se_scene_3d_add_object(scene, world->buildings);
 	se_scene_3d_add_object(scene, world->units);
 
+	se_object_3d_set_scale(world->landscape, &s_vec3(LANDSCAPE_SIZE, LANDSCAPE_SIZE, LANDSCAPE_SIZE));
+
 	se_camera_handle camera = se_scene_3d_get_camera(scene);
-	se_camera_set_location(camera, &s_vec3(5.0f, 5.0f, 5.0f));
+	se_camera_set_location(camera, &s_vec3(.0f, 5.0f, -1.f));
 	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
 }
 
@@ -124,6 +127,7 @@ void render_ui(se_window_handle window) {
 i32 main() {
 	se_context *ctx = se_context_create();
     se_window_handle window = se_window_create("Syphax - Civilization", 1280, 720);
+	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 
     world_t world = {0};
     init_world(&world, window);

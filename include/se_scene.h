@@ -223,6 +223,9 @@ extern b8 se_scene_3d_unregister_custom_render(const se_scene_3d_handle scene, c
 extern se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat4 *transform, const sz max_instances_count);
 extern void se_object_3d_destroy(const se_object_3d_handle object);
 extern void se_object_3d_set_transform(const se_object_3d_handle object, const s_mat4 *transform);
+extern void se_object_3d_set_location(const se_object_3d_handle object, const s_vec3 *location);
+extern void se_object_3d_set_rotation(const se_object_3d_handle object, const s_vec3 *rotation);
+extern void se_object_3d_set_scale(const se_object_3d_handle object, const s_vec3 *scale);
 extern s_mat4 se_object_3d_get_transform(const se_object_3d_handle object);
 extern se_instance_id se_object_3d_add_instance(const se_object_3d_handle object, const s_mat4 *transform, const s_mat4 *buffer);
 extern b8 se_object_3d_remove_instance(const se_object_3d_handle object, const se_instance_id instance_id);
