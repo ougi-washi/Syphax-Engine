@@ -6,6 +6,7 @@
 #include "se_debug.h"
 #include "se_framebuffer.h"
 #include "se_model.h"
+#include "se_physics.h"
 #include "se_render_buffer.h"
 #include "se_scene.h"
 #include "se_shader.h"
@@ -101,6 +102,14 @@ static void se_context_log_leaks(se_context *context) {
 			"se_context_log_leaks :: context teardown with simulations alive (%zu)",
 			s_array_get_size(&context->simulations));
 	}
+	if (s_array_get_size(&context->physics_worlds_2d) > 0 || s_array_get_size(&context->physics_worlds_3d) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+			"se_context_log_leaks :: context teardown with physics worlds alive (2d=%zu, 3d=%zu)",
+			s_array_get_size(&context->physics_worlds_2d),
+			s_array_get_size(&context->physics_worlds_3d));
+	}
 	if (s_array_get_size(&context->vfx_2ds) > 0 || s_array_get_size(&context->vfx_3ds) > 0) {
 		se_debug_log(
 			SE_DEBUG_LEVEL_WARN,
@@ -139,6 +148,8 @@ se_context *se_context_create(void) {
 	s_array_init(&context->ui_elements);
 	s_array_init(&context->ui_texts);
 	s_array_init(&context->simulations);
+	s_array_init(&context->physics_worlds_2d);
+	s_array_init(&context->physics_worlds_3d);
 	context->ui_text_handle = NULL;
 	context->default_text_handle = NULL;
 	se_uniform_set_float((se_uniforms*)&context->global_uniforms, "u_time", 0.0f);
@@ -248,6 +259,18 @@ void se_context_destroy(se_context *context) {
 	while (s_array_get_size(&context->simulations) > 0) {
 		se_simulation_handle simulation_handle = s_array_handle(&context->simulations, (u32)(s_array_get_size(&context->simulations) - 1));
 		se_simulation_destroy(simulation_handle);
+	}
+
+	while (s_array_get_size(&context->physics_worlds_2d) > 0) {
+		se_physics_world_2d_handle world_handle = s_array_handle(&context->physics_worlds_2d, (u32)(s_array_get_size(&context->physics_worlds_2d) - 1));
+		se_physics_world_2d_destroy(world_handle);
+		se_last_destroy_report.physics_worlds_2d++;
+	}
+
+	while (s_array_get_size(&context->physics_worlds_3d) > 0) {
+		se_physics_world_3d_handle world_handle = s_array_handle(&context->physics_worlds_3d, (u32)(s_array_get_size(&context->physics_worlds_3d) - 1));
+		se_physics_world_3d_destroy(world_handle);
+		se_last_destroy_report.physics_worlds_3d++;
 	}
 
 	while (s_array_get_size(&context->windows) > 0) {

@@ -50,8 +50,8 @@ struct se_editor {
 	se_input_handle* input;
 	se_audio_engine* audio;
 	se_navigation_grid* navigation;
-	se_physics_world_2d* physics_2d;
-	se_physics_world_3d* physics_3d;
+	se_physics_world_2d_handle physics_2d;
+	se_physics_world_3d_handle physics_3d;
 	se_simulation_handle focused_simulation;
 	se_vfx_2d_handle focused_vfx_2d;
 	se_vfx_3d_handle focused_vfx_3d;
@@ -1238,28 +1238,6 @@ static void se_editor_camera_refresh_axes(se_camera* camera) {
 	}
 }
 
-static void se_editor_physics_update_mass_2d(se_physics_body_2d* body) {
-	if (!body) {
-		return;
-	}
-	if (body->type == SE_PHYSICS_BODY_DYNAMIC && body->mass > 0.000001f) {
-		body->inv_mass = 1.0f / body->mass;
-	} else {
-		body->inv_mass = 0.0f;
-	}
-}
-
-static void se_editor_physics_update_mass_3d(se_physics_body_3d* body) {
-	if (!body) {
-		return;
-	}
-	if (body->type == SE_PHYSICS_BODY_DYNAMIC && body->mass > 0.000001f) {
-		body->inv_mass = 1.0f / body->mass;
-	} else {
-		body->inv_mass = 0.0f;
-	}
-}
-
 static void se_editor_add_ui_style_state_properties(se_editor_properties* properties, const c8* prefix, const se_ui_style_state* state, b8 editable) {
 	c8 name[SE_MAX_NAME_LENGTH] = {0};
 	if (!properties || !prefix || !state) {
@@ -1926,36 +1904,36 @@ static b8 se_editor_collect_physics_2d_properties(se_editor* editor) {
 	if (!editor->physics_2d) {
 		return false;
 	}
-	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_GRAVITY, editor->physics_2d->gravity, true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, editor->physics_2d->solver_iterations, true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, editor->physics_2d->shapes_per_body, true);
-	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_BODY_COUNT, (u64)s_array_get_size(&editor->physics_2d->bodies), false);
-	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_CONTACT_COUNT, (u64)s_array_get_size(&editor->physics_2d->contacts), false);
+	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_GRAVITY, se_physics_world_2d_get_gravity(editor->physics_2d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, se_physics_world_2d_get_solver_iterations(editor->physics_2d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, se_physics_world_2d_get_shapes_per_body(editor->physics_2d), true);
+	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_BODY_COUNT, (u64)se_physics_world_2d_get_body_count(editor->physics_2d), false);
+	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_CONTACT_COUNT, (u64)se_physics_world_2d_get_contact_count(editor->physics_2d), false);
 	return true;
 }
 
 static b8 se_editor_collect_physics_2d_body_properties(se_editor* editor, const se_editor_item* item) {
-	se_physics_body_2d* body = (se_physics_body_2d*)item->pointer;
-	(void)editor;
-	if (!body || !body->is_valid) {
+	const se_physics_world_2d_handle world = editor ? editor->physics_2d : SE_PHYSICS_WORLD_2D_HANDLE_NULL;
+	const se_physics_body_2d_handle body = item ? (se_physics_body_2d_handle)item->handle : SE_PHYSICS_BODY_2D_HANDLE_NULL;
+	if (!editor || !item || !world || !body) {
 		return false;
 	}
-	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_TYPE, (i32)body->type, true);
-	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_POSITION, body->position, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ROTATION, body->rotation, true);
-	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_VELOCITY, body->velocity, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ANGULAR_VELOCITY, body->angular_velocity, true);
-	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_FORCE, body->force, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_TORQUE, body->torque, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_MASS, body->mass, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_MASS, body->inv_mass, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INERTIA, body->inertia, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_INERTIA, body->inv_inertia, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RESTITUTION, body->restitution, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FRICTION, body->friction, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_LINEAR_DAMPING, body->linear_damping, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ANGULAR_DAMPING, body->angular_damping, true);
-	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_SHAPE_COUNT, (u64)s_array_get_size(&body->shapes), false);
+	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_TYPE, (i32)se_physics_body_2d_get_type(world, body), true);
+	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_POSITION, se_physics_body_2d_get_position(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ROTATION, se_physics_body_2d_get_rotation(world, body), true);
+	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_VELOCITY, se_physics_body_2d_get_velocity(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ANGULAR_VELOCITY, se_physics_body_2d_get_angular_velocity(world, body), true);
+	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_FORCE, se_physics_body_2d_get_force(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_TORQUE, se_physics_body_2d_get_torque(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_MASS, se_physics_body_2d_get_mass(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_MASS, se_physics_body_2d_get_inv_mass(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INERTIA, se_physics_body_2d_get_inertia(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_INERTIA, se_physics_body_2d_get_inv_inertia(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RESTITUTION, se_physics_body_2d_get_restitution(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FRICTION, se_physics_body_2d_get_friction(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_LINEAR_DAMPING, se_physics_body_2d_get_linear_damping(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ANGULAR_DAMPING, se_physics_body_2d_get_angular_damping(world, body), true);
+	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_SHAPE_COUNT, (u64)se_physics_body_2d_get_shape_count(world, body), false);
 	return true;
 }
 
@@ -1963,36 +1941,36 @@ static b8 se_editor_collect_physics_3d_properties(se_editor* editor) {
 	if (!editor->physics_3d) {
 		return false;
 	}
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_GRAVITY, editor->physics_3d->gravity, true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, editor->physics_3d->solver_iterations, true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, editor->physics_3d->shapes_per_body, true);
-	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_BODY_COUNT, (u64)s_array_get_size(&editor->physics_3d->bodies), false);
-	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_CONTACT_COUNT, (u64)s_array_get_size(&editor->physics_3d->contacts), false);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_GRAVITY, se_physics_world_3d_get_gravity(editor->physics_3d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, se_physics_world_3d_get_solver_iterations(editor->physics_3d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, se_physics_world_3d_get_shapes_per_body(editor->physics_3d), true);
+	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_BODY_COUNT, (u64)se_physics_world_3d_get_body_count(editor->physics_3d), false);
+	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_CONTACT_COUNT, (u64)se_physics_world_3d_get_contact_count(editor->physics_3d), false);
 	return true;
 }
 
 static b8 se_editor_collect_physics_3d_body_properties(se_editor* editor, const se_editor_item* item) {
-	se_physics_body_3d* body = (se_physics_body_3d*)item->pointer;
-	(void)editor;
-	if (!body || !body->is_valid) {
+	const se_physics_world_3d_handle world = editor ? editor->physics_3d : SE_PHYSICS_WORLD_3D_HANDLE_NULL;
+	const se_physics_body_3d_handle body = item ? (se_physics_body_3d_handle)item->handle : SE_PHYSICS_BODY_3D_HANDLE_NULL;
+	if (!editor || !item || !world || !body) {
 		return false;
 	}
-	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_TYPE, (i32)body->type, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_POSITION, body->position, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_ROTATION, body->rotation, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_VELOCITY, body->velocity, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_ANGULAR_VELOCITY, body->angular_velocity, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_FORCE, body->force, false);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_TORQUE, body->torque, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_MASS, body->mass, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_MASS, body->inv_mass, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INERTIA, body->inertia, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_INERTIA, body->inv_inertia, false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RESTITUTION, body->restitution, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FRICTION, body->friction, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_LINEAR_DAMPING, body->linear_damping, true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ANGULAR_DAMPING, body->angular_damping, true);
-	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_SHAPE_COUNT, (u64)s_array_get_size(&body->shapes), false);
+	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_TYPE, (i32)se_physics_body_3d_get_type(world, body), true);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_POSITION, se_physics_body_3d_get_position(world, body), true);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_ROTATION, se_physics_body_3d_get_rotation(world, body), true);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_VELOCITY, se_physics_body_3d_get_velocity(world, body), true);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_ANGULAR_VELOCITY, se_physics_body_3d_get_angular_velocity(world, body), true);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_FORCE, se_physics_body_3d_get_force(world, body), false);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_TORQUE, se_physics_body_3d_get_torque(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_MASS, se_physics_body_3d_get_mass(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_MASS, se_physics_body_3d_get_inv_mass(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INERTIA, se_physics_body_3d_get_inertia(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INV_INERTIA, se_physics_body_3d_get_inv_inertia(world, body), false);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RESTITUTION, se_physics_body_3d_get_restitution(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FRICTION, se_physics_body_3d_get_friction(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_LINEAR_DAMPING, se_physics_body_3d_get_linear_damping(world, body), true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ANGULAR_DAMPING, se_physics_body_3d_get_angular_damping(world, body), true);
+	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_SHAPE_COUNT, (u64)se_physics_body_3d_get_shape_count(world, body), false);
 	return true;
 }
 
@@ -4108,14 +4086,14 @@ static b8 se_editor_apply_physics_2d_command(se_editor* editor, const se_editor_
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		editor->physics_2d->solver_iterations = u32_value;
+		se_physics_world_2d_set_solver_iterations(editor->physics_2d, u32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_SHAPES_PER_BODY) == 0) {
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		editor->physics_2d->shapes_per_body = u32_value;
+		se_physics_world_2d_set_shapes_per_body(editor->physics_2d, u32_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_STEP) == 0) {
@@ -4129,104 +4107,103 @@ static b8 se_editor_apply_physics_2d_command(se_editor* editor, const se_editor_
 }
 
 static b8 se_editor_apply_physics_2d_body_command(se_editor* editor, const se_editor_command* command) {
-	se_physics_body_2d* body = (se_physics_body_2d*)command->item.pointer;
+	se_physics_world_2d_handle world = command->item.owner_handle != S_HANDLE_NULL ? (se_physics_world_2d_handle)command->item.owner_handle : editor->physics_2d;
+	se_physics_body_2d_handle body = (se_physics_body_2d_handle)command->item.handle;
 	s_vec2 vec2_value = {0};
 	f32 f32_value = 0.0f;
 	i32 i32_value = 0;
-	if (!editor || !body || !body->is_valid) {
+	if (!editor || !world || !body) {
 		return false;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_TYPE) == 0) {
 		if (!se_editor_value_as_i32(&command->value, &i32_value)) {
 			return false;
 		}
-		body->type = (se_physics_body_type)i32_value;
-		se_editor_physics_update_mass_2d(body);
+		se_physics_body_2d_set_type(world, body, (se_physics_body_type)i32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_POSITION) == 0) {
 		if (!se_editor_value_as_vec2(&command->value, &vec2_value)) {
 			return false;
 		}
-		se_physics_body_2d_set_position(body, &vec2_value);
+		se_physics_body_2d_set_position(world, body, &vec2_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ROTATION) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		se_physics_body_2d_set_rotation(body, f32_value);
+		se_physics_body_2d_set_rotation(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_VELOCITY) == 0) {
 		if (!se_editor_value_as_vec2(&command->value, &vec2_value)) {
 			return false;
 		}
-		se_physics_body_2d_set_velocity(body, &vec2_value);
+		se_physics_body_2d_set_velocity(world, body, &vec2_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ANGULAR_VELOCITY) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->angular_velocity = f32_value;
+		se_physics_body_2d_set_angular_velocity(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_FORCE) == 0) {
 		if (!se_editor_value_as_vec2(&command->value, &vec2_value)) {
 			return false;
 		}
-		body->force = vec2_value;
+		se_physics_body_2d_set_force(world, body, &vec2_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_TORQUE) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->torque = f32_value;
+		se_physics_body_2d_set_torque(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_MASS) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->mass = f32_value;
-		se_editor_physics_update_mass_2d(body);
+		se_physics_body_2d_set_mass(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_RESTITUTION) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->restitution = f32_value;
+		se_physics_body_2d_set_restitution(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_FRICTION) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->friction = f32_value;
+		se_physics_body_2d_set_friction(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_LINEAR_DAMPING) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->linear_damping = f32_value;
+		se_physics_body_2d_set_linear_damping(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ANGULAR_DAMPING) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->angular_damping = f32_value;
+		se_physics_body_2d_set_angular_damping(world, body, f32_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_APPLY_FORCE) == 0) {
 		if (!se_editor_value_as_vec2(&command->value, &vec2_value)) {
 			return false;
 		}
-		se_physics_body_2d_apply_force(body, &vec2_value);
+		se_physics_body_2d_apply_force(world, body, &vec2_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_APPLY_IMPULSE) == 0) {
@@ -4235,7 +4212,7 @@ static b8 se_editor_apply_physics_2d_body_command(se_editor* editor, const se_ed
 			return false;
 		}
 		(void)se_editor_value_as_vec2(&command->aux_value, &point);
-		se_physics_body_2d_apply_impulse(body, &vec2_value, &point);
+		se_physics_body_2d_apply_impulse(world, body, &vec2_value, &point);
 		return true;
 	}
 	return false;
@@ -4259,14 +4236,14 @@ static b8 se_editor_apply_physics_3d_command(se_editor* editor, const se_editor_
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		editor->physics_3d->solver_iterations = u32_value;
+		se_physics_world_3d_set_solver_iterations(editor->physics_3d, u32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_SHAPES_PER_BODY) == 0) {
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		editor->physics_3d->shapes_per_body = u32_value;
+		se_physics_world_3d_set_shapes_per_body(editor->physics_3d, u32_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_STEP) == 0) {
@@ -4280,104 +4257,103 @@ static b8 se_editor_apply_physics_3d_command(se_editor* editor, const se_editor_
 }
 
 static b8 se_editor_apply_physics_3d_body_command(se_editor* editor, const se_editor_command* command) {
-	se_physics_body_3d* body = (se_physics_body_3d*)command->item.pointer;
+	se_physics_world_3d_handle world = command->item.owner_handle != S_HANDLE_NULL ? (se_physics_world_3d_handle)command->item.owner_handle : editor->physics_3d;
+	se_physics_body_3d_handle body = (se_physics_body_3d_handle)command->item.handle;
 	s_vec3 vec3_value = {0};
 	f32 f32_value = 0.0f;
 	i32 i32_value = 0;
-	if (!editor || !body || !body->is_valid) {
+	if (!editor || !world || !body) {
 		return false;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_TYPE) == 0) {
 		if (!se_editor_value_as_i32(&command->value, &i32_value)) {
 			return false;
 		}
-		body->type = (se_physics_body_type)i32_value;
-		se_editor_physics_update_mass_3d(body);
+		se_physics_body_3d_set_type(world, body, (se_physics_body_type)i32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_POSITION) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_physics_body_3d_set_position(body, &vec3_value);
+		se_physics_body_3d_set_position(world, body, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ROTATION) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_physics_body_3d_set_rotation(body, &vec3_value);
+		se_physics_body_3d_set_rotation(world, body, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_VELOCITY) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_physics_body_3d_set_velocity(body, &vec3_value);
+		se_physics_body_3d_set_velocity(world, body, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ANGULAR_VELOCITY) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		body->angular_velocity = vec3_value;
+		se_physics_body_3d_set_angular_velocity(world, body, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_FORCE) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		body->force = vec3_value;
+		se_physics_body_3d_set_force(world, body, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_TORQUE) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		body->torque = vec3_value;
+		se_physics_body_3d_set_torque(world, body, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_MASS) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->mass = f32_value;
-		se_editor_physics_update_mass_3d(body);
+		se_physics_body_3d_set_mass(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_RESTITUTION) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->restitution = f32_value;
+		se_physics_body_3d_set_restitution(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_FRICTION) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->friction = f32_value;
+		se_physics_body_3d_set_friction(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_LINEAR_DAMPING) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->linear_damping = f32_value;
+		se_physics_body_3d_set_linear_damping(world, body, f32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ANGULAR_DAMPING) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		body->angular_damping = f32_value;
+		se_physics_body_3d_set_angular_damping(world, body, f32_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_APPLY_FORCE) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_physics_body_3d_apply_force(body, &vec3_value);
+		se_physics_body_3d_apply_force(world, body, &vec3_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_APPLY_IMPULSE) == 0) {
@@ -4386,7 +4362,7 @@ static b8 se_editor_apply_physics_3d_body_command(se_editor* editor, const se_ed
 			return false;
 		}
 		(void)se_editor_value_as_vec3(&command->aux_value, &point);
-		se_physics_body_3d_apply_impulse(body, &vec3_value, &point);
+		se_physics_body_3d_apply_impulse(world, body, &vec3_value, &point);
 		return true;
 	}
 	return false;
@@ -4752,30 +4728,30 @@ se_navigation_grid* se_editor_get_navigation(const se_editor* editor) {
 	return editor->navigation;
 }
 
-void se_editor_set_physics_2d(se_editor* editor, se_physics_world_2d* world) {
+void se_editor_set_physics_2d(se_editor* editor, se_physics_world_2d_handle world) {
 	if (!editor) {
 		return;
 	}
 	editor->physics_2d = world;
 }
 
-se_physics_world_2d* se_editor_get_physics_2d(const se_editor* editor) {
+se_physics_world_2d_handle se_editor_get_physics_2d(const se_editor* editor) {
 	if (!editor) {
-		return NULL;
+		return SE_PHYSICS_WORLD_2D_HANDLE_NULL;
 	}
 	return editor->physics_2d;
 }
 
-void se_editor_set_physics_3d(se_editor* editor, se_physics_world_3d* world) {
+void se_editor_set_physics_3d(se_editor* editor, se_physics_world_3d_handle world) {
 	if (!editor) {
 		return;
 	}
 	editor->physics_3d = world;
 }
 
-se_physics_world_3d* se_editor_get_physics_3d(const se_editor* editor) {
+se_physics_world_3d_handle se_editor_get_physics_3d(const se_editor* editor) {
 	if (!editor) {
-		return NULL;
+		return SE_PHYSICS_WORLD_3D_HANDLE_NULL;
 	}
 	return editor->physics_3d;
 }
@@ -4966,10 +4942,10 @@ b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts) {
 	out_counts->audio_captures = (u32)s_array_get_size(&editor->captures);
 	out_counts->queued_commands = (u32)s_array_get_size(&editor->queue);
 	if (editor->physics_2d) {
-		out_counts->physics_2d_bodies = (u32)s_array_get_size(&editor->physics_2d->bodies);
+		out_counts->physics_2d_bodies = se_physics_world_2d_get_body_count(editor->physics_2d);
 	}
 	if (editor->physics_3d) {
-		out_counts->physics_3d_bodies = (u32)s_array_get_size(&editor->physics_3d->bodies);
+		out_counts->physics_3d_bodies = se_physics_world_3d_get_body_count(editor->physics_3d);
 	}
 	if (context) {
 		out_counts->windows = (u32)s_array_get_size(&context->windows);
@@ -5024,31 +5000,31 @@ b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_m
 		se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_NAVIGATION, S_HANDLE_NULL, S_HANDLE_NULL, editor->navigation, NULL, 0u, SE_EDITOR_NAME_NAVIGATION);
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_PHYSICS_2D) && editor->physics_2d) {
-		se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_2D, S_HANDLE_NULL, S_HANDLE_NULL, editor->physics_2d, NULL, 0u, SE_EDITOR_NAME_PHYSICS2D);
+		se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_2D, editor->physics_2d, S_HANDLE_NULL, NULL, NULL, 0u, SE_EDITOR_NAME_PHYSICS2D);
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_PHYSICS_2D_BODY) && editor->physics_2d) {
-		for (sz i = 0; i < s_array_get_size(&editor->physics_2d->bodies); ++i) {
-			const s_handle body_handle = s_array_handle(&editor->physics_2d->bodies, (u32)i);
-			se_physics_body_2d* body = s_array_get(&editor->physics_2d->bodies, body_handle);
-			if (!body || !body->is_valid) {
+		const u32 body_count = se_physics_world_2d_get_body_count(editor->physics_2d);
+		for (u32 i = 0; i < body_count; ++i) {
+			const se_physics_body_2d_handle body_handle = se_physics_world_2d_get_body(editor->physics_2d, i);
+			if (body_handle == SE_PHYSICS_BODY_2D_HANDLE_NULL) {
 				continue;
 			}
-			snprintf(label, sizeof(label), SE_EDITOR_NAME_PHYSICS2D_BODY_U, (u32)i);
-			se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_2D_BODY, S_HANDLE_NULL, S_HANDLE_NULL, body, editor->physics_2d, (u32)i, label);
+			snprintf(label, sizeof(label), SE_EDITOR_NAME_PHYSICS2D_BODY_U, i);
+			se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_2D_BODY, body_handle, editor->physics_2d, NULL, NULL, i, label);
 		}
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_PHYSICS_3D) && editor->physics_3d) {
-		se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_3D, S_HANDLE_NULL, S_HANDLE_NULL, editor->physics_3d, NULL, 0u, SE_EDITOR_NAME_PHYSICS3D);
+		se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_3D, editor->physics_3d, S_HANDLE_NULL, NULL, NULL, 0u, SE_EDITOR_NAME_PHYSICS3D);
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY) && editor->physics_3d) {
-		for (sz i = 0; i < s_array_get_size(&editor->physics_3d->bodies); ++i) {
-			const s_handle body_handle = s_array_handle(&editor->physics_3d->bodies, (u32)i);
-			se_physics_body_3d* body = s_array_get(&editor->physics_3d->bodies, body_handle);
-			if (!body || !body->is_valid) {
+		const u32 body_count = se_physics_world_3d_get_body_count(editor->physics_3d);
+		for (u32 i = 0; i < body_count; ++i) {
+			const se_physics_body_3d_handle body_handle = se_physics_world_3d_get_body(editor->physics_3d, i);
+			if (body_handle == SE_PHYSICS_BODY_3D_HANDLE_NULL) {
 				continue;
 			}
-			snprintf(label, sizeof(label), SE_EDITOR_NAME_PHYSICS3D_BODY_U, (u32)i);
-			se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, S_HANDLE_NULL, S_HANDLE_NULL, body, editor->physics_3d, (u32)i, label);
+			snprintf(label, sizeof(label), SE_EDITOR_NAME_PHYSICS3D_BODY_U, i);
+			se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, body_handle, editor->physics_3d, NULL, NULL, i, label);
 		}
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_AUDIO_CLIP)) {

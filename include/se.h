@@ -44,6 +44,8 @@ typedef s_handle se_vfx_emitter_2d_handle;
 typedef s_handle se_vfx_emitter_3d_handle;
 
 struct se_simulation;
+struct se_physics_world_2d;
+struct se_physics_world_3d;
 
 typedef struct se_context {
 	s_array(struct se_window, windows);
@@ -64,6 +66,8 @@ typedef struct se_context {
 	s_array(struct se_ui_widget, ui_elements);
 	s_array(struct se_ui_text_cache, ui_texts);
 	s_array(struct se_simulation, simulations);
+	s_array(struct se_physics_world_2d, physics_worlds_2d);
+	s_array(struct se_physics_world_3d, physics_worlds_3d);
 	s_array(struct se_font, fonts);
 	se_text_handle *ui_text_handle;
 	se_text_handle *default_text_handle;
@@ -80,6 +84,8 @@ typedef struct {
 	u32 windows;
 	u32 vfx_2ds;
 	u32 vfx_3ds;
+	u32 physics_worlds_2d;
+	u32 physics_worlds_3d;
 } se_context_destroy_report;
 
 extern se_context *se_global_context;

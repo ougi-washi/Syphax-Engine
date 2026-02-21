@@ -41,11 +41,6 @@ typedef struct building_data_t {
 	building_type_t type;
 } building_data_t;
 
-typedef struct building_t {
-    se_instance_id id;
-    building_type_t type;
-} building_t;
-
 typedef struct unit_t {
     se_instance_id id;
 } unit_t;

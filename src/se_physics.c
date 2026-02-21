@@ -1,12 +1,245 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_physics.h"
+#include "se.h"
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define SE_PHYSICS_EPSILON 1e-6f
+
+struct se_physics_shape_2d {
+	se_physics_shape_type_2d type;
+	s_vec2 offset;
+	f32 rotation;
+	union {
+		struct {
+			f32 radius;
+		} circle;
+		struct {
+			s_vec2 half_extents;
+			b8 is_aabb;
+		} box;
+		se_physics_mesh_2d mesh;
+	};
+	se_box_2d local_bounds;
+	se_physics_bvh_nodes_2d bvh_nodes;
+	u32 *bvh_triangles;
+	sz bvh_triangle_count;
+	b8 bvh_built : 1;
+	b8 is_trigger : 1;
+};
+
+struct se_physics_shape_3d {
+	se_physics_shape_type_3d type;
+	s_vec3 offset;
+	s_vec3 rotation;
+	union {
+		struct {
+			f32 radius;
+		} sphere;
+		struct {
+			s_vec3 half_extents;
+			b8 is_aabb;
+		} box;
+		se_physics_mesh_3d mesh;
+	};
+	se_box_3d local_bounds;
+	se_physics_bvh_nodes_3d bvh_nodes;
+	u32 *bvh_triangles;
+	sz bvh_triangle_count;
+	b8 bvh_built : 1;
+	b8 is_trigger : 1;
+};
+
+typedef s_array(se_physics_shape_2d, se_physics_shapes_2d);
+typedef s_array(se_physics_shape_3d, se_physics_shapes_3d);
+
+struct se_physics_body_2d {
+	se_physics_world_2d_handle world_handle;
+	se_physics_body_2d_handle self_handle;
+	se_physics_body_type type;
+	s_vec2 position;
+	f32 rotation;
+	s_vec2 velocity;
+	f32 angular_velocity;
+	s_vec2 force;
+	f32 torque;
+	f32 mass;
+	f32 inv_mass;
+	f32 inertia;
+	f32 inv_inertia;
+	f32 restitution;
+	f32 friction;
+	f32 linear_damping;
+	f32 angular_damping;
+	se_physics_shapes_2d shapes;
+	b8 is_valid : 1;
+};
+
+struct se_physics_body_3d {
+	se_physics_world_3d_handle world_handle;
+	se_physics_body_3d_handle self_handle;
+	se_physics_body_type type;
+	s_vec3 position;
+	s_vec3 rotation;
+	s_vec3 velocity;
+	s_vec3 angular_velocity;
+	s_vec3 force;
+	s_vec3 torque;
+	f32 mass;
+	f32 inv_mass;
+	f32 inertia;
+	f32 inv_inertia;
+	f32 restitution;
+	f32 friction;
+	f32 linear_damping;
+	f32 angular_damping;
+	se_physics_shapes_3d shapes;
+	b8 is_valid : 1;
+};
+
+typedef s_array(se_physics_body_2d, se_physics_bodies_2d);
+typedef s_array(se_physics_body_3d, se_physics_bodies_3d);
+typedef s_array(se_physics_contact_2d, se_physics_contacts_2d);
+typedef s_array(se_physics_contact_3d, se_physics_contacts_3d);
+
+struct se_physics_world_2d {
+	se_physics_world_2d_handle self_handle;
+	s_vec2 gravity;
+	u32 solver_iterations;
+	u32 shapes_per_body;
+	se_physics_bodies_2d bodies;
+	se_physics_contacts_2d contacts;
+	se_physics_contact_callback_2d on_contact;
+	void *user_data;
+};
+
+struct se_physics_world_3d {
+	se_physics_world_3d_handle self_handle;
+	s_vec3 gravity;
+	u32 solver_iterations;
+	u32 shapes_per_body;
+	se_physics_bodies_3d bodies;
+	se_physics_contacts_3d contacts;
+	se_physics_contact_callback_3d on_contact;
+	void *user_data;
+};
+
+static se_context *se_physics_context(void) {
+	return se_current_context();
+}
+
+static se_physics_world_2d *se_physics_world_2d_from_handle_mut(const se_physics_world_2d_handle handle) {
+	se_context *context = se_physics_context();
+	if (!context || handle == SE_PHYSICS_WORLD_2D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&context->physics_worlds_2d, handle);
+}
+
+static const se_physics_world_2d *se_physics_world_2d_from_handle_const(const se_physics_world_2d_handle handle) {
+	se_context *context = se_physics_context();
+	if (!context || handle == SE_PHYSICS_WORLD_2D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&context->physics_worlds_2d, handle);
+}
+
+static se_physics_world_3d *se_physics_world_3d_from_handle_mut(const se_physics_world_3d_handle handle) {
+	se_context *context = se_physics_context();
+	if (!context || handle == SE_PHYSICS_WORLD_3D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&context->physics_worlds_3d, handle);
+}
+
+static const se_physics_world_3d *se_physics_world_3d_from_handle_const(const se_physics_world_3d_handle handle) {
+	se_context *context = se_physics_context();
+	if (!context || handle == SE_PHYSICS_WORLD_3D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&context->physics_worlds_3d, handle);
+}
+
+static se_physics_body_2d *se_physics_body_2d_from_world_mut(se_physics_world_2d *world, const se_physics_body_2d_handle handle) {
+	if (!world || handle == SE_PHYSICS_BODY_2D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&world->bodies, handle);
+}
+
+static const se_physics_body_2d *se_physics_body_2d_from_world_const(const se_physics_world_2d *world, const se_physics_body_2d_handle handle) {
+	if (!world || handle == SE_PHYSICS_BODY_2D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&((se_physics_world_2d *)world)->bodies, handle);
+}
+
+static se_physics_body_3d *se_physics_body_3d_from_world_mut(se_physics_world_3d *world, const se_physics_body_3d_handle handle) {
+	if (!world || handle == SE_PHYSICS_BODY_3D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&world->bodies, handle);
+}
+
+static const se_physics_body_3d *se_physics_body_3d_from_world_const(const se_physics_world_3d *world, const se_physics_body_3d_handle handle) {
+	if (!world || handle == SE_PHYSICS_BODY_3D_HANDLE_NULL) {
+		return NULL;
+	}
+	return s_array_get(&((se_physics_world_3d *)world)->bodies, handle);
+}
+
+static void se_physics_shape_2d_cleanup(se_physics_shape_2d *shape) {
+	if (!shape) {
+		return;
+	}
+	if (shape->bvh_triangles) {
+		free(shape->bvh_triangles);
+		shape->bvh_triangles = NULL;
+	}
+	if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
+		s_array_clear(&shape->bvh_nodes);
+	}
+	shape->bvh_built = false;
+}
+
+static void se_physics_shape_3d_cleanup(se_physics_shape_3d *shape) {
+	if (!shape) {
+		return;
+	}
+	if (shape->bvh_triangles) {
+		free(shape->bvh_triangles);
+		shape->bvh_triangles = NULL;
+	}
+	if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
+		s_array_clear(&shape->bvh_nodes);
+	}
+	shape->bvh_built = false;
+}
+
+static void se_physics_body_2d_cleanup(se_physics_body_2d *body) {
+	if (!body) {
+		return;
+	}
+	se_physics_shape_2d *shape = NULL;
+	s_foreach(&body->shapes, shape) {
+		se_physics_shape_2d_cleanup(shape);
+	}
+	s_array_clear(&body->shapes);
+}
+
+static void se_physics_body_3d_cleanup(se_physics_body_3d *body) {
+	if (!body) {
+		return;
+	}
+	se_physics_shape_3d *shape = NULL;
+	s_foreach(&body->shapes, shape) {
+		se_physics_shape_3d_cleanup(shape);
+	}
+	s_array_clear(&body->shapes);
+}
 
 s_vec2 se_physics_rotate_vec2(const s_vec2 *v, const f32 angle) {
 	f32 c = cosf(angle);
@@ -1344,9 +1577,10 @@ void se_physics_apply_impulse_3d(se_physics_body_3d *body, const s_vec3 *impulse
 	}
 }
 
-void se_physics_resolve_contact_2d(se_physics_contact_2d *contact) {
-	se_physics_body_2d *a = contact->a;
-	se_physics_body_2d *b = contact->b;
+void se_physics_resolve_contact_2d(se_physics_world_2d *world, se_physics_contact_2d *contact) {
+	se_physics_body_2d *a = se_physics_body_2d_from_world_mut(world, contact->a);
+	se_physics_body_2d *b = se_physics_body_2d_from_world_mut(world, contact->b);
+	if (!a || !b) return;
 	f32 inv_mass_sum = a->inv_mass + b->inv_mass;
 	if (inv_mass_sum == 0.0f) return;
 
@@ -1392,9 +1626,10 @@ void se_physics_resolve_contact_2d(se_physics_contact_2d *contact) {
 	}
 }
 
-void se_physics_resolve_contact_3d(se_physics_contact_3d *contact) {
-	se_physics_body_3d *a = contact->a;
-	se_physics_body_3d *b = contact->b;
+void se_physics_resolve_contact_3d(se_physics_world_3d *world, se_physics_contact_3d *contact) {
+	se_physics_body_3d *a = se_physics_body_3d_from_world_mut(world, contact->a);
+	se_physics_body_3d *b = se_physics_body_3d_from_world_mut(world, contact->b);
+	if (!a || !b) return;
 	f32 inv_mass_sum = a->inv_mass + b->inv_mass;
 	if (inv_mass_sum == 0.0f) return;
 
@@ -1447,9 +1682,10 @@ void se_physics_resolve_contact_3d(se_physics_contact_3d *contact) {
 	}
 }
 
-void se_physics_positional_correction_2d(se_physics_contact_2d *contact) {
-	se_physics_body_2d *a = contact->a;
-	se_physics_body_2d *b = contact->b;
+void se_physics_positional_correction_2d(se_physics_world_2d *world, se_physics_contact_2d *contact) {
+	se_physics_body_2d *a = se_physics_body_2d_from_world_mut(world, contact->a);
+	se_physics_body_2d *b = se_physics_body_2d_from_world_mut(world, contact->b);
+	if (!a || !b) return;
 	f32 inv_mass_sum = a->inv_mass + b->inv_mass;
 	if (inv_mass_sum == 0.0f) return;
 	const f32 percent = 0.2f;
@@ -1462,9 +1698,10 @@ void se_physics_positional_correction_2d(se_physics_contact_2d *contact) {
 	b->position.y += correction.y * b->inv_mass;
 }
 
-void se_physics_positional_correction_3d(se_physics_contact_3d *contact) {
-	se_physics_body_3d *a = contact->a;
-	se_physics_body_3d *b = contact->b;
+void se_physics_positional_correction_3d(se_physics_world_3d *world, se_physics_contact_3d *contact) {
+	se_physics_body_3d *a = se_physics_body_3d_from_world_mut(world, contact->a);
+	se_physics_body_3d *b = se_physics_body_3d_from_world_mut(world, contact->b);
+	if (!a || !b) return;
 	f32 inv_mass_sum = a->inv_mass + b->inv_mass;
 	if (inv_mass_sum == 0.0f) return;
 	const f32 percent = 0.2f;
@@ -1620,8 +1857,9 @@ b8 se_physics_shapes_collide_3d(se_physics_body_3d *a, se_physics_shape_3d *shap
 	return false;
 }
 
-se_physics_world_2d *se_physics_world_2d_create(const se_physics_world_params_2d *params) {
+se_physics_world_2d_handle se_physics_world_2d_create(const se_physics_world_params_2d *params) {
 	se_physics_world_params_2d cfg = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS;
+	se_context *context = se_physics_context();
 	if (params) {
 		cfg = *params;
 		if (cfg.bodies_count == 0) cfg.bodies_count = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS.bodies_count;
@@ -1629,12 +1867,18 @@ se_physics_world_2d *se_physics_world_2d_create(const se_physics_world_params_2d
 		if (cfg.contacts_count == 0) cfg.contacts_count = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS.contacts_count;
 		if (cfg.solver_iterations == 0) cfg.solver_iterations = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS.solver_iterations;
 	}
-	se_physics_world_2d *world = malloc(sizeof(se_physics_world_2d));
+	if (!context) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return SE_PHYSICS_WORLD_2D_HANDLE_NULL;
+	}
+	se_physics_world_2d_handle world_handle = s_array_increment(&context->physics_worlds_2d);
+	se_physics_world_2d *world = s_array_get(&context->physics_worlds_2d, world_handle);
 	if (!world) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
-		return NULL;
+		return SE_PHYSICS_WORLD_2D_HANDLE_NULL;
 	}
 	memset(world, 0, sizeof(*world));
+	world->self_handle = world_handle;
 	world->gravity = cfg.gravity;
 	world->solver_iterations = cfg.solver_iterations;
 	world->shapes_per_body = cfg.shapes_per_body;
@@ -1645,35 +1889,28 @@ se_physics_world_2d *se_physics_world_2d_create(const se_physics_world_params_2d
 	s_array_init(&world->contacts);
 	s_array_reserve(&world->contacts, cfg.contacts_count);
 	se_set_last_error(SE_RESULT_OK);
-	return world;
+	return world_handle;
 }
 
-void se_physics_world_2d_destroy(se_physics_world_2d *world) {
-	if (!world) return;
+void se_physics_world_2d_destroy(const se_physics_world_2d_handle world_handle) {
+	se_context *context = se_physics_context();
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	if (!context || !world) {
+		return;
+	}
 	se_physics_body_2d *body = NULL;
 	s_foreach(&world->bodies, body) {
-		if (!body->is_valid) continue;
-		se_physics_shape_2d *shape = NULL;
-		s_foreach(&body->shapes, shape) {
-			if (shape->bvh_triangles) {
-				free(shape->bvh_triangles);
-				shape->bvh_triangles = NULL;
-			}
-			if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
-				s_array_clear(&shape->bvh_nodes);
-			}
-			shape->bvh_built = false;
-		}
-		s_array_clear(&body->shapes);
-		body->is_valid = false;
+		se_physics_body_2d_cleanup(body);
 	}
 	s_array_clear(&world->bodies);
 	s_array_clear(&world->contacts);
-	free(world);
+	s_array_remove(&context->physics_worlds_2d, world_handle);
+	se_set_last_error(SE_RESULT_OK);
 }
 
-se_physics_world_3d *se_physics_world_3d_create(const se_physics_world_params_3d *params) {
+se_physics_world_3d_handle se_physics_world_3d_create(const se_physics_world_params_3d *params) {
 	se_physics_world_params_3d cfg = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
+	se_context *context = se_physics_context();
 	if (params) {
 		cfg = *params;
 		if (cfg.bodies_count == 0) cfg.bodies_count = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS.bodies_count;
@@ -1681,12 +1918,18 @@ se_physics_world_3d *se_physics_world_3d_create(const se_physics_world_params_3d
 		if (cfg.contacts_count == 0) cfg.contacts_count = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS.contacts_count;
 		if (cfg.solver_iterations == 0) cfg.solver_iterations = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS.solver_iterations;
 	}
-	se_physics_world_3d *world = malloc(sizeof(se_physics_world_3d));
+	if (!context) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return SE_PHYSICS_WORLD_3D_HANDLE_NULL;
+	}
+	se_physics_world_3d_handle world_handle = s_array_increment(&context->physics_worlds_3d);
+	se_physics_world_3d *world = s_array_get(&context->physics_worlds_3d, world_handle);
 	if (!world) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
-		return NULL;
+		return SE_PHYSICS_WORLD_3D_HANDLE_NULL;
 	}
 	memset(world, 0, sizeof(*world));
+	world->self_handle = world_handle;
 	world->gravity = cfg.gravity;
 	world->solver_iterations = cfg.solver_iterations;
 	world->shapes_per_body = cfg.shapes_per_body;
@@ -1697,37 +1940,30 @@ se_physics_world_3d *se_physics_world_3d_create(const se_physics_world_params_3d
 	s_array_init(&world->contacts);
 	s_array_reserve(&world->contacts, cfg.contacts_count);
 	se_set_last_error(SE_RESULT_OK);
-	return world;
+	return world_handle;
 }
 
-void se_physics_world_3d_destroy(se_physics_world_3d *world) {
-	if (!world) return;
+void se_physics_world_3d_destroy(const se_physics_world_3d_handle world_handle) {
+	se_context *context = se_physics_context();
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	if (!context || !world) {
+		return;
+	}
 	se_physics_body_3d *body = NULL;
 	s_foreach(&world->bodies, body) {
-		if (!body->is_valid) continue;
-		se_physics_shape_3d *shape = NULL;
-		s_foreach(&body->shapes, shape) {
-			if (shape->bvh_triangles) {
-				free(shape->bvh_triangles);
-				shape->bvh_triangles = NULL;
-			}
-			if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
-				s_array_clear(&shape->bvh_nodes);
-			}
-			shape->bvh_built = false;
-		}
-		s_array_clear(&body->shapes);
-		body->is_valid = false;
+		se_physics_body_3d_cleanup(body);
 	}
 	s_array_clear(&world->bodies);
 	s_array_clear(&world->contacts);
-	free(world);
+	s_array_remove(&context->physics_worlds_3d, world_handle);
+	se_set_last_error(SE_RESULT_OK);
 }
 
-se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const se_physics_body_params_2d *params) {
+se_physics_body_2d_handle se_physics_body_2d_create(const se_physics_world_2d_handle world_handle, const se_physics_body_params_2d *params) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
 	if (!world) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_BODY_2D_HANDLE_NULL;
 	}
 	se_physics_body_params_2d cfg = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
 	if (params) cfg = *params;
@@ -1737,26 +1973,22 @@ se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const 
 	cfg.angular_damping = se_physics_maxf(cfg.angular_damping, 0.0f);
 	if (cfg.type == SE_PHYSICS_BODY_DYNAMIC && cfg.mass <= SE_PHYSICS_EPSILON) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_BODY_2D_HANDLE_NULL;
 	}
 
-	se_physics_body_2d *body = NULL;
-	s_foreach(&world->bodies, body) {
-		se_physics_body_2d *slot = body;
-		if (!slot->is_valid) {
-			body = slot;
-			break;
-		}
+	if (s_array_get_capacity(&world->bodies) == s_array_get_size(&world->bodies)) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return SE_PHYSICS_BODY_2D_HANDLE_NULL;
 	}
+	se_physics_body_2d_handle body_handle = s_array_increment(&world->bodies);
+	se_physics_body_2d *body = s_array_get(&world->bodies, body_handle);
 	if (!body) {
-		if (s_array_get_capacity(&world->bodies) == s_array_get_size(&world->bodies)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		s_handle body_handle = s_array_increment(&world->bodies);
-		body = s_array_get(&world->bodies, body_handle);
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return SE_PHYSICS_BODY_2D_HANDLE_NULL;
 	}
 	memset(body, 0, sizeof(*body));
+	body->world_handle = world_handle;
+	body->self_handle = body_handle;
 	body->type = cfg.type;
 	body->position = cfg.position;
 	body->rotation = cfg.rotation;
@@ -1775,31 +2007,25 @@ se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const 
 	body->is_valid = true;
 	se_physics_body_2d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return body;
+	return body_handle;
 }
 
-void se_physics_body_2d_destroy(se_physics_world_2d *world, se_physics_body_2d *body) {
-	if (!world || !body) return;
-	if (!body->is_valid) return;
-	se_physics_shape_2d *shape = NULL;
-	s_foreach(&body->shapes, shape) {
-		if (shape->bvh_triangles) {
-			free(shape->bvh_triangles);
-			shape->bvh_triangles = NULL;
-		}
-		if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
-			s_array_clear(&shape->bvh_nodes);
-		}
-		shape->bvh_built = false;
+void se_physics_body_2d_destroy(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!world || !body) {
+		return;
 	}
-	s_array_clear(&body->shapes);
-	body->is_valid = false;
+	se_physics_body_2d_cleanup(body);
+	s_array_remove(&world->bodies, body_handle);
+	se_set_last_error(SE_RESULT_OK);
 }
 
-se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const se_physics_body_params_3d *params) {
+se_physics_body_3d_handle se_physics_body_3d_create(const se_physics_world_3d_handle world_handle, const se_physics_body_params_3d *params) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
 	if (!world) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
 	}
 	se_physics_body_params_3d cfg = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
 	if (params) cfg = *params;
@@ -1809,26 +2035,22 @@ se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const 
 	cfg.angular_damping = se_physics_maxf(cfg.angular_damping, 0.0f);
 	if (cfg.type == SE_PHYSICS_BODY_DYNAMIC && cfg.mass <= SE_PHYSICS_EPSILON) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
 	}
 
-	se_physics_body_3d *body = NULL;
-	s_foreach(&world->bodies, body) {
-		se_physics_body_3d *slot = body;
-		if (!slot->is_valid) {
-			body = slot;
-			break;
-		}
+	if (s_array_get_capacity(&world->bodies) == s_array_get_size(&world->bodies)) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
 	}
+	se_physics_body_3d_handle body_handle = s_array_increment(&world->bodies);
+	se_physics_body_3d *body = s_array_get(&world->bodies, body_handle);
 	if (!body) {
-		if (s_array_get_capacity(&world->bodies) == s_array_get_size(&world->bodies)) {
-			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-			return NULL;
-		}
-		s_handle body_handle = s_array_increment(&world->bodies);
-		body = s_array_get(&world->bodies, body_handle);
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
 	}
 	memset(body, 0, sizeof(*body));
+	body->world_handle = world_handle;
+	body->self_handle = body_handle;
 	body->type = cfg.type;
 	body->position = cfg.position;
 	body->rotation = cfg.rotation;
@@ -1847,37 +2069,32 @@ se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const 
 	body->is_valid = true;
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return body;
+	return body_handle;
 }
 
-void se_physics_body_3d_destroy(se_physics_world_3d *world, se_physics_body_3d *body) {
-	if (!world || !body) return;
-	if (!body->is_valid) return;
-	se_physics_shape_3d *shape = NULL;
-	s_foreach(&body->shapes, shape) {
-		if (shape->bvh_triangles) {
-			free(shape->bvh_triangles);
-			shape->bvh_triangles = NULL;
-		}
-		if (s_array_get_capacity(&shape->bvh_nodes) > 0) {
-			s_array_clear(&shape->bvh_nodes);
-		}
-		shape->bvh_built = false;
+void se_physics_body_3d_destroy(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!world || !body) {
+		return;
 	}
-	s_array_clear(&body->shapes);
-	body->is_valid = false;
+	se_physics_body_3d_cleanup(body);
+	s_array_remove(&world->bodies, body_handle);
+	se_set_last_error(SE_RESULT_OK);
 }
 
-se_physics_shape_2d *se_physics_body_2d_add_circle(se_physics_body_2d *body, const s_vec2 *offset, const f32 radius, const b8 is_trigger) {
-	if (!body || !offset || radius <= 0.0f) {
+se_physics_shape_2d_handle se_physics_body_2d_add_circle(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *offset, const f32 radius, const b8 is_trigger) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!world || !body || !offset || radius <= 0.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_CIRCLE;
@@ -1888,19 +2105,21 @@ se_physics_shape_2d *se_physics_body_2d_add_circle(se_physics_body_2d *body, con
 	shape->is_trigger = is_trigger;
 	se_physics_body_2d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_2d *se_physics_body_2d_add_aabb(se_physics_body_2d *body, const s_vec2 *offset, const s_vec2 *half_extents, const b8 is_trigger) {
-	if (!body || !offset || !half_extents || half_extents->x <= 0.0f || half_extents->y <= 0.0f) {
+se_physics_shape_2d_handle se_physics_body_2d_add_aabb(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *offset, const s_vec2 *half_extents, const b8 is_trigger) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!world || !body || !offset || !half_extents || half_extents->x <= 0.0f || half_extents->y <= 0.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_AABB;
@@ -1912,19 +2131,21 @@ se_physics_shape_2d *se_physics_body_2d_add_aabb(se_physics_body_2d *body, const
 	shape->is_trigger = is_trigger;
 	se_physics_body_2d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_2d *se_physics_body_2d_add_box(se_physics_body_2d *body, const s_vec2 *offset, const s_vec2 *half_extents, const f32 rotation, const b8 is_trigger) {
-	if (!body || !offset || !half_extents || half_extents->x <= 0.0f || half_extents->y <= 0.0f) {
+se_physics_shape_2d_handle se_physics_body_2d_add_box(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *offset, const s_vec2 *half_extents, const f32 rotation, const b8 is_trigger) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!world || !body || !offset || !half_extents || half_extents->x <= 0.0f || half_extents->y <= 0.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_BOX;
@@ -1937,19 +2158,21 @@ se_physics_shape_2d *se_physics_body_2d_add_box(se_physics_body_2d *body, const 
 	shape->is_trigger = is_trigger;
 	se_physics_body_2d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_2d *se_physics_body_2d_add_mesh(se_physics_body_2d *body, const se_physics_mesh_2d *mesh, const s_vec2 *offset, const f32 rotation, const b8 is_trigger) {
-	if (!body || !mesh || !offset || !mesh->vertices || mesh->vertex_count < 3) {
+se_physics_shape_2d_handle se_physics_body_2d_add_mesh(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const se_physics_mesh_2d *mesh, const s_vec2 *offset, const f32 rotation, const b8 is_trigger) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!world || !body || !mesh || !offset || !mesh->vertices || mesh->vertex_count < 3) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_2D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_2d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_2D_MESH;
@@ -1973,19 +2196,21 @@ se_physics_shape_2d *se_physics_body_2d_add_mesh(se_physics_body_2d *body, const
 	}
 	se_physics_body_2d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_3d *se_physics_body_3d_add_sphere(se_physics_body_3d *body, const s_vec3 *offset, const f32 radius, const b8 is_trigger) {
-	if (!body || !offset || radius <= 0.0f) {
+se_physics_shape_3d_handle se_physics_body_3d_add_sphere(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *offset, const f32 radius, const b8 is_trigger) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!world || !body || !offset || radius <= 0.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_SPHERE;
@@ -1996,19 +2221,21 @@ se_physics_shape_3d *se_physics_body_3d_add_sphere(se_physics_body_3d *body, con
 	shape->is_trigger = is_trigger;
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_3d *se_physics_body_3d_add_aabb(se_physics_body_3d *body, const s_vec3 *offset, const s_vec3 *half_extents, const b8 is_trigger) {
-	if (!body || !offset || !half_extents || half_extents->x <= 0.0f || half_extents->y <= 0.0f || half_extents->z <= 0.0f) {
+se_physics_shape_3d_handle se_physics_body_3d_add_aabb(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *offset, const s_vec3 *half_extents, const b8 is_trigger) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!world || !body || !offset || !half_extents || half_extents->x <= 0.0f || half_extents->y <= 0.0f || half_extents->z <= 0.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_AABB;
@@ -2020,19 +2247,21 @@ se_physics_shape_3d *se_physics_body_3d_add_aabb(se_physics_body_3d *body, const
 	shape->is_trigger = is_trigger;
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_3d *se_physics_body_3d_add_box(se_physics_body_3d *body, const s_vec3 *offset, const s_vec3 *half_extents, const s_vec3 *rotation, const b8 is_trigger) {
-	if (!body || !offset || !half_extents || !rotation || half_extents->x <= 0.0f || half_extents->y <= 0.0f || half_extents->z <= 0.0f) {
+se_physics_shape_3d_handle se_physics_body_3d_add_box(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *offset, const s_vec3 *half_extents, const s_vec3 *rotation, const b8 is_trigger) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!world || !body || !offset || !half_extents || !rotation || half_extents->x <= 0.0f || half_extents->y <= 0.0f || half_extents->z <= 0.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_BOX;
@@ -2045,19 +2274,21 @@ se_physics_shape_3d *se_physics_body_3d_add_box(se_physics_body_3d *body, const 
 	shape->is_trigger = is_trigger;
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-se_physics_shape_3d *se_physics_body_3d_add_mesh(se_physics_body_3d *body, const se_physics_mesh_3d *mesh, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger) {
-	if (!body || !mesh || !offset || !rotation || !mesh->vertices || mesh->vertex_count < 3) {
+se_physics_shape_3d_handle se_physics_body_3d_add_mesh(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const se_physics_mesh_3d *mesh, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!world || !body || !mesh || !offset || !rotation || !mesh->vertices || mesh->vertex_count < 3) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
 	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
 		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return NULL;
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
 	}
-	s_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d_handle shape_handle = s_array_increment(&body->shapes);
 	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 	memset(shape, 0, sizeof(*shape));
 	shape->type = SE_PHYSICS_SHAPE_3D_MESH;
@@ -2081,70 +2312,500 @@ se_physics_shape_3d *se_physics_body_3d_add_mesh(se_physics_body_3d *body, const
 	}
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
-	return shape;
+	return shape_handle;
 }
 
-void se_physics_body_2d_set_position(se_physics_body_2d *body, const s_vec2 *position) {
+void se_physics_body_2d_set_type(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const se_physics_body_type type) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->type = type;
+	se_physics_body_2d_update_mass(body);
+}
+
+se_physics_body_type se_physics_body_2d_get_type(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->type : SE_PHYSICS_BODY_STATIC;
+}
+
+void se_physics_body_2d_set_position(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *position) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
 	if (!body || !position) return;
 	body->position = *position;
 }
 
-void se_physics_body_2d_set_velocity(se_physics_body_2d *body, const s_vec2 *velocity) {
+s_vec2 se_physics_body_2d_get_position(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->position : s_vec2(0.0f, 0.0f);
+}
+
+void se_physics_body_2d_set_velocity(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *velocity) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
 	if (!body || !velocity) return;
 	body->velocity = *velocity;
 }
 
-void se_physics_body_2d_set_rotation(se_physics_body_2d *body, const f32 rotation) {
+s_vec2 se_physics_body_2d_get_velocity(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->velocity : s_vec2(0.0f, 0.0f);
+}
+
+void se_physics_body_2d_set_rotation(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 rotation) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
 	if (!body) return;
 	body->rotation = rotation;
 }
 
-void se_physics_body_2d_apply_force(se_physics_body_2d *body, const s_vec2 *force) {
+f32 se_physics_body_2d_get_rotation(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->rotation : 0.0f;
+}
+
+void se_physics_body_2d_set_angular_velocity(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 angular_velocity) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->angular_velocity = angular_velocity;
+}
+
+f32 se_physics_body_2d_get_angular_velocity(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->angular_velocity : 0.0f;
+}
+
+void se_physics_body_2d_set_force(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *force) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body || !force) return;
+	body->force = *force;
+}
+
+s_vec2 se_physics_body_2d_get_force(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->force : s_vec2(0.0f, 0.0f);
+}
+
+void se_physics_body_2d_set_torque(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 torque) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->torque = torque;
+}
+
+f32 se_physics_body_2d_get_torque(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->torque : 0.0f;
+}
+
+void se_physics_body_2d_set_mass(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 mass) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->mass = mass;
+	se_physics_body_2d_update_mass(body);
+}
+
+f32 se_physics_body_2d_get_mass(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->mass : 0.0f;
+}
+
+f32 se_physics_body_2d_get_inv_mass(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->inv_mass : 0.0f;
+}
+
+f32 se_physics_body_2d_get_inertia(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->inertia : 0.0f;
+}
+
+f32 se_physics_body_2d_get_inv_inertia(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->inv_inertia : 0.0f;
+}
+
+void se_physics_body_2d_set_restitution(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 restitution) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->restitution = se_physics_clamp(restitution, 0.0f, 1.0f);
+}
+
+f32 se_physics_body_2d_get_restitution(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->restitution : 0.0f;
+}
+
+void se_physics_body_2d_set_friction(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 friction) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->friction = se_physics_maxf(friction, 0.0f);
+}
+
+f32 se_physics_body_2d_get_friction(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->friction : 0.0f;
+}
+
+void se_physics_body_2d_set_linear_damping(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 damping) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->linear_damping = se_physics_maxf(damping, 0.0f);
+}
+
+f32 se_physics_body_2d_get_linear_damping(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->linear_damping : 0.0f;
+}
+
+void se_physics_body_2d_set_angular_damping(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const f32 damping) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->angular_damping = se_physics_maxf(damping, 0.0f);
+}
+
+f32 se_physics_body_2d_get_angular_damping(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? body->angular_damping : 0.0f;
+}
+
+u32 se_physics_body_2d_get_shape_count(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	const se_physics_body_2d *body = se_physics_body_2d_from_world_const(world, body_handle);
+	return body ? (u32)s_array_get_size(&body->shapes) : 0u;
+}
+
+void se_physics_body_2d_apply_force(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *force) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
 	if (!body || !force || body->inv_mass == 0.0f) return;
 	body->force.x += force->x;
 	body->force.y += force->y;
 }
 
-void se_physics_body_2d_apply_impulse(se_physics_body_2d *body, const s_vec2 *impulse, const s_vec2 *point) {
+void se_physics_body_2d_apply_impulse(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *impulse, const s_vec2 *point) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	se_physics_body_2d *body = se_physics_body_2d_from_world_mut(world, body_handle);
 	if (!body || !impulse) return;
 	se_physics_apply_impulse_2d(body, impulse, point);
 }
 
-void se_physics_body_3d_set_position(se_physics_body_3d *body, const s_vec3 *position) {
+void se_physics_body_3d_set_type(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const se_physics_body_type type) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->type = type;
+	se_physics_body_3d_update_mass(body);
+}
+
+se_physics_body_type se_physics_body_3d_get_type(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->type : SE_PHYSICS_BODY_STATIC;
+}
+
+void se_physics_body_3d_set_position(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *position) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
 	if (!body || !position) return;
 	body->position = *position;
 }
 
-void se_physics_body_3d_set_velocity(se_physics_body_3d *body, const s_vec3 *velocity) {
+s_vec3 se_physics_body_3d_get_position(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->position : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_body_3d_set_velocity(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *velocity) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
 	if (!body || !velocity) return;
 	body->velocity = *velocity;
 }
 
-void se_physics_body_3d_set_rotation(se_physics_body_3d *body, const s_vec3 *rotation) {
+s_vec3 se_physics_body_3d_get_velocity(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->velocity : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_body_3d_set_rotation(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *rotation) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
 	if (!body || !rotation) return;
 	body->rotation = *rotation;
 }
 
-void se_physics_body_3d_apply_force(se_physics_body_3d *body, const s_vec3 *force) {
+s_vec3 se_physics_body_3d_get_rotation(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->rotation : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_body_3d_set_angular_velocity(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *angular_velocity) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body || !angular_velocity) return;
+	body->angular_velocity = *angular_velocity;
+}
+
+s_vec3 se_physics_body_3d_get_angular_velocity(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->angular_velocity : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_body_3d_set_force(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *force) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body || !force) return;
+	body->force = *force;
+}
+
+s_vec3 se_physics_body_3d_get_force(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->force : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_body_3d_set_torque(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *torque) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body || !torque) return;
+	body->torque = *torque;
+}
+
+s_vec3 se_physics_body_3d_get_torque(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->torque : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_body_3d_set_mass(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const f32 mass) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->mass = mass;
+	se_physics_body_3d_update_mass(body);
+}
+
+f32 se_physics_body_3d_get_mass(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->mass : 0.0f;
+}
+
+f32 se_physics_body_3d_get_inv_mass(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->inv_mass : 0.0f;
+}
+
+f32 se_physics_body_3d_get_inertia(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->inertia : 0.0f;
+}
+
+f32 se_physics_body_3d_get_inv_inertia(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->inv_inertia : 0.0f;
+}
+
+void se_physics_body_3d_set_restitution(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const f32 restitution) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->restitution = se_physics_clamp(restitution, 0.0f, 1.0f);
+}
+
+f32 se_physics_body_3d_get_restitution(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->restitution : 0.0f;
+}
+
+void se_physics_body_3d_set_friction(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const f32 friction) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->friction = se_physics_maxf(friction, 0.0f);
+}
+
+f32 se_physics_body_3d_get_friction(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->friction : 0.0f;
+}
+
+void se_physics_body_3d_set_linear_damping(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const f32 damping) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->linear_damping = se_physics_maxf(damping, 0.0f);
+}
+
+f32 se_physics_body_3d_get_linear_damping(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->linear_damping : 0.0f;
+}
+
+void se_physics_body_3d_set_angular_damping(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const f32 damping) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!body) return;
+	body->angular_damping = se_physics_maxf(damping, 0.0f);
+}
+
+f32 se_physics_body_3d_get_angular_damping(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? body->angular_damping : 0.0f;
+}
+
+u32 se_physics_body_3d_get_shape_count(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	const se_physics_body_3d *body = se_physics_body_3d_from_world_const(world, body_handle);
+	return body ? (u32)s_array_get_size(&body->shapes) : 0u;
+}
+
+void se_physics_body_3d_apply_force(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *force) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
 	if (!body || !force || body->inv_mass == 0.0f) return;
 	body->force.x += force->x;
 	body->force.y += force->y;
 	body->force.z += force->z;
 }
 
-void se_physics_body_3d_apply_impulse(se_physics_body_3d *body, const s_vec3 *impulse, const s_vec3 *point) {
+void se_physics_body_3d_apply_impulse(const se_physics_world_3d_handle world_handle, const se_physics_body_3d_handle body_handle, const s_vec3 *impulse, const s_vec3 *point) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
 	if (!body || !impulse) return;
 	se_physics_apply_impulse_3d(body, impulse, point);
 }
 
-void se_physics_world_2d_set_gravity(se_physics_world_2d *world, const s_vec2 *gravity) {
+void se_physics_world_2d_set_gravity(const se_physics_world_2d_handle world_handle, const s_vec2 *gravity) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
 	if (!world || !gravity) return;
 	world->gravity = *gravity;
 }
 
-void se_physics_world_3d_set_gravity(se_physics_world_3d *world, const s_vec3 *gravity) {
+s_vec2 se_physics_world_2d_get_gravity(const se_physics_world_2d_handle world_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	return world ? world->gravity : s_vec2(0.0f, 0.0f);
+}
+
+void se_physics_world_3d_set_gravity(const se_physics_world_3d_handle world_handle, const s_vec3 *gravity) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
 	if (!world || !gravity) return;
 	world->gravity = *gravity;
+}
+
+s_vec3 se_physics_world_3d_get_gravity(const se_physics_world_3d_handle world_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	return world ? world->gravity : s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+void se_physics_world_2d_set_solver_iterations(const se_physics_world_2d_handle world_handle, const u32 iterations) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	if (!world) return;
+	world->solver_iterations = iterations;
+}
+
+u32 se_physics_world_2d_get_solver_iterations(const se_physics_world_2d_handle world_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	return world ? world->solver_iterations : 0u;
+}
+
+void se_physics_world_3d_set_solver_iterations(const se_physics_world_3d_handle world_handle, const u32 iterations) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	if (!world) return;
+	world->solver_iterations = iterations;
+}
+
+u32 se_physics_world_3d_get_solver_iterations(const se_physics_world_3d_handle world_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	return world ? world->solver_iterations : 0u;
+}
+
+void se_physics_world_2d_set_shapes_per_body(const se_physics_world_2d_handle world_handle, const u32 count) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
+	if (!world) return;
+	world->shapes_per_body = count;
+}
+
+u32 se_physics_world_2d_get_shapes_per_body(const se_physics_world_2d_handle world_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	return world ? world->shapes_per_body : 0u;
+}
+
+void se_physics_world_3d_set_shapes_per_body(const se_physics_world_3d_handle world_handle, const u32 count) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	if (!world) return;
+	world->shapes_per_body = count;
+}
+
+u32 se_physics_world_3d_get_shapes_per_body(const se_physics_world_3d_handle world_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	return world ? world->shapes_per_body : 0u;
+}
+
+u32 se_physics_world_2d_get_body_count(const se_physics_world_2d_handle world_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	return world ? (u32)s_array_get_size(&world->bodies) : 0u;
+}
+
+u32 se_physics_world_2d_get_contact_count(const se_physics_world_2d_handle world_handle) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	return world ? (u32)s_array_get_size(&world->contacts) : 0u;
+}
+
+se_physics_body_2d_handle se_physics_world_2d_get_body(const se_physics_world_2d_handle world_handle, const u32 index) {
+	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
+	if (!world) return SE_PHYSICS_BODY_2D_HANDLE_NULL;
+	return s_array_handle(&world->bodies, index);
+}
+
+u32 se_physics_world_3d_get_body_count(const se_physics_world_3d_handle world_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	return world ? (u32)s_array_get_size(&world->bodies) : 0u;
+}
+
+u32 se_physics_world_3d_get_contact_count(const se_physics_world_3d_handle world_handle) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	return world ? (u32)s_array_get_size(&world->contacts) : 0u;
+}
+
+se_physics_body_3d_handle se_physics_world_3d_get_body(const se_physics_world_3d_handle world_handle, const u32 index) {
+	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
+	if (!world) return SE_PHYSICS_BODY_3D_HANDLE_NULL;
+	return s_array_handle(&world->bodies, index);
 }
 
 static void se_physics_integrate_body_2d(se_physics_body_2d *body, const s_vec2 *gravity, f32 dt) {
@@ -2213,7 +2874,8 @@ static void se_physics_integrate_kinematic_body_3d(se_physics_body_3d *body, f32
 	body->torque = s_vec3(0.0f, 0.0f, 0.0f);
 }
 
-void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
+void se_physics_world_2d_step(const se_physics_world_2d_handle world_handle, const f32 dt) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
 	if (!world || dt <= 0.0f) return;
 	const sz contacts_capacity = s_array_get_capacity(&world->contacts);
 	s_array_clear(&world->contacts);
@@ -2238,20 +2900,22 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 			s_handle b_handle = s_array_handle(&world->bodies, (u32)j);
 			se_physics_body_2d *b = s_array_get(&world->bodies, b_handle);
 			if (!b->is_valid) continue;
-				se_physics_shape_2d *shape_a = NULL;
-				s_foreach(&a->shapes, shape_a) {
-					se_physics_shape_2d *shape_b = NULL;
-					s_foreach(&b->shapes, shape_b) {
-						se_physics_contact_2d contact = {0};
-						if (se_physics_shapes_collide_2d(a, shape_a, b, shape_b, &contact)) {
-							contact.a = a;
-							contact.b = b;
-						contact.shape_a = shape_a;
-						contact.shape_b = shape_b;
+			for (sz k = 0; k < s_array_get_size(&a->shapes); ++k) {
+				s_handle shape_a_handle = s_array_handle(&a->shapes, (u32)k);
+				se_physics_shape_2d *shape_a = s_array_get(&a->shapes, shape_a_handle);
+				for (sz l = 0; l < s_array_get_size(&b->shapes); ++l) {
+					s_handle shape_b_handle = s_array_handle(&b->shapes, (u32)l);
+					se_physics_shape_2d *shape_b = s_array_get(&b->shapes, shape_b_handle);
+					se_physics_contact_2d contact = {0};
+					if (se_physics_shapes_collide_2d(a, shape_a, b, shape_b, &contact)) {
+						contact.a = a_handle;
+						contact.b = b_handle;
+						contact.shape_a = shape_a_handle;
+						contact.shape_b = shape_b_handle;
 						contact.restitution = (a->restitution + b->restitution) * 0.5f;
 						contact.friction = (a->friction + b->friction) * 0.5f;
 						contact.is_trigger = (shape_a->is_trigger || shape_b->is_trigger);
-						if (!contact.is_trigger && contact.a->inv_mass == 0.0f && contact.b->inv_mass == 0.0f) {
+						if (!contact.is_trigger && a->inv_mass == 0.0f && b->inv_mass == 0.0f) {
 							continue;
 						}
 						if (s_array_get_size(&world->contacts) < s_array_get_capacity(&world->contacts)) {
@@ -2268,16 +2932,19 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 	for (u32 iter = 0; iter < world->solver_iterations; iter++) {
 		se_physics_contact_2d *contact = NULL;
 		s_foreach(&world->contacts, contact) {
+			se_physics_body_2d *a = se_physics_body_2d_from_world_mut(world, contact->a);
+			se_physics_body_2d *b = se_physics_body_2d_from_world_mut(world, contact->b);
 			if (contact->is_trigger) continue;
-			if (contact->a->inv_mass == 0.0f && contact->b->inv_mass == 0.0f) continue;
-			se_physics_resolve_contact_2d(contact);
+			if (!a || !b) continue;
+			if (a->inv_mass == 0.0f && b->inv_mass == 0.0f) continue;
+			se_physics_resolve_contact_2d(world, contact);
 		}
 	}
 
 	se_physics_contact_2d *contact = NULL;
 	s_foreach(&world->contacts, contact) {
 		if (!contact->is_trigger) {
-			se_physics_positional_correction_2d(contact);
+			se_physics_positional_correction_2d(world, contact);
 		}
 		if (world->on_contact) {
 			world->on_contact(contact, world->user_data);
@@ -2285,7 +2952,8 @@ void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt) {
 	}
 }
 
-void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
+void se_physics_world_3d_step(const se_physics_world_3d_handle world_handle, const f32 dt) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
 	if (!world || dt <= 0.0f) return;
 	const sz contacts_capacity = s_array_get_capacity(&world->contacts);
 	s_array_clear(&world->contacts);
@@ -2310,20 +2978,22 @@ void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 			s_handle b_handle = s_array_handle(&world->bodies, (u32)j);
 			se_physics_body_3d *b = s_array_get(&world->bodies, b_handle);
 			if (!b->is_valid) continue;
-				se_physics_shape_3d *shape_a = NULL;
-				s_foreach(&a->shapes, shape_a) {
-					se_physics_shape_3d *shape_b = NULL;
-					s_foreach(&b->shapes, shape_b) {
-						se_physics_contact_3d contact = {0};
-						if (se_physics_shapes_collide_3d(a, shape_a, b, shape_b, &contact)) {
-						contact.a = a;
-						contact.b = b;
-						contact.shape_a = shape_a;
-						contact.shape_b = shape_b;
+			for (sz k = 0; k < s_array_get_size(&a->shapes); ++k) {
+				s_handle shape_a_handle = s_array_handle(&a->shapes, (u32)k);
+				se_physics_shape_3d *shape_a = s_array_get(&a->shapes, shape_a_handle);
+				for (sz l = 0; l < s_array_get_size(&b->shapes); ++l) {
+					s_handle shape_b_handle = s_array_handle(&b->shapes, (u32)l);
+					se_physics_shape_3d *shape_b = s_array_get(&b->shapes, shape_b_handle);
+					se_physics_contact_3d contact = {0};
+					if (se_physics_shapes_collide_3d(a, shape_a, b, shape_b, &contact)) {
+						contact.a = a_handle;
+						contact.b = b_handle;
+						contact.shape_a = shape_a_handle;
+						contact.shape_b = shape_b_handle;
 						contact.restitution = (a->restitution + b->restitution) * 0.5f;
 						contact.friction = (a->friction + b->friction) * 0.5f;
 						contact.is_trigger = (shape_a->is_trigger || shape_b->is_trigger);
-						if (!contact.is_trigger && contact.a->inv_mass == 0.0f && contact.b->inv_mass == 0.0f) {
+						if (!contact.is_trigger && a->inv_mass == 0.0f && b->inv_mass == 0.0f) {
 							continue;
 						}
 						if (s_array_get_size(&world->contacts) < s_array_get_capacity(&world->contacts)) {
@@ -2340,16 +3010,19 @@ void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 	for (u32 iter = 0; iter < world->solver_iterations; iter++) {
 		se_physics_contact_3d *contact = NULL;
 		s_foreach(&world->contacts, contact) {
+			se_physics_body_3d *a = se_physics_body_3d_from_world_mut(world, contact->a);
+			se_physics_body_3d *b = se_physics_body_3d_from_world_mut(world, contact->b);
 			if (contact->is_trigger) continue;
-			if (contact->a->inv_mass == 0.0f && contact->b->inv_mass == 0.0f) continue;
-			se_physics_resolve_contact_3d(contact);
+			if (!a || !b) continue;
+			if (a->inv_mass == 0.0f && b->inv_mass == 0.0f) continue;
+			se_physics_resolve_contact_3d(world, contact);
 		}
 	}
 
 	se_physics_contact_3d *contact = NULL;
 	s_foreach(&world->contacts, contact) {
 		if (!contact->is_trigger) {
-			se_physics_positional_correction_3d(contact);
+			se_physics_positional_correction_3d(world, contact);
 		}
 		if (world->on_contact) {
 			world->on_contact(contact, world->user_data);
@@ -2357,43 +3030,43 @@ void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt) {
 	}
 }
 
-se_physics_world_2d *se_physics_example_2d_create(void) {
-	se_physics_world_2d *world = se_physics_world_2d_create(NULL);
-	if (!world) return NULL;
+se_physics_world_2d_handle se_physics_example_2d_create(void) {
+	se_physics_world_2d_handle world = se_physics_world_2d_create(NULL);
+	if (world == SE_PHYSICS_WORLD_2D_HANDLE_NULL) return SE_PHYSICS_WORLD_2D_HANDLE_NULL;
 	se_physics_body_params_2d ground_params = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
 	ground_params.type = SE_PHYSICS_BODY_STATIC;
 	ground_params.position = s_vec2(0.0f, -5.0f);
-	se_physics_body_2d *ground = se_physics_body_2d_create(world, &ground_params);
-	if (ground) {
-		se_physics_body_2d_add_aabb(ground, &s_vec2(0.0f, 0.0f), &s_vec2(10.0f, 1.0f), false);
+	se_physics_body_2d_handle ground = se_physics_body_2d_create(world, &ground_params);
+	if (ground != SE_PHYSICS_BODY_2D_HANDLE_NULL) {
+		se_physics_body_2d_add_aabb(world, ground, &s_vec2(0.0f, 0.0f), &s_vec2(10.0f, 1.0f), false);
 	}
 	for (u32 i = 0; i < 5; i++) {
 		se_physics_body_params_2d params = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
 		params.position = s_vec2(-2.0f + (f32)i, 2.0f + (f32)i);
-		se_physics_body_2d *body = se_physics_body_2d_create(world, &params);
-		if (body) {
-			se_physics_body_2d_add_circle(body, &s_vec2(0.0f, 0.0f), 0.5f, false);
+		se_physics_body_2d_handle body = se_physics_body_2d_create(world, &params);
+		if (body != SE_PHYSICS_BODY_2D_HANDLE_NULL) {
+			se_physics_body_2d_add_circle(world, body, &s_vec2(0.0f, 0.0f), 0.5f, false);
 		}
 	}
 	return world;
 }
 
-se_physics_world_3d *se_physics_example_3d_create(void) {
-	se_physics_world_3d *world = se_physics_world_3d_create(NULL);
-	if (!world) return NULL;
+se_physics_world_3d_handle se_physics_example_3d_create(void) {
+	se_physics_world_3d_handle world = se_physics_world_3d_create(NULL);
+	if (world == SE_PHYSICS_WORLD_3D_HANDLE_NULL) return SE_PHYSICS_WORLD_3D_HANDLE_NULL;
 	se_physics_body_params_3d ground_params = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
 	ground_params.type = SE_PHYSICS_BODY_STATIC;
 	ground_params.position = s_vec3(0.0f, -5.0f, 0.0f);
-	se_physics_body_3d *ground = se_physics_body_3d_create(world, &ground_params);
-	if (ground) {
-		se_physics_body_3d_add_aabb(ground, &s_vec3(0.0f, 0.0f, 0.0f), &s_vec3(10.0f, 1.0f, 10.0f), false);
+	se_physics_body_3d_handle ground = se_physics_body_3d_create(world, &ground_params);
+	if (ground != SE_PHYSICS_BODY_3D_HANDLE_NULL) {
+		se_physics_body_3d_add_aabb(world, ground, &s_vec3(0.0f, 0.0f, 0.0f), &s_vec3(10.0f, 1.0f, 10.0f), false);
 	}
 	for (u32 i = 0; i < 5; i++) {
 		se_physics_body_params_3d params = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
 		params.position = s_vec3(-2.0f + (f32)i, 2.0f + (f32)i, 0.0f);
-		se_physics_body_3d *body = se_physics_body_3d_create(world, &params);
-		if (body) {
-			se_physics_body_3d_add_sphere(body, &s_vec3(0.0f, 0.0f, 0.0f), 0.5f, false);
+		se_physics_body_3d_handle body = se_physics_body_3d_create(world, &params);
+		if (body != SE_PHYSICS_BODY_3D_HANDLE_NULL) {
+			se_physics_body_3d_add_sphere(world, body, &s_vec3(0.0f, 0.0f, 0.0f), 0.5f, false);
 		}
 	}
 	return world;
@@ -2649,7 +3322,8 @@ b8 se_physics_raycast_shape_3d(se_physics_body_3d *body, se_physics_shape_3d *sh
 	return false;
 }
 
-b8 se_physics_world_2d_raycast(se_physics_world_2d *world, const s_vec2 *origin, const s_vec2 *direction, const f32 max_distance, se_physics_raycast_hit_2d *out_hit) {
+b8 se_physics_world_2d_raycast(const se_physics_world_2d_handle world_handle, const s_vec2 *origin, const s_vec2 *direction, const f32 max_distance, se_physics_raycast_hit_2d *out_hit) {
+	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
 	if (!world || !origin || !direction || !out_hit || max_distance <= 0.0f) return false;
 	f32 dir_len = s_vec2_length(direction);
 	if (dir_len < SE_PHYSICS_EPSILON) return false;
@@ -2657,18 +3331,20 @@ b8 se_physics_world_2d_raycast(se_physics_world_2d *world, const s_vec2 *origin,
 	b8 hit = false;
 	f32 best_t = max_distance;
 	se_physics_raycast_hit_2d best = {0};
-	se_physics_body_2d *body = NULL;
-	s_foreach(&world->bodies, body) {
+	for (sz i = 0; i < s_array_get_size(&world->bodies); ++i) {
+		s_handle body_handle = s_array_handle(&world->bodies, (u32)i);
+		se_physics_body_2d *body = s_array_get(&world->bodies, body_handle);
 		if (!body->is_valid) continue;
-		se_physics_shape_2d *shape = NULL;
-		s_foreach(&body->shapes, shape) {
+		for (sz j = 0; j < s_array_get_size(&body->shapes); ++j) {
+			s_handle shape_handle = s_array_handle(&body->shapes, (u32)j);
+			se_physics_shape_2d *shape = s_array_get(&body->shapes, shape_handle);
 			f32 t = 0.0f;
 			s_vec2 normal = s_vec2(0.0f, 1.0f);
 			if (se_physics_raycast_shape_2d(body, shape, origin, &dir, max_distance, &t, &normal)) {
 				if (t < best_t) {
 					best_t = t;
-					best.body = body;
-					best.shape = shape;
+					best.body = body_handle;
+					best.shape = shape_handle;
 					best.distance = t;
 					best.normal = normal;
 					best.point = s_vec2(origin->x + dir.x * t, origin->y + dir.y * t);
@@ -2683,7 +3359,8 @@ b8 se_physics_world_2d_raycast(se_physics_world_2d *world, const s_vec2 *origin,
 	return hit;
 }
 
-b8 se_physics_world_3d_raycast(se_physics_world_3d *world, const s_vec3 *origin, const s_vec3 *direction, const f32 max_distance, se_physics_raycast_hit_3d *out_hit) {
+b8 se_physics_world_3d_raycast(const se_physics_world_3d_handle world_handle, const s_vec3 *origin, const s_vec3 *direction, const f32 max_distance, se_physics_raycast_hit_3d *out_hit) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
 	if (!world || !origin || !direction || !out_hit || max_distance <= 0.0f) return false;
 	f32 dir_len = s_vec3_length(direction);
 	if (dir_len < SE_PHYSICS_EPSILON) return false;
@@ -2691,18 +3368,20 @@ b8 se_physics_world_3d_raycast(se_physics_world_3d *world, const s_vec3 *origin,
 	b8 hit = false;
 	f32 best_t = max_distance;
 	se_physics_raycast_hit_3d best = {0};
-	se_physics_body_3d *body = NULL;
-	s_foreach(&world->bodies, body) {
+	for (sz i = 0; i < s_array_get_size(&world->bodies); ++i) {
+		s_handle body_handle = s_array_handle(&world->bodies, (u32)i);
+		se_physics_body_3d *body = s_array_get(&world->bodies, body_handle);
 		if (!body->is_valid) continue;
-		se_physics_shape_3d *shape = NULL;
-		s_foreach(&body->shapes, shape) {
+		for (sz j = 0; j < s_array_get_size(&body->shapes); ++j) {
+			s_handle shape_handle = s_array_handle(&body->shapes, (u32)j);
+			se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
 			f32 t = 0.0f;
 			s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
 			if (se_physics_raycast_shape_3d(body, shape, origin, &dir, max_distance, &t, &normal)) {
 				if (t < best_t) {
 					best_t = t;
-					best.body = body;
-					best.shape = shape;
+					best.body = body_handle;
+					best.shape = shape_handle;
 					best.distance = t;
 					best.normal = normal;
 					best.point = s_vec3(origin->x + dir.x * t, origin->y + dir.y * t, origin->z + dir.z * t);

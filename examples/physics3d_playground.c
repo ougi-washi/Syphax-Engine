@@ -12,7 +12,7 @@
 #define BODY_COUNT 8
 
 typedef struct {
-	se_physics_body_3d* body;
+	se_physics_body_3d_handle body;
 	se_instance_id instance;
 	s_vec3 half_extents;
 } physics_slot_3d;
@@ -48,15 +48,16 @@ int main(void) {
 
 	se_physics_world_params_3d world_params = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
 	world_params.gravity = s_vec3(0.0f, -3.2f, 0.0f);
-	se_physics_world_3d* world = se_physics_world_3d_create(&world_params);
+	se_physics_world_3d_handle world = se_physics_world_3d_create(&world_params);
 
 	se_physics_body_params_3d ground_params = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
 	ground_params.type = SE_PHYSICS_BODY_STATIC;
 	ground_params.position = s_vec3(0.0f, -2.5f, 0.0f);
-	se_physics_body_3d* ground = se_physics_body_3d_create(world, &ground_params);
+	se_physics_body_3d_handle ground = se_physics_body_3d_create(world, &ground_params);
 	s_vec3 ground_half = s_vec3(6.0f, 0.5f, 6.0f);
-	se_physics_body_3d_add_aabb(ground, &s_vec3(0.0f, 0.0f, 0.0f), &ground_half, false);
-	s_mat4 ground_transform_init = physics_make_transform(&ground->position, &ground_half);
+	se_physics_body_3d_add_aabb(world, ground, &s_vec3(0.0f, 0.0f, 0.0f), &ground_half, false);
+	s_vec3 ground_position = se_physics_body_3d_get_position(world, ground);
+	s_mat4 ground_transform_init = physics_make_transform(&ground_position, &ground_half);
 	se_instance_id ground_instance = se_object_3d_add_instance(cubes, &ground_transform_init, &s_mat4_identity);
 
 	physics_slots_3d slots = {0};
@@ -64,10 +65,11 @@ int main(void) {
 	for (i32 i = 0; i < BODY_COUNT; ++i) {
 		se_physics_body_params_3d params = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
 		params.position = s_vec3(-3.0f + i * 0.9f, 0.8f + i * 0.5f, 0.0f);
-		se_physics_body_3d* body = se_physics_body_3d_create(world, &params);
+		se_physics_body_3d_handle body = se_physics_body_3d_create(world, &params);
 		s_vec3 half_extents = s_vec3(0.32f, 0.32f, 0.32f);
-		se_physics_body_3d_add_box(body, &s_vec3(0.0f, 0.0f, 0.0f), &half_extents, &s_vec3(0.0f, 0.0f, 0.0f), false);
-		s_mat4 body_transform = physics_make_transform(&body->position, &half_extents);
+		se_physics_body_3d_add_box(world, body, &s_vec3(0.0f, 0.0f, 0.0f), &half_extents, &s_vec3(0.0f, 0.0f, 0.0f), false);
+		s_vec3 body_position = se_physics_body_3d_get_position(world, body);
+		s_mat4 body_transform = physics_make_transform(&body_position, &half_extents);
 		se_instance_id instance = se_object_3d_add_instance(cubes, &body_transform, &s_mat4_identity);
 		physics_slot_3d slot = { .body = body, .instance = instance, .half_extents = half_extents };
 		s_array_add(&slots, slot);
@@ -84,18 +86,21 @@ int main(void) {
 			for (sz i = 0; i < s_array_get_size(&slots); ++i) {
 				physics_slot_3d* slot = s_array_get(&slots, s_array_handle(&slots, (u32)i));
 				if (slot && slot->body) {
-					se_physics_body_3d_apply_impulse(slot->body, &s_vec3(0.0f, 3.5f, 0.0f), &slot->body->position);
+					s_vec3 point = se_physics_body_3d_get_position(world, slot->body);
+					se_physics_body_3d_apply_impulse(world, slot->body, &s_vec3(0.0f, 3.5f, 0.0f), &point);
 				}
 			}
 		}
 
 		se_physics_world_3d_step(world, (f32)se_window_get_delta_time(window));
-		s_mat4 ground_transform = physics_make_transform(&ground->position, &ground_half);
+		ground_position = se_physics_body_3d_get_position(world, ground);
+		s_mat4 ground_transform = physics_make_transform(&ground_position, &ground_half);
 		se_object_3d_set_instance_transform(cubes, ground_instance, &ground_transform);
 		for (sz i = 0; i < s_array_get_size(&slots); ++i) {
 			physics_slot_3d* slot = s_array_get(&slots, s_array_handle(&slots, (u32)i));
 			if (slot && slot->body) {
-				s_mat4 transform = physics_make_transform(&slot->body->position, &slot->half_extents);
+				s_vec3 body_position = se_physics_body_3d_get_position(world, slot->body);
+				s_mat4 transform = physics_make_transform(&body_position, &slot->half_extents);
 				se_object_3d_set_instance_transform(cubes, slot->instance, &transform);
 			}
 		}

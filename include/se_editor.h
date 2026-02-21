@@ -137,8 +137,8 @@ typedef struct {
 	se_input_handle* input;
 	se_audio_engine* audio;
 	se_navigation_grid* navigation;
-	se_physics_world_2d* physics_2d;
-	se_physics_world_3d* physics_3d;
+	se_physics_world_2d_handle physics_2d;
+	se_physics_world_3d_handle physics_3d;
 	se_simulation_handle focused_simulation;
 	se_vfx_2d_handle focused_vfx_2d;
 	se_vfx_3d_handle focused_vfx_3d;
@@ -150,8 +150,8 @@ typedef struct {
 	.input = NULL, \
 	.audio = NULL, \
 	.navigation = NULL, \
-	.physics_2d = NULL, \
-	.physics_3d = NULL, \
+	.physics_2d = SE_PHYSICS_WORLD_2D_HANDLE_NULL, \
+	.physics_3d = SE_PHYSICS_WORLD_3D_HANDLE_NULL, \
 	.focused_simulation = S_HANDLE_NULL, \
 	.focused_vfx_2d = S_HANDLE_NULL, \
 	.focused_vfx_3d = S_HANDLE_NULL \
@@ -258,11 +258,11 @@ extern se_audio_engine* se_editor_get_audio_engine(const se_editor* editor);
 extern void se_editor_set_navigation(se_editor* editor, se_navigation_grid* navigation);
 extern se_navigation_grid* se_editor_get_navigation(const se_editor* editor);
 
-extern void se_editor_set_physics_2d(se_editor* editor, se_physics_world_2d* world);
-extern se_physics_world_2d* se_editor_get_physics_2d(const se_editor* editor);
+extern void se_editor_set_physics_2d(se_editor* editor, se_physics_world_2d_handle world);
+extern se_physics_world_2d_handle se_editor_get_physics_2d(const se_editor* editor);
 
-extern void se_editor_set_physics_3d(se_editor* editor, se_physics_world_3d* world);
-extern se_physics_world_3d* se_editor_get_physics_3d(const se_editor* editor);
+extern void se_editor_set_physics_3d(se_editor* editor, se_physics_world_3d_handle world);
+extern se_physics_world_3d_handle se_editor_get_physics_3d(const se_editor* editor);
 
 extern void se_editor_set_focused_simulation(se_editor* editor, se_simulation_handle simulation);
 extern se_simulation_handle se_editor_get_focused_simulation(const se_editor* editor);

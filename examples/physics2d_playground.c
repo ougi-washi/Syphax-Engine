@@ -11,7 +11,7 @@
 #define BODY_COUNT 8
 
 typedef struct {
-	se_physics_body_2d* body;
+	se_physics_body_2d_handle body;
 	se_object_2d_handle object;
 } physics_slot_2d;
 typedef s_array(physics_slot_2d, physics_slots_2d);
@@ -34,17 +34,18 @@ int main(void) {
 
 	se_physics_world_params_2d world_params = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS;
 	world_params.gravity = s_vec2(0.0f, -2.0f);
-	se_physics_world_2d* world = se_physics_world_2d_create(&world_params);
+	se_physics_world_2d_handle world = se_physics_world_2d_create(&world_params);
 
 	se_physics_body_params_2d floor_params = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
 	floor_params.type = SE_PHYSICS_BODY_STATIC;
 	floor_params.position = s_vec2(0.0f, -0.90f);
-	se_physics_body_2d* floor = se_physics_body_2d_create(world, &floor_params);
-	se_physics_body_2d_add_aabb(floor, &s_vec2(0.0f, 0.0f), &s_vec2(0.95f, 0.05f), false);
+	se_physics_body_2d_handle floor = se_physics_body_2d_create(world, &floor_params);
+	se_physics_body_2d_add_aabb(world, floor, &s_vec2(0.0f, 0.0f), &s_vec2(0.95f, 0.05f), false);
 	se_object_2d_handle floor_object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/box.glsl"), &s_mat3_identity, 0);
 	se_shader_handle obj_shader = se_object_2d_get_shader(floor_object);
 	se_shader_set_vec3(obj_shader, "u_color", &s_vec3(0.6f, 0.6f, .6f));
-	se_object_2d_set_position(floor_object, &floor->position);
+	s_vec2 floor_position = se_physics_body_2d_get_position(world, floor);
+	se_object_2d_set_position(floor_object, &floor_position);
 	se_object_2d_set_scale(floor_object, &s_vec2(0.95f, 0.05f));
 	se_scene_2d_add_object(scene, floor_object);
 
@@ -53,8 +54,9 @@ int main(void) {
 	for (i32 i = 0; i < BODY_COUNT; ++i) {
 		se_physics_body_params_2d body_params = SE_PHYSICS_BODY_PARAMS_2D_DEFAULTS;
 		body_params.position = s_vec2(-0.75f + i * 0.20f, 0.45f + i * 0.12f);
-		se_physics_body_2d* body = se_physics_body_2d_create(world, &body_params);
-		se_physics_body_2d_add_box(body, &s_vec2(0.0f, 0.0f), &s_vec2(0.06f, 0.06f), 0.0f, false);
+		se_physics_body_2d_handle body = se_physics_body_2d_create(world, &body_params);
+		se_physics_body_2d_add_circle(world, body, &s_vec2(0.0f, 0.0f), .07f, false);
+		//se_physics_shape_2d_handle se_physics_body_2d_add_circle(const se_physics_world_2d_handle world_handle, const se_physics_body_2d_handle body_handle, const s_vec2 *offset, const f32 radius, const b8 is_trigger) {
 		se_object_2d_handle object = se_object_2d_create(SE_RESOURCE_EXAMPLE("physics2d/box.glsl"), &s_mat3_identity, 0);
 		se_shader_handle obj_shader = se_object_2d_get_shader(object);
 		if (i % 2 == 0) {
@@ -62,7 +64,8 @@ int main(void) {
 		} else {
 			se_shader_set_vec3(obj_shader, "u_color", &s_vec3(0.0f, 1.0f, 0.0f));
 		}
-		se_object_2d_set_position(object, &body->position);
+		s_vec2 body_position = se_physics_body_2d_get_position(world, body);
+		se_object_2d_set_position(object, &body_position);
 		se_object_2d_set_scale(object, &s_vec2(0.06f, 0.06f));
 		se_scene_2d_add_object(scene, object);
 		physics_slot_2d slot = { .body = body, .object = object };
@@ -79,7 +82,8 @@ int main(void) {
 			for (sz i = 0; i < s_array_get_size(&slots); ++i) {
 				physics_slot_2d* slot = s_array_get(&slots, s_array_handle(&slots, (u32)i));
 				if (slot && slot->body) {
-					se_physics_body_2d_apply_impulse(slot->body, &s_vec2(0.0f, 1.8f), &slot->body->position);
+					s_vec2 point = se_physics_body_2d_get_position(world, slot->body);
+					se_physics_body_2d_apply_impulse(world, slot->body, &s_vec2(0.0f, 1.8f), &point);
 				}
 			}
 		}
@@ -88,7 +92,8 @@ int main(void) {
 		for (sz i = 0; i < s_array_get_size(&slots); ++i) {
 			physics_slot_2d* slot = s_array_get(&slots, s_array_handle(&slots, (u32)i));
 			if (slot && slot->body) {
-				se_object_2d_set_position(slot->object, &slot->body->position);
+				s_vec2 body_position = se_physics_body_2d_get_position(world, slot->body);
+				se_object_2d_set_position(slot->object, &body_position);
 			}
 		}
 
