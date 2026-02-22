@@ -9,6 +9,7 @@
 #include "se_sdf.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 enum {
 	INPUT_CONTEXT_CAMERA = 0,
@@ -136,7 +137,12 @@ int main(void) {
 		return 1;
 	}
 
-	se_camera_set_aspect_from_window(camera, window);
+	u32 initial_fb_w = 0;
+	u32 initial_fb_h = 0;
+	se_window_get_framebuffer_size(window, &initial_fb_w, &initial_fb_h);
+	const f32 initial_aspect_w = initial_fb_w > 0 ? (f32)initial_fb_w : 1280.0f;
+	const f32 initial_aspect_h = initial_fb_h > 0 ? (f32)initial_fb_h : 720.0f;
+	se_camera_set_aspect(camera, initial_aspect_w, initial_aspect_h);
 	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
 
 	se_sdf_camera_align_desc align = SE_SDF_CAMERA_ALIGN_DESC_DEFAULTS;
@@ -165,15 +171,20 @@ int main(void) {
 	printf("depth demo:\n");
 	printf("  rasterized cubes in the scene should occlude the SDF sphere where closer.\n");
 	fflush(stdout);
+	char last_diag_stage[64] = {0};
+	char last_diag_message[512] = {0};
+	b8 has_last_diag = false;
 
 	se_window_loop(window,
 		se_input_tick(input);
-		u32 w = 0;
-		u32 h = 0;
-		se_window_get_size(window, &w, &h);
+		u32 fb_w = 0;
+		u32 fb_h = 0;
+		se_window_get_framebuffer_size(window, &fb_w, &fb_h);
 
 		f32 t = (f32)se_window_get_time(window);
-		s_vec2 res = s_vec2(w > 0 ? (f32)w : 1280.0f, h > 0 ? (f32)h : 720.0f);
+		const f32 aspect_w = fb_w > 0 ? (f32)fb_w : 1280.0f;
+		const f32 aspect_h = fb_h > 0 ? (f32)fb_h : 720.0f;
+		s_vec2 res = s_vec2(aspect_w, aspect_h);
 		const f32 yaw_input = se_input_action_get_value(input, ACTION_CAMERA_YAW);
 		if (se_window_is_mouse_down(window, SE_MOUSE_LEFT)) {
 			camera_yaw += yaw_input;
@@ -194,18 +205,34 @@ int main(void) {
 		frame.resolution = res;
 		frame.time_seconds = t;
 
-		se_camera_set_aspect_from_window(camera, window);
+		se_camera_set_aspect(camera, aspect_w, aspect_h);
 		se_sdf_frame_set_camera(&frame, camera);
-		u32 depth_texture = 0;
-		if (se_scene_3d_get_output_depth_texture(raster_scene, &depth_texture) && depth_texture != 0u) {
-			se_sdf_frame_set_scene_depth_texture(&frame, depth_texture);
-		}
 		se_window_get_mouse_position_normalized(window, &frame.mouse_normalized);
 
 		se_render_clear();
 		se_scene_3d_render_to_buffer(raster_scene);
+		u32 depth_texture = 0;
+		if (se_scene_3d_get_output_depth_texture(raster_scene, &depth_texture) && depth_texture != 0u) {
+			se_sdf_frame_set_scene_depth_texture(&frame, depth_texture);
+		}
 		se_scene_3d_render_to_screen(raster_scene, window);
-		se_sdf_renderer_render(renderer, &frame);
+		const b8 sdf_rendered = se_sdf_renderer_render(renderer, &frame);
+		if (!sdf_rendered) {
+			const se_sdf_build_diagnostics diagnostics = se_sdf_renderer_get_last_build_diagnostics(renderer);
+			if (!has_last_diag ||
+				strcmp(last_diag_stage, diagnostics.stage) != 0 ||
+				strcmp(last_diag_message, diagnostics.message) != 0) {
+				printf("sdf render skipped (%s): %s\n", diagnostics.stage, diagnostics.message);
+				fflush(stdout);
+				strncpy(last_diag_stage, diagnostics.stage, sizeof(last_diag_stage) - 1);
+				last_diag_stage[sizeof(last_diag_stage) - 1] = '\0';
+				strncpy(last_diag_message, diagnostics.message, sizeof(last_diag_message) - 1);
+				last_diag_message[sizeof(last_diag_message) - 1] = '\0';
+				has_last_diag = true;
+			}
+		} else {
+			has_last_diag = false;
+		}
 	);
 
 	se_input_destroy(input);

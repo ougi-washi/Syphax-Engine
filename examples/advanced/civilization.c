@@ -55,6 +55,8 @@ typedef struct world_t {
 	se_model_handle landscape_model;
     se_model_handle building_model;
     se_model_handle unit_model;
+
+    se_input_handle* input;
 } world_t;
 
 static se_object_3d_handle create_object(world_t *world, const se_model_handle model, const sz max_instances) {
@@ -71,6 +73,36 @@ typedef struct ui_t {
     se_ui_handle unit_panel;
 } ui_t;
 
+static void move_camera_forward(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(0.0f, 0.0f, speed));
+}
+
+static void move_camera_left(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(-speed, 0.0f, 0.0f));
+}
+
+static void move_camera_backward(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(0.0f, 0.0f, -speed));
+}
+
+static void move_camera_right(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(speed, 0.0f, 0.0f));
+}
+
+void bind_camera(se_camera_handle camera, se_input_handle *input) {
+    se_input_bind(input, SE_KEY_W, SE_INPUT_DOWN, &move_camera_forward, &camera); 
+    se_input_bind(input, SE_KEY_A, SE_INPUT_DOWN, &move_camera_left, &camera); 
+    se_input_bind(input, SE_KEY_S, SE_INPUT_DOWN, &move_camera_backward, &camera);
+    se_input_bind(input, SE_KEY_D, SE_INPUT_DOWN, &move_camera_right, &camera); 
+}
 void init_world(world_t *world, se_window_handle window) {
     world->scene = se_scene_3d_create_for_window(window, 128);
     if (world->scene == S_HANDLE_NULL) {
@@ -103,6 +135,9 @@ void init_world(world_t *world, se_window_handle window) {
 	se_camera_handle camera = se_scene_3d_get_camera(scene);
 	se_camera_set_location(camera, &s_vec3(.0f, 5.0f, -1.f));
 	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
+    
+    world->input = se_input_create(window, 128);
+    bind_camera(camera, world->input);
 }
 
 void render_world(world_t *world, se_window_handle window) {

@@ -547,70 +547,35 @@ static void rts_clamp_world_position(s_vec3 *position) {
 	position->z = rts_clampf(position->z, -RTS_MAP_HALF_SIZE, RTS_MAP_HALF_SIZE);
 }
 
-static void rts_camera_set_static_pose(const se_camera_handle camera_handle, const s_vec3 *target, const f32 distance) {
-	se_camera* camera = se_camera_get(camera_handle);
-	if (!camera || !target) {
-		return;
-	}
-	s_vec3 look_target = *target;
-	look_target.y = 0.0f;
-	const s_vec3 rotation = s_vec3(RTS_CAMERA_DEFAULT_PITCH, RTS_CAMERA_DEFAULT_YAW, 0.0f);
-	se_camera_set_target_mode(camera_handle, true);
-	se_camera_set_rotation(camera_handle, &rotation);
-	const s_vec3 forward = se_camera_get_forward_vector(camera_handle);
-	const f32 safe_distance = s_max(distance, 0.0001f);
-	const s_vec3 position = s_vec3_sub(&look_target, &s_vec3_muls(&forward, safe_distance));
-	se_camera_set_location(camera_handle, &position);
-	se_camera_set_target(camera_handle, &look_target);
+static void rts_move_camera_forward(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(0.0f, 0.0f, speed));
 }
 
-static void rts_camera_pan(const se_camera_handle camera_handle, const s_vec3* delta) {
-	if (camera_handle == S_HANDLE_NULL || !delta) {
-		return;
-	}
-	se_camera_add_location(camera_handle, delta);
+static void rts_move_camera_left(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(-speed, 0.0f, 0.0f));
 }
 
-static void rts_camera_dolly_to_target(
-	const se_camera_handle camera_handle,
-	const f32 distance_delta,
-	const f32 min_distance,
-	const f32 max_distance) {
-	se_camera* camera = se_camera_get(camera_handle);
-	if (!camera) {
-		return;
-	}
-
-	const s_vec3 target = camera->target;
-	const s_vec3 from_target = s_vec3_sub(&camera->position, &target);
-	const f32 distance = s_vec3_length(&from_target);
-	if (distance <= 0.0001f) {
-		return;
-	}
-
-	const f32 clamped_min = s_max(min_distance, 0.001f);
-	const f32 clamped_max = s_max(max_distance, clamped_min);
-	const f32 next_distance = rts_clampf(distance + distance_delta, clamped_min, clamped_max);
-	const s_vec3 direction = s_vec3_divs(&from_target, distance);
-	const s_vec3 position = s_vec3_add(&target, &s_vec3_muls(&direction, next_distance));
-	se_camera_set_location(camera_handle, &position);
-	se_camera_set_target(camera_handle, &target);
+static void rts_move_camera_backward(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(0.0f, 0.0f, -speed));
 }
 
-static void rts_camera_clamp_target(const se_camera_handle camera_handle, const s_vec3* min_bounds, const s_vec3* max_bounds) {
-	se_camera* camera = se_camera_get(camera_handle);
-	if (!camera || !min_bounds || !max_bounds) {
-		return;
-	}
+static void rts_move_camera_right(void *user_data) {
+    se_camera_handle camera = (se_camera_handle)user_data;
+    const f32 speed = 1.0f;
+    se_camera_add_location(camera, &s_vec3(speed, 0.0f, 0.0f));
+}
 
-	s_vec3 clamped = camera->target;
-	clamped.x = rts_clampf(clamped.x, min_bounds->x, max_bounds->x);
-	clamped.y = rts_clampf(clamped.y, min_bounds->y, max_bounds->y);
-	clamped.z = rts_clampf(clamped.z, min_bounds->z, max_bounds->z);
-	const s_vec3 delta = s_vec3_sub(&clamped, &camera->target);
-	if (s_vec3_length(&delta) > 0.0f) {
-		se_camera_add_location(camera_handle, &delta);
-	}
+void rts_bind_camera(se_camera_handle camera, se_input_handle input) {
+    se_input_bind(&input, SE_KEY_W, SE_INPUT_DOWN, &rts_move_camera_forward, &camera); 
+    se_input_bind(&input, SE_KEY_A, SE_INPUT_DOWN, &rts_move_camera_left, &camera); 
+    se_input_bind(&input, SE_KEY_S, SE_INPUT_DOWN, &rts_move_camera_backward, &camera);
+    se_input_bind(&input, SE_KEY_D, SE_INPUT_DOWN, &rts_move_camera_right, &camera); 
 }
 
 static void rts_get_input_view_size(const rts_game *game, f32 *out_width, f32 *out_height) {
@@ -2659,160 +2624,6 @@ static void rts_update_build_preview_visual(rts_game *game) {
 	}
 }
 
-static void rts_update_camera(rts_game *game, const f32 dt) {
-	if (game && game->headless_mode) {
-		game->mouse_world_valid = true;
-		game->mouse_world = game->camera_target;
-		return;
-	}
-	if (!game || game->window == S_HANDLE_NULL) {
-		return;
-	}
-	const se_camera_handle camera_handle = se_scene_3d_get_camera(game->scene);
-	if (camera_handle == S_HANDLE_NULL) {
-		return;
-	}
-	se_camera *camera = se_camera_get(camera_handle);
-	if (!camera) {
-		return;
-	}
-	if (game->autotest.enabled) {
-		game->autotest.saw_camera_update = true;
-	}
-
-	const f32 mouse_x = se_window_get_mouse_position_x(game->window);
-	const f32 mouse_y = se_window_get_mouse_position_y(game->window);
-	f32 width = 0.0f;
-	f32 height = 0.0f;
-	rts_get_input_view_size(game, &width, &height);
-	se_camera_set_aspect_from_window(camera_handle, game->window);
-	se_camera_set_perspective(camera_handle, 52.0f, 0.1f, 220.0f);
-	const b8 mouse_inside = mouse_x >= 0.0f && mouse_x <= width && mouse_y >= 0.0f && mouse_y <= height;
-
-	const b8 shift = se_window_is_key_down(game->window, SE_KEY_LEFT_SHIFT) || se_window_is_key_down(game->window, SE_KEY_RIGHT_SHIFT);
-	f32 movement_speed = shift ? 27.0f : 14.0f;
-	movement_speed *= dt;
-	const s_vec3 camera_forward_xz = s_vec3(-sinf(RTS_CAMERA_DEFAULT_YAW), 0.0f, -cosf(RTS_CAMERA_DEFAULT_YAW));
-	const s_vec3 right_xz = s_vec3(-camera_forward_xz.z, 0.0f, camera_forward_xz.x);
-
-	s_vec3 movement_delta = s_vec3(0.0f, 0.0f, 0.0f);
-
-	if (se_window_is_key_down(game->window, SE_KEY_W) || se_window_is_key_down(game->window, SE_KEY_UP)) {
-		movement_delta = s_vec3_add(&movement_delta, &s_vec3_muls(&camera_forward_xz, movement_speed));
-	}
-	if (se_window_is_key_down(game->window, SE_KEY_S) || se_window_is_key_down(game->window, SE_KEY_DOWN)) {
-		movement_delta = s_vec3_sub(&movement_delta, &s_vec3_muls(&camera_forward_xz, movement_speed));
-	}
-	if (se_window_is_key_down(game->window, SE_KEY_D) || se_window_is_key_down(game->window, SE_KEY_RIGHT)) {
-		movement_delta = s_vec3_add(&movement_delta, &s_vec3_muls(&right_xz, movement_speed));
-	}
-	if (se_window_is_key_down(game->window, SE_KEY_A) || se_window_is_key_down(game->window, SE_KEY_LEFT)) {
-		movement_delta = s_vec3_sub(&movement_delta, &s_vec3_muls(&right_xz, movement_speed));
-	}
-	if (s_vec3_length(&movement_delta) > 0.0f) {
-		rts_camera_pan(camera_handle, &movement_delta);
-	}
-
-	const f32 edge_margin = 18.0f;
-	const b8 allow_edge_pan = (game->frame_index > 4) && (mouse_x > 0.5f || mouse_y > 0.5f);
-	s_vec3 edge_delta = s_vec3(0.0f, 0.0f, 0.0f);
-	if (allow_edge_pan && mouse_inside && !se_window_is_mouse_down(game->window, SE_MOUSE_MIDDLE) && game->build_mode == RTS_BUILD_MODE_NONE) {
-		if (mouse_x < edge_margin) {
-			edge_delta = s_vec3_sub(&edge_delta, &s_vec3_muls(&right_xz, movement_speed * 0.85f));
-		}
-		if (mouse_x > width - edge_margin) {
-			edge_delta = s_vec3_add(&edge_delta, &s_vec3_muls(&right_xz, movement_speed * 0.85f));
-		}
-		if (mouse_y < edge_margin) {
-			edge_delta = s_vec3_add(&edge_delta, &s_vec3_muls(&camera_forward_xz, movement_speed * 0.85f));
-		}
-		if (mouse_y > height - edge_margin) {
-			edge_delta = s_vec3_sub(&edge_delta, &s_vec3_muls(&camera_forward_xz, movement_speed * 0.85f));
-		}
-	}
-	if (s_vec3_length(&edge_delta) > 0.0f) {
-		rts_camera_pan(camera_handle, &edge_delta);
-	}
-
-	if (se_window_is_mouse_down(game->window, SE_MOUSE_MIDDLE) && game->build_mode == RTS_BUILD_MODE_NONE) {
-		s_vec2 mouse_delta = {0};
-		se_window_get_mouse_delta(game->window, &mouse_delta);
-		const s_vec3 to_camera = s_vec3_sub(&camera->position, &camera->target);
-		const f32 distance = s_vec3_length(&to_camera);
-		const f32 drag_speed = rts_clampf(distance * 0.0018f, 0.010f, 0.082f);
-		s_vec3 drag_delta = s_vec3(0.0f, 0.0f, 0.0f);
-		drag_delta = s_vec3_sub(&drag_delta, &s_vec3_muls(&right_xz, mouse_delta.x * drag_speed));
-		drag_delta = s_vec3_sub(&drag_delta, &s_vec3_muls(&camera_forward_xz, mouse_delta.y * drag_speed));
-		rts_camera_pan(camera_handle, &drag_delta);
-	}
-
-	s_vec2 scroll = {0};
-	se_window_get_scroll_delta(game->window, &scroll);
-	if (fabsf(scroll.y) > 0.0001f) {
-		rts_camera_dolly_to_target(camera_handle, -scroll.y * 1.8f, 12.0f, 54.0f);
-	}
-
-	if (se_window_is_key_pressed(game->window, SE_KEY_F)) {
-		s_vec3 sum = s_vec3(0.0f, 0.0f, 0.0f);
-		i32 count = 0;
-		for (i32 kind = 0; kind < RTS_UNIT_KIND_COUNT; ++kind) {
-			if (rts_unit_kind_team((rts_unit_kind)kind) != RTS_TEAM_ALLY) {
-				continue;
-			}
-			for (i32 i = 0; i < RTS_MAX_UNITS_PER_KIND; ++i) {
-				const rts_unit *unit = &game->units[kind][i];
-				if (!unit->active || !unit->selected) {
-					continue;
-				}
-				sum = s_vec3_add(&sum, &unit->position);
-				count++;
-			}
-		}
-		if (count > 0) {
-			const s_vec3 desired_target = s_vec3_divs(&sum, (f32)count);
-			const s_vec3 to_target = s_vec3_sub(&desired_target, &camera->target);
-			rts_camera_pan(camera_handle, &to_target);
-		}
-	}
-	if (se_window_is_key_pressed(game->window, SE_KEY_H)) {
-		const rts_building *ally_hq = rts_find_primary_building(game, RTS_TEAM_ALLY, RTS_BUILDING_TYPE_HQ);
-		if (ally_hq) {
-			const s_vec3 to_target = s_vec3_sub(&ally_hq->position, &camera->target);
-			rts_camera_pan(camera_handle, &to_target);
-			rts_camera_dolly_to_target(camera_handle, 0.0f, 18.0f, 60.0f);
-			rts_set_command_line(game, "Camera centered on HQ");
-		}
-	}
-	if (se_window_is_key_pressed(game->window, SE_KEY_R)) {
-		s_vec3 reset_target = camera->target;
-		const rts_building *ally_hq = rts_find_primary_building(game, RTS_TEAM_ALLY, RTS_BUILDING_TYPE_HQ);
-		if (ally_hq) {
-			reset_target = ally_hq->position;
-			reset_target.x += 1.8f;
-			reset_target.z -= 1.6f;
-		}
-		rts_camera_set_static_pose(camera_handle, &reset_target, RTS_CAMERA_DEFAULT_DISTANCE);
-		rts_set_command_line(game, "Camera reset");
-	}
-
-	const s_vec3 min_bounds = s_vec3(-RTS_MAP_HALF_SIZE, 0.0f, -RTS_MAP_HALF_SIZE);
-	const s_vec3 max_bounds = s_vec3(RTS_MAP_HALF_SIZE, 0.0f, RTS_MAP_HALF_SIZE);
-	rts_camera_clamp_target(camera_handle, &min_bounds, &max_bounds);
-
-	const s_vec3 cam_offset = s_vec3_sub(&camera->position, &camera->target);
-	const f32 cam_distance = s_max(s_vec3_length(&cam_offset), 0.0001f);
-	rts_camera_set_static_pose(camera_handle, &camera->target, cam_distance);
-	game->camera_target = camera->target;
-	game->camera_distance = cam_distance;
-	game->camera_yaw = RTS_CAMERA_DEFAULT_YAW;
-	game->camera_pitch = RTS_CAMERA_DEFAULT_PITCH;
-
-	game->mouse_world_valid = rts_screen_to_ground(game, mouse_x, mouse_y, &game->mouse_world);
-	if (!game->mouse_world_valid) {
-		game->mouse_world = game->camera_target;
-	}
-}
-
 static void rts_handle_player_input(rts_game *game) {
 	if (game && game->headless_mode) {
 		return;
@@ -3217,7 +3028,7 @@ static void rts_step_simulation(rts_game *game, const f32 dt) {
 	}
 
 	rts_run_input_simulator(game, dt);
-	rts_update_camera(game, dt);
+	//rts_update_camera(game, dt);
 	rts_handle_player_input(game);
 	rts_update_enemy_ai(game, dt);
 	rts_update_units(game, dt);
@@ -3317,7 +3128,6 @@ static void rts_seed_world(rts_game *game) {
 	if (!game->headless_mode && game->ctx && game->scene != S_HANDLE_NULL) {
 		const se_camera_handle camera_handle = se_scene_3d_get_camera(game->scene);
 		if (camera_handle != S_HANDLE_NULL) {
-			rts_camera_set_static_pose(camera_handle, &game->camera_target, game->camera_distance);
 			se_camera_set_perspective(camera_handle, 52.0f, 0.1f, 220.0f);
 			if (game->window != S_HANDLE_NULL) {
 				se_camera_set_aspect_from_window(camera_handle, game->window);
@@ -3463,7 +3273,7 @@ int main(int argc, char **argv) {
 	}
 
 	rts_seed_world(&game);
-	rts_update_camera(&game, 0.016f);
+	//rts_update_camera(&game, 0.016f);
 	rts_update_visuals(&game);
 	rts_update_build_preview_visual(&game);
 

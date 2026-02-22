@@ -5,6 +5,7 @@
 #include "se_graphics.h"
 #include "se_quad.h"
 #include "se_shader.h"
+#include "render/se_gl.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2409,7 +2410,15 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	const s_mat4 camera_view_projection = s_mat4_mul(&camera_projection, &camera_view);
 	const s_mat4 camera_inv_view_projection = s_mat4_inverse(&camera_view_projection);
 	const s_vec3 camera_position = camera_ptr->position;
+	const s_vec3 camera_forward = se_camera_get_forward_vector(frame->camera);
+	const s_vec3 camera_right = se_camera_get_right_vector(frame->camera);
+	const s_vec3 camera_up = se_camera_get_up_vector(frame->camera);
 	const s_vec2 camera_near_far = s_vec2(camera_ptr->near, camera_ptr->far);
+	const f32 camera_aspect = camera_ptr->aspect > 0.0001f
+		? camera_ptr->aspect
+		: (resolution.x / s_max(resolution.y, 0.0001f));
+	const f32 camera_tan_half_fov = tanf((camera_ptr->fov * 0.5f) * (3.14159265358979323846f / 180.0f));
+	const f32 camera_ortho_height = camera_ptr->ortho_height > 0.0001f ? camera_ptr->ortho_height : 1.0f;
 	const i32 camera_is_orthographic = camera_ptr->use_orthographic ? 1 : 0;
 
 	se_shader_set_vec2(renderer_ptr->shader, "u_resolution", &resolution);
@@ -2419,7 +2428,13 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	se_shader_set_mat4(renderer_ptr->shader, "u_camera_projection", &camera_projection);
 	se_shader_set_mat4(renderer_ptr->shader, "u_camera_inv_view_projection", &camera_inv_view_projection);
 	se_shader_set_vec3(renderer_ptr->shader, "u_camera_position", &camera_position);
+	se_shader_set_vec3(renderer_ptr->shader, "u_camera_forward", &camera_forward);
+	se_shader_set_vec3(renderer_ptr->shader, "u_camera_right", &camera_right);
+	se_shader_set_vec3(renderer_ptr->shader, "u_camera_up", &camera_up);
 	se_shader_set_vec2(renderer_ptr->shader, "u_camera_near_far", &camera_near_far);
+	se_shader_set_float(renderer_ptr->shader, "u_camera_tan_half_fov", camera_tan_half_fov);
+	se_shader_set_float(renderer_ptr->shader, "u_camera_aspect", camera_aspect);
+	se_shader_set_float(renderer_ptr->shader, "u_camera_ortho_height", camera_ortho_height);
 	se_shader_set_int(renderer_ptr->shader, "u_camera_is_orthographic", camera_is_orthographic);
 	se_shader_set_int(renderer_ptr->shader, "u_has_scene_depth", frame->has_scene_depth_texture ? 1 : 0);
 	if (frame->has_scene_depth_texture && frame->scene_depth_texture != 0u) {
@@ -2486,10 +2501,44 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 		}
 	}
 	renderer_ptr->total_uniform_write_count += renderer_ptr->last_uniform_write_count;
+
+	const GLboolean was_cull_enabled = glIsEnabled(GL_CULL_FACE);
+	const GLboolean was_depth_test_enabled = glIsEnabled(GL_DEPTH_TEST);
+	const GLboolean was_blend_enabled = glIsEnabled(GL_BLEND);
+	GLboolean previous_depth_write_mask = GL_TRUE;
+	GLint previous_depth_func = GL_LESS;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &previous_depth_write_mask);
+	glGetIntegerv(GL_DEPTH_FUNC, &previous_depth_func);
+
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+	glDepthFunc(GL_LEQUAL);
+	glDisable(GL_BLEND);
+
 	se_shader_use(renderer_ptr->shader, true, false);
 	if (renderer_ptr->quad_ready) {
 		se_quad_render(&renderer_ptr->quad, 0);
 	}
+
+	if (was_cull_enabled) {
+		glEnable(GL_CULL_FACE);
+	} else {
+		glDisable(GL_CULL_FACE);
+	}
+	if (was_depth_test_enabled) {
+		glEnable(GL_DEPTH_TEST);
+	} else {
+		glDisable(GL_DEPTH_TEST);
+	}
+	if (was_blend_enabled) {
+		glEnable(GL_BLEND);
+	} else {
+		glDisable(GL_BLEND);
+	}
+	glDepthMask(previous_depth_write_mask);
+	glDepthFunc((GLenum)previous_depth_func);
+
 	return 1;
 }
 
@@ -4011,7 +4060,13 @@ b8 se_sdf_codegen_emit_uniform_block(se_sdf_string* out) {
 		"uniform mat4 u_camera_projection;\n"
 		"uniform mat4 u_camera_inv_view_projection;\n"
 		"uniform vec3 u_camera_position;\n"
+		"uniform vec3 u_camera_forward;\n"
+		"uniform vec3 u_camera_right;\n"
+		"uniform vec3 u_camera_up;\n"
 		"uniform vec2 u_camera_near_far;\n"
+		"uniform float u_camera_tan_half_fov;\n"
+		"uniform float u_camera_aspect;\n"
+		"uniform float u_camera_ortho_height;\n"
 		"uniform int u_camera_is_orthographic;\n"
 		"uniform sampler2D u_scene_depth;\n"
 		"uniform int u_has_scene_depth;\n"
@@ -4124,24 +4179,47 @@ b8 se_sdf_codegen_emit_fragment_main(se_sdf_string* out, const char* map_func_na
 		"void main(void) {\n"
 		"	vec2 res = max(u_resolution, vec2(1.0));\n"
 		"	vec2 screen_uv = gl_FragCoord.xy / res;\n"
-		"	vec2 ndc = screen_uv * 2.0 - 1.0;\n"
-		"	vec3 near_world = se_sdf_world_from_ndc(vec3(ndc, -1.0));\n"
-		"	vec3 far_world = se_sdf_world_from_ndc(vec3(ndc, 1.0));\n"
-		"	vec3 rd = normalize(far_world - near_world);\n"
-		"	vec3 ro = (u_camera_is_orthographic != 0) ? near_world : u_camera_position;\n"
+		"	vec2 uv = screen_uv * 2.0 - 1.0;\n"
+		"	vec3 camera_forward = normalize(u_camera_forward);\n"
+		"	vec3 camera_right = normalize(u_camera_right);\n"
+		"	vec3 camera_up = normalize(u_camera_up);\n"
+		"	vec3 ro = u_camera_position;\n"
+		"	vec3 rd = camera_forward;\n"
+		"	if (u_camera_is_orthographic != 0) {\n"
+		"		float half_height = max(u_camera_ortho_height * 0.5, 0.0001);\n"
+		"		float half_width = half_height * max(u_camera_aspect, 0.0001);\n"
+		"		ro += camera_right * (uv.x * half_width);\n"
+		"		ro += camera_up * (uv.y * half_height);\n"
+		"	} else {\n"
+		"		float tan_half_fov = max(u_camera_tan_half_fov, 0.0001);\n"
+		"		rd = normalize(camera_forward +\n"
+		"			camera_right * (uv.x * tan_half_fov * u_camera_aspect) +\n"
+		"			camera_up * (uv.y * tan_half_fov));\n"
+		"	}\n"
+		"	float march_start = max(u_camera_near_far.x, 0.0);\n"
 		"	float march_limit = min(u_quality_max_distance, max(u_camera_near_far.y, 0.0001));\n"
 		"	float scene_depth_sample = 1.0;\n"
 		"	if (u_has_scene_depth != 0) {\n"
 		"		scene_depth_sample = texture(u_scene_depth, screen_uv).r;\n"
 		"		if (scene_depth_sample < 0.999999) {\n"
-		"			vec3 scene_world = se_sdf_world_from_ndc(vec3(ndc, scene_depth_sample * 2.0 - 1.0));\n"
-		"			float depth_t = dot(scene_world - ro, rd);\n"
+		"			float near_plane = max(u_camera_near_far.x, 0.0001);\n"
+		"			float far_plane = max(u_camera_near_far.y, near_plane + 0.0001);\n"
+		"			float linear_depth = 0.0;\n"
+		"			if (u_camera_is_orthographic != 0) {\n"
+		"				linear_depth = mix(near_plane, far_plane, scene_depth_sample);\n"
+		"			} else {\n"
+		"				float z_ndc = scene_depth_sample * 2.0 - 1.0;\n"
+		"				linear_depth = (2.0 * near_plane * far_plane) /\n"
+		"					max(far_plane + near_plane - z_ndc * (far_plane - near_plane), 0.0001);\n"
+		"			}\n"
+		"			float ray_forward = max(dot(rd, camera_forward), 0.0001);\n"
+		"			float depth_t = linear_depth / ray_forward;\n"
 		"			if (depth_t > 0.0) {\n"
 		"				march_limit = min(march_limit, depth_t);\n"
 		"			}\n"
 		"		}\n"
 		"	}\n"
-		"	float t = 0.0;\n"
+		"	float t = march_start;\n"
 		"	int used_steps = 0;\n"
 		"	bool hit = false;\n"
 		"	vec3 p = ro;\n"
@@ -4169,7 +4247,9 @@ b8 se_sdf_codegen_emit_fragment_main(se_sdf_string* out, const char* map_func_na
 		"		color = 0.5 + 0.5 * se_sdf_normal(p);\n"
 		"	}\n"
 		"	if (u_debug_show_distance != 0) {\n"
-		"		float dnorm = clamp(t / max(march_limit, 0.0001), 0.0, 1.0);\n"
+		"		float travelled = max(t - march_start, 0.0);\n"
+		"		float max_travel = max(march_limit - march_start, 0.0001);\n"
+		"		float dnorm = clamp(travelled / max_travel, 0.0, 1.0);\n"
 		"		color = vec3(dnorm);\n"
 		"	}\n"
 		"	if (u_debug_show_steps != 0) {\n"

@@ -1574,8 +1574,12 @@ void se_scene_3d_render_to_screen(const se_scene_3d_handle scene, const se_windo
 	se_render_unbind_framebuffer();
 	se_render_clear();
 	se_render_set_blending(true);
+	GLboolean previous_depth_mask = GL_TRUE;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &previous_depth_mask);
+	glDepthMask(GL_FALSE);
 	se_shader_set_texture(window_ptr->shader, "u_texture", framebuffer_ptr->texture);
 	se_window_render_quad(window);
+	glDepthMask(previous_depth_mask);
 	se_render_set_blending(false);
 }
 
