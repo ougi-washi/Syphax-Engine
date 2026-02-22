@@ -76,7 +76,11 @@ int main(void) {
 	}
 
 	se_camera_handle camera = se_scene_3d_get_camera(scene);
-	se_camera_set_orbit_defaults(camera, window, &s_vec3(40.0f, 30.0f, .0f), 30.0f);
+	se_camera_set_target_mode(camera, true);
+	se_camera_set_aspect_from_window(camera, window);
+	se_camera_set_perspective(camera, 52.0f, 0.05f, 220.0f);
+	se_camera_set_location(camera, &s_vec3(12.0f, 8.0f, 14.0f));
+	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
 	printf("physics3d_playground controls:\n");
 	printf("  Space: launch all cubes upward\n  Esc: quit\n");
 

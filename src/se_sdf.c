@@ -112,8 +112,6 @@ typedef struct {
 	b8 quad_ready;
 	se_sdf_material_desc material;
 	se_sdf_stylized_desc stylized;
-	s_vec3 default_camera_position;
-	s_vec3 default_camera_target;
 	s_vec3 lighting_direction;
 	s_vec3 lighting_color;
 	s_vec3 fog_color;
@@ -1733,17 +1731,6 @@ b8 se_sdf_scene_align_camera(
 	}
 	direction = s_vec3_divs(&direction, direction_len);
 
-	s_vec3 up = align.up;
-	f32 up_len = s_vec3_length(&up);
-	if (up_len <= 0.0001f) {
-		up = s_vec3(0.0f, 1.0f, 0.0f);
-	} else {
-		up = s_vec3_divs(&up, up_len);
-	}
-	if (fabsf(s_vec3_dot(&direction, &up)) > 0.995f) {
-		up = fabsf(direction.y) < 0.95f ? s_vec3(0.0f, 1.0f, 0.0f) : s_vec3(1.0f, 0.0f, 0.0f);
-	}
-
 	const f32 min_distance = fmaxf(align.min_distance, 0.0001f);
 	const f32 aspect = camera_ptr->aspect > 0.0001f ? camera_ptr->aspect : 1.0f;
 	f32 near_plane = camera_ptr->near;
@@ -1761,10 +1748,8 @@ b8 se_sdf_scene_align_camera(
 			const f32 far_margin = fmaxf(align.far_margin, 0.0f);
 			near_plane = fmaxf(0.01f, distance - radius - near_margin);
 			far_plane = fmaxf(near_plane + 0.01f, distance + radius + far_margin);
-			se_camera_set_orthographic(camera, ortho_height, near_plane, far_plane);
-		} else {
-			camera_ptr->ortho_height = ortho_height;
 		}
+		se_camera_set_orthographic(camera, ortho_height, near_plane, far_plane);
 	} else {
 		const f32 pi = 3.14159265358979323846f;
 		f32 fov_degrees = camera_ptr->fov;
@@ -1780,13 +1765,15 @@ b8 se_sdf_scene_align_camera(
 			const f32 far_margin = fmaxf(align.far_margin, 0.0f);
 			near_plane = fmaxf(0.01f, distance - radius - near_margin);
 			far_plane = fmaxf(near_plane + 0.01f, distance + radius + far_margin);
-			se_camera_set_perspective(camera, fov_degrees, near_plane, far_plane);
 		}
+		se_camera_set_perspective(camera, fov_degrees, near_plane, far_plane);
 	}
 
-	camera_ptr->target = bounds.center;
-	camera_ptr->position = s_vec3_add(&bounds.center, &s_vec3_muls(&direction, distance));
-	camera_ptr->up = up;
+	const s_vec3 target = bounds.center;
+	const s_vec3 position = s_vec3_add(&bounds.center, &s_vec3_muls(&direction, distance));
+	se_camera_set_target_mode(camera, true);
+	se_camera_set_location(camera, &position);
+	se_camera_set_target(camera, &target);
 	return 1;
 }
 
@@ -2021,8 +2008,6 @@ se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) 
 	renderer->quad_ready = 0;
 	renderer->material = SE_SDF_MATERIAL_DESC_DEFAULTS;
 	renderer->stylized = SE_SDF_STYLIZED_DESC_DEFAULTS;
-	renderer->default_camera_position = s_vec3(0.0f, 0.0f, 6.0f);
-	renderer->default_camera_target = s_vec3(0.0f, 0.0f, 0.0f);
 	renderer->lighting_direction = s_vec3(0.58f, 0.76f, 0.28f);
 	renderer->lighting_color = s_vec3(1.0f, 1.0f, 1.0f);
 	renderer->fog_color = s_vec3(0.11f, 0.15f, 0.21f);
@@ -2352,13 +2337,19 @@ b8 se_sdf_frame_set_camera(se_sdf_frame_desc* frame, const se_camera_handle came
 	if (!frame || camera == S_HANDLE_NULL) {
 		return 0;
 	}
-	se_camera* camera_ptr = se_camera_get(camera);
-	if (!camera_ptr) {
+	if (!se_camera_get(camera)) {
 		return 0;
 	}
-	frame->has_camera_override = 1;
-	frame->camera_position = camera_ptr->position;
-	frame->camera_target = camera_ptr->target;
+	frame->camera = camera;
+	return 1;
+}
+
+b8 se_sdf_frame_set_scene_depth_texture(se_sdf_frame_desc* frame, const u32 depth_texture) {
+	if (!frame || depth_texture == 0u) {
+		return 0;
+	}
+	frame->has_scene_depth_texture = 1;
+	frame->scene_depth_texture = depth_texture;
 	return 1;
 }
 
@@ -2394,14 +2385,46 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	if (resolution.x <= 0.0f) resolution.x = 1.0f;
 	if (resolution.y <= 0.0f) resolution.y = 1.0f;
 	f32 time_value = renderer_ptr->debug.freeze_time ? 0.0f : frame->time_seconds;
-	s_vec3 camera_position = frame->has_camera_override ? frame->camera_position : renderer_ptr->default_camera_position;
-	s_vec3 camera_target = frame->has_camera_override ? frame->camera_target : renderer_ptr->default_camera_target;
+	if (frame->camera == S_HANDLE_NULL) {
+		se_sdf_runtime_set_diagnostics(
+			renderer_ptr,
+			0,
+			"frame_camera",
+			"render skipped: frame camera is null"
+		);
+		return 0;
+	}
+	se_camera* camera_ptr = se_camera_get(frame->camera);
+	if (!camera_ptr) {
+		se_sdf_runtime_set_diagnostics(
+			renderer_ptr,
+			0,
+			"frame_camera",
+			"render skipped: frame camera handle is invalid"
+		);
+		return 0;
+	}
+	const s_mat4 camera_view = se_camera_get_view_matrix(frame->camera);
+	const s_mat4 camera_projection = se_camera_get_projection_matrix(frame->camera);
+	const s_mat4 camera_view_projection = s_mat4_mul(&camera_projection, &camera_view);
+	const s_mat4 camera_inv_view_projection = s_mat4_inverse(&camera_view_projection);
+	const s_vec3 camera_position = camera_ptr->position;
+	const s_vec2 camera_near_far = s_vec2(camera_ptr->near, camera_ptr->far);
+	const i32 camera_is_orthographic = camera_ptr->use_orthographic ? 1 : 0;
 
 	se_shader_set_vec2(renderer_ptr->shader, "u_resolution", &resolution);
 	se_shader_set_float(renderer_ptr->shader, "u_time", time_value);
 	se_shader_set_vec2(renderer_ptr->shader, "u_mouse", &frame->mouse_normalized);
+	se_shader_set_mat4(renderer_ptr->shader, "u_camera_view", &camera_view);
+	se_shader_set_mat4(renderer_ptr->shader, "u_camera_projection", &camera_projection);
+	se_shader_set_mat4(renderer_ptr->shader, "u_camera_inv_view_projection", &camera_inv_view_projection);
 	se_shader_set_vec3(renderer_ptr->shader, "u_camera_position", &camera_position);
-	se_shader_set_vec3(renderer_ptr->shader, "u_camera_target", &camera_target);
+	se_shader_set_vec2(renderer_ptr->shader, "u_camera_near_far", &camera_near_far);
+	se_shader_set_int(renderer_ptr->shader, "u_camera_is_orthographic", camera_is_orthographic);
+	se_shader_set_int(renderer_ptr->shader, "u_has_scene_depth", frame->has_scene_depth_texture ? 1 : 0);
+	if (frame->has_scene_depth_texture && frame->scene_depth_texture != 0u) {
+		se_shader_set_texture(renderer_ptr->shader, "u_scene_depth", frame->scene_depth_texture);
+	}
 	se_shader_set_int(renderer_ptr->shader, "u_quality_max_steps", renderer_ptr->quality.max_steps);
 	se_shader_set_float(renderer_ptr->shader, "u_quality_hit_epsilon", renderer_ptr->quality.hit_epsilon);
 	se_shader_set_float(renderer_ptr->shader, "u_quality_max_distance", renderer_ptr->quality.max_distance);
@@ -2467,7 +2490,6 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	if (renderer_ptr->quad_ready) {
 		se_quad_render(&renderer_ptr->quad, 0);
 	}
-	(void)frame;
 	return 1;
 }
 
@@ -3985,8 +4007,14 @@ b8 se_sdf_codegen_emit_uniform_block(se_sdf_string* out) {
 		"uniform vec2 u_resolution;\n"
 		"uniform float u_time;\n"
 		"uniform vec2 u_mouse;\n"
+		"uniform mat4 u_camera_view;\n"
+		"uniform mat4 u_camera_projection;\n"
+		"uniform mat4 u_camera_inv_view_projection;\n"
 		"uniform vec3 u_camera_position;\n"
-		"uniform vec3 u_camera_target;\n"
+		"uniform vec2 u_camera_near_far;\n"
+		"uniform int u_camera_is_orthographic;\n"
+		"uniform sampler2D u_scene_depth;\n"
+		"uniform int u_has_scene_depth;\n"
 		"uniform int u_quality_max_steps;\n"
 		"uniform float u_quality_hit_epsilon;\n"
 		"uniform float u_quality_max_distance;\n"
@@ -4046,6 +4074,11 @@ b8 se_sdf_codegen_emit_shading_stub(se_sdf_string* out) {
 		"		map(p + e.yyx) - map(p - e.yyx)\n"
 		"	));\n"
 		"}\n"
+		"vec3 se_sdf_world_from_ndc(vec3 ndc) {\n"
+		"	vec4 world = u_camera_inv_view_projection * vec4(ndc, 1.0);\n"
+		"	float inv_w = (abs(world.w) > 0.000001) ? (1.0 / world.w) : 0.0;\n"
+		"	return world.xyz * inv_w;\n"
+		"}\n"
 		"vec3 se_sdf_stylized(vec3 p, vec3 rd) {\n"
 		"	vec3 n = se_sdf_normal(p);\n"
 		"	vec3 key_dir = normalize(u_light_direction);\n"
@@ -4090,21 +4123,31 @@ b8 se_sdf_codegen_emit_fragment_main(se_sdf_string* out, const char* map_func_na
 	se_sdf_string_append(out,
 		"void main(void) {\n"
 		"	vec2 res = max(u_resolution, vec2(1.0));\n"
-		"	vec2 uv = v_uv * 2.0 - 1.0;\n"
-		"	uv.x *= res.x / res.y;\n"
-		"	uv.y *= -1.0;\n"
-		"	vec3 ro = u_camera_position;\n"
-		"	vec3 ta = u_camera_target;\n"
-		"	vec3 f = normalize(ta - ro);\n"
-		"	vec3 r = normalize(cross(f, vec3(0.0, 1.0, 0.0)));\n"
-		"	vec3 u = cross(r, f);\n"
-		"	vec3 rd = normalize(f + uv.x * r + uv.y * u);\n"
+		"	vec2 screen_uv = gl_FragCoord.xy / res;\n"
+		"	vec2 ndc = screen_uv * 2.0 - 1.0;\n"
+		"	vec3 near_world = se_sdf_world_from_ndc(vec3(ndc, -1.0));\n"
+		"	vec3 far_world = se_sdf_world_from_ndc(vec3(ndc, 1.0));\n"
+		"	vec3 rd = normalize(far_world - near_world);\n"
+		"	vec3 ro = (u_camera_is_orthographic != 0) ? near_world : u_camera_position;\n"
+		"	float march_limit = min(u_quality_max_distance, max(u_camera_near_far.y, 0.0001));\n"
+		"	float scene_depth_sample = 1.0;\n"
+		"	if (u_has_scene_depth != 0) {\n"
+		"		scene_depth_sample = texture(u_scene_depth, screen_uv).r;\n"
+		"		if (scene_depth_sample < 0.999999) {\n"
+		"			vec3 scene_world = se_sdf_world_from_ndc(vec3(ndc, scene_depth_sample * 2.0 - 1.0));\n"
+		"			float depth_t = dot(scene_world - ro, rd);\n"
+		"			if (depth_t > 0.0) {\n"
+		"				march_limit = min(march_limit, depth_t);\n"
+		"			}\n"
+		"		}\n"
+		"	}\n"
 		"	float t = 0.0;\n"
 		"	int used_steps = 0;\n"
 		"	bool hit = false;\n"
 		"	vec3 p = ro;\n"
 		"	for (int i = 0; i < 512; ++i) {\n"
 		"		if (i >= u_quality_max_steps) break;\n"
+		"		if (t > march_limit) break;\n"
 		"		p = ro + rd * t;\n"
 		"		float d = %s(p);\n"
 		"		used_steps = i + 1;\n"
@@ -4113,9 +4156,10 @@ b8 se_sdf_codegen_emit_fragment_main(se_sdf_string* out, const char* map_func_na
 		"			break;\n"
 		"		}\n"
 		"		t += d;\n"
-		"		if (t > u_quality_max_distance) break;\n"
+		"		if (t > march_limit) break;\n"
 		"	}\n"
 		"	vec3 color = u_fog_color;\n"
+		"	bool debug_enabled = (u_debug_show_normals != 0) || (u_debug_show_distance != 0) || (u_debug_show_steps != 0);\n"
 		"	if (hit) {\n"
 		"		color = se_sdf_stylized(p, rd);\n"
 		"		float fog = exp(-u_fog_density * t * t);\n"
@@ -4125,15 +4169,28 @@ b8 se_sdf_codegen_emit_fragment_main(se_sdf_string* out, const char* map_func_na
 		"		color = 0.5 + 0.5 * se_sdf_normal(p);\n"
 		"	}\n"
 		"	if (u_debug_show_distance != 0) {\n"
-		"		float dnorm = clamp(t / max(u_quality_max_distance, 0.0001), 0.0, 1.0);\n"
+		"		float dnorm = clamp(t / max(march_limit, 0.0001), 0.0, 1.0);\n"
 		"		color = vec3(dnorm);\n"
 		"	}\n"
 		"	if (u_debug_show_steps != 0) {\n"
 		"		float snorm = float(used_steps) / max(float(u_quality_max_steps), 1.0);\n"
 		"		color = vec3(snorm, snorm * snorm, 1.0 - snorm);\n"
 		"	}\n"
+		"	if (!hit && u_has_scene_depth != 0 && !debug_enabled) {\n"
+		"		discard;\n"
+		"	}\n"
 		"	color = pow(max(color, vec3(0.0)), vec3(1.0 / max(u_stylized_gamma, 0.0001)));\n"
 		"	FragColor = vec4(color, 1.0);\n"
+		"	if (hit) {\n"
+		"		vec4 clip_hit = u_camera_projection * (u_camera_view * vec4(p, 1.0));\n"
+		"		float inv_w = (abs(clip_hit.w) > 0.000001) ? (1.0 / clip_hit.w) : 0.0;\n"
+		"		float hit_depth = (clip_hit.z * inv_w) * 0.5 + 0.5;\n"
+		"		gl_FragDepth = clamp(hit_depth, 0.0, 1.0);\n"
+		"	} else if (u_has_scene_depth != 0) {\n"
+		"		gl_FragDepth = clamp(scene_depth_sample, 0.0, 1.0);\n"
+		"	} else {\n"
+		"		gl_FragDepth = 1.0;\n"
+		"	}\n"
 		"}\n", name);
 	return !out->oom;
 }

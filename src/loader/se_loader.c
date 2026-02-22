@@ -1385,25 +1385,25 @@ void se_gltf_scene_fit_camera(const se_scene_3d_handle scene, const se_gltf_asse
 	f32 bounds_radius = 1.0f;
 	b8 has_bounds = se_gltf_scene_compute_bounds(asset, &bounds_center, &bounds_radius);
 
-	se_camera *camera = s_array_get(&ctx->cameras, scene_ptr->camera);
+	const se_camera_handle camera_handle = scene_ptr->camera;
+	se_camera *camera = s_array_get(&ctx->cameras, camera_handle);
 	if (camera == NULL) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return;
 	}
 	s_vec3 target = s_vec3(0.0f, 0.0f, 0.0f);
 	s_vec3 position = s_vec3(0.0f, 300.0f, 1500.0f);
+	f32 far_plane = 5000.0f;
 	if (has_bounds) {
 		target = bounds_center;
 		position = s_vec3(bounds_center.x, bounds_center.y + bounds_radius * 0.35f, bounds_center.z + bounds_radius * 1.5f);
-		camera->far = bounds_radius * 10.0f;
-	} else {
-		camera->far = 5000.0f;
+		far_plane = bounds_radius * 10.0f;
 	}
 
-	camera->position = position;
-	camera->target = target;
-	camera->up = s_vec3(0.0f, 1.0f, 0.0f);
-	camera->near = 0.1f;
+	se_camera_set_target_mode(camera_handle, true);
+	se_camera_set_perspective(camera_handle, camera->fov, 0.1f, far_plane);
+	se_camera_set_location(camera_handle, &position);
+	se_camera_set_target(camera_handle, &target);
 
 	se_set_last_error(SE_RESULT_OK);
 }

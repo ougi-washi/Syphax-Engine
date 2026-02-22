@@ -1219,25 +1219,6 @@ static se_ui_handle se_editor_find_widget_owner(se_editor* editor, se_ui_widget_
 	return S_HANDLE_NULL;
 }
 
-static void se_editor_camera_refresh_axes(se_camera* camera) {
-	if (!camera) {
-		return;
-	}
-	s_vec3 forward = s_vec3_sub(&camera->target, &camera->position);
-	if (s_vec3_length(&forward) <= 0.00001f) {
-		return;
-	}
-	forward = s_vec3_normalize(&forward);
-	s_vec3 right = s_vec3_cross(&forward, &camera->up);
-	if (s_vec3_length(&right) > 0.00001f) {
-		camera->right = s_vec3_normalize(&right);
-	}
-	s_vec3 up = s_vec3_cross(&camera->right, &forward);
-	if (s_vec3_length(&up) > 0.00001f) {
-		camera->up = s_vec3_normalize(&up);
-	}
-}
-
 static void se_editor_add_ui_style_state_properties(se_editor_properties* properties, const c8* prefix, const se_ui_style_state* state, b8 editable) {
 	c8 name[SE_MAX_NAME_LENGTH] = {0};
 	if (!properties || !prefix || !state) {
@@ -2311,33 +2292,27 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		camera->position = vec3_value;
-		se_editor_camera_refresh_axes(camera);
+		se_camera_set_location(camera_handle, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_TARGET) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		camera->target = vec3_value;
-		se_editor_camera_refresh_axes(camera);
+		se_camera_set_target(camera_handle, &vec3_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_UP) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		camera->up = vec3_value;
-		se_editor_camera_refresh_axes(camera);
-		return true;
+		return false;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_RIGHT) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		camera->right = vec3_value;
-		se_editor_camera_refresh_axes(camera);
-		return true;
+		return false;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_FOV) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
@@ -2379,7 +2354,7 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		camera->aspect = f32_value;
+		se_camera_set_aspect(camera_handle, f32_value, 1.0f);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ORTHO_HEIGHT) == 0) {
@@ -2401,7 +2376,6 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		} else {
 			se_camera_set_perspective(camera_handle, camera->fov, camera->near, camera->far);
 		}
-		camera->use_orthographic = bool_value;
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_SET_ASPECT_FROM_WINDOW) == 0) {
@@ -2416,35 +2390,41 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_ORBIT) == 0) {
-		s_vec3 pivot = camera->target;
 		if (!se_editor_value_as_vec4(&command->value, &vec4_value)) {
 			return false;
 		}
-		(void)se_editor_value_as_vec3(&command->aux_value, &pivot);
-		se_camera_orbit(camera_handle, &pivot, vec4_value.x, vec4_value.y, vec4_value.z, vec4_value.w);
+		const s_vec3 delta_rotation = s_vec3(vec4_value.y, vec4_value.x, 0.0f);
+		se_camera_add_rotation(camera_handle, &delta_rotation);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_PAN_WORLD) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_camera_pan_world(camera_handle, &vec3_value);
+		se_camera_add_location(camera_handle, &vec3_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_PAN_LOCAL) == 0) {
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_camera_pan_local(camera_handle, vec3_value.x, vec3_value.y, vec3_value.z);
+		const s_vec3 right = se_camera_get_right_vector(camera_handle);
+		const s_vec3 up = se_camera_get_up_vector(camera_handle);
+		const s_vec3 forward = se_camera_get_forward_vector(camera_handle);
+		s_vec3 delta = s_vec3(0.0f, 0.0f, 0.0f);
+		delta = s_vec3_add(&delta, &s_vec3_muls(&right, vec3_value.x));
+		delta = s_vec3_add(&delta, &s_vec3_muls(&up, vec3_value.y));
+		delta = s_vec3_add(&delta, &s_vec3_muls(&forward, vec3_value.z));
+		se_camera_add_location(camera_handle, &delta);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_DOLLY) == 0) {
-		s_vec3 pivot = camera->target;
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		(void)se_editor_value_as_vec3(&command->aux_value, &pivot);
-		se_camera_dolly(camera_handle, &pivot, vec3_value.x, vec3_value.y, vec3_value.z);
+		const s_vec3 forward = se_camera_get_forward_vector(camera_handle);
+		const s_vec3 delta = s_vec3_muls(&forward, vec3_value.x);
+		se_camera_add_location(camera_handle, &delta);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_CLAMP_TARGET) == 0) {
@@ -2452,7 +2432,11 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value) || !se_editor_value_as_vec3(&command->aux_value, &max_bounds)) {
 			return false;
 		}
-		se_camera_clamp_target(camera_handle, &vec3_value, &max_bounds);
+		s_vec3 target = camera->target;
+		target.x = s_max(vec3_value.x, s_min(max_bounds.x, target.x));
+		target.y = s_max(vec3_value.y, s_min(max_bounds.y, target.y));
+		target.z = s_max(vec3_value.z, s_min(max_bounds.z, target.z));
+		se_camera_set_target(camera_handle, &target);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_SMOOTH_TARGET) == 0) {
@@ -2462,7 +2446,9 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_vec2(&command->aux_value, &vec2_value)) {
 			vec2_value = s_vec2(12.0f, 1.0f / 60.0f);
 		}
-		se_camera_smooth_target(camera_handle, &vec3_value, vec2_value.x, vec2_value.y);
+		const f32 t = 1.0f - expf(-s_max(vec2_value.x, 0.0f) * s_max(vec2_value.y, 0.0f));
+		const s_vec3 target = s_vec3_lerp(&camera->target, &vec3_value, t);
+		se_camera_set_target(camera_handle, &target);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_SMOOTH_POSITION) == 0) {
@@ -2472,7 +2458,9 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_vec2(&command->aux_value, &vec2_value)) {
 			vec2_value = s_vec2(12.0f, 1.0f / 60.0f);
 		}
-		se_camera_smooth_position(camera_handle, &vec3_value, vec2_value.x, vec2_value.y);
+		const f32 t = 1.0f - expf(-s_max(vec2_value.x, 0.0f) * s_max(vec2_value.y, 0.0f));
+		const s_vec3 position = s_vec3_lerp(&camera->position, &vec3_value, t);
+		se_camera_set_location(camera_handle, &position);
 		return true;
 	}
 	return false;

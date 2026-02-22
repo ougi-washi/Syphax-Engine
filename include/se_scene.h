@@ -207,6 +207,7 @@ extern void se_scene_3d_remove_object(const se_scene_3d_handle scene, const se_o
 extern b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_object_3d_handle* out_object, f32* out_distance);
 extern void se_scene_3d_set_camera(const se_scene_3d_handle scene, const se_camera_handle camera);
 extern se_camera_handle se_scene_3d_get_camera(const se_scene_3d_handle scene);
+extern b8 se_scene_3d_get_output_depth_texture(const se_scene_3d_handle scene, u32* out_depth_texture);
 extern void se_scene_3d_set_culling(const se_scene_3d_handle scene, const b8 enabled);
 extern void se_scene_3d_add_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);
 extern void se_scene_3d_remove_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);

@@ -55,8 +55,11 @@ typedef struct {
 	se_scene_2d_handle scene_2d;
 	se_scene_3d_handle scene_3d;
 	se_camera_handle camera_3d;
-	se_camera_controller* camera_controller;
 	se_model_handle cube_model;
+	s_vec3 camera_target_3d;
+	f32 camera_yaw_3d;
+	f32 camera_pitch_3d;
+	f32 camera_distance_3d;
 
 	se_ui_handle ui;
 	se_ui_widget_handle ui_panel;
@@ -89,6 +92,9 @@ typedef struct {
 	f64 next_status_time;
 	u64 frame_index;
 } editor_showcase_app;
+
+static void editor_apply_camera_pose_3d(editor_showcase_app* app);
+static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt);
 
 static f32 editor_clampf(const f32 value, const f32 min_value, const f32 max_value) {
 	if (value < min_value) {
@@ -931,7 +937,6 @@ static b8 editor_setup_ui(editor_showcase_app* app) {
 }
 
 static b8 editor_setup_scenes(editor_showcase_app* app) {
-	se_camera_controller_params camera_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
 	se_editor_config editor_config = SE_EDITOR_CONFIG_DEFAULTS;
 	if (!app) {
 		return false;
@@ -953,17 +958,13 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 		editor_log_error("scene_3d camera");
 		return false;
 	}
-	se_camera_set_orbit_defaults(app->camera_3d, app->window, &s_vec3(0.0f, 0.5f, 0.0f), 7.5f);
-
-	camera_params.window = app->window;
-	camera_params.camera = app->camera_3d;
-	camera_params.movement_speed = 7.0f;
-	camera_params.mouse_x_speed = 0.0032f;
-	camera_params.mouse_y_speed = 0.0032f;
-	camera_params.preset = SE_CAMERA_CONTROLLER_PRESET_UE;
-	camera_params.look_toggle = false;
-	camera_params.lock_cursor_while_active = true;
-	app->camera_controller = se_camera_controller_create(&camera_params);
+	app->camera_target_3d = s_vec3(0.0f, 0.5f, 0.0f);
+	app->camera_yaw_3d = 0.55f;
+	app->camera_pitch_3d = 0.32f;
+	app->camera_distance_3d = 7.5f;
+	se_camera_set_target_mode(app->camera_3d, true);
+	se_camera_set_aspect_from_window(app->camera_3d, app->window);
+	se_camera_set_perspective(app->camera_3d, 52.0f, 0.05f, 220.0f);
 
 	app->cube_model = se_model_load_obj_simple(
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
@@ -1006,6 +1007,7 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	app->selected_3d = editor_spawn_object_3d(app, &s_vec3(-1.1f, 0.35f, -0.7f));
 	(void)editor_spawn_object_3d(app, &s_vec3(0.0f, 0.35f, 0.0f));
 	(void)editor_spawn_object_3d(app, &s_vec3(1.25f, 0.35f, 0.55f));
+	editor_apply_camera_pose_3d(app);
 
 	return true;
 }
@@ -1070,6 +1072,71 @@ static b8 editor_is_alt_down(editor_showcase_app* app) {
 	return se_window_is_key_down(app->window, SE_KEY_LEFT_ALT) || se_window_is_key_down(app->window, SE_KEY_RIGHT_ALT);
 }
 
+static void editor_apply_camera_pose_3d(editor_showcase_app* app) {
+	if (!app || app->camera_3d == S_HANDLE_NULL) {
+		return;
+	}
+	const s_vec3 rotation = s_vec3(app->camera_pitch_3d, app->camera_yaw_3d, 0.0f);
+	se_camera_set_rotation(app->camera_3d, &rotation);
+	const s_vec3 forward = se_camera_get_forward_vector(app->camera_3d);
+	const s_vec3 position = s_vec3_sub(&app->camera_target_3d, &s_vec3_muls(&forward, app->camera_distance_3d));
+	se_camera_set_location(app->camera_3d, &position);
+	se_camera_set_target(app->camera_3d, &app->camera_target_3d);
+	se_camera_set_aspect_from_window(app->camera_3d, app->window);
+}
+
+static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt) {
+	s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
+	s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
+	if (!app || app->target != EDITOR_TARGET_SCENE_3D || app->dragging) {
+		return;
+	}
+
+	const b8 alt = editor_is_alt_down(app);
+	se_window_get_mouse_delta(app->window, &mouse_delta);
+	se_window_get_scroll_delta(app->window, &scroll_delta);
+
+	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
+		app->camera_yaw_3d += mouse_delta.x * 0.007f;
+		app->camera_pitch_3d = editor_clampf(app->camera_pitch_3d - mouse_delta.y * 0.007f, -1.45f, 1.45f);
+	}
+	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_MIDDLE)) {
+		const s_vec3 right = se_camera_get_right_vector(app->camera_3d);
+		const s_vec3 up = se_camera_get_up_vector(app->camera_3d);
+		const f32 pan_scale = s_max(0.01f, app->camera_distance_3d * 0.0025f);
+		s_vec3 pan = s_vec3_muls(&right, -mouse_delta.x * pan_scale);
+		pan = s_vec3_add(&pan, &s_vec3_muls(&up, mouse_delta.y * pan_scale));
+		app->camera_target_3d = s_vec3_add(&app->camera_target_3d, &pan);
+	}
+	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT)) {
+		app->camera_distance_3d += mouse_delta.y * 0.028f * s_max(1.0f, app->camera_distance_3d);
+	}
+	if (fabsf(scroll_delta.y) > 0.0001f) {
+		app->camera_distance_3d -= scroll_delta.y * 0.9f;
+	}
+
+	if (se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT) && !alt) {
+		const s_vec3 forward = se_camera_get_forward_vector(app->camera_3d);
+		const s_vec3 right = se_camera_get_right_vector(app->camera_3d);
+		s_vec3 move = s_vec3(0.0f, 0.0f, 0.0f);
+		if (se_window_is_key_down(app->window, SE_KEY_W)) move = s_vec3_add(&move, &forward);
+		if (se_window_is_key_down(app->window, SE_KEY_S)) move = s_vec3_sub(&move, &forward);
+		if (se_window_is_key_down(app->window, SE_KEY_D)) move = s_vec3_add(&move, &right);
+		if (se_window_is_key_down(app->window, SE_KEY_A)) move = s_vec3_sub(&move, &right);
+		if (se_window_is_key_down(app->window, SE_KEY_E)) move.y += 1.0f;
+		if (se_window_is_key_down(app->window, SE_KEY_Q)) move.y -= 1.0f;
+		const f32 move_len = s_vec3_length(&move);
+		if (move_len > 0.0001f) {
+			const f32 speed = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 12.0f : 6.0f;
+			move = s_vec3_muls(&s_vec3_divs(&move, move_len), speed * s_max(dt, 0.0f));
+			app->camera_target_3d = s_vec3_add(&app->camera_target_3d, &move);
+		}
+	}
+
+	app->camera_distance_3d = editor_clampf(app->camera_distance_3d, 1.5f, 120.0f);
+	editor_apply_camera_pose_3d(app);
+}
+
 static void editor_update_scene_2d_interaction(editor_showcase_app* app) {
 	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
 	if (!app || app->target != EDITOR_TARGET_SCENE_2D) {
@@ -1131,10 +1198,6 @@ static void editor_update_scene_3d_interaction(editor_showcase_app* app) {
 static void editor_cleanup(editor_showcase_app* app) {
 	if (!app) {
 		return;
-	}
-	if (app->camera_controller) {
-		se_camera_controller_destroy(app->camera_controller);
-		app->camera_controller = NULL;
 	}
 	if (app->editor) {
 		se_editor_destroy(app->editor);
@@ -1202,7 +1265,7 @@ int main(void) {
 	printf("  Left Mouse: select and drag with gizmo handles\n");
 	printf("  N: add object at cursor\n");
 	printf("  Delete/Backspace: remove selected object\n");
-	printf("  3D camera: RMB fly + WASD, Alt+LMB orbit, Alt+MMB pan, Alt+RMB dolly\n");
+	printf("  3D camera: Alt+LMB orbit, Alt+MMB pan, Alt+RMB or wheel zoom, RMB+WASDQE fly\n");
 	printf("  Esc: quit\n");
 
 	while (!se_window_should_close(app.window)) {
@@ -1223,12 +1286,7 @@ int main(void) {
 			editor_remove_selected_object(&app);
 		}
 
-		if (app.target == EDITOR_TARGET_SCENE_3D && app.camera_controller && !app.dragging) {
-			se_camera_controller_set_enabled(app.camera_controller, true);
-			se_camera_controller_tick(app.camera_controller, dt);
-		} else if (app.camera_controller) {
-			se_camera_controller_set_enabled(app.camera_controller, false);
-		}
+		editor_update_camera_3d(&app, dt);
 
 		editor_update_scene_2d_interaction(&app);
 		editor_update_scene_3d_interaction(&app);

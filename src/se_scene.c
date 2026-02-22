@@ -1709,6 +1709,20 @@ se_camera_handle se_scene_3d_get_camera(const se_scene_3d_handle scene) {
 	return scene_ptr->camera;
 }
 
+b8 se_scene_3d_get_output_depth_texture(const se_scene_3d_handle scene, u32* out_depth_texture) {
+	if (!out_depth_texture) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_context *ctx = se_current_context();
+	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
+	if (!scene_ptr || scene_ptr->output == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	return se_framebuffer_get_depth_texture_id(scene_ptr->output, out_depth_texture);
+}
+
 void se_scene_3d_set_culling(const se_scene_3d_handle scene, const b8 enabled) {
 	se_context *ctx = se_current_context();
 	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);

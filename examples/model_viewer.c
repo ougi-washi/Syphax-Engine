@@ -4,6 +4,7 @@
 #include "se_graphics.h"
 #include "se_scene.h"
 
+#include <math.h>
 #include <stdio.h>
 
 // What you will learn: load a 3D model, add a camera controller, and render it.
@@ -35,15 +36,13 @@ int main(void) {
 	}
 
 	const se_camera_handle camera = se_scene_3d_get_camera(scene);
-	se_camera_set_orbit_defaults(camera, window, &s_vec3(0.0f, 0.0f, 0.0f), 9.0f);
-	se_camera_controller_params camera_params = SE_CAMERA_CONTROLLER_PARAMS_DEFAULTS;
-	camera_params.window = window;
-	camera_params.camera = camera;
-	camera_params.preset = SE_CAMERA_CONTROLLER_PRESET_UE;
-	camera_params.movement_speed = 8.0f;
-	camera_params.mouse_x_speed = 0.004f;
-	camera_params.mouse_y_speed = 0.004f;
-	se_camera_controller* controller = se_camera_controller_create(&camera_params);
+	s_vec3 camera_target = s_vec3(0.0f, 0.0f, 0.0f);
+	f32 camera_yaw = 0.52f;
+	f32 camera_pitch = 0.28f;
+	f32 camera_distance = 9.0f;
+	se_camera_set_target_mode(camera, true);
+	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
+	se_camera_set_target(camera, &camera_target);
 
 	printf("model_viewer controls:\n");
 	printf("  Mouse + WASD: move camera\n");
@@ -52,20 +51,50 @@ int main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
+		s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
+		s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
+		se_window_get_mouse_delta(window, &mouse_delta);
+		se_window_get_scroll_delta(window, &scroll_delta);
+
+		if (se_window_is_mouse_down(window, SE_MOUSE_LEFT)) {
+			camera_yaw += mouse_delta.x * 0.01f;
+			camera_pitch = s_max(-1.45f, s_min(1.45f, camera_pitch - mouse_delta.y * 0.01f));
+		}
+		if (fabsf(scroll_delta.y) > 0.0001f) {
+			camera_distance = s_max(2.0f, s_min(32.0f, camera_distance - scroll_delta.y * 0.8f));
+		}
+
+		s_vec3 pan = s_vec3(0.0f, 0.0f, 0.0f);
+		const f32 pan_speed = 0.08f;
+		const s_vec3 forward_xz = s_vec3(sinf(camera_yaw), 0.0f, -cosf(camera_yaw));
+		const s_vec3 right_xz = s_vec3(cosf(camera_yaw), 0.0f, sinf(camera_yaw));
+		if (se_window_is_key_down(window, SE_KEY_W)) pan = s_vec3_add(&pan, &s_vec3_muls(&forward_xz, pan_speed));
+		if (se_window_is_key_down(window, SE_KEY_S)) pan = s_vec3_sub(&pan, &s_vec3_muls(&forward_xz, pan_speed));
+		if (se_window_is_key_down(window, SE_KEY_D)) pan = s_vec3_add(&pan, &s_vec3_muls(&right_xz, pan_speed));
+		if (se_window_is_key_down(window, SE_KEY_A)) pan = s_vec3_sub(&pan, &s_vec3_muls(&right_xz, pan_speed));
+		if (se_window_is_key_down(window, SE_KEY_E)) pan.y += pan_speed;
+		if (se_window_is_key_down(window, SE_KEY_Q)) pan.y -= pan_speed;
+		camera_target = s_vec3_add(&camera_target, &pan);
+
 		if (se_window_is_key_pressed(window, SE_KEY_R)) {
-			se_camera_set_orbit_defaults(camera, window, &s_vec3(0.0f, 0.0f, 0.0f), 9.0f);
+			camera_target = s_vec3(0.0f, 0.0f, 0.0f);
+			camera_yaw = 0.52f;
+			camera_pitch = 0.28f;
+			camera_distance = 9.0f;
 		}
-		if (controller) {
-			se_camera_controller_tick(controller, (f32)se_window_get_delta_time(window));
-		}
+
+		const s_vec3 rotation = s_vec3(camera_pitch, camera_yaw, 0.0f);
+		se_camera_set_rotation(camera, &rotation);
+		const s_vec3 forward = se_camera_get_forward_vector(camera);
+		const s_vec3 position = s_vec3_sub(&camera_target, &s_vec3_muls(&forward, camera_distance));
+		se_camera_set_location(camera, &position);
+		se_camera_set_target(camera, &camera_target);
+
 		se_render_clear();
 		se_scene_3d_draw(scene, window);
 		se_window_end_frame(window);
 	}
 
-	if (controller) {
-		se_camera_controller_destroy(controller);
-	}
 	se_scene_3d_destroy_full(scene, true, true);
 	se_context_destroy(context);
 	return 0;

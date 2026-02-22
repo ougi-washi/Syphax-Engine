@@ -446,11 +446,12 @@ typedef struct {
 	s_vec2 resolution;
 	f32 time_seconds;
 	s_vec2 mouse_normalized;
-	b8 has_camera_override;
-	s_vec3 camera_position;
-	s_vec3 camera_target;
+	se_camera_handle camera;
+	b8 has_scene_depth_texture;
+	u32 scene_depth_texture;
 } se_sdf_frame_desc;
 extern b8 se_sdf_frame_set_camera(se_sdf_frame_desc* frame, se_camera_handle camera);
+extern b8 se_sdf_frame_set_scene_depth_texture(se_sdf_frame_desc* frame, u32 depth_texture);
 
 typedef enum {
 	SE_SDF_SHADING_STYLIZED,
@@ -526,9 +527,9 @@ typedef enum {
 	.resolution = (s_vec2){ .x = 1.0f, .y = 1.0f }, \
 	.time_seconds = 0.0f, \
 	.mouse_normalized = (s_vec2){ .x = 0.0f, .y = 0.0f }, \
-	.has_camera_override = 0, \
-	.camera_position = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
-	.camera_target = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f } \
+	.camera = S_HANDLE_NULL, \
+	.has_scene_depth_texture = 0, \
+	.scene_depth_texture = 0u \
 })
 
 #define SE_SDF_MATERIAL_DESC_DEFAULTS ((se_sdf_material_desc){ \

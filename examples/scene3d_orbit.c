@@ -39,7 +39,12 @@ int main(void) {
 
 	const s_vec3 pivot = s_vec3(0.0f, 0.0f, 0.0f);
 	const se_camera_handle camera = se_scene_3d_get_camera(scene);
-	se_camera_set_orbit_defaults(camera, window, &pivot, 10.0f);
+	f32 camera_yaw = 0.62f;
+	f32 camera_pitch = 0.34f;
+	f32 camera_distance = 10.0f;
+	se_camera_set_target_mode(camera, true);
+	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
+	se_camera_set_target(camera, &pivot);
 
 	printf("scene3d_orbit controls:\n");
 	printf("  Hold left mouse and move: orbit camera\n");
@@ -57,14 +62,24 @@ int main(void) {
 		se_window_get_scroll_delta(window, &scroll_delta);
 
 		if (se_window_is_mouse_down(window, SE_MOUSE_LEFT)) {
-			se_camera_orbit(camera, &pivot, mouse_delta.x * 0.01f, -mouse_delta.y * 0.01f, -1.45f, 1.45f);
+			camera_yaw += mouse_delta.x * 0.01f;
+			camera_pitch = s_max(-1.45f, s_min(1.45f, camera_pitch - mouse_delta.y * 0.01f));
 		}
 		if (fabsf(scroll_delta.y) > 0.0001f) {
-			se_camera_dolly(camera, &pivot, -scroll_delta.y, 3.0f, 26.0f);
+			camera_distance = s_max(3.0f, s_min(26.0f, camera_distance - scroll_delta.y));
 		}
 		if (se_window_is_key_pressed(window, SE_KEY_R)) {
-			se_camera_set_orbit_defaults(camera, window, &pivot, 10.0f);
+			camera_yaw = 0.62f;
+			camera_pitch = 0.34f;
+			camera_distance = 10.0f;
 		}
+
+		const s_vec3 rotation = s_vec3(camera_pitch, camera_yaw, 0.0f);
+		se_camera_set_rotation(camera, &rotation);
+		const s_vec3 forward = se_camera_get_forward_vector(camera);
+		const s_vec3 position = s_vec3_sub(&pivot, &s_vec3_muls(&forward, camera_distance));
+		se_camera_set_location(camera, &position);
+		se_camera_set_target(camera, &pivot);
 
 		se_render_clear();
 		se_scene_3d_draw(scene, window);
