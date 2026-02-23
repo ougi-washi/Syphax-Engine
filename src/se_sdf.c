@@ -1778,6 +1778,1078 @@ b8 se_sdf_scene_align_camera(
 	return 1;
 }
 
+typedef enum {
+	SE_SDF_RUNTIME_PHYSICS_DETAIL_NEAR = 0,
+	SE_SDF_RUNTIME_PHYSICS_DETAIL_MID,
+	SE_SDF_RUNTIME_PHYSICS_DETAIL_FAR
+} se_sdf_runtime_physics_detail_tier;
+
+typedef struct {
+	s_vec3 offset;
+	s_vec3 half_extents;
+	f32 volume;
+} se_sdf_runtime_physics_box;
+typedef s_array(se_sdf_runtime_physics_box, se_sdf_runtime_physics_boxes);
+typedef s_array(u8, se_sdf_runtime_u8_array);
+
+static b8 se_sdf_runtime_physics_vec3_is_finite(const s_vec3* v) {
+	if (!v) {
+		return 0;
+	}
+	return isfinite(v->x) && isfinite(v->y) && isfinite(v->z);
+}
+
+static f32 se_sdf_runtime_physics_clampf(const f32 v, const f32 min_v, const f32 max_v) {
+	if (v < min_v) {
+		return min_v;
+	}
+	if (v > max_v) {
+		return max_v;
+	}
+	return v;
+}
+
+static i32 se_sdf_runtime_physics_clampi(const i32 v, const i32 min_v, const i32 max_v) {
+	if (v < min_v) {
+		return min_v;
+	}
+	if (v > max_v) {
+		return max_v;
+	}
+	return v;
+}
+
+static f32 se_sdf_runtime_physics_length2(const f32 x, const f32 y) {
+	return sqrtf(x * x + y * y);
+}
+
+static f32 se_sdf_runtime_physics_length3(const f32 x, const f32 y, const f32 z) {
+	return sqrtf(x * x + y * y + z * z);
+}
+
+static f32 se_sdf_runtime_physics_dot2(const f32 ax, const f32 ay, const f32 bx, const f32 by) {
+	return ax * bx + ay * by;
+}
+
+static f32 se_sdf_runtime_physics_box_distance(const s_vec3* p, const s_vec3* half_extents) {
+	if (!p || !half_extents) {
+		return 1e9f;
+	}
+	const f32 qx = fabsf(p->x) - half_extents->x;
+	const f32 qy = fabsf(p->y) - half_extents->y;
+	const f32 qz = fabsf(p->z) - half_extents->z;
+	const f32 ox = fmaxf(qx, 0.0f);
+	const f32 oy = fmaxf(qy, 0.0f);
+	const f32 oz = fmaxf(qz, 0.0f);
+	const f32 outside = sqrtf(ox * ox + oy * oy + oz * oz);
+	const f32 inside = fminf(fmaxf(qx, fmaxf(qy, qz)), 0.0f);
+	return outside + inside;
+}
+
+static b8 se_sdf_runtime_physics_object_to_primitive_desc(
+	const se_sdf_object* object,
+	se_sdf_primitive_desc* out
+) {
+	if (!object || !out) {
+		return 0;
+	}
+
+	memset(out, 0, sizeof(*out));
+	switch (object->type) {
+		case SE_SDF_SPHERE:
+			out->type = SE_SDF_PRIMITIVE_SPHERE;
+			out->sphere.radius = object->sphere.radius;
+			return 1;
+		case SE_SDF_BOX:
+			out->type = SE_SDF_PRIMITIVE_BOX;
+			out->box.size = object->box.size;
+			return 1;
+		case SE_SDF_ROUND_BOX:
+			out->type = SE_SDF_PRIMITIVE_ROUND_BOX;
+			out->round_box.size = object->round_box.size;
+			out->round_box.roundness = object->round_box.roundness;
+			return 1;
+		case SE_SDF_BOX_FRAME:
+			out->type = SE_SDF_PRIMITIVE_BOX_FRAME;
+			out->box_frame.size = object->box_frame.size;
+			out->box_frame.thickness = object->box_frame.thickness;
+			return 1;
+		case SE_SDF_TORUS:
+			out->type = SE_SDF_PRIMITIVE_TORUS;
+			out->torus.radii = object->torus.radii;
+			return 1;
+		case SE_SDF_CAPPED_TORUS:
+			out->type = SE_SDF_PRIMITIVE_CAPPED_TORUS;
+			out->capped_torus.axis_sin_cos = object->capped_torus.axis_sin_cos;
+			out->capped_torus.major_radius = object->capped_torus.major_radius;
+			out->capped_torus.minor_radius = object->capped_torus.minor_radius;
+			return 1;
+		case SE_SDF_LINK:
+			out->type = SE_SDF_PRIMITIVE_LINK;
+			out->link.half_length = object->link.half_length;
+			out->link.outer_radius = object->link.outer_radius;
+			out->link.inner_radius = object->link.inner_radius;
+			return 1;
+		case SE_SDF_CYLINDER:
+			out->type = SE_SDF_PRIMITIVE_CYLINDER;
+			out->cylinder.axis_and_radius = object->cylinder.axis_and_radius;
+			return 1;
+		case SE_SDF_CONE:
+			out->type = SE_SDF_PRIMITIVE_CONE;
+			out->cone.angle_sin_cos = object->cone.angle_sin_cos;
+			out->cone.height = object->cone.height;
+			return 1;
+		case SE_SDF_CONE_INFINITE:
+			out->type = SE_SDF_PRIMITIVE_CONE_INFINITE;
+			out->cone_infinite.angle_sin_cos = object->cone_infinite.angle_sin_cos;
+			return 1;
+		case SE_SDF_PLANE:
+			out->type = SE_SDF_PRIMITIVE_PLANE;
+			out->plane.normal = object->plane.normal;
+			out->plane.offset = object->plane.offset;
+			return 1;
+		case SE_SDF_HEX_PRISM:
+			out->type = SE_SDF_PRIMITIVE_HEX_PRISM;
+			out->hex_prism.half_size = object->hex_prism.half_size;
+			return 1;
+		case SE_SDF_CAPSULE:
+			out->type = SE_SDF_PRIMITIVE_CAPSULE;
+			out->capsule.a = object->capsule.a;
+			out->capsule.b = object->capsule.b;
+			out->capsule.radius = object->capsule.radius;
+			return 1;
+		case SE_SDF_VERTICAL_CAPSULE:
+			out->type = SE_SDF_PRIMITIVE_VERTICAL_CAPSULE;
+			out->vertical_capsule.height = object->vertical_capsule.height;
+			out->vertical_capsule.radius = object->vertical_capsule.radius;
+			return 1;
+		case SE_SDF_CAPPED_CYLINDER:
+			out->type = SE_SDF_PRIMITIVE_CAPPED_CYLINDER;
+			out->capped_cylinder.radius = object->capped_cylinder.radius;
+			out->capped_cylinder.half_height = object->capped_cylinder.half_height;
+			return 1;
+		case SE_SDF_CAPPED_CYLINDER_ARBITRARY:
+			out->type = SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY;
+			out->capped_cylinder_arbitrary.a = object->capped_cylinder_arbitrary.a;
+			out->capped_cylinder_arbitrary.b = object->capped_cylinder_arbitrary.b;
+			out->capped_cylinder_arbitrary.radius = object->capped_cylinder_arbitrary.radius;
+			return 1;
+		case SE_SDF_ROUNDED_CYLINDER:
+			out->type = SE_SDF_PRIMITIVE_ROUNDED_CYLINDER;
+			out->rounded_cylinder.outer_radius = object->rounded_cylinder.outer_radius;
+			out->rounded_cylinder.corner_radius = object->rounded_cylinder.corner_radius;
+			out->rounded_cylinder.half_height = object->rounded_cylinder.half_height;
+			return 1;
+		case SE_SDF_CAPPED_CONE:
+			out->type = SE_SDF_PRIMITIVE_CAPPED_CONE;
+			out->capped_cone.height = object->capped_cone.height;
+			out->capped_cone.radius_base = object->capped_cone.radius_base;
+			out->capped_cone.radius_top = object->capped_cone.radius_top;
+			return 1;
+		case SE_SDF_CAPPED_CONE_ARBITRARY:
+			out->type = SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY;
+			out->capped_cone_arbitrary.a = object->capped_cone_arbitrary.a;
+			out->capped_cone_arbitrary.b = object->capped_cone_arbitrary.b;
+			out->capped_cone_arbitrary.radius_a = object->capped_cone_arbitrary.radius_a;
+			out->capped_cone_arbitrary.radius_b = object->capped_cone_arbitrary.radius_b;
+			return 1;
+		case SE_SDF_SOLID_ANGLE:
+			out->type = SE_SDF_PRIMITIVE_SOLID_ANGLE;
+			out->solid_angle.angle_sin_cos = object->solid_angle.angle_sin_cos;
+			out->solid_angle.radius = object->solid_angle.radius;
+			return 1;
+		case SE_SDF_CUT_SPHERE:
+			out->type = SE_SDF_PRIMITIVE_CUT_SPHERE;
+			out->cut_sphere.radius = object->cut_sphere.radius;
+			out->cut_sphere.cut_height = object->cut_sphere.cut_height;
+			return 1;
+		case SE_SDF_CUT_HOLLOW_SPHERE:
+			out->type = SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE;
+			out->cut_hollow_sphere.radius = object->cut_hollow_sphere.radius;
+			out->cut_hollow_sphere.cut_height = object->cut_hollow_sphere.cut_height;
+			out->cut_hollow_sphere.thickness = object->cut_hollow_sphere.thickness;
+			return 1;
+		case SE_SDF_DEATH_STAR:
+			out->type = SE_SDF_PRIMITIVE_DEATH_STAR;
+			out->death_star.radius_a = object->death_star.radius_a;
+			out->death_star.radius_b = object->death_star.radius_b;
+			out->death_star.separation = object->death_star.separation;
+			return 1;
+		case SE_SDF_ROUND_CONE:
+			out->type = SE_SDF_PRIMITIVE_ROUND_CONE;
+			out->round_cone.radius_base = object->round_cone.radius_base;
+			out->round_cone.radius_top = object->round_cone.radius_top;
+			out->round_cone.height = object->round_cone.height;
+			return 1;
+		case SE_SDF_ROUND_CONE_ARBITRARY:
+			out->type = SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY;
+			out->round_cone_arbitrary.a = object->round_cone_arbitrary.a;
+			out->round_cone_arbitrary.b = object->round_cone_arbitrary.b;
+			out->round_cone_arbitrary.radius_a = object->round_cone_arbitrary.radius_a;
+			out->round_cone_arbitrary.radius_b = object->round_cone_arbitrary.radius_b;
+			return 1;
+		case SE_SDF_VESICA_SEGMENT:
+			out->type = SE_SDF_PRIMITIVE_VESICA_SEGMENT;
+			out->vesica_segment.a = object->vesica_segment.a;
+			out->vesica_segment.b = object->vesica_segment.b;
+			out->vesica_segment.width = object->vesica_segment.width;
+			return 1;
+		case SE_SDF_RHOMBUS:
+			out->type = SE_SDF_PRIMITIVE_RHOMBUS;
+			out->rhombus.length_a = object->rhombus.length_a;
+			out->rhombus.length_b = object->rhombus.length_b;
+			out->rhombus.height = object->rhombus.height;
+			out->rhombus.corner_radius = object->rhombus.corner_radius;
+			return 1;
+		case SE_SDF_OCTAHEDRON:
+			out->type = SE_SDF_PRIMITIVE_OCTAHEDRON;
+			out->octahedron.size = object->octahedron.size;
+			return 1;
+		case SE_SDF_OCTAHEDRON_BOUND:
+			out->type = SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND;
+			out->octahedron_bound.size = object->octahedron_bound.size;
+			return 1;
+		case SE_SDF_PYRAMID:
+			out->type = SE_SDF_PRIMITIVE_PYRAMID;
+			out->pyramid.height = object->pyramid.height;
+			return 1;
+		case SE_SDF_TRIANGLE:
+			out->type = SE_SDF_PRIMITIVE_TRIANGLE;
+			out->triangle.a = object->triangle.a;
+			out->triangle.b = object->triangle.b;
+			out->triangle.c = object->triangle.c;
+			return 1;
+		case SE_SDF_QUAD:
+			out->type = SE_SDF_PRIMITIVE_QUAD;
+			out->quad.a = object->quad.a;
+			out->quad.b = object->quad.b;
+			out->quad.c = object->quad.c;
+			out->quad.d = object->quad.d;
+			return 1;
+		case SE_SDF_NONE:
+		default:
+			break;
+	}
+	return 0;
+}
+
+static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
+	se_sdf_object* object,
+	const s_vec3* local_point
+) {
+	if (!object || !local_point) {
+		return 1e9f;
+	}
+
+	switch (object->type) {
+		case SE_SDF_SPHERE:
+			return se_sdf_runtime_physics_length3(local_point->x, local_point->y, local_point->z) - fabsf(object->sphere.radius);
+		case SE_SDF_BOX: {
+			const s_vec3 half = s_vec3(
+				fabsf(object->box.size.x),
+				fabsf(object->box.size.y),
+				fabsf(object->box.size.z)
+			);
+			return se_sdf_runtime_physics_box_distance(local_point, &half);
+		}
+		case SE_SDF_ROUND_BOX: {
+			const f32 r = fabsf(object->round_box.roundness);
+			const s_vec3 half = s_vec3(
+				fabsf(object->round_box.size.x) + r,
+				fabsf(object->round_box.size.y) + r,
+				fabsf(object->round_box.size.z) + r
+			);
+			return se_sdf_runtime_physics_box_distance(local_point, &half) - r;
+		}
+		case SE_SDF_TORUS: {
+			const f32 major_r = fabsf(object->torus.radii.x);
+			const f32 minor_r = fabsf(object->torus.radii.y);
+			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z) - major_r;
+			const f32 qy = local_point->y;
+			return se_sdf_runtime_physics_length2(qx, qy) - minor_r;
+		}
+		case SE_SDF_CAPSULE: {
+			const s_vec3 pa = s_vec3_sub(local_point, &object->capsule.a);
+			const s_vec3 ba = s_vec3_sub(&object->capsule.b, &object->capsule.a);
+			const f32 ba_len2 = s_vec3_dot(&ba, &ba);
+			f32 h = 0.0f;
+			if (ba_len2 > 0.000001f) {
+				h = se_sdf_runtime_physics_clampf(s_vec3_dot(&pa, &ba) / ba_len2, 0.0f, 1.0f);
+			}
+			const s_vec3 q = s_vec3_sub(&pa, &s_vec3_muls(&ba, h));
+			return s_vec3_length(&q) - fabsf(object->capsule.radius);
+		}
+		case SE_SDF_VERTICAL_CAPSULE: {
+			s_vec3 q = *local_point;
+			const f32 h = fmaxf(fabsf(object->vertical_capsule.height), 0.0f);
+			q.y -= se_sdf_runtime_physics_clampf(q.y, 0.0f, h);
+			return s_vec3_length(&q) - fabsf(object->vertical_capsule.radius);
+		}
+		case SE_SDF_CAPPED_CYLINDER: {
+			const f32 r = fabsf(object->capped_cylinder.radius);
+			const f32 h = fabsf(object->capped_cylinder.half_height);
+			const f32 dx = fabsf(se_sdf_runtime_physics_length2(local_point->x, local_point->z)) - r;
+			const f32 dy = fabsf(local_point->y) - h;
+			const f32 ox = fmaxf(dx, 0.0f);
+			const f32 oy = fmaxf(dy, 0.0f);
+			return fminf(fmaxf(dx, dy), 0.0f) + se_sdf_runtime_physics_length2(ox, oy);
+		}
+		case SE_SDF_CONE: {
+			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qy = local_point->y;
+			const f32 sx = object->cone.angle_sin_cos.x;
+			const f32 sy = object->cone.angle_sin_cos.y;
+			const f32 h = fabsf(object->cone.height);
+			const f32 k1x = sy;
+			const f32 k1y = h;
+			const f32 k2x = sy - sx;
+			const f32 k2y = 2.0f * h;
+			const f32 ca_x = qx - fminf(qx, (qy < 0.0f) ? sx : sy);
+			const f32 ca_y = fabsf(qy) - h;
+			const f32 k2_dot = k2x * k2x + k2y * k2y;
+			f32 t = 0.0f;
+			if (k2_dot > 0.000001f) {
+				t = se_sdf_runtime_physics_clampf(
+					((k1x - qx) * k2x + (k1y - qy) * k2y) / k2_dot,
+					0.0f,
+					1.0f
+				);
+			}
+			const f32 cb_x = qx - k1x + k2x * t;
+			const f32 cb_y = qy - k1y + k2y * t;
+			const f32 s = (cb_x < 0.0f && ca_y < 0.0f) ? -1.0f : 1.0f;
+			return s * sqrtf(fminf(ca_x * ca_x + ca_y * ca_y, cb_x * cb_x + cb_y * cb_y));
+		}
+		case SE_SDF_CONE_INFINITE: {
+			const f32 sx = object->cone_infinite.angle_sin_cos.x;
+			const f32 sy = object->cone_infinite.angle_sin_cos.y;
+			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qy = -local_point->y;
+			const f32 dot_v = se_sdf_runtime_physics_dot2(qx, qy, sx, sy);
+			const f32 m = fmaxf(dot_v, 0.0f);
+			const f32 wx = qx - sx * m;
+			const f32 wy = qy - sy * m;
+			const f32 d = se_sdf_runtime_physics_length2(wx, wy);
+			return d * ((qx * sy - qy * sx < 0.0f) ? -1.0f : 1.0f);
+		}
+		case SE_SDF_PLANE: {
+			const s_vec3 n = object->plane.normal;
+			return s_vec3_dot(local_point, &n) + object->plane.offset;
+		}
+		case SE_SDF_CYLINDER: {
+			const f32 dx = local_point->x - object->cylinder.axis_and_radius.x;
+			const f32 dz = local_point->z - object->cylinder.axis_and_radius.y;
+			return se_sdf_runtime_physics_length2(dx, dz) - fabsf(object->cylinder.axis_and_radius.z);
+		}
+		case SE_SDF_CUT_SPHERE: {
+			const f32 r = fabsf(object->cut_sphere.radius);
+			const f32 ch = object->cut_sphere.cut_height;
+			const f32 w = sqrtf(fmaxf(r * r - ch * ch, 0.0f));
+			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qy = local_point->y;
+			const f32 s = fmaxf(
+				(ch - r) * qx * qx + w * w * (ch + r - 2.0f * qy),
+				ch * qx - w * qy
+			);
+			if (s < 0.0f) {
+				return se_sdf_runtime_physics_length2(qx, qy) - r;
+			}
+			if (qx < w) {
+				return ch - qy;
+			}
+			return se_sdf_runtime_physics_length2(qx - w, qy - ch);
+		}
+		case SE_SDF_CUT_HOLLOW_SPHERE: {
+			const f32 r = fabsf(object->cut_hollow_sphere.radius);
+			const f32 ch = object->cut_hollow_sphere.cut_height;
+			const f32 t = fabsf(object->cut_hollow_sphere.thickness);
+			const f32 w = sqrtf(fmaxf(r * r - ch * ch, 0.0f));
+			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qy = local_point->y;
+			const f32 candidate = (ch * qx < w * qy)
+				? se_sdf_runtime_physics_length2(qx - w, qy - ch)
+				: fabsf(se_sdf_runtime_physics_length2(qx, qy) - r);
+			return candidate - t;
+		}
+		case SE_SDF_ROUND_CONE: {
+			const f32 r1 = fabsf(object->round_cone.radius_base);
+			const f32 r2 = fabsf(object->round_cone.radius_top);
+			const f32 h = fmaxf(fabsf(object->round_cone.height), 0.0001f);
+			const f32 b = (r1 - r2) / h;
+			const f32 a = sqrtf(fmaxf(1.0f - b * b, 0.0f));
+			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qy = local_point->y;
+			const f32 k = se_sdf_runtime_physics_dot2(qx, qy, -b, a);
+			if (k < 0.0f) {
+				return se_sdf_runtime_physics_length2(qx, qy) - r1;
+			}
+			if (k > a * h) {
+				return se_sdf_runtime_physics_length2(qx, qy - h) - r2;
+			}
+			return se_sdf_runtime_physics_dot2(qx, qy, a, b) - r1;
+		}
+		case SE_SDF_NONE:
+		default: {
+			se_sdf_primitive_desc primitive = {0};
+			if (!se_sdf_runtime_physics_object_to_primitive_desc(object, &primitive)) {
+				return 1e9f;
+			}
+			s_vec3 local_min = s_vec3(0.0f, 0.0f, 0.0f);
+			s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
+			b8 is_unbounded = 0;
+			if (!se_sdf_runtime_get_primitive_local_bounds(&primitive, &local_min, &local_max, &is_unbounded)) {
+				return is_unbounded ? 1e9f : 0.0f;
+			}
+			const s_vec3 center = s_vec3(
+				(local_min.x + local_max.x) * 0.5f,
+				(local_min.y + local_max.y) * 0.5f,
+				(local_min.z + local_max.z) * 0.5f
+			);
+			const s_vec3 half = s_vec3(
+				fmaxf((local_max.x - local_min.x) * 0.5f, 0.0001f),
+				fmaxf((local_max.y - local_min.y) * 0.5f, 0.0001f),
+				fmaxf((local_max.z - local_min.z) * 0.5f, 0.0001f)
+			);
+			const s_vec3 p = s_vec3_sub(local_point, &center);
+			return se_sdf_runtime_physics_box_distance(&p, &half);
+		}
+	}
+}
+
+static f32 se_sdf_runtime_physics_apply_operation(
+	const se_sdf_operation operation,
+	const f32 lhs,
+	const f32 rhs
+) {
+	switch (operation) {
+		case SE_SDF_OP_UNION:
+		case SE_SDF_OP_SMOOTH_UNION:
+			return fminf(lhs, rhs);
+		case SE_SDF_OP_INTERSECTION:
+		case SE_SDF_OP_SMOOTH_INTERSECTION:
+			return fmaxf(lhs, rhs);
+		case SE_SDF_OP_SUBTRACTION:
+		case SE_SDF_OP_SMOOTH_SUBTRACTION:
+			return fmaxf(lhs, -rhs);
+		case SE_SDF_OP_NONE:
+		default:
+			return lhs;
+	}
+}
+
+static f32 se_sdf_runtime_physics_apply_noise(
+	const se_sdf_noise* noise,
+	const s_vec3* local_point,
+	const f32 distance
+) {
+	if (!noise || !noise->active || !local_point) {
+		return distance;
+	}
+	const f32 frequency = fmaxf(fabsf(noise->frequency), 0.0001f);
+	const f32 n = sinf(local_point->x * frequency)
+		* sinf(local_point->y * frequency)
+		* sinf(local_point->z * frequency);
+	return distance + noise->offset + noise->scale * n;
+}
+
+static f32 se_sdf_runtime_physics_eval_object_distance_recursive(
+	se_sdf_object* object,
+	const s_vec3* world_point,
+	const s_mat4* parent_transform,
+	const sz depth,
+	const sz max_depth
+) {
+	if (!object || !world_point || !parent_transform || depth > max_depth) {
+		return 1e9f;
+	}
+
+	const s_mat4 world_transform = s_mat4_mul(parent_transform, &object->transform);
+	const s_mat4 inverse_transform = s_mat4_inverse(&world_transform);
+	const s_vec3 local_point = se_sdf_runtime_mul_mat4_point(&inverse_transform, world_point);
+	if (!se_sdf_runtime_physics_vec3_is_finite(&local_point)) {
+		return 1e9f;
+	}
+
+	const sz child_count = s_array_get_size(&object->children);
+	f32 distance = 1e9f;
+	if (child_count > 0) {
+		se_sdf_object* first = s_array_get(&object->children, s_array_handle(&object->children, 0));
+		distance = se_sdf_runtime_physics_eval_object_distance_recursive(
+			first,
+			world_point,
+			&world_transform,
+			depth + 1,
+			max_depth
+		);
+		for (sz i = 1; i < child_count; ++i) {
+			se_sdf_object* child = s_array_get(&object->children, s_array_handle(&object->children, (u32)i));
+			const f32 rhs = se_sdf_runtime_physics_eval_object_distance_recursive(
+				child,
+				world_point,
+				&world_transform,
+				depth + 1,
+				max_depth
+			);
+			distance = se_sdf_runtime_physics_apply_operation(object->operation, distance, rhs);
+		}
+	} else {
+		distance = se_sdf_runtime_physics_eval_primitive_distance_local(object, &local_point);
+	}
+
+	distance = se_sdf_runtime_physics_apply_noise(&object->noise, &local_point, distance);
+	return isfinite(distance) ? distance : 1e9f;
+}
+
+static void se_sdf_runtime_physics_collect_object_bounds_recursive(
+	se_sdf_object* object,
+	const s_mat4* parent_transform,
+	se_sdf_scene_bounds* bounds,
+	const sz depth,
+	const sz max_depth
+) {
+	if (!object || !parent_transform || !bounds || depth > max_depth) {
+		return;
+	}
+
+	const s_mat4 world_transform = s_mat4_mul(parent_transform, &object->transform);
+	const sz child_count = s_array_get_size(&object->children);
+
+	if (child_count == 0 && object->type != SE_SDF_NONE) {
+		se_sdf_primitive_desc primitive = {0};
+		if (se_sdf_runtime_physics_object_to_primitive_desc(object, &primitive)) {
+			s_vec3 local_min = s_vec3(0.0f, 0.0f, 0.0f);
+			s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
+			b8 is_unbounded = 0;
+			if (se_sdf_runtime_get_primitive_local_bounds(&primitive, &local_min, &local_max, &is_unbounded)) {
+				se_sdf_runtime_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
+			} else if (is_unbounded) {
+				bounds->has_unbounded_primitives = 1;
+			}
+		}
+	}
+
+	for (sz i = 0; i < child_count; ++i) {
+		se_sdf_object* child = s_array_get(&object->children, s_array_handle(&object->children, (u32)i));
+		se_sdf_runtime_physics_collect_object_bounds_recursive(
+			child,
+			&world_transform,
+			bounds,
+			depth + 1,
+			max_depth
+		);
+	}
+}
+
+static void se_sdf_runtime_physics_finalize_bounds(se_sdf_scene_bounds* bounds) {
+	if (!bounds || !bounds->valid) {
+		return;
+	}
+	bounds->center = s_vec3(
+		(bounds->min.x + bounds->max.x) * 0.5f,
+		(bounds->min.y + bounds->max.y) * 0.5f,
+		(bounds->min.z + bounds->max.z) * 0.5f
+	);
+	const s_vec3 span = s_vec3(
+		bounds->max.x - bounds->min.x,
+		bounds->max.y - bounds->min.y,
+		bounds->max.z - bounds->min.z
+	);
+	bounds->radius = 0.5f * sqrtf(span.x * span.x + span.y * span.y + span.z * span.z);
+}
+
+static se_sdf_runtime_physics_detail_tier se_sdf_runtime_physics_pick_tier(
+	const se_sdf_scene_bounds* bounds,
+	const s_vec3* reference_position
+) {
+	if (!bounds || !bounds->valid || !reference_position) {
+		return SE_SDF_RUNTIME_PHYSICS_DETAIL_MID;
+	}
+	const s_vec3 delta = s_vec3_sub(reference_position, &bounds->center);
+	const f32 distance = s_vec3_length(&delta);
+	const f32 normalized = distance / fmaxf(bounds->radius, 0.001f);
+	if (normalized > 8.0f) {
+		return SE_SDF_RUNTIME_PHYSICS_DETAIL_FAR;
+	}
+	if (normalized > 2.0f) {
+		return SE_SDF_RUNTIME_PHYSICS_DETAIL_MID;
+	}
+	return SE_SDF_RUNTIME_PHYSICS_DETAIL_NEAR;
+}
+
+static b8 se_sdf_runtime_physics_extract_simple_transform(
+	const s_mat4* transform,
+	s_vec3* out_translation,
+	s_vec3* out_scale
+) {
+	if (!transform || !out_translation || !out_scale) {
+		return 0;
+	}
+	const f32 eps = 0.0001f;
+	if (fabsf(transform->m[0][1]) > eps || fabsf(transform->m[0][2]) > eps ||
+		fabsf(transform->m[1][0]) > eps || fabsf(transform->m[1][2]) > eps ||
+		fabsf(transform->m[2][0]) > eps || fabsf(transform->m[2][1]) > eps ||
+		fabsf(transform->m[0][3]) > eps || fabsf(transform->m[1][3]) > eps ||
+		fabsf(transform->m[2][3]) > eps || fabsf(transform->m[3][3] - 1.0f) > eps) {
+		return 0;
+	}
+	*out_translation = s_vec3(transform->m[3][0], transform->m[3][1], transform->m[3][2]);
+	*out_scale = s_vec3(
+		fabsf(transform->m[0][0]),
+		fabsf(transform->m[1][1]),
+		fabsf(transform->m[2][2])
+	);
+	return (out_scale->x > eps && out_scale->y > eps && out_scale->z > eps);
+}
+
+static b8 se_sdf_runtime_physics_try_add_simple_shape(
+	se_physics_world_3d_handle world,
+	se_physics_body_3d_handle body,
+	se_sdf_object* object,
+	const b8 is_trigger
+) {
+	if (!world || !body || !object || object->noise.active || s_array_get_size(&object->children) != 0) {
+		return 0;
+	}
+	s_vec3 offset = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 scale = s_vec3(1.0f, 1.0f, 1.0f);
+	if (!se_sdf_runtime_physics_extract_simple_transform(&object->transform, &offset, &scale)) {
+		return 0;
+	}
+
+	switch (object->type) {
+		case SE_SDF_SPHERE: {
+			if (fabsf(scale.x - scale.y) > 0.0001f || fabsf(scale.y - scale.z) > 0.0001f) {
+				return 0;
+			}
+			const f32 radius = fabsf(object->sphere.radius) * scale.x;
+			return se_physics_body_3d_add_sphere(world, body, &offset, radius, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+		}
+		case SE_SDF_BOX: {
+			const s_vec3 half_extents = s_vec3(
+				fabsf(object->box.size.x) * scale.x,
+				fabsf(object->box.size.y) * scale.y,
+				fabsf(object->box.size.z) * scale.z
+			);
+			const s_vec3 rotation = s_vec3(0.0f, 0.0f, 0.0f);
+			return se_physics_body_3d_add_box(world, body, &offset, &half_extents, &rotation, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+		}
+		case SE_SDF_ROUND_BOX: {
+			const f32 r = fabsf(object->round_box.roundness);
+			const s_vec3 half_extents = s_vec3(
+				(fabsf(object->round_box.size.x) + r) * scale.x,
+				(fabsf(object->round_box.size.y) + r) * scale.y,
+				(fabsf(object->round_box.size.z) + r) * scale.z
+			);
+			const s_vec3 rotation = s_vec3(0.0f, 0.0f, 0.0f);
+			return se_physics_body_3d_add_box(world, body, &offset, &half_extents, &rotation, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+		}
+		default:
+			break;
+	}
+	return 0;
+}
+
+static sz se_sdf_runtime_physics_voxel_index(
+	const i32 x,
+	const i32 y,
+	const i32 z,
+	const i32 nx,
+	const i32 ny
+) {
+	return (sz)x + (sz)nx * ((sz)y + (sz)ny * (sz)z);
+}
+
+static void se_sdf_runtime_physics_u8_array_set_count(
+	se_sdf_runtime_u8_array* array,
+	const sz count,
+	const u8 fill_value
+) {
+	if (!array) {
+		return;
+	}
+	s_array_reserve(array, count);
+	for (sz i = 0; i < count; ++i) {
+		u8 value = fill_value;
+		s_array_add(array, value);
+	}
+}
+
+static void se_sdf_runtime_physics_build_voxel_occupancy(
+	se_sdf_object* object,
+	const s_vec3* bounds_min,
+	const s_vec3* cell_size,
+	const i32 nx,
+	const i32 ny,
+	const i32 nz,
+	const f32 inside_bias,
+	se_sdf_runtime_u8_array* out_occupancy
+) {
+	if (!object || !bounds_min || !cell_size || !out_occupancy) {
+		return;
+	}
+	const s_mat4 identity = s_mat4_identity;
+	for (i32 z = 0; z < nz; ++z) {
+		for (i32 y = 0; y < ny; ++y) {
+			for (i32 x = 0; x < nx; ++x) {
+				const s_vec3 sample_point = s_vec3(
+					bounds_min->x + ((f32)x + 0.5f) * cell_size->x,
+					bounds_min->y + ((f32)y + 0.5f) * cell_size->y,
+					bounds_min->z + ((f32)z + 0.5f) * cell_size->z
+				);
+				const f32 distance = se_sdf_runtime_physics_eval_object_distance_recursive(
+					object,
+					&sample_point,
+					&identity,
+					0,
+					128
+				);
+				u8 filled = (distance <= inside_bias) ? 1u : 0u;
+				s_array_add(out_occupancy, filled);
+			}
+		}
+	}
+}
+
+static void se_sdf_runtime_physics_greedy_merge_voxels(
+	const s_vec3* bounds_min,
+	const s_vec3* cell_size,
+	const i32 nx,
+	const i32 ny,
+	const i32 nz,
+	se_sdf_runtime_u8_array* occupancy,
+	se_sdf_runtime_physics_boxes* out_boxes
+) {
+	if (!bounds_min || !cell_size || !occupancy || !out_boxes) {
+		return;
+	}
+
+	se_sdf_runtime_u8_array used;
+	s_array_init(&used);
+	se_sdf_runtime_physics_u8_array_set_count(&used, s_array_get_size(occupancy), 0u);
+	u8* occ_data = s_array_get_data(occupancy);
+	u8* used_data = s_array_get_data(&used);
+
+	for (i32 z = 0; z < nz; ++z) {
+		for (i32 y = 0; y < ny; ++y) {
+			for (i32 x = 0; x < nx; ++x) {
+				const sz start_idx = se_sdf_runtime_physics_voxel_index(x, y, z, nx, ny);
+				if (!occ_data[start_idx] || used_data[start_idx]) {
+					continue;
+				}
+
+				i32 x2 = x;
+				while (x2 + 1 < nx) {
+					const sz idx = se_sdf_runtime_physics_voxel_index(x2 + 1, y, z, nx, ny);
+					if (!occ_data[idx] || used_data[idx]) {
+						break;
+					}
+					++x2;
+				}
+
+				i32 y2 = y;
+				for (;;) {
+					if (y2 + 1 >= ny) {
+						break;
+					}
+					b8 can_expand_y = 1;
+					for (i32 xx = x; xx <= x2; ++xx) {
+						const sz idx = se_sdf_runtime_physics_voxel_index(xx, y2 + 1, z, nx, ny);
+						if (!occ_data[idx] || used_data[idx]) {
+							can_expand_y = 0;
+							break;
+						}
+					}
+					if (!can_expand_y) {
+						break;
+					}
+					++y2;
+				}
+
+				i32 z2 = z;
+				for (;;) {
+					if (z2 + 1 >= nz) {
+						break;
+					}
+					b8 can_expand_z = 1;
+					for (i32 yy = y; yy <= y2 && can_expand_z; ++yy) {
+						for (i32 xx = x; xx <= x2; ++xx) {
+							const sz idx = se_sdf_runtime_physics_voxel_index(xx, yy, z2 + 1, nx, ny);
+							if (!occ_data[idx] || used_data[idx]) {
+								can_expand_z = 0;
+								break;
+							}
+						}
+					}
+					if (!can_expand_z) {
+						break;
+					}
+					++z2;
+				}
+
+				for (i32 zz = z; zz <= z2; ++zz) {
+					for (i32 yy = y; yy <= y2; ++yy) {
+						for (i32 xx = x; xx <= x2; ++xx) {
+							const sz idx = se_sdf_runtime_physics_voxel_index(xx, yy, zz, nx, ny);
+							used_data[idx] = 1u;
+						}
+					}
+				}
+
+				const s_vec3 min_v = s_vec3(
+					bounds_min->x + (f32)x * cell_size->x,
+					bounds_min->y + (f32)y * cell_size->y,
+					bounds_min->z + (f32)z * cell_size->z
+				);
+				const s_vec3 max_v = s_vec3(
+					bounds_min->x + (f32)(x2 + 1) * cell_size->x,
+					bounds_min->y + (f32)(y2 + 1) * cell_size->y,
+					bounds_min->z + (f32)(z2 + 1) * cell_size->z
+				);
+				se_sdf_runtime_physics_box box = {0};
+				box.offset = s_vec3(
+					(min_v.x + max_v.x) * 0.5f,
+					(min_v.y + max_v.y) * 0.5f,
+					(min_v.z + max_v.z) * 0.5f
+				);
+				box.half_extents = s_vec3(
+					fmaxf((max_v.x - min_v.x) * 0.5f, 0.0001f),
+					fmaxf((max_v.y - min_v.y) * 0.5f, 0.0001f),
+					fmaxf((max_v.z - min_v.z) * 0.5f, 0.0001f)
+				);
+				box.volume = 8.0f * box.half_extents.x * box.half_extents.y * box.half_extents.z;
+				s_array_add(out_boxes, box);
+			}
+		}
+	}
+
+	s_array_clear(&used);
+}
+
+static u32 se_sdf_runtime_physics_add_boxes_with_budget(
+	se_physics_world_3d_handle world,
+	se_physics_body_3d_handle body,
+	se_sdf_runtime_physics_boxes* boxes,
+	const u32 budget,
+	const b8 is_trigger
+) {
+	if (!world || !body || !boxes || budget == 0 || s_array_get_size(boxes) == 0) {
+		return 0;
+	}
+
+	const s_vec3 rotation = s_vec3(0.0f, 0.0f, 0.0f);
+	u32 added = 0;
+	const sz box_count = s_array_get_size(boxes);
+	if (box_count <= (sz)budget) {
+		for (sz i = 0; i < box_count; ++i) {
+			se_sdf_runtime_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)i));
+			if (!box) {
+				continue;
+			}
+			if (se_physics_body_3d_add_box(world, body, &box->offset, &box->half_extents, &rotation, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL) {
+				++added;
+			}
+		}
+		return added;
+	}
+
+	se_sdf_runtime_u8_array selected;
+	s_array_init(&selected);
+	se_sdf_runtime_physics_u8_array_set_count(&selected, box_count, 0u);
+	u8* selected_data = s_array_get_data(&selected);
+
+	for (u32 pick = 0; pick < budget; ++pick) {
+		f32 best_volume = -1.0f;
+		sz best_index = (sz)-1;
+		for (sz i = 0; i < box_count; ++i) {
+			if (selected_data[i] != 0u) {
+				continue;
+			}
+			se_sdf_runtime_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)i));
+			if (!box) {
+				continue;
+			}
+			if (box->volume > best_volume) {
+				best_volume = box->volume;
+				best_index = i;
+			}
+		}
+		if (best_index == (sz)-1) {
+			break;
+		}
+		selected_data[best_index] = 1u;
+		se_sdf_runtime_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)best_index));
+		if (box &&
+			se_physics_body_3d_add_box(world, body, &box->offset, &box->half_extents, &rotation, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL) {
+			++added;
+		}
+	}
+
+	s_array_clear(&selected);
+	return added;
+}
+
+se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
+	const se_physics_world_3d_handle world,
+	const se_sdf_object* object,
+	const se_physics_body_params_3d* body_params,
+	const s_vec3* reference_position,
+	const b8 is_trigger
+) {
+	if (world == SE_PHYSICS_WORLD_3D_HANDLE_NULL || !object || !reference_position) {
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
+	}
+
+	se_sdf_object* root = (se_sdf_object*)object;
+	se_physics_body_params_3d body_cfg = body_params
+		? *body_params
+		: SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
+	if (!body_params) {
+		body_cfg.type = SE_PHYSICS_BODY_STATIC;
+	}
+
+	se_physics_body_3d_handle body = se_physics_body_3d_create(world, &body_cfg);
+	if (body == SE_PHYSICS_BODY_3D_HANDLE_NULL) {
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
+	}
+
+	se_sdf_scene_bounds bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
+	const s_mat4 identity = s_mat4_identity;
+	se_sdf_runtime_physics_collect_object_bounds_recursive(root, &identity, &bounds, 0, 128);
+
+	if (!bounds.valid) {
+		const s_vec3 origin_local = se_sdf_runtime_mul_mat4_point(&root->transform, &s_vec3(0.0f, 0.0f, 0.0f));
+		const s_vec3 fallback_half = s_vec3(2.0f, 2.0f, 2.0f);
+		bounds.min = s_vec3_sub(&origin_local, &fallback_half);
+		bounds.max = s_vec3_add(&origin_local, &fallback_half);
+		bounds.valid = 1;
+	}
+	se_sdf_runtime_physics_finalize_bounds(&bounds);
+
+	if (bounds.has_unbounded_primitives) {
+		s_vec3 half = s_vec3(
+			(bounds.max.x - bounds.min.x) * 0.5f,
+			(bounds.max.y - bounds.min.y) * 0.5f,
+			(bounds.max.z - bounds.min.z) * 0.5f
+		);
+		half.x = fmaxf(half.x, 64.0f);
+		half.y = fmaxf(half.y, 64.0f);
+		half.z = fmaxf(half.z, 64.0f);
+		bounds.min = s_vec3_sub(&bounds.center, &half);
+		bounds.max = s_vec3_add(&bounds.center, &half);
+		se_sdf_runtime_physics_finalize_bounds(&bounds);
+	}
+
+	s_vec3 span = s_vec3(
+		bounds.max.x - bounds.min.x,
+		bounds.max.y - bounds.min.y,
+		bounds.max.z - bounds.min.z
+	);
+	if (span.x < 0.02f || span.y < 0.02f || span.z < 0.02f) {
+		const s_vec3 min_half = s_vec3(
+			fmaxf(span.x * 0.5f, 0.05f),
+			fmaxf(span.y * 0.5f, 0.05f),
+			fmaxf(span.z * 0.5f, 0.05f)
+		);
+		bounds.min = s_vec3_sub(&bounds.center, &min_half);
+		bounds.max = s_vec3_add(&bounds.center, &min_half);
+		span = s_vec3(
+			bounds.max.x - bounds.min.x,
+			bounds.max.y - bounds.min.y,
+			bounds.max.z - bounds.min.z
+		);
+		se_sdf_runtime_physics_finalize_bounds(&bounds);
+	}
+
+	const s_vec3 reference_local = s_vec3_sub(reference_position, &body_cfg.position);
+	const se_sdf_runtime_physics_detail_tier detail_tier = se_sdf_runtime_physics_pick_tier(&bounds, &reference_local);
+	const u32 world_shape_budget = s_max((u32)1u, se_physics_world_3d_get_shapes_per_body(world));
+
+	if (se_sdf_runtime_physics_try_add_simple_shape(world, body, root, is_trigger)) {
+		return body;
+	}
+
+	const s_vec3 aabb_half = s_vec3(
+		fmaxf(span.x * 0.5f, 0.05f),
+		fmaxf(span.y * 0.5f, 0.05f),
+		fmaxf(span.z * 0.5f, 0.05f)
+	);
+
+	if (detail_tier == SE_SDF_RUNTIME_PHYSICS_DETAIL_FAR) {
+		if (se_physics_body_3d_add_aabb(world, body, &bounds.center, &aabb_half, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL) {
+			return body;
+		}
+		se_physics_body_3d_destroy(world, body);
+		return SE_PHYSICS_BODY_3D_HANDLE_NULL;
+	}
+
+	u32 shape_budget = world_shape_budget;
+	i32 base_resolution = 22;
+	if (detail_tier == SE_SDF_RUNTIME_PHYSICS_DETAIL_MID) {
+		shape_budget = s_max((u32)1u, world_shape_budget / 2u);
+		base_resolution = 14;
+	}
+	if (shape_budget <= 2u) {
+		base_resolution = 8;
+	} else if (shape_budget <= 4u) {
+		base_resolution = s_min(base_resolution, 10);
+	} else if (shape_budget <= 8u) {
+		base_resolution = s_min(base_resolution, 12);
+	}
+
+	const f32 max_span = fmaxf(span.x, fmaxf(span.y, span.z));
+	const f32 safe_max_span = fmaxf(max_span, 0.0001f);
+	const i32 nx = se_sdf_runtime_physics_clampi((i32)ceilf((f32)base_resolution * span.x / safe_max_span), 4, base_resolution);
+	const i32 ny = se_sdf_runtime_physics_clampi((i32)ceilf((f32)base_resolution * span.y / safe_max_span), 4, base_resolution);
+	const i32 nz = se_sdf_runtime_physics_clampi((i32)ceilf((f32)base_resolution * span.z / safe_max_span), 4, base_resolution);
+	const s_vec3 cell_size = s_vec3(
+		span.x / (f32)nx,
+		span.y / (f32)ny,
+		span.z / (f32)nz
+	);
+	const f32 min_cell = fmaxf(fminf(cell_size.x, fminf(cell_size.y, cell_size.z)), 0.0001f);
+	const f32 inside_bias = min_cell * 0.15f;
+
+	se_sdf_runtime_u8_array occupancy;
+	se_sdf_runtime_physics_boxes boxes;
+	s_array_init(&occupancy);
+	s_array_init(&boxes);
+
+	se_sdf_runtime_physics_build_voxel_occupancy(
+		root,
+		&bounds.min,
+		&cell_size,
+		nx,
+		ny,
+		nz,
+		inside_bias,
+		&occupancy
+	);
+	se_sdf_runtime_physics_greedy_merge_voxels(
+		&bounds.min,
+		&cell_size,
+		nx,
+		ny,
+		nz,
+		&occupancy,
+		&boxes
+	);
+
+	const u32 added = se_sdf_runtime_physics_add_boxes_with_budget(world, body, &boxes, shape_budget, is_trigger);
+	s_array_clear(&boxes);
+	s_array_clear(&occupancy);
+
+	if (added > 0) {
+		return body;
+	}
+
+	if (se_physics_body_3d_add_aabb(world, body, &bounds.center, &aabb_half, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL) {
+		return body;
+	}
+
+	se_physics_body_3d_destroy(world, body);
+	return SE_PHYSICS_BODY_3D_HANDLE_NULL;
+}
+
 static void se_sdf_runtime_free_legacy_object(se_sdf_object* obj) {
 	if (!obj) {
 		return;

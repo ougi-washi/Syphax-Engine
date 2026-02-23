@@ -4,241 +4,141 @@
 #include "se_window.h"
 #include "se_graphics.h"
 #include "se_camera.h"
-#include "se_input.h"
 #include "se_scene.h"
+#include "se_physics.h"
 #include "se_sdf.h"
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
-
-enum {
-	INPUT_CONTEXT_CAMERA = 0,
-	ACTION_CAMERA_YAW = 200,
-	ACTION_CAMERA_ZOOM = 201
-};
 
 int main(void) {
-	printf("advanced/sdf_playground :: Advanced example (reference)\n");
 	se_context* context = se_context_create();
-	if (!context) {
-		return 1;
-	}
-
-	se_window_handle window = se_window_create("Syphax-Engine - 16_sdf", 1280, 720);
-	if (window == S_HANDLE_NULL) {
-		se_context_destroy(context);
-		return 1;
-	}
-
+	se_window_handle window = se_window_create("Syphax-Engine - sdf_playground", 1280, 720);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
 	se_render_set_background_color(s_vec4(0.03f, 0.04f, 0.05f, 1.0f));
 
-	se_scene_3d_handle raster_scene = se_scene_3d_create_for_window(window, 16);
-	if (raster_scene == S_HANDLE_NULL) {
-		return 1;
-	}
-	se_model_handle cube_model = se_model_load_obj_simple(
-		SE_RESOURCE_PUBLIC("models/cube.obj"),
-		SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
-		SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"));
-	if (cube_model != S_HANDLE_NULL) {
-		se_object_3d_handle cube_object = se_scene_3d_add_model(raster_scene, cube_model, &s_mat4_identity);
-		if (cube_object != S_HANDLE_NULL) {
-			s_mat4 transform = s_mat4_identity;
-			s_mat4_set_translation(&transform, &s_vec3(-1.9f, -0.1f, 0.2f));
-			(void)se_object_3d_add_instance(cube_object, &transform, &s_mat4_identity);
-			s_mat4_set_translation(&transform, &s_vec3(1.7f, -0.1f, -0.9f));
-			(void)se_object_3d_add_instance(cube_object, &transform, &s_mat4_identity);
-		}
-	}
+	se_scene_3d_handle camera_scene = se_scene_3d_create_for_window(window, 1);
+	se_camera_handle camera = se_scene_3d_get_camera(camera_scene);
+	se_camera_set_target_mode(camera, true);
+	se_camera_set_aspect_from_window(camera, window);
+	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
+	se_camera_set_location(camera, &s_vec3(6.0f, 4.5f, 6.0f));
+	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
 
-	se_sdf_scene_handle scene = se_sdf_scene_create(NULL);
+	const f32 ball_radius = 0.45f;
+	const s_vec3 ground_size = s_vec3(8.0f, 0.20f, 8.0f);
+	const s_vec3 ball_start = s_vec3(0.0f, 2.2f, 0.0f);
+	const s_mat4 ground_transform = se_sdf_transform_trs(
+		0.0f, -1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f,
+		1.0f, 1.0f, 1.0f);
+
+	se_sdf_scene_handle sdf_scene = se_sdf_scene_create(NULL);
 	se_sdf_node_group_desc root_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
-	se_sdf_node_handle root = se_sdf_node_create_group(scene, &root_desc);
-	se_sdf_scene_set_root(scene, root);
+	se_sdf_node_handle root = se_sdf_node_create_group(sdf_scene, &root_desc);
+	se_sdf_scene_set_root(sdf_scene, root);
 
-	se_sdf_node_primitive_desc sphere = {
-		.transform = se_sdf_transform_trs(0.0f, 0.10f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f),
-		.operation = SE_SDF_OP_UNION,
-		.primitive = {
-			.type = SE_SDF_PRIMITIVE_SPHERE,
-			.sphere = {
-				.radius = 0.90f
-			}
-		}
-	};
-
-	se_sdf_node_primitive_desc ground = {
-		.transform = se_sdf_transform_trs(0.0f, -1.10f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f),
+	se_sdf_node_primitive_desc ground_node_desc = {
+		.transform = ground_transform,
 		.operation = SE_SDF_OP_UNION,
 		.primitive = {
 			.type = SE_SDF_PRIMITIVE_BOX,
 			.box = {
-				.size = {9.0f, 0.20f, 9.0f}
+				.size = ground_size
 			}
 		}
 	};
-
-	se_sdf_node_handle sphere_node = se_sdf_node_create_primitive(scene, &sphere);
-	se_sdf_node_handle ground_node = se_sdf_node_create_primitive(scene, &ground);
-
-	if (sphere_node == SE_SDF_NODE_NULL ||
-		ground_node == SE_SDF_NODE_NULL ||
-		!se_sdf_node_add_child(scene, root, sphere_node) ||
-		!se_sdf_node_add_child(scene, root, ground_node)) {
-		return 1;
-	}
+	se_sdf_node_primitive_desc ball_node_desc = {
+		.transform = s_mat4_identity,
+		.operation = SE_SDF_OP_UNION,
+		.primitive = {
+			.type = SE_SDF_PRIMITIVE_SPHERE,
+			.sphere = {
+				.radius = ball_radius
+			}
+		}
+	};
+	se_sdf_node_handle ground_node = se_sdf_node_create_primitive(sdf_scene, &ground_node_desc);
+	se_sdf_node_handle ball_node = se_sdf_node_create_primitive(sdf_scene, &ball_node_desc);
+	se_sdf_node_add_child(sdf_scene, root, ground_node);
+	se_sdf_node_add_child(sdf_scene, root, ball_node);
 
 	se_sdf_renderer_handle renderer = se_sdf_renderer_create(NULL);
-	if (renderer == SE_SDF_RENDERER_NULL || !se_sdf_renderer_set_scene(renderer, scene)) {
-		return 1;
-	}
+	se_sdf_renderer_set_scene(renderer, sdf_scene);
+	se_sdf_control_handle ball_translation_control = se_sdf_control_define_vec3(renderer, "ball_translation", &ball_start);
+	se_sdf_control_bind_node_translation(renderer, sdf_scene, ball_node, ball_translation_control);
 
-	se_sdf_material_desc material = SE_SDF_MATERIAL_DESC_DEFAULTS;
-	material.model = SE_SDF_SHADING_STYLIZED;
-	material.base_color = s_vec3(0.70f, 0.72f, 0.75f);
+	se_physics_world_params_3d world_params = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
+	world_params.gravity = s_vec3(0.0f, -9.81f, 0.0f);
+	world_params.shapes_per_body = 24;
+	se_physics_world_3d_handle physics_world = se_physics_world_3d_create(&world_params);
 
-	se_sdf_stylized_desc stylized = SE_SDF_STYLIZED_DESC_DEFAULTS;
-	stylized.band_levels = 4.0f;
-	stylized.rim_power = 2.2f;
+	const s_vec3 reference_position = s_vec3(6.0f, 4.5f, 6.0f);
 
-	se_sdf_renderer_set_material(renderer, &material);
-	se_sdf_renderer_set_stylized(renderer, &stylized);
-
-	se_input_handle* input = se_input_create(window, 16);
-	if (!input) {
-		return 1;
-	}
-	se_input_context_create(input, INPUT_CONTEXT_CAMERA, "camera", true);
-	se_input_context_push(input, INPUT_CONTEXT_CAMERA);
-	se_input_action_create(input, ACTION_CAMERA_YAW, "camera_yaw", INPUT_CONTEXT_CAMERA);
-	se_input_action_bind(input, ACTION_CAMERA_YAW, &(se_input_action_binding){
-		.source_id = SE_INPUT_MOUSE_DELTA_X,
-		.source_type = SE_INPUT_SOURCE_AXIS,
-		.state = SE_INPUT_AXIS,
-		.axis = (se_input_axis_options){
-			.deadzone = 0.0f,
-			.sensitivity = 0.007f,
-			.exponent = 1.0f,
-			.smoothing = 0.0f
+	se_sdf_object ground_object = se_sdf_box(
+		ground_transform,
+		.box = {
+			.size = ground_size
 		}
-	});
-	se_input_action_create(input, ACTION_CAMERA_ZOOM, "camera_zoom", INPUT_CONTEXT_CAMERA);
-	se_input_action_bind(input, ACTION_CAMERA_ZOOM, &(se_input_action_binding){
-		.source_id = SE_INPUT_MOUSE_SCROLL_Y,
-		.source_type = SE_INPUT_SOURCE_AXIS,
-		.state = SE_INPUT_AXIS,
-		.axis = SE_INPUT_AXIS_OPTIONS_DEFAULTS
-	});
+	);
+	se_physics_body_params_3d ground_body_params = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
+	ground_body_params.type = SE_PHYSICS_BODY_STATIC;
+	ground_body_params.position = s_vec3(0.0f, 0.0f, 0.0f);
+	(void)se_sdf_object_create_physics_body_3d(
+		physics_world,
+		&ground_object,
+		&ground_body_params,
+		&reference_position,
+		false
+	);
 
-	se_camera_handle camera = se_scene_3d_get_camera(raster_scene);
-	if (camera == S_HANDLE_NULL) {
-		return 1;
-	}
-
-	u32 initial_fb_w = 0;
-	u32 initial_fb_h = 0;
-	se_window_get_framebuffer_size(window, &initial_fb_w, &initial_fb_h);
-	const f32 initial_aspect_w = initial_fb_w > 0 ? (f32)initial_fb_w : 1280.0f;
-	const f32 initial_aspect_h = initial_fb_h > 0 ? (f32)initial_fb_h : 720.0f;
-	se_camera_set_aspect(camera, initial_aspect_w, initial_aspect_h);
-	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
-
-	se_sdf_camera_align_desc align = SE_SDF_CAMERA_ALIGN_DESC_DEFAULTS;
-	align.padding = 1.35f;
-	align.min_distance = 3.0f;
-	align.far_margin = 36.0f;
-
-	se_sdf_scene_bounds scene_bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
-	se_sdf_scene_align_camera(scene, camera, &align, &scene_bounds);
-	se_camera_set_target_mode(camera, true);
-	s_vec3 camera_target = scene_bounds.valid ? scene_bounds.center : s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec3 camera_position = s_vec3(0.0f, 0.0f, 6.0f);
-	(void)se_camera_get_location(camera, &camera_position);
-	(void)se_camera_get_target(camera, &camera_target);
-	s_vec3 forward = se_camera_get_forward_vector(camera);
-	f32 camera_pitch = asinf(s_max(-1.0f, s_min(1.0f, forward.y)));
-	f32 camera_yaw = atan2f(forward.x, -forward.z);
-	f32 camera_distance = s_vec3_length(&s_vec3_sub(&camera_position, &camera_target));
-	if (camera_distance < 0.5f) {
-		camera_distance = 6.0f;
-	}
-
-	printf("sdf_playground controls:\n");
-	printf("  hold left mouse: orbit around Y axis\n");
-	printf("  mouse wheel: zoom\n");
-	printf("depth demo:\n");
-	printf("  rasterized cubes in the scene should occlude the SDF sphere where closer.\n");
-	fflush(stdout);
-	char last_diag_stage[64] = {0};
-	char last_diag_message[512] = {0};
-	b8 has_last_diag = false;
+	se_sdf_object ball_object = se_sdf_sphere(
+		s_mat4_identity,
+		.sphere = {
+			.radius = ball_radius
+		}
+	);
+	se_physics_body_params_3d ball_body_params = SE_PHYSICS_BODY_PARAMS_3D_DEFAULTS;
+	ball_body_params.type = SE_PHYSICS_BODY_DYNAMIC;
+	ball_body_params.position = ball_start;
+	ball_body_params.mass = 1.0f;
+	ball_body_params.friction = 0.6f;
+	ball_body_params.restitution = 0.2f;
+	se_physics_body_3d_handle ball_body = se_sdf_object_create_physics_body_3d(
+		physics_world,
+		&ball_object,
+		&ball_body_params,
+		&reference_position,
+		false
+	);
 
 	se_window_loop(window,
-		se_input_tick(input);
+		const f32 dt = (f32)se_window_get_delta_time(window);
+		if (dt > 0.0f) {
+			se_physics_world_3d_step(physics_world, dt);
+		}
+
+		const s_vec3 ball_position = se_physics_body_3d_get_position(physics_world, ball_body);
+		se_sdf_control_set_vec3(renderer, ball_translation_control, &ball_position);
+
 		u32 fb_w = 0;
 		u32 fb_h = 0;
 		se_window_get_framebuffer_size(window, &fb_w, &fb_h);
-
-		f32 t = (f32)se_window_get_time(window);
 		const f32 aspect_w = fb_w > 0 ? (f32)fb_w : 1280.0f;
 		const f32 aspect_h = fb_h > 0 ? (f32)fb_h : 720.0f;
-		s_vec2 res = s_vec2(aspect_w, aspect_h);
-		const f32 yaw_input = se_input_action_get_value(input, ACTION_CAMERA_YAW);
-		if (se_window_is_mouse_down(window, SE_MOUSE_LEFT)) {
-			camera_yaw += yaw_input;
-		}
-		const f32 zoom_input = se_input_action_get_value(input, ACTION_CAMERA_ZOOM);
-		if (fabsf(zoom_input) > 0.0001f) {
-			camera_distance = s_max(1.2f, s_min(80.0f, camera_distance - zoom_input * 0.8f));
-		}
-
-		const s_vec3 rotation = s_vec3(camera_pitch, camera_yaw, 0.0f);
-		se_camera_set_rotation(camera, &rotation);
-		forward = se_camera_get_forward_vector(camera);
-		camera_position = s_vec3_sub(&camera_target, &s_vec3_muls(&forward, camera_distance));
-		se_camera_set_location(camera, &camera_position);
-		se_camera_set_target(camera, &camera_target);
+		se_camera_set_aspect(camera, aspect_w, aspect_h);
 
 		se_sdf_frame_desc frame = SE_SDF_FRAME_DESC_DEFAULTS;
-		frame.resolution = res;
-		frame.time_seconds = t;
-
-		se_camera_set_aspect(camera, aspect_w, aspect_h);
+		frame.resolution = s_vec2(aspect_w, aspect_h);
+		frame.time_seconds = (f32)se_window_get_time(window);
 		se_sdf_frame_set_camera(&frame, camera);
-		se_window_get_mouse_position_normalized(window, &frame.mouse_normalized);
 
 		se_render_clear();
-		se_scene_3d_render_to_buffer(raster_scene);
-		u32 depth_texture = 0;
-		if (se_scene_3d_get_output_depth_texture(raster_scene, &depth_texture) && depth_texture != 0u) {
-			se_sdf_frame_set_scene_depth_texture(&frame, depth_texture);
-		}
-		se_scene_3d_render_to_screen(raster_scene, window);
-		const b8 sdf_rendered = se_sdf_renderer_render(renderer, &frame);
-		if (!sdf_rendered) {
-			const se_sdf_build_diagnostics diagnostics = se_sdf_renderer_get_last_build_diagnostics(renderer);
-			if (!has_last_diag ||
-				strcmp(last_diag_stage, diagnostics.stage) != 0 ||
-				strcmp(last_diag_message, diagnostics.message) != 0) {
-				printf("sdf render skipped (%s): %s\n", diagnostics.stage, diagnostics.message);
-				fflush(stdout);
-				strncpy(last_diag_stage, diagnostics.stage, sizeof(last_diag_stage) - 1);
-				last_diag_stage[sizeof(last_diag_stage) - 1] = '\0';
-				strncpy(last_diag_message, diagnostics.message, sizeof(last_diag_message) - 1);
-				last_diag_message[sizeof(last_diag_message) - 1] = '\0';
-				has_last_diag = true;
-			}
-		} else {
-			has_last_diag = false;
-		}
+		se_sdf_renderer_render(renderer, &frame);
 	);
 
-	se_input_destroy(input);
-	se_scene_3d_destroy_full(raster_scene, true, true);
+	se_physics_world_3d_destroy(physics_world);
 	se_sdf_renderer_destroy(renderer);
-	se_sdf_scene_destroy(scene);
+	se_sdf_scene_destroy(sdf_scene);
+	se_scene_3d_destroy(camera_scene);
 	se_sdf_shutdown();
 	se_context_destroy(context);
 	return 0;

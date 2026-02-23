@@ -6,6 +6,7 @@
 #include "syphax/s_types.h"
 #include "syphax/s_array.h"
 #include "se_camera.h"
+#include "se_physics.h"
 
 #define SE_SDF_MAX_STRING_LENGTH 4096
 
@@ -412,6 +413,13 @@ extern b8 se_sdf_scene_align_camera(
 	se_camera_handle camera,
 	const se_sdf_camera_align_desc* desc,
 	se_sdf_scene_bounds* out_bounds
+);
+extern se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
+	se_physics_world_3d_handle world,
+	const se_sdf_object* object,
+	const se_physics_body_params_3d* body_params,
+	const s_vec3* reference_position,
+	b8 is_trigger
 );
 
 typedef struct {
