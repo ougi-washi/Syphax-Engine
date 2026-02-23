@@ -59,7 +59,7 @@ typedef struct world_t {
     se_input_handle* input;
 } world_t;
 
-static se_object_3d_handle create_object(world_t *world, const se_model_handle model, const sz max_instances) {
+se_object_3d_handle create_object(world_t *world, const se_model_handle model, const sz max_instances) {
     if (!world || world->scene == S_HANDLE_NULL || model == S_HANDLE_NULL) {
         return S_HANDLE_NULL;
     }
@@ -73,25 +73,25 @@ typedef struct ui_t {
     se_ui_handle unit_panel;
 } ui_t;
 
-static void move_camera_forward(void *user_data) {
+void move_camera_forward(void *user_data) {
     se_camera_handle camera = (se_camera_handle)user_data;
     const f32 speed = 1.0f;
     se_camera_add_location(camera, &s_vec3(0.0f, 0.0f, speed));
 }
 
-static void move_camera_left(void *user_data) {
+void move_camera_left(void *user_data) {
     se_camera_handle camera = (se_camera_handle)user_data;
     const f32 speed = 1.0f;
     se_camera_add_location(camera, &s_vec3(-speed, 0.0f, 0.0f));
 }
 
-static void move_camera_backward(void *user_data) {
+void move_camera_backward(void *user_data) {
     se_camera_handle camera = (se_camera_handle)user_data;
     const f32 speed = 1.0f;
     se_camera_add_location(camera, &s_vec3(0.0f, 0.0f, -speed));
 }
 
-static void move_camera_right(void *user_data) {
+void move_camera_right(void *user_data) {
     se_camera_handle camera = (se_camera_handle)user_data;
     const f32 speed = 1.0f;
     se_camera_add_location(camera, &s_vec3(speed, 0.0f, 0.0f));
