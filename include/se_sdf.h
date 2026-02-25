@@ -325,8 +325,6 @@ extern b8 se_sdf_node_remove_child(se_sdf_scene_handle scene, se_sdf_node_handle
 extern b8 se_sdf_node_set_operation(se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_operation operation);
 extern b8 se_sdf_node_set_transform(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_mat4* transform);
 extern s_mat4 se_sdf_node_get_transform(se_sdf_scene_handle scene, se_sdf_node_handle node);
-extern s_mat4 se_sdf_transform_trs(f32 tx, f32 ty, f32 tz, f32 rx, f32 ry, f32 rz, f32 sx, f32 sy, f32 sz);
-extern s_mat4 se_sdf_transform_grid_cell(i32 index, i32 columns, i32 rows, f32 spacing, f32 y, f32 yaw, f32 sx, f32 sy, f32 sz);
 extern se_sdf_node_handle se_sdf_node_spawn_primitive(
 	se_sdf_scene_handle scene,
 	se_sdf_node_handle parent,
