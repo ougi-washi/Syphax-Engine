@@ -807,50 +807,7 @@ static void editor_update_2d_gizmo_visuals(editor_showcase_app* app) {
 }
 
 static void editor_draw_3d_helpers(editor_showcase_app* app) {
-	if (!app || app->scene_3d == S_HANDLE_NULL || app->target != EDITOR_TARGET_SCENE_3D) {
-		return;
-	}
-	se_scene_3d_clear_debug_markers(app->scene_3d);
-
-	for (i32 i = -8; i <= 8; ++i) {
-		s_vec4 line_color = s_vec4(0.22f, 0.24f, 0.30f, 1.0f);
-		s_vec3 a = s_vec3((f32)i, 0.0f, -8.0f);
-		s_vec3 b = s_vec3((f32)i, 0.0f, 8.0f);
-		s_vec3 c = s_vec3(-8.0f, 0.0f, (f32)i);
-		s_vec3 d = s_vec3(8.0f, 0.0f, (f32)i);
-		if (i == 0) {
-			line_color = s_vec4(0.34f, 0.38f, 0.46f, 1.0f);
-		}
-		se_scene_3d_debug_line(app->scene_3d, &a, &b, &line_color);
-		se_scene_3d_debug_line(app->scene_3d, &c, &d, &line_color);
-	}
-
-	if (app->selected_3d != S_HANDLE_NULL) {
-		const s_vec3 origin = editor_get_selected_3d_position(app);
-		const s_vec4 color_x = s_vec4(0.95f, 0.28f, 0.26f, 1.0f);
-		const s_vec4 color_y = s_vec4(0.24f, 0.92f, 0.38f, 1.0f);
-		const s_vec4 color_z = s_vec4(0.34f, 0.62f, 0.95f, 1.0f);
-		s_vec4 color_center = s_vec4(0.98f, 0.88f, 0.25f, 1.0f);
-		s_vec3 x_end = s_vec3_add(&origin, &s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH, 0.0f, 0.0f));
-		s_vec3 y_end = s_vec3_add(&origin, &s_vec3(0.0f, EDITOR_3D_GIZMO_AXIS_LENGTH, 0.0f));
-		s_vec3 z_end = s_vec3_add(&origin, &s_vec3(0.0f, 0.0f, EDITOR_3D_GIZMO_AXIS_LENGTH));
-		if (app->active_axis == EDITOR_GIZMO_AXIS_X && app->dragging) {
-			color_center = s_vec4(1.0f, 0.60f, 0.42f, 1.0f);
-		}
-		if (app->active_axis == EDITOR_GIZMO_AXIS_Y && app->dragging) {
-			color_center = s_vec4(0.56f, 1.0f, 0.62f, 1.0f);
-		}
-		if (app->active_axis == EDITOR_GIZMO_AXIS_Z && app->dragging) {
-			color_center = s_vec4(0.58f, 0.76f, 1.0f, 1.0f);
-		}
-		if (app->active_axis == EDITOR_GIZMO_AXIS_FREE && app->dragging) {
-			color_center = s_vec4(1.0f, 0.95f, 0.55f, 1.0f);
-		}
-		se_scene_3d_debug_line(app->scene_3d, &origin, &x_end, &color_x);
-		se_scene_3d_debug_line(app->scene_3d, &origin, &y_end, &color_y);
-		se_scene_3d_debug_line(app->scene_3d, &origin, &z_end, &color_z);
-		se_scene_3d_debug_sphere(app->scene_3d, &origin, 0.10f, &color_center);
-	}
+	(void)app;
 }
 
 static void editor_update_ui_status(editor_showcase_app* app) {
@@ -893,6 +850,7 @@ static void editor_update_ui_status(editor_showcase_app* app) {
 }
 
 static b8 editor_setup_ui(editor_showcase_app* app) {
+	se_ui_style root_style = SE_UI_STYLE_DEFAULT;
 	se_ui_style panel_style = SE_UI_STYLE_DEFAULT;
 	if (!app || app->window == S_HANDLE_NULL) {
 		return false;
@@ -903,6 +861,18 @@ static b8 editor_setup_ui(editor_showcase_app* app) {
 	}
 
 	se_ui_widget_handle root = se_ui_create_root(app->ui);
+	root_style.normal.background_color.w = 0.0f;
+	root_style.hovered.background_color.w = 0.0f;
+	root_style.pressed.background_color.w = 0.0f;
+	root_style.disabled.background_color.w = 0.0f;
+	root_style.focused.background_color.w = 0.0f;
+	root_style.normal.border_width = 0.0f;
+	root_style.hovered.border_width = 0.0f;
+	root_style.pressed.border_width = 0.0f;
+	root_style.disabled.border_width = 0.0f;
+	root_style.focused.border_width = 0.0f;
+	(void)se_ui_widget_set_style(app->ui, root, &root_style);
+
 	app->ui_panel = se_ui_add_panel(root, {
 		.id = "editor_hud",
 		.position = s_vec2(0.012f, 0.012f),
@@ -1307,7 +1277,9 @@ int main(void) {
 			se_scene_3d_draw(app.scene_3d, app.window);
 		}
 		if (app.ui != S_HANDLE_NULL) {
+			se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
 			se_ui_draw(app.ui);
+			se_render_set_background_color(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
 		}
 		se_window_end_frame(app.window);
 	}

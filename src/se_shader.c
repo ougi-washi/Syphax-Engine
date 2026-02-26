@@ -3,6 +3,7 @@
 #include "se_shader.h"
 #include "se_debug.h"
 #include "se_graphics.h"
+#include "se_texture.h"
 #include "render/se_gl.h"
 #include "syphax/s_files.h"
 
@@ -27,6 +28,7 @@ static const char *se_shader_skip_bom(const char *source);
 static const char *se_shader_get_line_end(const char *line_start);
 static const char *se_shader_get_body_after_version(const char *source);
 static b8 se_shader_line_is_precision(const char *line_start, const char *line_end);
+static GLenum se_shader_texture_target_from_id(se_context* ctx, const u32 texture_id);
 #if defined(SE_RENDER_BACKEND_GLES)
 static b8 se_shader_has_precision_decl(const char *source);
 static char *se_shader_translate_gl330_to_es300(const char *source, const GLenum type);
@@ -88,6 +90,21 @@ static void se_shader_uniform_location_cache_remove_program(u32 program) {
 		}
 		s_array_remove(&g_uniform_location_cache, s_array_handle(&g_uniform_location_cache, (u32)(i - 1)));
 	}
+}
+
+static GLenum se_shader_texture_target_from_id(se_context* ctx, const u32 texture_id) {
+	if (!ctx || texture_id == 0u) {
+		return GL_TEXTURE_2D;
+	}
+	for (sz i = 0; i < s_array_get_size(&ctx->textures); ++i) {
+		const se_texture_handle handle = s_array_handle(&ctx->textures, (u32)i);
+		se_texture* texture = s_array_get(&ctx->textures, handle);
+		if (!texture || texture->id != texture_id) {
+			continue;
+		}
+		return texture->target != 0u ? (GLenum)texture->target : GL_TEXTURE_2D;
+	}
+	return GL_TEXTURE_2D;
 }
 
 static const char *se_shader_skip_bom(const char *source) {
@@ -887,7 +904,7 @@ void se_uniform_apply(const se_shader_handle shader, const b8 update_global_unif
 				break;
 			case SE_UNIFORM_TEXTURE:
 				glActiveTexture(GL_TEXTURE0 + texture_unit);
-				glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
+				glBindTexture(se_shader_texture_target_from_id(ctx, uniform->value.texture), uniform->value.texture);
 				glUniform1i(location, texture_unit);
 				texture_unit++;
 				break;
@@ -932,7 +949,7 @@ void se_uniform_apply(const se_shader_handle shader, const b8 update_global_unif
 				break;
 			case SE_UNIFORM_TEXTURE:
 				glActiveTexture(GL_TEXTURE0 + texture_unit);
-				glBindTexture(GL_TEXTURE_2D, uniform->value.texture);
+				glBindTexture(se_shader_texture_target_from_id(ctx, uniform->value.texture), uniform->value.texture);
 				glUniform1i(location, texture_unit);
 				texture_unit++;
 				break;

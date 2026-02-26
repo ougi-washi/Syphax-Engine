@@ -27,23 +27,6 @@ typedef b8 (*se_scene_pick_filter_3d)(se_object_3d_handle object, void* user_dat
 typedef s_handle se_scene_3d_custom_render_handle;
 typedef void (*se_scene_3d_custom_render_callback)(se_scene_3d_handle scene, void* user_data);
 
-typedef enum {
-	SE_SCENE_DEBUG_MARKER_LINE = 0,
-	SE_SCENE_DEBUG_MARKER_BOX,
-	SE_SCENE_DEBUG_MARKER_SPHERE,
-	SE_SCENE_DEBUG_MARKER_TEXT
-} se_scene_debug_marker_type;
-
-typedef struct {
-	se_scene_debug_marker_type type;
-	s_vec3 a;
-	s_vec3 b;
-	s_vec4 color;
-	f32 radius;
-	c8 text[64];
-} se_scene_debug_marker;
-typedef s_array(se_scene_debug_marker, se_scene_debug_markers);
-
 typedef struct {
 	se_instance_ids ids;
 	se_transforms transforms;
@@ -129,7 +112,6 @@ typedef struct se_scene_3d {
 	se_render_buffers_ptr post_process; // still wip
 	se_shader_handle output_shader;
 	se_framebuffer_handle output;
-	se_scene_debug_markers debug_markers;
 	se_scene_3d_custom_render_entries custom_renders;
 	s_mat4 last_vp;
 	b8 enable_culling : 1;
@@ -211,12 +193,6 @@ extern b8 se_scene_3d_get_output_depth_texture(const se_scene_3d_handle scene, u
 extern void se_scene_3d_set_culling(const se_scene_3d_handle scene, const b8 enabled);
 extern void se_scene_3d_add_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);
 extern void se_scene_3d_remove_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);
-extern void se_scene_3d_debug_line(const se_scene_3d_handle scene, const s_vec3* start, const s_vec3* end, const s_vec4* color);
-extern void se_scene_3d_debug_box(const se_scene_3d_handle scene, const s_vec3* min_corner, const s_vec3* max_corner, const s_vec4* color);
-extern void se_scene_3d_debug_sphere(const se_scene_3d_handle scene, const s_vec3* center, const f32 radius, const s_vec4* color);
-extern void se_scene_3d_debug_text(const se_scene_3d_handle scene, const s_vec3* position, const c8* text, const s_vec4* color);
-extern b8 se_scene_3d_get_debug_markers(const se_scene_3d_handle scene, const se_scene_debug_marker** out_markers, sz* out_count);
-extern void se_scene_3d_clear_debug_markers(const se_scene_3d_handle scene);
 extern se_scene_3d_custom_render_handle se_scene_3d_register_custom_render(const se_scene_3d_handle scene, se_scene_3d_custom_render_callback callback, void* user_data);
 extern b8 se_scene_3d_unregister_custom_render(const se_scene_3d_handle scene, const se_scene_3d_custom_render_handle callback_handle);
 

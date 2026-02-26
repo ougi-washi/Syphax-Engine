@@ -131,7 +131,6 @@ struct se_editor {
 #define SE_EDITOR_NAME_CLAMP_TARGET "clamp_target"
 #define SE_EDITOR_NAME_CLEANUP "cleanup"
 #define SE_EDITOR_NAME_CLEAR "clear"
-#define SE_EDITOR_NAME_CLEAR_DEBUG_MARKERS "clear_debug_markers"
 #define SE_EDITOR_NAME_CLEAR_EVENTS "clear_events"
 #define SE_EDITOR_NAME_CLEAR_FOCUS "clear_focus"
 #define SE_EDITOR_NAME_CLEAR_INPUT_STATE "clear_input_state"
@@ -155,7 +154,6 @@ struct se_editor {
 #define SE_EDITOR_NAME_CURSOR "cursor"
 #define SE_EDITOR_NAME_CURSOR_MODE "cursor_mode"
 #define SE_EDITOR_NAME_DEBUG "debug"
-#define SE_EDITOR_NAME_DEBUG_MARKER_COUNT "debug_marker_count"
 #define SE_EDITOR_NAME_DEBUG_OVERLAY "debug_overlay"
 #define SE_EDITOR_NAME_DELTA_TIME "delta_time"
 #define SE_EDITOR_NAME_DEPTH_BUFFER "depth_buffer"
@@ -1518,8 +1516,6 @@ static b8 se_editor_collect_object_2d_properties(se_editor* editor, const se_edi
 
 static b8 se_editor_collect_scene_3d_properties(se_editor* editor, const se_editor_item* item) {
 	se_scene_3d* scene = se_editor_scene_3d_ptr(editor, (se_scene_3d_handle)item->handle);
-	const se_scene_debug_marker* markers = NULL;
-	sz marker_count = 0;
 	s_vec2 size = s_vec2(0.0f, 0.0f);
 	se_framebuffer* framebuffer = NULL;
 	if (!scene) {
@@ -1538,9 +1534,6 @@ static b8 se_editor_collect_scene_3d_properties(se_editor* editor, const se_edit
 			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_OUTPUT_RATIO, framebuffer->ratio, true);
 			se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_OUTPUT_AUTO_RESIZE, framebuffer->auto_resize, true);
 		}
-	}
-	if (se_scene_3d_get_debug_markers((se_scene_3d_handle)item->handle, &markers, &marker_count)) {
-		se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_DEBUG_MARKER_COUNT, (u64)marker_count, false);
 	}
 	return true;
 }
@@ -2780,10 +2773,6 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 			return false;
 		}
 		se_scene_3d_remove_post_process_buffer(scene_handle, (se_render_buffer_handle)handle_value);
-		return true;
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_CLEAR_DEBUG_MARKERS) == 0) {
-		se_scene_3d_clear_debug_markers(scene_handle);
 		return true;
 	}
 	return false;

@@ -3,14 +3,17 @@
 #include "se_sdf.h"
 #include "se_camera.h"
 #include "se_graphics.h"
+#include "se_model.h"
 #include "se_quad.h"
 #include "se_shader.h"
+#include "se_texture.h"
 #include "render/se_gl.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <float.h>
 #include <math.h>
 
 static const char* se_sdf_fullscreen_vertex_shader =
@@ -28,6 +31,7 @@ typedef struct {
 	se_sdf_scene_handle owner_scene;
 	s_mat4 transform;
 	se_sdf_operation operation;
+	f32 operation_amount;
 	se_sdf_primitive_desc primitive;
 	se_sdf_node_handle parent;
 	b8 is_group;
@@ -475,6 +479,30 @@ static b8 se_sdf_runtime_operation_child_count_is_legal(
 	return 1;
 }
 
+static b8 se_sdf_runtime_operation_is_smooth(const se_sdf_operation operation) {
+	switch (operation) {
+		case SE_SDF_OP_SMOOTH_UNION:
+		case SE_SDF_OP_SMOOTH_INTERSECTION:
+		case SE_SDF_OP_SMOOTH_SUBTRACTION:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+static f32 se_sdf_runtime_sanitize_operation_amount(
+	const se_sdf_operation operation,
+	const f32 operation_amount
+) {
+	if (!se_sdf_runtime_operation_is_smooth(operation)) {
+		return operation_amount;
+	}
+	if (!isfinite(operation_amount) || operation_amount <= 0.000001f) {
+		return SE_SDF_OPERATION_AMOUNT_DEFAULT;
+	}
+	return operation_amount;
+}
+
 static b8 se_sdf_runtime_is_ancestor(
 	se_sdf_runtime_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
@@ -689,6 +717,14 @@ b8 se_sdf_scene_validate(
 				s_handle_slot(handle), (int)node->operation, s_array_get_size(&node->children));
 			return 0;
 		}
+		if (se_sdf_runtime_operation_is_smooth(node->operation) &&
+			(!isfinite(node->operation_amount) || node->operation_amount <= 0.000001f)) {
+			se_sdf_runtime_write_scene_error(
+				error_message, error_message_size,
+				"invalid smooth operation amount (node_slot=%u, amount=%.6f)",
+				s_handle_slot(handle), (double)node->operation_amount);
+			return 0;
+		}
 
 		if (node->parent != SE_SDF_NODE_NULL) {
 			se_sdf_runtime_node* parent = se_sdf_runtime_node_from_handle(scene_ptr, scene, node->parent);
@@ -777,6 +813,7 @@ se_sdf_node_handle se_sdf_node_create_primitive(
 	node->owner_scene = scene;
 	node->transform = desc->transform;
 	node->operation = desc->operation;
+	node->operation_amount = se_sdf_runtime_sanitize_operation_amount(desc->operation, desc->operation_amount);
 	node->primitive = desc->primitive;
 	node->parent = SE_SDF_NODE_NULL;
 	node->is_group = 0;
@@ -811,6 +848,7 @@ se_sdf_node_handle se_sdf_node_create_group(
 	node->owner_scene = scene;
 	node->transform = group_desc.transform;
 	node->operation = group_desc.operation;
+	node->operation_amount = se_sdf_runtime_sanitize_operation_amount(group_desc.operation, group_desc.operation_amount);
 	node->parent = SE_SDF_NODE_NULL;
 	node->is_group = 1;
 	node->control_translation = s_vec3(0.0f, 0.0f, 0.0f);
@@ -912,6 +950,7 @@ b8 se_sdf_node_set_operation(
 		return 0;
 	}
 	node_ptr->operation = operation;
+	node_ptr->operation_amount = se_sdf_runtime_sanitize_operation_amount(operation, node_ptr->operation_amount);
 	return 1;
 }
 
@@ -3018,6 +3057,7 @@ static b8 se_sdf_runtime_build_legacy_object_recursive(
 	out->source_scene = scene;
 	out->source_node = node_handle;
 	out->operation = runtime_node->operation;
+	out->operation_amount = runtime_node->operation_amount;
 	out->noise = (se_sdf_noise){0};
 
 	if (runtime_node->is_group) {
@@ -5725,29 +5765,54 @@ void se_sdf_gen_transform(se_sdf_string* out, const char* p_var, s_mat4 transfor
 }
 
 void se_sdf_gen_operation(se_sdf_string* out, se_sdf_operation op, const char* d1, const char* d2) {
-    switch (op) {
-        case SE_SDF_OP_UNION:
-            se_sdf_string_append(out, "min(%s, %s)", d1, d2);
-            break;
+	const f32 smooth_amount = se_sdf_runtime_sanitize_operation_amount(op, SE_SDF_OPERATION_AMOUNT_DEFAULT);
+	switch (op) {
+		case SE_SDF_OP_UNION:
+			se_sdf_string_append(out, "min(%s, %s)", d1, d2);
+			break;
         case SE_SDF_OP_INTERSECTION:
             se_sdf_string_append(out, "max(%s, %s)", d1, d2);
             break;
-        case SE_SDF_OP_SUBTRACTION:
-            se_sdf_string_append(out, "max(%s, -%s)", d1, d2);
-            break;
-        case SE_SDF_OP_SMOOTH_UNION:
-            se_sdf_string_append(out, "min(%s, %s) /* smooth_union_reserved */", d1, d2);
-            break;
-        case SE_SDF_OP_SMOOTH_INTERSECTION:
-            se_sdf_string_append(out, "max(%s, %s) /* smooth_intersection_reserved */", d1, d2);
-            break;
-        case SE_SDF_OP_SMOOTH_SUBTRACTION:
-            se_sdf_string_append(out, "max(%s, -%s) /* smooth_subtraction_reserved */", d1, d2);
-            break;
-        default:
-            se_sdf_string_append(out, "%s", d1);
-            break;
-    }
+		case SE_SDF_OP_SUBTRACTION:
+			se_sdf_string_append(out, "max(%s, -%s)", d1, d2);
+			break;
+		case SE_SDF_OP_SMOOTH_UNION:
+			se_sdf_string_append(
+				out,
+				"(mix(%s, %s, clamp(0.5 + 0.5 * ((%s) - (%s)) / %.6f, 0.0, 1.0)) - %.6f * clamp(0.5 + 0.5 * ((%s) - (%s)) / %.6f, 0.0, 1.0) * (1.0 - clamp(0.5 + 0.5 * ((%s) - (%s)) / %.6f, 0.0, 1.0)))",
+				d2, d1,
+				d2, d1, smooth_amount,
+				smooth_amount,
+				d2, d1, smooth_amount,
+				d2, d1, smooth_amount
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_INTERSECTION:
+			se_sdf_string_append(
+				out,
+				"(mix(%s, %s, clamp(0.5 - 0.5 * ((%s) - (%s)) / %.6f, 0.0, 1.0)) + %.6f * clamp(0.5 - 0.5 * ((%s) - (%s)) / %.6f, 0.0, 1.0) * (1.0 - clamp(0.5 - 0.5 * ((%s) - (%s)) / %.6f, 0.0, 1.0)))",
+				d2, d1,
+				d2, d1, smooth_amount,
+				smooth_amount,
+				d2, d1, smooth_amount,
+				d2, d1, smooth_amount
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_SUBTRACTION:
+			se_sdf_string_append(
+				out,
+				"(mix(%s, -%s, clamp(0.5 - 0.5 * ((%s) + (%s)) / %.6f, 0.0, 1.0)) + %.6f * clamp(0.5 - 0.5 * ((%s) + (%s)) / %.6f, 0.0, 1.0) * (1.0 - clamp(0.5 - 0.5 * ((%s) + (%s)) / %.6f, 0.0, 1.0)))",
+				d1, d2,
+				d2, d1, smooth_amount,
+				smooth_amount,
+				d2, d1, smooth_amount,
+				d2, d1, smooth_amount
+			);
+			break;
+		default:
+			se_sdf_string_append(out, "%s", d1);
+			break;
+	}
 }
 
 // ============================================================================
@@ -6205,31 +6270,50 @@ static void se_sdf_emit_leaf_eval(
 }
 
 static void se_sdf_emit_operation(
-    se_sdf_string* out, se_sdf_operation op,
-    const char* d1, const char* d2, u32 indent
+	se_sdf_string* out, se_sdf_operation op, f32 operation_amount,
+	const char* d1, const char* d2, u32 indent
 ) {
-    se_sdf_emit_indent(out, indent);
-    switch (op) {
-        case SE_SDF_OP_UNION:
-            se_sdf_string_append(out, "%s = min(%s, %s);\n", d1, d1, d2);
-            break;
+	const f32 smooth_amount = se_sdf_runtime_sanitize_operation_amount(op, operation_amount);
+	se_sdf_emit_indent(out, indent);
+	switch (op) {
+		case SE_SDF_OP_UNION:
+			se_sdf_string_append(out, "%s = min(%s, %s);\n", d1, d1, d2);
+			break;
         case SE_SDF_OP_INTERSECTION:
             se_sdf_string_append(out, "%s = max(%s, %s);\n", d1, d1, d2);
             break;
-        case SE_SDF_OP_SUBTRACTION:
-            se_sdf_string_append(out, "%s = max(%s, -%s);\n", d1, d1, d2);
-            break;
-        case SE_SDF_OP_SMOOTH_UNION:
-            se_sdf_string_append(out, "%s = min(%s, %s); // smooth_union_reserved\n", d1, d1, d2);
-            break;
-        case SE_SDF_OP_SMOOTH_INTERSECTION:
-            se_sdf_string_append(out, "%s = max(%s, %s); // smooth_intersection_reserved\n", d1, d1, d2);
-            break;
-        case SE_SDF_OP_SMOOTH_SUBTRACTION:
-            se_sdf_string_append(out, "%s = max(%s, -%s); // smooth_subtraction_reserved\n", d1, d1, d2);
-            break;
-        case SE_SDF_OP_NONE:
-        default:
+		case SE_SDF_OP_SUBTRACTION:
+			se_sdf_string_append(out, "%s = max(%s, -%s);\n", d1, d1, d2);
+			break;
+		case SE_SDF_OP_SMOOTH_UNION:
+			se_sdf_string_append(
+				out,
+				"{ const float k = %.6f; float h = clamp(0.5 + 0.5 * ((%s) - (%s)) / k, 0.0, 1.0); %s = mix(%s, %s, h) - k * h * (1.0 - h); }\n",
+				smooth_amount,
+				d2, d1,
+				d1, d2, d1
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_INTERSECTION:
+			se_sdf_string_append(
+				out,
+				"{ const float k = %.6f; float h = clamp(0.5 - 0.5 * ((%s) - (%s)) / k, 0.0, 1.0); %s = mix(%s, %s, h) + k * h * (1.0 - h); }\n",
+				smooth_amount,
+				d2, d1,
+				d1, d2, d1
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_SUBTRACTION:
+			se_sdf_string_append(
+				out,
+				"{ const float k = %.6f; float h = clamp(0.5 - 0.5 * ((%s) + (%s)) / k, 0.0, 1.0); %s = mix(%s, -%s, h) + k * h * (1.0 - h); }\n",
+				smooth_amount,
+				d2, d1,
+				d1, d1, d2
+			);
+			break;
+		case SE_SDF_OP_NONE:
+		default:
             break;
     }
 }
@@ -6363,8 +6447,8 @@ static void se_sdf_emit_object_eval(
         snprintf(rhs_result, sizeof(rhs_result), "_d%u", (*temp_counter)++);
         se_sdf_object* child = se_sdf_get_child(obj, i);
         se_sdf_emit_object_eval(out, child, local_p, rhs_result, temp_counter, indent);
-        se_sdf_emit_operation(out, obj->operation, result_var, rhs_result, indent);
-    }
+		se_sdf_emit_operation(out, obj->operation, obj->operation_amount, result_var, rhs_result, indent);
+	}
 }
 
 void se_sdf_object_to_string(se_sdf_string* out, se_sdf_object* obj, const char* p_var) {
@@ -6380,4 +6464,480 @@ void se_sdf_generate_distance_function(se_sdf_string* out, se_sdf_object* root, 
     se_sdf_string_append(out, "float %s(vec3 p) {\n", func_name);
     se_sdf_object_to_string(out, root, "p");
     se_sdf_string_append(out, "}\n");
+}
+
+typedef struct {
+	s_vec3 a;
+	s_vec3 b;
+	s_vec3 c;
+	s_vec3 color_a;
+	s_vec3 color_b;
+	s_vec3 color_c;
+	se_box_3d bounds;
+} se_sdf_bake_triangle;
+typedef s_array(se_sdf_bake_triangle, se_sdf_bake_triangles);
+
+static s_vec4 se_sdf_bake_get_mesh_base_factor(const se_mesh *mesh, const c8 *uniform_name) {
+	s_vec4 factor = s_vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	if (!mesh || mesh->shader == S_HANDLE_NULL) {
+		return factor;
+	}
+
+	const c8 *name = uniform_name;
+	if (!name || name[0] == '\0') {
+		name = "u_base_color_factor";
+	}
+
+	s_vec4 *uniform = se_shader_get_uniform_vec4(mesh->shader, name);
+	if (!uniform && strcmp(name, "u_base_color_factor") != 0) {
+		uniform = se_shader_get_uniform_vec4(mesh->shader, "u_base_color_factor");
+	}
+	if (uniform) {
+		factor = *uniform;
+	}
+	return factor;
+}
+
+static se_texture_handle se_sdf_bake_get_mesh_base_texture(const se_mesh *mesh, const c8 *uniform_name) {
+	if (!mesh || mesh->shader == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+
+	const c8 *name = uniform_name;
+	if (!name || name[0] == '\0') {
+		name = "u_texture";
+	}
+
+	u32 *uniform = se_shader_get_uniform_texture(mesh->shader, name);
+	if (!uniform && strcmp(name, "u_texture") != 0) {
+		uniform = se_shader_get_uniform_texture(mesh->shader, "u_texture");
+	}
+	if (!uniform || *uniform == 0u) {
+		return S_HANDLE_NULL;
+	}
+	return se_texture_find_by_id(*uniform);
+}
+
+static s_vec3 se_sdf_bake_sample_diffuse_color(
+	const se_vertex_3d *vertex,
+	const se_texture_handle texture_handle,
+	const s_vec4 *base_factor
+) {
+	s_vec3 sampled = s_vec3(1.0f, 1.0f, 1.0f);
+	if (texture_handle != S_HANDLE_NULL && vertex != NULL) {
+		const s_vec2 uv = vertex->uv;
+		(void)se_texture_sample_rgb(texture_handle, &uv, &sampled);
+	}
+	return s_vec3(
+		sampled.x * base_factor->x,
+		sampled.y * base_factor->y,
+		sampled.z * base_factor->z
+	);
+}
+
+static void se_sdf_bake_bounds_include_point(
+	s_vec3 *out_min,
+	s_vec3 *out_max,
+	b8 *has_value,
+	const s_vec3 *point
+) {
+	if (!out_min || !out_max || !has_value || !point) {
+		return;
+	}
+	if (!*has_value) {
+		*out_min = *point;
+		*out_max = *point;
+		*has_value = true;
+		return;
+	}
+	out_min->x = s_min(out_min->x, point->x);
+	out_min->y = s_min(out_min->y, point->y);
+	out_min->z = s_min(out_min->z, point->z);
+	out_max->x = s_max(out_max->x, point->x);
+	out_max->y = s_max(out_max->y, point->y);
+	out_max->z = s_max(out_max->z, point->z);
+}
+
+static f32 se_sdf_bake_point_aabb_distance_sq(const s_vec3 *point, const se_box_3d *bounds) {
+	const f32 cx = s_max(bounds->min.x, s_min(bounds->max.x, point->x));
+	const f32 cy = s_max(bounds->min.y, s_min(bounds->max.y, point->y));
+	const f32 cz = s_max(bounds->min.z, s_min(bounds->max.z, point->z));
+	const f32 dx = point->x - cx;
+	const f32 dy = point->y - cy;
+	const f32 dz = point->z - cz;
+	return dx * dx + dy * dy + dz * dz;
+}
+
+static void se_sdf_bake_closest_point_on_triangle(
+	const s_vec3 *point,
+	const s_vec3 *a,
+	const s_vec3 *b,
+	const s_vec3 *c,
+	s_vec3 *out_closest,
+	s_vec3 *out_barycentric
+) {
+	const s_vec3 ab = s_vec3_sub(b, a);
+	const s_vec3 ac = s_vec3_sub(c, a);
+	const s_vec3 ap = s_vec3_sub(point, a);
+	const f32 d1 = s_vec3_dot(&ab, &ap);
+	const f32 d2 = s_vec3_dot(&ac, &ap);
+	if (d1 <= 0.0f && d2 <= 0.0f) {
+		*out_closest = *a;
+		*out_barycentric = s_vec3(1.0f, 0.0f, 0.0f);
+		return;
+	}
+
+	const s_vec3 bp = s_vec3_sub(point, b);
+	const f32 d3 = s_vec3_dot(&ab, &bp);
+	const f32 d4 = s_vec3_dot(&ac, &bp);
+	if (d3 >= 0.0f && d4 <= d3) {
+		*out_closest = *b;
+		*out_barycentric = s_vec3(0.0f, 1.0f, 0.0f);
+		return;
+	}
+
+	const f32 vc = d1 * d4 - d3 * d2;
+	if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f) {
+		const f32 v = d1 / (d1 - d3);
+		*out_closest = s_vec3_add(a, &s_vec3_muls(&ab, v));
+		*out_barycentric = s_vec3(1.0f - v, v, 0.0f);
+		return;
+	}
+
+	const s_vec3 cp = s_vec3_sub(point, c);
+	const f32 d5 = s_vec3_dot(&ab, &cp);
+	const f32 d6 = s_vec3_dot(&ac, &cp);
+	if (d6 >= 0.0f && d5 <= d6) {
+		*out_closest = *c;
+		*out_barycentric = s_vec3(0.0f, 0.0f, 1.0f);
+		return;
+	}
+
+	const f32 vb = d5 * d2 - d1 * d6;
+	if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f) {
+		const f32 w = d2 / (d2 - d6);
+		*out_closest = s_vec3_add(a, &s_vec3_muls(&ac, w));
+		*out_barycentric = s_vec3(1.0f - w, 0.0f, w);
+		return;
+	}
+
+	const f32 va = d3 * d6 - d5 * d4;
+	if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f) {
+		const s_vec3 bc = s_vec3_sub(c, b);
+		const f32 w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+		*out_closest = s_vec3_add(b, &s_vec3_muls(&bc, w));
+		*out_barycentric = s_vec3(0.0f, 1.0f - w, w);
+		return;
+	}
+
+	const f32 denom = 1.0f / (va + vb + vc);
+	const f32 v = vb * denom;
+	const f32 w = vc * denom;
+	const f32 u = 1.0f - v - w;
+	*out_closest = s_vec3_add(a, &s_vec3_add(&s_vec3_muls(&ab, v), &s_vec3_muls(&ac, w)));
+	*out_barycentric = s_vec3(u, v, w);
+}
+
+static f32 se_sdf_bake_triangle_solid_angle(const s_vec3 *point, const se_sdf_bake_triangle *triangle) {
+	const s_vec3 a = s_vec3_sub(&triangle->a, point);
+	const s_vec3 b = s_vec3_sub(&triangle->b, point);
+	const s_vec3 c = s_vec3_sub(&triangle->c, point);
+	const f32 la = s_vec3_length(&a);
+	const f32 lb = s_vec3_length(&b);
+	const f32 lc = s_vec3_length(&c);
+	const f32 eps = 1e-8f;
+	if (la < eps || lb < eps || lc < eps) {
+		return 0.0f;
+	}
+
+	const s_vec3 bc = s_vec3_cross(&b, &c);
+	const f32 numerator = s_vec3_dot(&a, &bc);
+	const f32 denominator =
+		la * lb * lc +
+		s_vec3_dot(&a, &b) * lc +
+		s_vec3_dot(&b, &c) * la +
+		s_vec3_dot(&c, &a) * lb;
+
+	return atan2f(numerator, denominator);
+}
+
+b8 se_sdf_bake_model_texture3d(
+	se_model_handle model_handle,
+	const se_sdf_model_texture3d_desc *desc,
+	se_sdf_model_texture3d_result *out_result
+) {
+	if (!out_result) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+
+	se_context *ctx = se_current_context();
+	se_model *model = ctx ? s_array_get(&ctx->models, model_handle) : NULL;
+	if (!ctx || !model) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+
+	se_sdf_model_texture3d_desc cfg = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS;
+	if (desc) {
+		cfg = *desc;
+		if (cfg.resolution_x == 0u) cfg.resolution_x = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS.resolution_x;
+		if (cfg.resolution_y == 0u) cfg.resolution_y = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS.resolution_y;
+		if (cfg.resolution_z == 0u) cfg.resolution_z = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS.resolution_z;
+		if (cfg.padding < 0.0f) cfg.padding = 0.0f;
+		if (!cfg.base_color_texture_uniform || cfg.base_color_texture_uniform[0] == '\0') {
+			cfg.base_color_texture_uniform = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS.base_color_texture_uniform;
+		}
+		if (!cfg.base_color_factor_uniform || cfg.base_color_factor_uniform[0] == '\0') {
+			cfg.base_color_factor_uniform = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS.base_color_factor_uniform;
+		}
+	}
+
+	se_sdf_bake_triangles triangles = {0};
+	s_array_init(&triangles);
+
+	s_vec3 scene_min = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 scene_max = s_vec3(0.0f, 0.0f, 0.0f);
+	b8 has_bounds = false;
+
+	se_mesh *mesh = NULL;
+	s_foreach(&model->meshes, mesh) {
+		if (!mesh || !se_mesh_has_cpu_data(mesh)) {
+			s_array_clear(&triangles);
+			se_set_last_error(SE_RESULT_UNSUPPORTED);
+			return false;
+		}
+
+		const sz vertex_count = s_array_get_size(&mesh->cpu.vertices);
+		const sz index_count = s_array_get_size(&mesh->cpu.indices);
+		if (vertex_count == 0 || index_count < 3) {
+			continue;
+		}
+
+		se_texture_handle base_texture = se_sdf_bake_get_mesh_base_texture(mesh, cfg.base_color_texture_uniform);
+		const s_vec4 base_factor = se_sdf_bake_get_mesh_base_factor(mesh, cfg.base_color_factor_uniform);
+
+		s_array(s_vec3, vertex_colors) = {0};
+		s_array_init(&vertex_colors);
+		s_array_reserve(&vertex_colors, vertex_count);
+
+		for (sz v = 0; v < vertex_count; ++v) {
+			const se_vertex_3d *vertex = s_array_get(&mesh->cpu.vertices, s_array_handle(&mesh->cpu.vertices, (u32)v));
+			const s_vec3 color = se_sdf_bake_sample_diffuse_color(vertex, base_texture, &base_factor);
+			s_handle color_handle = s_array_increment(&vertex_colors);
+			s_vec3 *dst = s_array_get(&vertex_colors, color_handle);
+			*dst = color;
+		}
+
+		const sz triangle_count = index_count / 3u;
+		for (sz t = 0; t < triangle_count; ++t) {
+			const u32 *i0_ptr = s_array_get(&mesh->cpu.indices, s_array_handle(&mesh->cpu.indices, (u32)(t * 3u + 0u)));
+			const u32 *i1_ptr = s_array_get(&mesh->cpu.indices, s_array_handle(&mesh->cpu.indices, (u32)(t * 3u + 1u)));
+			const u32 *i2_ptr = s_array_get(&mesh->cpu.indices, s_array_handle(&mesh->cpu.indices, (u32)(t * 3u + 2u)));
+			if (!i0_ptr || !i1_ptr || !i2_ptr) {
+				continue;
+			}
+			const u32 i0 = *i0_ptr;
+			const u32 i1 = *i1_ptr;
+			const u32 i2 = *i2_ptr;
+			if ((sz)i0 >= vertex_count || (sz)i1 >= vertex_count || (sz)i2 >= vertex_count) {
+				continue;
+			}
+
+			const se_vertex_3d *v0 = s_array_get(&mesh->cpu.vertices, s_array_handle(&mesh->cpu.vertices, i0));
+			const se_vertex_3d *v1 = s_array_get(&mesh->cpu.vertices, s_array_handle(&mesh->cpu.vertices, i1));
+			const se_vertex_3d *v2 = s_array_get(&mesh->cpu.vertices, s_array_handle(&mesh->cpu.vertices, i2));
+			const s_vec3 *c0 = s_array_get(&vertex_colors, s_array_handle(&vertex_colors, i0));
+			const s_vec3 *c1 = s_array_get(&vertex_colors, s_array_handle(&vertex_colors, i1));
+			const s_vec3 *c2 = s_array_get(&vertex_colors, s_array_handle(&vertex_colors, i2));
+			if (!v0 || !v1 || !v2 || !c0 || !c1 || !c2) {
+				continue;
+			}
+
+			const s_vec3 p0 = se_sdf_runtime_mul_mat4_point(&mesh->matrix, &v0->position);
+			const s_vec3 p1 = se_sdf_runtime_mul_mat4_point(&mesh->matrix, &v1->position);
+			const s_vec3 p2 = se_sdf_runtime_mul_mat4_point(&mesh->matrix, &v2->position);
+
+			se_sdf_bake_triangle tri = {0};
+			tri.a = p0;
+			tri.b = p1;
+			tri.c = p2;
+			tri.color_a = *c0;
+			tri.color_b = *c1;
+			tri.color_c = *c2;
+			tri.bounds.min = s_vec3(
+				s_min(p0.x, s_min(p1.x, p2.x)),
+				s_min(p0.y, s_min(p1.y, p2.y)),
+				s_min(p0.z, s_min(p1.z, p2.z))
+			);
+			tri.bounds.max = s_vec3(
+				s_max(p0.x, s_max(p1.x, p2.x)),
+				s_max(p0.y, s_max(p1.y, p2.y)),
+				s_max(p0.z, s_max(p1.z, p2.z))
+			);
+
+			se_sdf_bake_bounds_include_point(&scene_min, &scene_max, &has_bounds, &p0);
+			se_sdf_bake_bounds_include_point(&scene_min, &scene_max, &has_bounds, &p1);
+			se_sdf_bake_bounds_include_point(&scene_min, &scene_max, &has_bounds, &p2);
+
+			s_handle tri_handle = s_array_increment(&triangles);
+			se_sdf_bake_triangle *dst = s_array_get(&triangles, tri_handle);
+			*dst = tri;
+		}
+
+		s_array_clear(&vertex_colors);
+	}
+
+	if (!has_bounds || s_array_get_size(&triangles) == 0) {
+		s_array_clear(&triangles);
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+
+	const s_vec3 size = s_vec3_sub(&scene_max, &scene_min);
+	const f32 max_extent = s_max(size.x, s_max(size.y, size.z));
+	const f32 padding = max_extent > 0.0f ? max_extent * cfg.padding : 0.1f;
+
+	scene_min = s_vec3(scene_min.x - padding, scene_min.y - padding, scene_min.z - padding);
+	scene_max = s_vec3(scene_max.x + padding, scene_max.y + padding, scene_max.z + padding);
+
+	s_vec3 volume_size = s_vec3_sub(&scene_max, &scene_min);
+	if (volume_size.x <= 0.0f) volume_size.x = 0.001f;
+	if (volume_size.y <= 0.0f) volume_size.y = 0.001f;
+	if (volume_size.z <= 0.0f) volume_size.z = 0.001f;
+
+	const s_vec3 voxel_size = s_vec3(
+		volume_size.x / (f32)cfg.resolution_x,
+		volume_size.y / (f32)cfg.resolution_y,
+		volume_size.z / (f32)cfg.resolution_z
+	);
+
+	const sz voxel_count = (sz)cfg.resolution_x * (sz)cfg.resolution_y * (sz)cfg.resolution_z;
+	const sz value_count = voxel_count * 4u;
+	if (voxel_count == 0 || value_count / 4u != voxel_count) {
+		s_array_clear(&triangles);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+
+	f32 *volume_rgbsdf = malloc(sizeof(f32) * value_count);
+	if (!volume_rgbsdf) {
+		s_array_clear(&triangles);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+
+	const f32 four_pi_inv = 1.0f / (4.0f * PI);
+	const f32 max_distance = cfg.max_distance > 0.0f
+		? cfg.max_distance
+		: s_vec3_length(&volume_size);
+
+	for (u32 z = 0; z < cfg.resolution_z; ++z) {
+		for (u32 y = 0; y < cfg.resolution_y; ++y) {
+			for (u32 x = 0; x < cfg.resolution_x; ++x) {
+				const s_vec3 point = s_vec3(
+					scene_min.x + ((f32)x + 0.5f) * voxel_size.x,
+					scene_min.y + ((f32)y + 0.5f) * voxel_size.y,
+					scene_min.z + ((f32)z + 0.5f) * voxel_size.z
+				);
+
+				f32 best_distance_sq = FLT_MAX;
+				s_vec3 best_barycentric = s_vec3(1.0f, 0.0f, 0.0f);
+				se_sdf_bake_triangle *best_triangle = NULL;
+
+				for (sz i = 0; i < s_array_get_size(&triangles); ++i) {
+					se_sdf_bake_triangle *triangle = s_array_get(&triangles, s_array_handle(&triangles, (u32)i));
+					if (!triangle) {
+						continue;
+					}
+
+					const f32 aabb_distance_sq = se_sdf_bake_point_aabb_distance_sq(&point, &triangle->bounds);
+					if (aabb_distance_sq > best_distance_sq) {
+						continue;
+					}
+
+					s_vec3 closest = s_vec3(0.0f, 0.0f, 0.0f);
+					s_vec3 barycentric = s_vec3(1.0f, 0.0f, 0.0f);
+					se_sdf_bake_closest_point_on_triangle(
+						&point,
+						&triangle->a,
+						&triangle->b,
+						&triangle->c,
+						&closest,
+						&barycentric
+					);
+
+					const s_vec3 delta = s_vec3_sub(&point, &closest);
+					const f32 distance_sq = s_vec3_dot(&delta, &delta);
+					if (distance_sq < best_distance_sq) {
+						best_distance_sq = distance_sq;
+						best_barycentric = barycentric;
+						best_triangle = triangle;
+					}
+				}
+
+				const sz voxel_index = ((sz)z * (sz)cfg.resolution_y * (sz)cfg.resolution_x) +
+					((sz)y * (sz)cfg.resolution_x) + (sz)x;
+				const sz base = voxel_index * 4u;
+				if (!best_triangle) {
+					volume_rgbsdf[base + 0u] = 1.0f;
+					volume_rgbsdf[base + 1u] = 1.0f;
+					volume_rgbsdf[base + 2u] = 1.0f;
+					volume_rgbsdf[base + 3u] = max_distance;
+					continue;
+				}
+
+				f32 winding_sum = 0.0f;
+				for (sz i = 0; i < s_array_get_size(&triangles); ++i) {
+					se_sdf_bake_triangle *triangle = s_array_get(&triangles, s_array_handle(&triangles, (u32)i));
+					if (!triangle) {
+						continue;
+					}
+					winding_sum += se_sdf_bake_triangle_solid_angle(&point, triangle);
+				}
+
+				const f32 winding_number = winding_sum * four_pi_inv;
+				const b8 inside = fabsf(winding_number) > 0.5f;
+				const f32 distance = sqrtf(best_distance_sq);
+				const f32 signed_distance = inside ? -distance : distance;
+
+				const s_vec3 interp_color = s_vec3(
+					best_triangle->color_a.x * best_barycentric.x + best_triangle->color_b.x * best_barycentric.y + best_triangle->color_c.x * best_barycentric.z,
+					best_triangle->color_a.y * best_barycentric.x + best_triangle->color_b.y * best_barycentric.y + best_triangle->color_c.y * best_barycentric.z,
+					best_triangle->color_a.z * best_barycentric.x + best_triangle->color_b.z * best_barycentric.y + best_triangle->color_c.z * best_barycentric.z
+				);
+
+				volume_rgbsdf[base + 0u] = interp_color.x;
+				volume_rgbsdf[base + 1u] = interp_color.y;
+				volume_rgbsdf[base + 2u] = interp_color.z;
+				volume_rgbsdf[base + 3u] = s_max(-max_distance, s_min(max_distance, signed_distance));
+			}
+		}
+	}
+
+	se_texture_handle baked_texture = se_texture_create_3d_rgba16f(
+		volume_rgbsdf,
+		cfg.resolution_x,
+		cfg.resolution_y,
+		cfg.resolution_z,
+		SE_CLAMP
+	);
+
+	free(volume_rgbsdf);
+	s_array_clear(&triangles);
+
+	if (baked_texture == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
+		return false;
+	}
+
+	memset(out_result, 0, sizeof(*out_result));
+	out_result->texture = baked_texture;
+	out_result->bounds_min = scene_min;
+	out_result->bounds_max = scene_max;
+	out_result->voxel_size = voxel_size;
+	out_result->max_distance = max_distance;
+
+	se_set_last_error(SE_RESULT_OK);
+	return true;
 }

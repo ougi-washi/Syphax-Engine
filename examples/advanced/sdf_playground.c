@@ -33,6 +33,8 @@ int main(void) {
 
 	se_sdf_scene_handle sdf_scene = se_sdf_scene_create(NULL);
 	se_sdf_node_group_desc root_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
+	root_desc.operation = SE_SDF_OP_SMOOTH_UNION;
+	root_desc.operation_amount = 0.5f;
 	se_sdf_node_handle root = se_sdf_node_create_group(sdf_scene, &root_desc);
 	se_sdf_scene_set_root(sdf_scene, root);
 
@@ -101,7 +103,7 @@ int main(void) {
 	ball_body_params.position = ball_start;
 	ball_body_params.mass = 1.0f;
 	ball_body_params.friction = 0.6f;
-	ball_body_params.restitution = 0.2f;
+	ball_body_params.restitution = 0.95f;
 	se_physics_body_3d_handle ball_body = se_sdf_object_create_physics_body_3d(
 		physics_world,
 		&ball_object,

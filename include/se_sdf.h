@@ -75,6 +75,8 @@ typedef enum {
 	SE_SDF_OP_SMOOTH_SUBTRACTION
 } se_sdf_operation;
 
+#define SE_SDF_OPERATION_AMOUNT_DEFAULT 0.5f
+
 typedef enum {
 	SE_SDF_PRIMITIVE_SPHERE = SE_SDF_SPHERE,
 	SE_SDF_PRIMITIVE_BOX = SE_SDF_BOX,
@@ -221,6 +223,7 @@ typedef struct se_sdf_object {
 		struct { s_vec3 a; s_vec3 b; s_vec3 c; s_vec3 d; } quad;
 	};			
 	se_sdf_operation operation;
+	f32 operation_amount;
 	se_sdf_noise noise;
 	s_array(struct se_sdf_object, children);
 } se_sdf_object;
@@ -299,16 +302,18 @@ typedef struct {
 typedef struct {
 	s_mat4 transform;
 	se_sdf_operation operation;
+	f32 operation_amount;
 } se_sdf_node_group_desc;
 
 typedef struct {
 	s_mat4 transform;
 	se_sdf_operation operation;
+	f32 operation_amount;
 	se_sdf_primitive_desc primitive;
 } se_sdf_node_primitive_desc;
 
 #define SE_SDF_SCENE_DESC_DEFAULTS ((se_sdf_scene_desc){ .initial_node_capacity = 0 })
-#define SE_SDF_NODE_GROUP_DESC_DEFAULTS ((se_sdf_node_group_desc){ .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION })
+#define SE_SDF_NODE_GROUP_DESC_DEFAULTS ((se_sdf_node_group_desc){ .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION, .operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT })
 
 extern se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc);
 extern void se_sdf_scene_destroy(se_sdf_scene_handle scene);
@@ -420,6 +425,40 @@ extern se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 	const se_physics_body_params_3d* body_params,
 	const s_vec3* reference_position,
 	b8 is_trigger
+);
+
+typedef struct {
+	u32 resolution_x;
+	u32 resolution_y;
+	u32 resolution_z;
+	f32 padding;
+	f32 max_distance;
+	const c8* base_color_texture_uniform;
+	const c8* base_color_factor_uniform;
+} se_sdf_model_texture3d_desc;
+
+typedef struct {
+	se_texture_handle texture;
+	s_vec3 bounds_min;
+	s_vec3 bounds_max;
+	s_vec3 voxel_size;
+	f32 max_distance;
+} se_sdf_model_texture3d_result;
+
+#define SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS ((se_sdf_model_texture3d_desc){ \
+	.resolution_x = 128u, \
+	.resolution_y = 128u, \
+	.resolution_z = 128u, \
+	.padding = 0.05f, \
+	.max_distance = 0.0f, \
+	.base_color_texture_uniform = "u_texture", \
+	.base_color_factor_uniform = "u_base_color_factor" \
+})
+
+extern b8 se_sdf_bake_model_texture3d(
+	se_model_handle model,
+	const se_sdf_model_texture3d_desc* desc,
+	se_sdf_model_texture3d_result* out_result
 );
 
 typedef struct {

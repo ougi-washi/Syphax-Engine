@@ -264,15 +264,6 @@ static void se_buffers_clear_keep_capacity(se_buffers* buffers) {
 	}
 }
 
-static void se_scene_debug_markers_clear_keep_capacity(se_scene_debug_markers* markers) {
-	if (!markers) {
-		return;
-	}
-	while (s_array_get_size(markers) > 0) {
-		s_array_remove(markers, s_array_handle(markers, (u32)(s_array_get_size(markers) - 1)));
-	}
-}
-
 static void se_scene_3d_invoke_custom_renders(const se_scene_3d_handle scene, se_scene_3d* scene_ptr) {
 	if (!scene_ptr || s_array_get_size(&scene_ptr->custom_renders) == 0) {
 		return;
@@ -1263,7 +1254,6 @@ se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 object_count
 	new_scene->output = framebuffer;
 	s_array_init(&new_scene->objects);
 	s_array_init(&new_scene->post_process);
-	s_array_init(&new_scene->debug_markers);
 	s_array_init(&new_scene->custom_renders);
 	s_array_reserve(&new_scene->objects, object_count);
 	s_array_reserve(&new_scene->post_process, object_count);
@@ -1355,7 +1345,6 @@ void se_scene_3d_destroy(const se_scene_3d_handle scene) {
 		scene_ptr->output = S_HANDLE_NULL;
 	}
 	s_array_clear(&scene_ptr->post_process);
-	s_array_clear(&scene_ptr->debug_markers);
 	s_array_clear(&scene_ptr->custom_renders);
 	s_array_clear(&scene_ptr->objects);
 	s_array_remove(&ctx->scenes_3d, scene);
@@ -1750,87 +1739,6 @@ void se_scene_3d_remove_post_process_buffer(const se_scene_3d_handle scene, cons
 			break;
 		}
 	}
-}
-
-void se_scene_3d_debug_line(const se_scene_3d_handle scene, const s_vec3* start, const s_vec3* end, const s_vec4* color) {
-	if (!start || !end || !color) {
-		return;
-	}
-	se_context *ctx = se_current_context();
-	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_debug_line :: scene is null");
-	se_scene_debug_marker marker = {0};
-	marker.type = SE_SCENE_DEBUG_MARKER_LINE;
-	marker.a = *start;
-	marker.b = *end;
-	marker.color = *color;
-	s_array_add(&scene_ptr->debug_markers, marker);
-}
-
-void se_scene_3d_debug_box(const se_scene_3d_handle scene, const s_vec3* min_corner, const s_vec3* max_corner, const s_vec4* color) {
-	if (!min_corner || !max_corner || !color) {
-		return;
-	}
-	se_context *ctx = se_current_context();
-	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_debug_box :: scene is null");
-	se_scene_debug_marker marker = {0};
-	marker.type = SE_SCENE_DEBUG_MARKER_BOX;
-	marker.a = *min_corner;
-	marker.b = *max_corner;
-	marker.color = *color;
-	s_array_add(&scene_ptr->debug_markers, marker);
-}
-
-void se_scene_3d_debug_sphere(const se_scene_3d_handle scene, const s_vec3* center, const f32 radius, const s_vec4* color) {
-	if (!center || !color) {
-		return;
-	}
-	se_context *ctx = se_current_context();
-	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_debug_sphere :: scene is null");
-	se_scene_debug_marker marker = {0};
-	marker.type = SE_SCENE_DEBUG_MARKER_SPHERE;
-	marker.a = *center;
-	marker.radius = s_max(radius, 0.0f);
-	marker.color = *color;
-	s_array_add(&scene_ptr->debug_markers, marker);
-}
-
-void se_scene_3d_debug_text(const se_scene_3d_handle scene, const s_vec3* position, const c8* text, const s_vec4* color) {
-	if (!position || !text || !color) {
-		return;
-	}
-	se_context *ctx = se_current_context();
-	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_debug_text :: scene is null");
-	se_scene_debug_marker marker = {0};
-	marker.type = SE_SCENE_DEBUG_MARKER_TEXT;
-	marker.a = *position;
-	marker.color = *color;
-	strncpy(marker.text, text, sizeof(marker.text) - 1);
-	s_array_add(&scene_ptr->debug_markers, marker);
-}
-
-b8 se_scene_3d_get_debug_markers(const se_scene_3d_handle scene, const se_scene_debug_marker** out_markers, sz* out_count) {
-	if (!out_markers || !out_count) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	se_context *ctx = se_current_context();
-	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_get_debug_markers :: scene is null");
-	*out_markers = s_array_get_data(&scene_ptr->debug_markers);
-	*out_count = s_array_get_size(&scene_ptr->debug_markers);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-void se_scene_3d_clear_debug_markers(const se_scene_3d_handle scene) {
-	se_context *ctx = se_current_context();
-	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_clear_debug_markers :: scene is null");
-	se_scene_debug_markers_clear_keep_capacity(&scene_ptr->debug_markers);
 }
 
 se_scene_3d_custom_render_handle se_scene_3d_register_custom_render(const se_scene_3d_handle scene, se_scene_3d_custom_render_callback callback, void* user_data) {
