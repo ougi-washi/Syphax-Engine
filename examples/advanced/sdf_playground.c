@@ -26,10 +26,8 @@ int main(void) {
 	const f32 ball_radius = 0.45f;
 	const s_vec3 ground_size = s_vec3(8.0f, 0.20f, 8.0f);
 	const s_vec3 ball_start = s_vec3(0.0f, 2.2f, 0.0f);
-	const s_mat4 ground_transform = se_sdf_transform_trs(
-		0.0f, -1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f,
-		1.0f, 1.0f, 1.0f);
+	s_mat4 ground_transform = s_mat4_identity;
+	s_mat4_set_translation(&ground_transform, &s_vec3(0.0f, -1.0f, 0.0f));
 
 	se_sdf_scene_handle sdf_scene = se_sdf_scene_create(NULL);
 	se_sdf_node_group_desc root_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;

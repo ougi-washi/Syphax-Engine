@@ -67,7 +67,7 @@ Key API calls:
 - `se_sdf_scene_clear`
 - `se_sdf_node_create_group`
 - `se_sdf_scene_set_root`
-- `se_sdf_transform_trs`
+- `s_mat4_identity`
 - `se_sdf_node_set_transform`
 
 ## Step 4: Complete Practical Demo
@@ -86,7 +86,7 @@ Key API calls:
 - `se_sdf_scene_clear`
 - `se_sdf_node_create_group`
 - `se_sdf_scene_set_root`
-- `se_sdf_transform_trs`
+- `s_mat4_identity`
 - `se_sdf_node_set_transform`
 
 ## Common mistakes

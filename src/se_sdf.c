@@ -203,6 +203,28 @@ static void se_sdf_runtime_collect_scene_bounds_recursive(
 	sz depth,
 	sz max_depth
 );
+static s_mat4 se_sdf_runtime_transform_trs(
+	f32 tx,
+	f32 ty,
+	f32 tz,
+	f32 rx,
+	f32 ry,
+	f32 rz,
+	f32 sx,
+	f32 sy,
+	f32 sz
+);
+static s_mat4 se_sdf_transform_grid_cell(
+	i32 index,
+	i32 columns,
+	i32 rows,
+	f32 spacing,
+	f32 y,
+	f32 yaw,
+	f32 sx,
+	f32 sy,
+	f32 sz
+);
 
 static void se_sdf_runtime_init_storage(void) {
 	if (se_sdf_runtime_scene_storage_initialized) {
@@ -987,10 +1009,16 @@ s_mat4 se_sdf_node_get_transform(const se_sdf_scene_handle scene, const se_sdf_n
 	return node_ptr->transform;
 }
 
-s_mat4 se_sdf_transform_trs(
-	const f32 tx, const f32 ty, const f32 tz,
-	const f32 rx, const f32 ry, const f32 rz,
-	const f32 sx, const f32 sy, const f32 sz
+static s_mat4 se_sdf_runtime_transform_trs(
+	const f32 tx,
+	const f32 ty,
+	const f32 tz,
+	const f32 rx,
+	const f32 ry,
+	const f32 rz,
+	const f32 sx,
+	const f32 sy,
+	const f32 sz
 ) {
 	s_mat4 transform = s_mat4_identity;
 	const s_vec3 translation = s_vec3(tx, ty, tz);
@@ -1004,7 +1032,7 @@ s_mat4 se_sdf_transform_trs(
 	return transform;
 }
 
-s_mat4 se_sdf_transform_grid_cell(
+static s_mat4 se_sdf_transform_grid_cell(
 	const i32 index,
 	const i32 columns,
 	const i32 rows,
@@ -1024,7 +1052,7 @@ s_mat4 se_sdf_transform_grid_cell(
 	const i32 col = index % safe_columns;
 	const f32 x = ((f32)col - half_width) * spacing;
 	const f32 z = ((f32)row - half_depth) * spacing;
-	return se_sdf_transform_trs(x, y, z, 0.0f, yaw, 0.0f, sx, sy, sz);
+	return se_sdf_runtime_transform_trs(x, y, z, 0.0f, yaw, 0.0f, sx, sy, sz);
 }
 
 static se_sdf_primitive_desc se_sdf_runtime_default_sphere_primitive(void) {
@@ -1204,7 +1232,8 @@ b8 se_sdf_scene_build_grid_preset(
 	const se_sdf_primitive_desc* selected = primitive ? primitive : &fallback;
 	const i32 total_cells = columns * rows;
 	for (i32 i = 0; i < total_cells; ++i) {
-		const s_mat4 node_transform = se_sdf_transform_grid_cell(i, columns, rows, spacing, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+		const s_mat4 node_transform = se_sdf_transform_grid_cell(
+			i, columns, rows, spacing, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
 		se_sdf_node_handle node = se_sdf_node_spawn_primitive(scene, root, selected, &node_transform, SE_SDF_OP_UNION);
 		if (node == SE_SDF_NODE_NULL) {
 			return 0;
@@ -1301,7 +1330,7 @@ b8 se_sdf_scene_build_orbit_showcase_preset(
 		const f32 x = cosf(t) * orbit_radius;
 		const f32 z = sinf(t) * orbit_radius;
 		const f32 yaw = -t;
-		const s_mat4 orbit_transform = se_sdf_transform_trs(
+		const s_mat4 orbit_transform = se_sdf_runtime_transform_trs(
 			x, 0.35f, z, 0.0f, yaw, 0.0f, 0.72f, 0.72f, 0.72f
 		);
 		se_sdf_node_handle orbit_node = se_sdf_node_spawn_primitive(scene, root, orbit, &orbit_transform, SE_SDF_OP_UNION);

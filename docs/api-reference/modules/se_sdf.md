@@ -975,30 +975,6 @@ extern void se_sdf_shutdown(void);
 
 No inline description found in header comments.
 
-### `se_sdf_transform_grid_cell`
-
-<div class="api-signature">
-
-```c
-extern s_mat4 se_sdf_transform_grid_cell(i32 index, i32 columns, i32 rows, f32 spacing, f32 y, f32 yaw, f32 sx, f32 sy, f32 sz);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_transform_trs`
-
-<div class="api-signature">
-
-```c
-extern s_mat4 se_sdf_transform_trs(f32 tx, f32 ty, f32 tz, f32 rx, f32 ry, f32 rz, f32 sx, f32 sy, f32 sz);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ## Enums
 
 ### `se_sdf_control_type`
