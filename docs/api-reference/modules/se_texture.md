@@ -15,12 +15,36 @@ This page is generated from `include/se_texture.h` and is deterministic.
 
 ## Functions
 
+### `se_texture_create_3d_rgba16f`
+
+<div class="api-signature">
+
+```c
+extern se_texture_handle se_texture_create_3d_rgba16f(const f32 *data, const u32 width, const u32 height, const u32 depth, const se_texture_wrap wrap);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_texture_destroy`
 
 <div class="api-signature">
 
 ```c
 extern void se_texture_destroy(const se_texture_handle texture);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_texture_find_by_id`
+
+<div class="api-signature">
+
+```c
+extern se_texture_handle se_texture_find_by_id(const u32 texture_id);
 ```
 
 </div>
@@ -51,6 +75,18 @@ extern se_texture_handle se_texture_load_from_memory(const u8 *data, const sz si
 
 No inline description found in header comments.
 
+### `se_texture_sample_rgb`
+
+<div class="api-signature">
+
+```c
+extern b8 se_texture_sample_rgb(const se_texture_handle texture, const s_vec2 *uv, s_vec3 *out_color);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ## Enums
 
 ### `se_texture_wrap`
@@ -72,7 +108,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_texture { char path[SE_MAX_PATH_LENGTH]; u32 id; i32 width; i32 height; i32 channels; } se_texture;
+typedef struct se_texture { char path[SE_MAX_PATH_LENGTH]; u32 id; i32 width; i32 height; i32 depth; i32 channels; i32 cpu_channels; u32 target; se_texture_wrap wrap; u8 *cpu_pixels; sz cpu_pixels_size; } se_texture;
 ```
 
 </div>

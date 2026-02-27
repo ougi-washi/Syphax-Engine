@@ -237,6 +237,9 @@ se_texture_handle se_texture_create_3d_rgba16f(const f32 *data, const u32 width,
 	glBindTexture(GL_TEXTURE_3D, texture->id);
 	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, (GLsizei)width, (GLsizei)height, (GLsizei)depth, 0, GL_RGBA, GL_FLOAT, data);
 
+	// Use single-level linear filtering for stable raymarch interpolation.
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, 0);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	se_texture_set_wrap_params(GL_TEXTURE_3D, wrap);

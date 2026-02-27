@@ -313,6 +313,7 @@ extern void se_gl_dispatchBindTexture(GLenum target, GLuint texture);
 extern void se_gl_dispatchDeleteTextures(GLsizei n, const GLuint *textures);
 extern void se_gl_dispatchGenTextures(GLsizei n, GLuint *textures);
 extern void se_gl_dispatchTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels);
+extern void se_gl_dispatchTexImage3D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
 extern void se_gl_dispatchTexParameteri(GLenum target, GLenum pname, GLint param);
 extern void se_gl_dispatchActiveTexture(GLenum texture);
 extern void se_gl_dispatchViewport(GLint x, GLint y, GLsizei width, GLsizei height);
@@ -398,6 +399,7 @@ extern const GLubyte* se_gl_dispatchGetString(GLenum name);
 #define glDeleteTextures se_gl_dispatchDeleteTextures
 #define glGenTextures se_gl_dispatchGenTextures
 #define glTexImage2D se_gl_dispatchTexImage2D
+#define glTexImage3D se_gl_dispatchTexImage3D
 #define glTexParameteri se_gl_dispatchTexParameteri
 #define glActiveTexture se_gl_dispatchActiveTexture
 #define glViewport se_gl_dispatchViewport

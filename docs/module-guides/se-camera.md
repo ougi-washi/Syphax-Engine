@@ -1,6 +1,6 @@
 ---
 title: se_camera
-summary: Camera projection and camera controller APIs.
+summary: Camera projection, transforms, and screen/world conversion APIs.
 prerequisites:
   - Public header include path available.
 ---

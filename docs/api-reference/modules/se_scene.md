@@ -591,6 +591,42 @@ extern void se_object_3d_set_instances_transforms_bulk(const se_object_3d_handle
 
 No inline description found in header comments.
 
+### `se_object_3d_set_location`
+
+<div class="api-signature">
+
+```c
+extern void se_object_3d_set_location(const se_object_3d_handle object, const s_vec3 *location);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_set_rotation`
+
+<div class="api-signature">
+
+```c
+extern void se_object_3d_set_rotation(const se_object_3d_handle object, const s_vec3 *rotation);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_set_scale`
+
+<div class="api-signature">
+
+```c
+extern void se_object_3d_set_scale(const se_object_3d_handle object, const s_vec3 *scale);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_object_3d_set_transform`
 
 <div class="api-signature">
@@ -807,18 +843,6 @@ extern void se_scene_3d_add_post_process_buffer(const se_scene_3d_handle scene, 
 
 No inline description found in header comments.
 
-### `se_scene_3d_clear_debug_markers`
-
-<div class="api-signature">
-
-```c
-extern void se_scene_3d_clear_debug_markers(const se_scene_3d_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_scene_3d_create`
 
 <div class="api-signature">
@@ -837,54 +861,6 @@ extern se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 objec
 
 ```c
 extern se_scene_3d_handle se_scene_3d_create_for_window(const se_window_handle window, const u16 object_count);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_scene_3d_debug_box`
-
-<div class="api-signature">
-
-```c
-extern void se_scene_3d_debug_box(const se_scene_3d_handle scene, const s_vec3* min_corner, const s_vec3* max_corner, const s_vec4* color);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_scene_3d_debug_line`
-
-<div class="api-signature">
-
-```c
-extern void se_scene_3d_debug_line(const se_scene_3d_handle scene, const s_vec3* start, const s_vec3* end, const s_vec4* color);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_scene_3d_debug_sphere`
-
-<div class="api-signature">
-
-```c
-extern void se_scene_3d_debug_sphere(const se_scene_3d_handle scene, const s_vec3* center, const f32 radius, const s_vec4* color);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_scene_3d_debug_text`
-
-<div class="api-signature">
-
-```c
-extern void se_scene_3d_debug_text(const se_scene_3d_handle scene, const s_vec3* position, const c8* text, const s_vec4* color);
 ```
 
 </div>
@@ -939,12 +915,12 @@ extern se_camera_handle se_scene_3d_get_camera(const se_scene_3d_handle scene);
 
 No inline description found in header comments.
 
-### `se_scene_3d_get_debug_markers`
+### `se_scene_3d_get_output_depth_texture`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_scene_3d_get_debug_markers(const se_scene_3d_handle scene, const se_scene_debug_marker** out_markers, sz* out_count);
+extern b8 se_scene_3d_get_output_depth_texture(const se_scene_3d_handle scene, u32* out_depth_texture);
 ```
 
 </div>
@@ -1073,17 +1049,7 @@ No inline description found in header comments.
 
 ## Enums
 
-### `se_scene_debug_marker_type`
-
-<div class="api-signature">
-
-```c
-typedef enum { SE_SCENE_DEBUG_MARKER_LINE = 0, SE_SCENE_DEBUG_MARKER_BOX, SE_SCENE_DEBUG_MARKER_SPHERE, SE_SCENE_DEBUG_MARKER_TEXT } se_scene_debug_marker_type;
-```
-
-</div>
-
-No inline description found in header comments.
+No enums found in this header.
 
 ## Typedefs
 
@@ -1224,7 +1190,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_scene_3d { se_objects_3d_ptr objects; se_camera_handle camera; se_render_buffers_ptr post_process; se_shader_handle output_shader; se_framebuffer_handle output; se_scene_debug_markers debug_markers; se_scene_3d_custom_render_entries custom_renders; s_mat4 last_vp; b8 enable_culling : 1; b8 has_last_vp : 1; } se_scene_3d;
+typedef struct se_scene_3d { se_objects_3d_ptr objects; se_camera_handle camera; se_render_buffers_ptr post_process; // still wip se_shader_handle output_shader; se_framebuffer_handle output; se_scene_3d_custom_render_entries custom_renders; s_mat4 last_vp; b8 enable_culling : 1; b8 has_last_vp : 1; } se_scene_3d;
 ```
 
 </div>
@@ -1273,18 +1239,6 @@ No inline description found in header comments.
 
 ```c
 typedef se_scene_3d_handle se_scene_3d_ptr;
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_scene_debug_marker`
-
-<div class="api-signature">
-
-```c
-typedef struct { se_scene_debug_marker_type type; s_vec3 a; s_vec3 b; s_vec4 color; f32 radius; c8 text[64]; } se_scene_debug_marker;
 ```
 
 </div>
@@ -1477,18 +1431,6 @@ No inline description found in header comments.
 
 ```c
 typedef s_array(se_scene_3d_handle, se_scenes_3d_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_15`
-
-<div class="api-signature">
-
-```c
-typedef s_array(se_scene_debug_marker, se_scene_debug_markers);
 ```
 
 </div>

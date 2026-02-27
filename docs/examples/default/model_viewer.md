@@ -12,7 +12,7 @@ prerequisites:
 
 ## Goal
 
-Load and inspect a 3D model with a camera controller.
+Load and inspect a 3D model with orbit-style camera controls.
 
 
 ## Learning path
@@ -41,7 +41,7 @@ Load and inspect a 3D model with a camera controller.
 ## Internal flow
 
 - Model data is loaded once, then reused through one scene object with multiple instances.
-- `se_camera_controller_tick` converts input into camera transform updates each frame.
+- Input deltas and keys update yaw/pitch/distance and target offset, then camera rotation/location are applied.
 - `se_scene_3d_draw` walks model instances, binds materials/shaders, and submits the 3D pass.
 
 ## Related API links

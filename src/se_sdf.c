@@ -6667,27 +6667,88 @@ static void se_sdf_bake_closest_point_on_triangle(
 	*out_barycentric = s_vec3(u, v, w);
 }
 
-static f32 se_sdf_bake_triangle_solid_angle(const s_vec3 *point, const se_sdf_bake_triangle *triangle) {
-	const s_vec3 a = s_vec3_sub(&triangle->a, point);
-	const s_vec3 b = s_vec3_sub(&triangle->b, point);
-	const s_vec3 c = s_vec3_sub(&triangle->c, point);
-	const f32 la = s_vec3_length(&a);
-	const f32 lb = s_vec3_length(&b);
-	const f32 lc = s_vec3_length(&c);
-	const f32 eps = 1e-8f;
-	if (la < eps || lb < eps || lc < eps) {
-		return 0.0f;
+static b8 se_sdf_bake_ray_intersects_triangle(
+	const s_vec3 *origin,
+	const s_vec3 *direction,
+	const se_sdf_bake_triangle *triangle
+) {
+	const f32 eps = 1e-6f;
+	const s_vec3 edge_ab = s_vec3_sub(&triangle->b, &triangle->a);
+	const s_vec3 edge_ac = s_vec3_sub(&triangle->c, &triangle->a);
+	const s_vec3 pvec = s_vec3_cross(direction, &edge_ac);
+	const f32 det = s_vec3_dot(&edge_ab, &pvec);
+	if (fabsf(det) < eps) {
+		return false;
 	}
 
-	const s_vec3 bc = s_vec3_cross(&b, &c);
-	const f32 numerator = s_vec3_dot(&a, &bc);
-	const f32 denominator =
-		la * lb * lc +
-		s_vec3_dot(&a, &b) * lc +
-		s_vec3_dot(&b, &c) * la +
-		s_vec3_dot(&c, &a) * lb;
+	const f32 inv_det = 1.0f / det;
+	const s_vec3 tvec = s_vec3_sub(origin, &triangle->a);
+	const f32 u = s_vec3_dot(&tvec, &pvec) * inv_det;
+	if (u < -eps || u > 1.0f + eps) {
+		return false;
+	}
 
-	return atan2f(numerator, denominator);
+	const s_vec3 qvec = s_vec3_cross(&tvec, &edge_ab);
+	const f32 v = s_vec3_dot(direction, &qvec) * inv_det;
+	if (v < -eps || (u + v) > 1.0f + eps) {
+		return false;
+	}
+
+	const f32 t = s_vec3_dot(&edge_ac, &qvec) * inv_det;
+	return t > eps;
+}
+
+static b8 se_sdf_bake_point_inside_mesh_parity(const s_vec3 *point, const se_sdf_bake_triangles *triangles) {
+	if (!point || !triangles || s_array_get_size((se_sdf_bake_triangles *)triangles) == 0u) {
+		return false;
+	}
+
+	const s_vec3 ray_dir_x = s_vec3(1.0f, 0.0f, 0.0f);
+	const s_vec3 ray_dir_y = s_vec3(0.0f, 1.0f, 0.0f);
+	const s_vec3 ray_dir_z = s_vec3(0.0f, 0.0f, 1.0f);
+	const f32 eps = 1e-6f;
+
+	u32 odd_rays = 0u;
+	for (u32 axis = 0u; axis < 3u; ++axis) {
+		const s_vec3 *ray_dir = axis == 0u ? &ray_dir_x : (axis == 1u ? &ray_dir_y : &ray_dir_z);
+		u32 intersections = 0u;
+		for (sz i = 0; i < s_array_get_size((se_sdf_bake_triangles *)triangles); ++i) {
+			se_sdf_bake_triangle *triangle = s_array_get((se_sdf_bake_triangles *)triangles, s_array_handle((se_sdf_bake_triangles *)triangles, (u32)i));
+			if (!triangle) {
+				continue;
+			}
+
+			if (axis == 0u) {
+				if (triangle->bounds.max.x <= point->x + eps ||
+					point->y < triangle->bounds.min.y - eps || point->y > triangle->bounds.max.y + eps ||
+					point->z < triangle->bounds.min.z - eps || point->z > triangle->bounds.max.z + eps) {
+					continue;
+				}
+			} else if (axis == 1u) {
+				if (triangle->bounds.max.y <= point->y + eps ||
+					point->x < triangle->bounds.min.x - eps || point->x > triangle->bounds.max.x + eps ||
+					point->z < triangle->bounds.min.z - eps || point->z > triangle->bounds.max.z + eps) {
+					continue;
+				}
+			} else {
+				if (triangle->bounds.max.z <= point->z + eps ||
+					point->x < triangle->bounds.min.x - eps || point->x > triangle->bounds.max.x + eps ||
+					point->y < triangle->bounds.min.y - eps || point->y > triangle->bounds.max.y + eps) {
+					continue;
+				}
+			}
+
+			if (se_sdf_bake_ray_intersects_triangle(point, ray_dir, triangle)) {
+				intersections++;
+			}
+		}
+
+		if ((intersections & 1u) != 0u) {
+			odd_rays++;
+		}
+	}
+
+	return odd_rays >= 2u;
 }
 
 b8 se_sdf_bake_model_texture3d(
@@ -6856,7 +6917,6 @@ b8 se_sdf_bake_model_texture3d(
 		return false;
 	}
 
-	const f32 four_pi_inv = 1.0f / (4.0f * PI);
 	const f32 max_distance = cfg.max_distance > 0.0f
 		? cfg.max_distance
 		: s_vec3_length(&volume_size);
@@ -6916,17 +6976,7 @@ b8 se_sdf_bake_model_texture3d(
 					continue;
 				}
 
-				f32 winding_sum = 0.0f;
-				for (sz i = 0; i < s_array_get_size(&triangles); ++i) {
-					se_sdf_bake_triangle *triangle = s_array_get(&triangles, s_array_handle(&triangles, (u32)i));
-					if (!triangle) {
-						continue;
-					}
-					winding_sum += se_sdf_bake_triangle_solid_angle(&point, triangle);
-				}
-
-				const f32 winding_number = winding_sum * four_pi_inv;
-				const b8 inside = fabsf(winding_number) > 0.5f;
+				const b8 inside = se_sdf_bake_point_inside_mesh_parity(&point, &triangles);
 				const f32 distance = sqrtf(best_distance_sq);
 				const f32 signed_distance = inside ? -distance : distance;
 

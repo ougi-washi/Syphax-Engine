@@ -444,7 +444,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_uniform { char name[SE_MAX_NAME_LENGTH]; se_uniform_type type; union { f32 f; s_vec2 vec2; s_vec3 vec3; s_vec4 vec4; i32 i; s_mat3 mat3; s_mat4 mat4; u32 texture; } value; } se_uniform;
+typedef struct se_uniform { char name[SE_MAX_NAME_LENGTH]; se_uniform_type type; i32 location; b8 location_cached; union { f32 f; s_vec2 vec2; s_vec3 vec3; s_vec4 vec4; i32 i; s_mat3 mat3; s_mat4 mat4; u32 texture; } value; } se_uniform;
 ```
 
 </div>

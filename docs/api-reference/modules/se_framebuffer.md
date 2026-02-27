@@ -63,6 +63,18 @@ extern void se_framebuffer_destroy(const se_framebuffer_handle framebuffer);
 
 No inline description found in header comments.
 
+### `se_framebuffer_get_depth_texture_id`
+
+<div class="api-signature">
+
+```c
+extern b8 se_framebuffer_get_depth_texture_id(const se_framebuffer_handle framebuffer, u32 *out_depth_texture);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_framebuffer_get_size`
 
 <div class="api-signature">

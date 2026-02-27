@@ -274,6 +274,19 @@ typedef struct {
 
 typedef struct {
 	GLenum target;
+	GLint level;
+	GLint internal_format;
+	GLsizei width;
+	GLsizei height;
+	GLsizei depth;
+	GLint border;
+	GLenum format;
+	GLenum type;
+	const void* pixels;
+} se_gl_tex_image_3d_payload;
+
+typedef struct {
+	GLenum target;
 	GLenum pname;
 	GLint param;
 } se_gl_tex_param_i_payload;
@@ -1581,6 +1594,21 @@ void se_gl_dispatchTexImage2D(GLenum target, GLint level, GLint internalFormat, 
 	}
 	const se_gl_tex_image_2d_payload payload = {target, level, internalFormat, width, height, border, format, type, pixels};
 	(void)se_render_queue_call_sync_sized(se_gl_exec_tex_image_2d, &payload, NULL, (u32)sizeof(payload));
+}
+
+static void se_gl_exec_tex_image_3d(const void* payload, void* out_result) {
+	(void)out_result;
+	const se_gl_tex_image_3d_payload* args = (const se_gl_tex_image_3d_payload*)payload;
+	glTexImage3D(args->target, args->level, args->internal_format, args->width, args->height, args->depth, args->border, args->format, args->type, args->pixels);
+}
+
+void se_gl_dispatchTexImage3D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels) {
+	if (se_gl_dispatch_direct()) {
+		glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, pixels);
+		return;
+	}
+	const se_gl_tex_image_3d_payload payload = {target, level, internalFormat, width, height, depth, border, format, type, pixels};
+	(void)se_render_queue_call_sync_sized(se_gl_exec_tex_image_3d, &payload, NULL, (u32)sizeof(payload));
 }
 
 static void se_gl_exec_tex_param_i(const void* payload, void* out_result) {

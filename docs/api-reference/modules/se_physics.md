@@ -20,7 +20,7 @@ This page is generated from `include/se_physics.h` and is deterministic.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_2d *se_physics_body_2d_add_aabb(se_physics_body_2d *body, const s_vec2 *offset, const s_vec2 *half_extents, const b8 is_trigger);
+extern se_physics_shape_2d_handle se_physics_body_2d_add_aabb(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *offset, const s_vec2 *half_extents, const b8 is_trigger);
 ```
 
 </div>
@@ -32,7 +32,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_2d *se_physics_body_2d_add_box(se_physics_body_2d *body, const s_vec2 *offset, const s_vec2 *half_extents, const f32 rotation, const b8 is_trigger);
+extern se_physics_shape_2d_handle se_physics_body_2d_add_box(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *offset, const s_vec2 *half_extents, const f32 rotation, const b8 is_trigger);
 ```
 
 </div>
@@ -44,7 +44,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_2d *se_physics_body_2d_add_circle(se_physics_body_2d *body, const s_vec2 *offset, const f32 radius, const b8 is_trigger);
+extern se_physics_shape_2d_handle se_physics_body_2d_add_circle(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *offset, const f32 radius, const b8 is_trigger);
 ```
 
 </div>
@@ -56,7 +56,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_2d *se_physics_body_2d_add_mesh(se_physics_body_2d *body, const se_physics_mesh_2d *mesh, const s_vec2 *offset, const f32 rotation, const b8 is_trigger);
+extern se_physics_shape_2d_handle se_physics_body_2d_add_mesh(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const se_physics_mesh_2d *mesh, const s_vec2 *offset, const f32 rotation, const b8 is_trigger);
 ```
 
 </div>
@@ -68,7 +68,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_2d_apply_force(se_physics_body_2d *body, const s_vec2 *force);
+extern void se_physics_body_2d_apply_force(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *force);
 ```
 
 </div>
@@ -80,7 +80,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_2d_apply_impulse(se_physics_body_2d *body, const s_vec2 *impulse, const s_vec2 *point);
+extern void se_physics_body_2d_apply_impulse(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *impulse, const s_vec2 *point);
 ```
 
 </div>
@@ -92,7 +92,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_body_2d *se_physics_body_2d_create(se_physics_world_2d *world, const se_physics_body_params_2d *params);
+extern se_physics_body_2d_handle se_physics_body_2d_create(se_physics_world_2d_handle world, const se_physics_body_params_2d *params);
 ```
 
 </div>
@@ -104,7 +104,271 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_2d_destroy(se_physics_world_2d *world, se_physics_body_2d *body);
+extern void se_physics_body_2d_destroy(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_angular_damping`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_angular_damping(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_angular_velocity`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_angular_velocity(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_force`
+
+<div class="api-signature">
+
+```c
+extern s_vec2 se_physics_body_2d_get_force(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_friction`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_friction(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_inertia`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_inertia(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_inv_inertia`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_inv_inertia(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_inv_mass`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_inv_mass(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_linear_damping`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_linear_damping(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_mass`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_mass(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_position`
+
+<div class="api-signature">
+
+```c
+extern s_vec2 se_physics_body_2d_get_position(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_restitution`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_restitution(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_rotation`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_rotation(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_shape_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_body_2d_get_shape_count(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_torque`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_2d_get_torque(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_type`
+
+<div class="api-signature">
+
+```c
+extern se_physics_body_type se_physics_body_2d_get_type(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_get_velocity`
+
+<div class="api-signature">
+
+```c
+extern s_vec2 se_physics_body_2d_get_velocity(se_physics_world_2d_handle world, se_physics_body_2d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_angular_damping`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_angular_damping(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 damping);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_angular_velocity`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_angular_velocity(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 angular_velocity);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_force`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_force(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *force);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_friction`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_friction(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 friction);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_linear_damping`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_linear_damping(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 damping);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_mass`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_mass(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 mass);
 ```
 
 </div>
@@ -116,7 +380,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_2d_set_position(se_physics_body_2d *body, const s_vec2 *position);
+extern void se_physics_body_2d_set_position(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *position);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_restitution`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_restitution(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 restitution);
 ```
 
 </div>
@@ -128,7 +404,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_2d_set_rotation(se_physics_body_2d *body, const f32 rotation);
+extern void se_physics_body_2d_set_rotation(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 rotation);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_torque`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_torque(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const f32 torque);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_set_type`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_2d_set_type(se_physics_world_2d_handle world, se_physics_body_2d_handle body, se_physics_body_type type);
 ```
 
 </div>
@@ -140,7 +440,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_2d_set_velocity(se_physics_body_2d *body, const s_vec2 *velocity);
+extern void se_physics_body_2d_set_velocity(se_physics_world_2d_handle world, se_physics_body_2d_handle body, const s_vec2 *velocity);
 ```
 
 </div>
@@ -152,7 +452,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_3d *se_physics_body_3d_add_aabb(se_physics_body_3d *body, const s_vec3 *offset, const s_vec3 *half_extents, const b8 is_trigger);
+extern se_physics_shape_3d_handle se_physics_body_3d_add_aabb(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *offset, const s_vec3 *half_extents, const b8 is_trigger);
 ```
 
 </div>
@@ -164,7 +464,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_3d *se_physics_body_3d_add_box(se_physics_body_3d *body, const s_vec3 *offset, const s_vec3 *half_extents, const s_vec3 *rotation, const b8 is_trigger);
+extern se_physics_shape_3d_handle se_physics_body_3d_add_box(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *offset, const s_vec3 *half_extents, const s_vec3 *rotation, const b8 is_trigger);
 ```
 
 </div>
@@ -176,7 +476,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_3d *se_physics_body_3d_add_mesh(se_physics_body_3d *body, const se_physics_mesh_3d *mesh, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger);
+extern se_physics_shape_3d_handle se_physics_body_3d_add_mesh(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const se_physics_mesh_3d *mesh, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger);
 ```
 
 </div>
@@ -188,7 +488,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_shape_3d *se_physics_body_3d_add_sphere(se_physics_body_3d *body, const s_vec3 *offset, const f32 radius, const b8 is_trigger);
+extern se_physics_shape_3d_handle se_physics_body_3d_add_sphere(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *offset, const f32 radius, const b8 is_trigger);
 ```
 
 </div>
@@ -200,7 +500,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_3d_apply_force(se_physics_body_3d *body, const s_vec3 *force);
+extern void se_physics_body_3d_apply_force(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *force);
 ```
 
 </div>
@@ -212,7 +512,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_3d_apply_impulse(se_physics_body_3d *body, const s_vec3 *impulse, const s_vec3 *point);
+extern void se_physics_body_3d_apply_impulse(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *impulse, const s_vec3 *point);
 ```
 
 </div>
@@ -224,7 +524,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_body_3d *se_physics_body_3d_create(se_physics_world_3d *world, const se_physics_body_params_3d *params);
+extern se_physics_body_3d_handle se_physics_body_3d_create(se_physics_world_3d_handle world, const se_physics_body_params_3d *params);
 ```
 
 </div>
@@ -236,7 +536,271 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_3d_destroy(se_physics_world_3d *world, se_physics_body_3d *body);
+extern void se_physics_body_3d_destroy(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_angular_damping`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_angular_damping(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_angular_velocity`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_body_3d_get_angular_velocity(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_force`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_body_3d_get_force(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_friction`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_friction(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_inertia`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_inertia(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_inv_inertia`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_inv_inertia(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_inv_mass`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_inv_mass(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_linear_damping`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_linear_damping(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_mass`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_mass(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_position`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_body_3d_get_position(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_restitution`
+
+<div class="api-signature">
+
+```c
+extern f32 se_physics_body_3d_get_restitution(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_rotation`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_body_3d_get_rotation(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_shape_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_body_3d_get_shape_count(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_torque`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_body_3d_get_torque(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_type`
+
+<div class="api-signature">
+
+```c
+extern se_physics_body_type se_physics_body_3d_get_type(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_get_velocity`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_body_3d_get_velocity(se_physics_world_3d_handle world, se_physics_body_3d_handle body);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_angular_damping`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_angular_damping(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const f32 damping);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_angular_velocity`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_angular_velocity(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *angular_velocity);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_force`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_force(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *force);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_friction`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_friction(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const f32 friction);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_linear_damping`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_linear_damping(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const f32 damping);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_mass`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_mass(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const f32 mass);
 ```
 
 </div>
@@ -248,7 +812,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_3d_set_position(se_physics_body_3d *body, const s_vec3 *position);
+extern void se_physics_body_3d_set_position(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *position);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_restitution`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_restitution(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const f32 restitution);
 ```
 
 </div>
@@ -260,7 +836,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_3d_set_rotation(se_physics_body_3d *body, const s_vec3 *rotation);
+extern void se_physics_body_3d_set_rotation(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *rotation);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_torque`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_torque(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *torque);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_set_type`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_body_3d_set_type(se_physics_world_3d_handle world, se_physics_body_3d_handle body, se_physics_body_type type);
 ```
 
 </div>
@@ -272,7 +872,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_body_3d_set_velocity(se_physics_body_3d *body, const s_vec3 *velocity);
+extern void se_physics_body_3d_set_velocity(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *velocity);
 ```
 
 </div>
@@ -284,7 +884,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_world_2d *se_physics_example_2d_create(void);
+extern se_physics_world_2d_handle se_physics_example_2d_create(void);
 ```
 
 </div>
@@ -296,7 +896,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_world_3d *se_physics_example_3d_create(void);
+extern se_physics_world_3d_handle se_physics_example_3d_create(void);
 ```
 
 </div>
@@ -308,7 +908,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_world_2d *se_physics_world_2d_create(const se_physics_world_params_2d *params);
+extern se_physics_world_2d_handle se_physics_world_2d_create(const se_physics_world_params_2d *params);
 ```
 
 </div>
@@ -320,7 +920,79 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_2d_destroy(se_physics_world_2d *world);
+extern void se_physics_world_2d_destroy(se_physics_world_2d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_get_body`
+
+<div class="api-signature">
+
+```c
+extern se_physics_body_2d_handle se_physics_world_2d_get_body(se_physics_world_2d_handle world, const u32 index);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_get_body_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_2d_get_body_count(se_physics_world_2d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_get_contact_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_2d_get_contact_count(se_physics_world_2d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_get_gravity`
+
+<div class="api-signature">
+
+```c
+extern s_vec2 se_physics_world_2d_get_gravity(se_physics_world_2d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_get_shapes_per_body`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_2d_get_shapes_per_body(se_physics_world_2d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_get_solver_iterations`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_2d_get_solver_iterations(se_physics_world_2d_handle world);
 ```
 
 </div>
@@ -332,7 +1004,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_physics_world_2d_raycast(se_physics_world_2d *world, const s_vec2 *origin, const s_vec2 *direction, const f32 max_distance, se_physics_raycast_hit_2d *out_hit);
+extern b8 se_physics_world_2d_raycast(se_physics_world_2d_handle world, const s_vec2 *origin, const s_vec2 *direction, const f32 max_distance, se_physics_raycast_hit_2d *out_hit);
 ```
 
 </div>
@@ -344,7 +1016,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_2d_set_gravity(se_physics_world_2d *world, const s_vec2 *gravity);
+extern void se_physics_world_2d_set_gravity(se_physics_world_2d_handle world, const s_vec2 *gravity);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_set_shapes_per_body`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_world_2d_set_shapes_per_body(se_physics_world_2d_handle world, const u32 count);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_set_solver_iterations`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_world_2d_set_solver_iterations(se_physics_world_2d_handle world, const u32 iterations);
 ```
 
 </div>
@@ -356,7 +1052,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_2d_step(se_physics_world_2d *world, const f32 dt);
+extern void se_physics_world_2d_step(se_physics_world_2d_handle world, const f32 dt);
 ```
 
 </div>
@@ -368,7 +1064,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_physics_world_3d *se_physics_world_3d_create(const se_physics_world_params_3d *params);
+extern se_physics_world_3d_handle se_physics_world_3d_create(const se_physics_world_params_3d *params);
 ```
 
 </div>
@@ -380,7 +1076,79 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_3d_destroy(se_physics_world_3d *world);
+extern void se_physics_world_3d_destroy(se_physics_world_3d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_get_body`
+
+<div class="api-signature">
+
+```c
+extern se_physics_body_3d_handle se_physics_world_3d_get_body(se_physics_world_3d_handle world, const u32 index);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_get_body_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_3d_get_body_count(se_physics_world_3d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_get_contact_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_3d_get_contact_count(se_physics_world_3d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_get_gravity`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_physics_world_3d_get_gravity(se_physics_world_3d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_get_shapes_per_body`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_3d_get_shapes_per_body(se_physics_world_3d_handle world);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_get_solver_iterations`
+
+<div class="api-signature">
+
+```c
+extern u32 se_physics_world_3d_get_solver_iterations(se_physics_world_3d_handle world);
 ```
 
 </div>
@@ -392,7 +1160,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_physics_world_3d_raycast(se_physics_world_3d *world, const s_vec3 *origin, const s_vec3 *direction, const f32 max_distance, se_physics_raycast_hit_3d *out_hit);
+extern b8 se_physics_world_3d_raycast(se_physics_world_3d_handle world, const s_vec3 *origin, const s_vec3 *direction, const f32 max_distance, se_physics_raycast_hit_3d *out_hit);
 ```
 
 </div>
@@ -404,7 +1172,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_3d_set_gravity(se_physics_world_3d *world, const s_vec3 *gravity);
+extern void se_physics_world_3d_set_gravity(se_physics_world_3d_handle world, const s_vec3 *gravity);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_set_shapes_per_body`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_world_3d_set_shapes_per_body(se_physics_world_3d_handle world, const u32 count);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_set_solver_iterations`
+
+<div class="api-signature">
+
+```c
+extern void se_physics_world_3d_set_solver_iterations(se_physics_world_3d_handle world, const u32 iterations);
 ```
 
 </div>
@@ -416,7 +1208,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_3d_step(se_physics_world_3d *world, const f32 dt);
+extern void se_physics_world_3d_step(se_physics_world_3d_handle world, const f32 dt);
 ```
 
 </div>
@@ -468,7 +1260,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_body_type type; s_vec2 position; f32 rotation; s_vec2 velocity; f32 angular_velocity; s_vec2 force; f32 torque; f32 mass; f32 inv_mass; f32 inertia; f32 inv_inertia; f32 restitution; f32 friction; f32 linear_damping; f32 angular_damping; se_physics_shapes_2d shapes; b8 is_valid : 1; } se_physics_body_2d;
+typedef struct se_physics_body_2d se_physics_body_2d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_2d_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_physics_body_2d_handle;
 ```
 
 </div>
@@ -480,7 +1284,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_body_type type; s_vec3 position; s_vec3 rotation; s_vec3 velocity; s_vec3 angular_velocity; s_vec3 force; s_vec3 torque; f32 mass; f32 inv_mass; f32 inertia; f32 inv_inertia; f32 restitution; f32 friction; f32 linear_damping; f32 angular_damping; se_physics_shapes_3d shapes; b8 is_valid : 1; } se_physics_body_3d;
+typedef struct se_physics_body_3d se_physics_body_3d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_body_3d_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_physics_body_3d_handle;
 ```
 
 </div>
@@ -540,7 +1356,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_body_2d *a; se_physics_body_2d *b; se_physics_shape_2d *shape_a; se_physics_shape_2d *shape_b; s_vec2 normal; f32 penetration; s_vec2 contact_point; f32 restitution; f32 friction; b8 is_trigger : 1; } se_physics_contact_2d;
+typedef struct { se_physics_body_2d_handle a; se_physics_body_2d_handle b; se_physics_shape_2d_handle shape_a; se_physics_shape_2d_handle shape_b; s_vec2 normal; f32 penetration; s_vec2 contact_point; f32 restitution; f32 friction; b8 is_trigger : 1; } se_physics_contact_2d;
 ```
 
 </div>
@@ -552,7 +1368,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_body_3d *a; se_physics_body_3d *b; se_physics_shape_3d *shape_a; se_physics_shape_3d *shape_b; s_vec3 normal; f32 penetration; s_vec3 contact_point; f32 restitution; f32 friction; b8 is_trigger : 1; } se_physics_contact_3d;
+typedef struct { se_physics_body_3d_handle a; se_physics_body_3d_handle b; se_physics_shape_3d_handle shape_a; se_physics_shape_3d_handle shape_b; s_vec3 normal; f32 penetration; s_vec3 contact_point; f32 restitution; f32 friction; b8 is_trigger : 1; } se_physics_contact_3d;
 ```
 
 </div>
@@ -612,7 +1428,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_body_2d *body; se_physics_shape_2d *shape; s_vec2 point; s_vec2 normal; f32 distance; } se_physics_raycast_hit_2d;
+typedef struct { se_physics_body_2d_handle body; se_physics_shape_2d_handle shape; s_vec2 point; s_vec2 normal; f32 distance; } se_physics_raycast_hit_2d;
 ```
 
 </div>
@@ -624,7 +1440,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_body_3d *body; se_physics_shape_3d *shape; s_vec3 point; s_vec3 normal; f32 distance; } se_physics_raycast_hit_3d;
+typedef struct { se_physics_body_3d_handle body; se_physics_shape_3d_handle shape; s_vec3 point; s_vec3 normal; f32 distance; } se_physics_raycast_hit_3d;
 ```
 
 </div>
@@ -636,7 +1452,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_shape_type_2d type; s_vec2 offset; f32 rotation; union { struct { f32 radius; } circle; struct { s_vec2 half_extents; b8 is_aabb; } box; se_physics_mesh_2d mesh; }; se_box_2d local_bounds; se_physics_bvh_nodes_2d bvh_nodes; u32 *bvh_triangles; sz bvh_triangle_count; b8 bvh_built : 1; b8 is_trigger : 1; } se_physics_shape_2d;
+typedef struct se_physics_shape_2d se_physics_shape_2d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_shape_2d_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_physics_shape_2d_handle;
 ```
 
 </div>
@@ -648,7 +1476,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_physics_shape_type_3d type; s_vec3 offset; s_vec3 rotation; union { struct { f32 radius; } sphere; struct { s_vec3 half_extents; b8 is_aabb; } box; se_physics_mesh_3d mesh; }; se_box_3d local_bounds; se_physics_bvh_nodes_3d bvh_nodes; u32 *bvh_triangles; sz bvh_triangle_count; b8 bvh_built : 1; b8 is_trigger : 1; } se_physics_shape_3d;
+typedef struct se_physics_shape_3d se_physics_shape_3d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_shape_3d_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_physics_shape_3d_handle;
 ```
 
 </div>
@@ -660,7 +1500,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { s_vec2 gravity; u32 solver_iterations; u32 shapes_per_body; se_physics_bodies_2d bodies; se_physics_contacts_2d contacts; se_physics_contact_callback_2d on_contact; void *user_data; } se_physics_world_2d;
+typedef struct se_physics_world_2d se_physics_world_2d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_2d_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_physics_world_2d_handle;
 ```
 
 </div>
@@ -672,7 +1524,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { s_vec3 gravity; u32 solver_iterations; u32 shapes_per_body; se_physics_bodies_3d bodies; se_physics_contacts_3d contacts; se_physics_contact_callback_3d on_contact; void *user_data; } se_physics_world_3d;
+typedef struct se_physics_world_3d se_physics_world_3d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_world_3d_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_physics_world_3d_handle;
 ```
 
 </div>
@@ -708,7 +1572,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef s_array(se_physics_body_2d, se_physics_bodies_2d);
+typedef s_array(se_physics_bvh_node_2d, se_physics_bvh_nodes_2d);
 ```
 
 </div>
@@ -720,79 +1584,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef s_array(se_physics_body_3d, se_physics_bodies_3d);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_3`
-
-<div class="api-signature">
-
-```c
-typedef s_array(se_physics_bvh_node_2d, se_physics_bvh_nodes_2d);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_4`
-
-<div class="api-signature">
-
-```c
 typedef s_array(se_physics_bvh_node_3d, se_physics_bvh_nodes_3d);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_5`
-
-<div class="api-signature">
-
-```c
-typedef s_array(se_physics_contact_2d, se_physics_contacts_2d);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_6`
-
-<div class="api-signature">
-
-```c
-typedef s_array(se_physics_contact_3d, se_physics_contacts_3d);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_7`
-
-<div class="api-signature">
-
-```c
-typedef s_array(se_physics_shape_2d, se_physics_shapes_2d);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `typedef_8`
-
-<div class="api-signature">
-
-```c
-typedef s_array(se_physics_shape_3d, se_physics_shapes_3d);
 ```
 
 </div>

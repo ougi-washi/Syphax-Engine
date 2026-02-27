@@ -1,6 +1,6 @@
 ---
 title: Camera
-summary: Progress from basic camera setup to tunable orbit and dolly control.
+summary: Progress from basic camera setup to tunable orbit and zoom control.
 prerequisites:
   - A 3D scene or model test target.
   - Window loop already running.
@@ -66,9 +66,12 @@ Key API calls:
 - `se_camera_create`
 - `se_camera_set_aspect`
 - `se_camera_set_perspective`
+- `se_camera_set_target_mode`
+- `se_camera_set_target`
+- `se_camera_set_rotation`
+- `se_camera_get_forward_vector`
+- `se_camera_set_location`
 - `se_camera_get_view_projection_matrix`
-- `se_camera_orbit`
-- `se_camera_dolly`
 
 ## Step 4: Complete Practical Demo
 
@@ -85,9 +88,14 @@ Key API calls:
 - `se_camera_create`
 - `se_camera_set_aspect`
 - `se_camera_set_perspective`
+- `se_camera_set_target_mode`
+- `se_camera_set_target`
+- `se_camera_set_rotation`
+- `se_camera_add_rotation`
+- `se_camera_get_forward_vector`
+- `se_camera_set_location`
 - `se_camera_get_view_projection_matrix`
-- `se_camera_orbit`
-- `se_camera_dolly`
+- `se_camera_destroy`
 
 ## Common mistakes
 
