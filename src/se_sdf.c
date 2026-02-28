@@ -7,6 +7,7 @@
 #include "se_quad.h"
 #include "se_shader.h"
 #include "se_texture.h"
+#include "syphax/s_json.h"
 #include "render/se_gl.h"
 #include <string.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 
 static const char* se_sdf_fullscreen_vertex_shader =
@@ -26,6 +28,12 @@ static const char* se_sdf_fullscreen_vertex_shader =
 	"	v_uv = a_uv;\n"
 	"	gl_Position = vec4(a_position.xy, 0.0, 1.0);\n"
 	"}\n";
+
+#define SE_SDF_JSON_FORMAT "se_sdf_json"
+
+enum {
+	SE_SDF_JSON_VERSION = 1u
+};
 
 typedef struct {
 	se_sdf_scene_handle owner_scene;
@@ -154,6 +162,7 @@ static b8 se_sdf_runtime_control_value_equals(
 	const se_sdf_runtime_control_value* a,
 	const se_sdf_runtime_control_value* b
 );
+static b8 se_sdf_runtime_is_valid_primitive_type(const se_sdf_primitive_type type);
 static b8 se_sdf_runtime_validate_primitive_desc(const se_sdf_primitive_desc* primitive);
 static void se_sdf_runtime_sync_control_bindings(se_sdf_runtime_renderer* renderer);
 static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer);
@@ -225,6 +234,581 @@ static s_mat4 se_sdf_transform_grid_cell(
 	f32 sy,
 	f32 sz
 );
+
+typedef s_array(se_sdf_node_handle, se_sdf_node_handles);
+
+static b8 se_sdf_json_add_child(s_json* parent, s_json* child) {
+	if (!parent || !child || !s_json_add(parent, child)) {
+		if (child) {
+			s_json_free(child);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+static s_json* se_sdf_json_add_object(s_json* parent, const c8* name) {
+	s_json* object = s_json_object_empty(name);
+	if (!object) {
+		return NULL;
+	}
+	if (!se_sdf_json_add_child(parent, object)) {
+		return NULL;
+	}
+	return object;
+}
+
+static s_json* se_sdf_json_add_array(s_json* parent, const c8* name) {
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return NULL;
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return NULL;
+	}
+	return array;
+}
+
+static b8 se_sdf_json_add_u32(s_json* parent, const c8* name, const u32 value) {
+	s_json* node = s_json_num(name, (f64)value);
+	return se_sdf_json_add_child(parent, node);
+}
+
+static b8 se_sdf_json_add_i32(s_json* parent, const c8* name, const i32 value) {
+	s_json* node = s_json_num(name, (f64)value);
+	return se_sdf_json_add_child(parent, node);
+}
+
+static b8 se_sdf_json_add_f32(s_json* parent, const c8* name, const f32 value) {
+	if (!isfinite((f64)value)) {
+		return 0;
+	}
+	s_json* node = s_json_num(name, (f64)value);
+	return se_sdf_json_add_child(parent, node);
+}
+
+static b8 se_sdf_json_add_bool(s_json* parent, const c8* name, const b8 value) {
+	s_json* node = s_json_bool(name, value);
+	return se_sdf_json_add_child(parent, node);
+}
+
+static b8 se_sdf_json_add_string(s_json* parent, const c8* name, const c8* value) {
+	s_json* node = s_json_str(name, value ? value : "");
+	return se_sdf_json_add_child(parent, node);
+}
+
+static b8 se_sdf_json_add_vec2(s_json* parent, const c8* name, const s_vec2* value) {
+	if (!parent || !value) {
+		return 0;
+	}
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return 0;
+	}
+	if (!se_sdf_json_add_f32(array, NULL, value->x) ||
+		!se_sdf_json_add_f32(array, NULL, value->y)) {
+		s_json_free(array);
+		return 0;
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return 0;
+	}
+	return 1;
+}
+
+static b8 se_sdf_json_add_vec3(s_json* parent, const c8* name, const s_vec3* value) {
+	if (!parent || !value) {
+		return 0;
+	}
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return 0;
+	}
+	if (!se_sdf_json_add_f32(array, NULL, value->x) ||
+		!se_sdf_json_add_f32(array, NULL, value->y) ||
+		!se_sdf_json_add_f32(array, NULL, value->z)) {
+		s_json_free(array);
+		return 0;
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return 0;
+	}
+	return 1;
+}
+
+static b8 se_sdf_json_add_mat4(s_json* parent, const c8* name, const s_mat4* value) {
+	if (!parent || !value) {
+		return 0;
+	}
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return 0;
+	}
+	for (u32 row = 0; row < 4u; ++row) {
+		for (u32 col = 0; col < 4u; ++col) {
+			if (!se_sdf_json_add_f32(array, NULL, value->m[row][col])) {
+				s_json_free(array);
+				return 0;
+			}
+		}
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return 0;
+	}
+	return 1;
+}
+
+static b8 se_sdf_json_number_to_u32(const s_json* node, u32* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return 0;
+	}
+	if (!isfinite(node->as.number) || node->as.number < 0.0 || node->as.number > 4294967295.0) {
+		return 0;
+	}
+	const f64 rounded = floor(node->as.number + 0.5);
+	if (fabs(node->as.number - rounded) > 0.0001) {
+		return 0;
+	}
+	*out_value = (u32)rounded;
+	return 1;
+}
+
+static b8 se_sdf_json_number_to_i32(const s_json* node, i32* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return 0;
+	}
+	if (!isfinite(node->as.number) || node->as.number < (f64)INT_MIN || node->as.number > (f64)INT_MAX) {
+		return 0;
+	}
+	const f64 rounded = floor(node->as.number + ((node->as.number >= 0.0) ? 0.5 : -0.5));
+	if (fabs(node->as.number - rounded) > 0.0001) {
+		return 0;
+	}
+	*out_value = (i32)rounded;
+	return 1;
+}
+
+static b8 se_sdf_json_number_to_f32(const s_json* node, f32* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return 0;
+	}
+	if (!isfinite(node->as.number)) {
+		return 0;
+	}
+	*out_value = (f32)node->as.number;
+	return 1;
+}
+
+static const s_json* se_sdf_json_get_required(const s_json* object, const c8* key, const s_json_type type) {
+	if (!object || object->type != S_JSON_OBJECT || !key) {
+		return NULL;
+	}
+	const s_json* child = s_json_get(object, key);
+	if (!child || child->type != type) {
+		return NULL;
+	}
+	return child;
+}
+
+static b8 se_sdf_json_get_u32(const s_json* object, const c8* key, u32* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_NUMBER);
+	return se_sdf_json_number_to_u32(node, out_value);
+}
+
+static b8 se_sdf_json_get_i32(const s_json* object, const c8* key, i32* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_NUMBER);
+	return se_sdf_json_number_to_i32(node, out_value);
+}
+
+static b8 se_sdf_json_get_f32(const s_json* object, const c8* key, f32* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_NUMBER);
+	return se_sdf_json_number_to_f32(node, out_value);
+}
+
+static b8 se_sdf_json_get_bool(const s_json* object, const c8* key, b8* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_BOOL);
+	if (!node || !out_value) {
+		return 0;
+	}
+	*out_value = node->as.boolean;
+	return 1;
+}
+
+static b8 se_sdf_json_get_string(const s_json* object, const c8* key, const c8** out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_STRING);
+	if (!node || !out_value) {
+		return 0;
+	}
+	*out_value = node->as.string;
+	return 1;
+}
+
+static b8 se_sdf_json_read_vec2_node(const s_json* node, s_vec2* out_value) {
+	if (!node || node->type != S_JSON_ARRAY || !out_value || node->as.children.count != 2u) {
+		return 0;
+	}
+	f32 values[2] = {0.0f, 0.0f};
+	for (u32 i = 0; i < 2u; ++i) {
+		const s_json* item = s_json_at(node, i);
+		if (!se_sdf_json_number_to_f32(item, &values[i])) {
+			return 0;
+		}
+	}
+	*out_value = s_vec2(values[0], values[1]);
+	return 1;
+}
+
+static b8 se_sdf_json_read_vec3_node(const s_json* node, s_vec3* out_value) {
+	if (!node || node->type != S_JSON_ARRAY || !out_value || node->as.children.count != 3u) {
+		return 0;
+	}
+	f32 values[3] = {0.0f, 0.0f, 0.0f};
+	for (u32 i = 0; i < 3u; ++i) {
+		const s_json* item = s_json_at(node, i);
+		if (!se_sdf_json_number_to_f32(item, &values[i])) {
+			return 0;
+		}
+	}
+	*out_value = s_vec3(values[0], values[1], values[2]);
+	return 1;
+}
+
+static b8 se_sdf_json_read_mat4_node(const s_json* node, s_mat4* out_value) {
+	if (!node || node->type != S_JSON_ARRAY || !out_value || node->as.children.count != 16u) {
+		return 0;
+	}
+	s_mat4 parsed = s_mat4_identity;
+	u32 index = 0u;
+	for (u32 row = 0; row < 4u; ++row) {
+		for (u32 col = 0; col < 4u; ++col) {
+			const s_json* item = s_json_at(node, index++);
+			if (!se_sdf_json_number_to_f32(item, &parsed.m[row][col])) {
+				return 0;
+			}
+		}
+	}
+	*out_value = parsed;
+	return 1;
+}
+
+static b8 se_sdf_json_read_vec2_field(const s_json* object, const c8* key, s_vec2* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_ARRAY);
+	return se_sdf_json_read_vec2_node(node, out_value);
+}
+
+static b8 se_sdf_json_read_vec3_field(const s_json* object, const c8* key, s_vec3* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_ARRAY);
+	return se_sdf_json_read_vec3_node(node, out_value);
+}
+
+static b8 se_sdf_json_read_mat4_field(const s_json* object, const c8* key, s_mat4* out_value) {
+	const s_json* node = se_sdf_json_get_required(object, key, S_JSON_ARRAY);
+	return se_sdf_json_read_mat4_node(node, out_value);
+}
+
+static b8 se_sdf_json_add_primitive_desc(s_json* parent, const c8* name, const se_sdf_primitive_desc* primitive) {
+	if (!parent || !primitive) {
+		return 0;
+	}
+	s_json* primitive_json = se_sdf_json_add_object(parent, name);
+	if (!primitive_json || !se_sdf_json_add_u32(primitive_json, "type", (u32)primitive->type)) {
+		return 0;
+	}
+
+	switch (primitive->type) {
+		case SE_SDF_PRIMITIVE_SPHERE:
+			return se_sdf_json_add_f32(primitive_json, "radius", primitive->sphere.radius);
+		case SE_SDF_PRIMITIVE_BOX:
+			return se_sdf_json_add_vec3(primitive_json, "size", &primitive->box.size);
+		case SE_SDF_PRIMITIVE_ROUND_BOX:
+			return se_sdf_json_add_vec3(primitive_json, "size", &primitive->round_box.size) &&
+				se_sdf_json_add_f32(primitive_json, "roundness", primitive->round_box.roundness);
+		case SE_SDF_PRIMITIVE_BOX_FRAME:
+			return se_sdf_json_add_vec3(primitive_json, "size", &primitive->box_frame.size) &&
+				se_sdf_json_add_f32(primitive_json, "thickness", primitive->box_frame.thickness);
+		case SE_SDF_PRIMITIVE_TORUS:
+			return se_sdf_json_add_vec2(primitive_json, "radii", &primitive->torus.radii);
+		case SE_SDF_PRIMITIVE_CAPPED_TORUS:
+			return se_sdf_json_add_vec2(primitive_json, "axis_sin_cos", &primitive->capped_torus.axis_sin_cos) &&
+				se_sdf_json_add_f32(primitive_json, "major_radius", primitive->capped_torus.major_radius) &&
+				se_sdf_json_add_f32(primitive_json, "minor_radius", primitive->capped_torus.minor_radius);
+		case SE_SDF_PRIMITIVE_LINK:
+			return se_sdf_json_add_f32(primitive_json, "half_length", primitive->link.half_length) &&
+				se_sdf_json_add_f32(primitive_json, "outer_radius", primitive->link.outer_radius) &&
+				se_sdf_json_add_f32(primitive_json, "inner_radius", primitive->link.inner_radius);
+		case SE_SDF_PRIMITIVE_CYLINDER:
+			return se_sdf_json_add_vec3(primitive_json, "axis_and_radius", &primitive->cylinder.axis_and_radius);
+		case SE_SDF_PRIMITIVE_CONE:
+			return se_sdf_json_add_vec2(primitive_json, "angle_sin_cos", &primitive->cone.angle_sin_cos) &&
+				se_sdf_json_add_f32(primitive_json, "height", primitive->cone.height);
+		case SE_SDF_PRIMITIVE_CONE_INFINITE:
+			return se_sdf_json_add_vec2(primitive_json, "angle_sin_cos", &primitive->cone_infinite.angle_sin_cos);
+		case SE_SDF_PRIMITIVE_PLANE:
+			return se_sdf_json_add_vec3(primitive_json, "normal", &primitive->plane.normal) &&
+				se_sdf_json_add_f32(primitive_json, "offset", primitive->plane.offset);
+		case SE_SDF_PRIMITIVE_HEX_PRISM:
+			return se_sdf_json_add_vec2(primitive_json, "half_size", &primitive->hex_prism.half_size);
+		case SE_SDF_PRIMITIVE_CAPSULE:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->capsule.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->capsule.b) &&
+				se_sdf_json_add_f32(primitive_json, "radius", primitive->capsule.radius);
+		case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE:
+			return se_sdf_json_add_f32(primitive_json, "height", primitive->vertical_capsule.height) &&
+				se_sdf_json_add_f32(primitive_json, "radius", primitive->vertical_capsule.radius);
+		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER:
+			return se_sdf_json_add_f32(primitive_json, "radius", primitive->capped_cylinder.radius) &&
+				se_sdf_json_add_f32(primitive_json, "half_height", primitive->capped_cylinder.half_height);
+		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->capped_cylinder_arbitrary.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->capped_cylinder_arbitrary.b) &&
+				se_sdf_json_add_f32(primitive_json, "radius", primitive->capped_cylinder_arbitrary.radius);
+		case SE_SDF_PRIMITIVE_ROUNDED_CYLINDER:
+			return se_sdf_json_add_f32(primitive_json, "outer_radius", primitive->rounded_cylinder.outer_radius) &&
+				se_sdf_json_add_f32(primitive_json, "corner_radius", primitive->rounded_cylinder.corner_radius) &&
+				se_sdf_json_add_f32(primitive_json, "half_height", primitive->rounded_cylinder.half_height);
+		case SE_SDF_PRIMITIVE_CAPPED_CONE:
+			return se_sdf_json_add_f32(primitive_json, "height", primitive->capped_cone.height) &&
+				se_sdf_json_add_f32(primitive_json, "radius_base", primitive->capped_cone.radius_base) &&
+				se_sdf_json_add_f32(primitive_json, "radius_top", primitive->capped_cone.radius_top);
+		case SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->capped_cone_arbitrary.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->capped_cone_arbitrary.b) &&
+				se_sdf_json_add_f32(primitive_json, "radius_a", primitive->capped_cone_arbitrary.radius_a) &&
+				se_sdf_json_add_f32(primitive_json, "radius_b", primitive->capped_cone_arbitrary.radius_b);
+		case SE_SDF_PRIMITIVE_SOLID_ANGLE:
+			return se_sdf_json_add_vec2(primitive_json, "angle_sin_cos", &primitive->solid_angle.angle_sin_cos) &&
+				se_sdf_json_add_f32(primitive_json, "radius", primitive->solid_angle.radius);
+		case SE_SDF_PRIMITIVE_CUT_SPHERE:
+			return se_sdf_json_add_f32(primitive_json, "radius", primitive->cut_sphere.radius) &&
+				se_sdf_json_add_f32(primitive_json, "cut_height", primitive->cut_sphere.cut_height);
+		case SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE:
+			return se_sdf_json_add_f32(primitive_json, "radius", primitive->cut_hollow_sphere.radius) &&
+				se_sdf_json_add_f32(primitive_json, "cut_height", primitive->cut_hollow_sphere.cut_height) &&
+				se_sdf_json_add_f32(primitive_json, "thickness", primitive->cut_hollow_sphere.thickness);
+		case SE_SDF_PRIMITIVE_DEATH_STAR:
+			return se_sdf_json_add_f32(primitive_json, "radius_a", primitive->death_star.radius_a) &&
+				se_sdf_json_add_f32(primitive_json, "radius_b", primitive->death_star.radius_b) &&
+				se_sdf_json_add_f32(primitive_json, "separation", primitive->death_star.separation);
+		case SE_SDF_PRIMITIVE_ROUND_CONE:
+			return se_sdf_json_add_f32(primitive_json, "radius_base", primitive->round_cone.radius_base) &&
+				se_sdf_json_add_f32(primitive_json, "radius_top", primitive->round_cone.radius_top) &&
+				se_sdf_json_add_f32(primitive_json, "height", primitive->round_cone.height);
+		case SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->round_cone_arbitrary.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->round_cone_arbitrary.b) &&
+				se_sdf_json_add_f32(primitive_json, "radius_a", primitive->round_cone_arbitrary.radius_a) &&
+				se_sdf_json_add_f32(primitive_json, "radius_b", primitive->round_cone_arbitrary.radius_b);
+		case SE_SDF_PRIMITIVE_VESICA_SEGMENT:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->vesica_segment.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->vesica_segment.b) &&
+				se_sdf_json_add_f32(primitive_json, "width", primitive->vesica_segment.width);
+		case SE_SDF_PRIMITIVE_RHOMBUS:
+			return se_sdf_json_add_f32(primitive_json, "length_a", primitive->rhombus.length_a) &&
+				se_sdf_json_add_f32(primitive_json, "length_b", primitive->rhombus.length_b) &&
+				se_sdf_json_add_f32(primitive_json, "height", primitive->rhombus.height) &&
+				se_sdf_json_add_f32(primitive_json, "corner_radius", primitive->rhombus.corner_radius);
+		case SE_SDF_PRIMITIVE_OCTAHEDRON:
+			return se_sdf_json_add_f32(primitive_json, "size", primitive->octahedron.size);
+		case SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND:
+			return se_sdf_json_add_f32(primitive_json, "size", primitive->octahedron_bound.size);
+		case SE_SDF_PRIMITIVE_PYRAMID:
+			return se_sdf_json_add_f32(primitive_json, "height", primitive->pyramid.height);
+		case SE_SDF_PRIMITIVE_TRIANGLE:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->triangle.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->triangle.b) &&
+				se_sdf_json_add_vec3(primitive_json, "c", &primitive->triangle.c);
+		case SE_SDF_PRIMITIVE_QUAD:
+			return se_sdf_json_add_vec3(primitive_json, "a", &primitive->quad.a) &&
+				se_sdf_json_add_vec3(primitive_json, "b", &primitive->quad.b) &&
+				se_sdf_json_add_vec3(primitive_json, "c", &primitive->quad.c) &&
+				se_sdf_json_add_vec3(primitive_json, "d", &primitive->quad.d);
+		default:
+			return 0;
+	}
+}
+
+static b8 se_sdf_json_read_primitive_desc(const s_json* primitive_json, se_sdf_primitive_desc* out_primitive) {
+	if (!primitive_json || primitive_json->type != S_JSON_OBJECT || !out_primitive) {
+		return 0;
+	}
+
+	u32 type_u32 = 0u;
+	if (!se_sdf_json_get_u32(primitive_json, "type", &type_u32)) {
+		return 0;
+	}
+	se_sdf_primitive_desc primitive = {0};
+	primitive.type = (se_sdf_primitive_type)type_u32;
+	if (!se_sdf_runtime_is_valid_primitive_type(primitive.type)) {
+		return 0;
+	}
+
+	switch (primitive.type) {
+		case SE_SDF_PRIMITIVE_SPHERE:
+			if (!se_sdf_json_get_f32(primitive_json, "radius", &primitive.sphere.radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_BOX:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "size", &primitive.box.size)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_ROUND_BOX:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "size", &primitive.round_box.size) ||
+				!se_sdf_json_get_f32(primitive_json, "roundness", &primitive.round_box.roundness)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_BOX_FRAME:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "size", &primitive.box_frame.size) ||
+				!se_sdf_json_get_f32(primitive_json, "thickness", &primitive.box_frame.thickness)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_TORUS:
+			if (!se_sdf_json_read_vec2_field(primitive_json, "radii", &primitive.torus.radii)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CAPPED_TORUS:
+			if (!se_sdf_json_read_vec2_field(primitive_json, "axis_sin_cos", &primitive.capped_torus.axis_sin_cos) ||
+				!se_sdf_json_get_f32(primitive_json, "major_radius", &primitive.capped_torus.major_radius) ||
+				!se_sdf_json_get_f32(primitive_json, "minor_radius", &primitive.capped_torus.minor_radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_LINK:
+			if (!se_sdf_json_get_f32(primitive_json, "half_length", &primitive.link.half_length) ||
+				!se_sdf_json_get_f32(primitive_json, "outer_radius", &primitive.link.outer_radius) ||
+				!se_sdf_json_get_f32(primitive_json, "inner_radius", &primitive.link.inner_radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CYLINDER:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "axis_and_radius", &primitive.cylinder.axis_and_radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CONE:
+			if (!se_sdf_json_read_vec2_field(primitive_json, "angle_sin_cos", &primitive.cone.angle_sin_cos) ||
+				!se_sdf_json_get_f32(primitive_json, "height", &primitive.cone.height)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CONE_INFINITE:
+			if (!se_sdf_json_read_vec2_field(primitive_json, "angle_sin_cos", &primitive.cone_infinite.angle_sin_cos)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_PLANE:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "normal", &primitive.plane.normal) ||
+				!se_sdf_json_get_f32(primitive_json, "offset", &primitive.plane.offset)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_HEX_PRISM:
+			if (!se_sdf_json_read_vec2_field(primitive_json, "half_size", &primitive.hex_prism.half_size)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CAPSULE:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.capsule.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.capsule.b) ||
+				!se_sdf_json_get_f32(primitive_json, "radius", &primitive.capsule.radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE:
+			if (!se_sdf_json_get_f32(primitive_json, "height", &primitive.vertical_capsule.height) ||
+				!se_sdf_json_get_f32(primitive_json, "radius", &primitive.vertical_capsule.radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER:
+			if (!se_sdf_json_get_f32(primitive_json, "radius", &primitive.capped_cylinder.radius) ||
+				!se_sdf_json_get_f32(primitive_json, "half_height", &primitive.capped_cylinder.half_height)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.capped_cylinder_arbitrary.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.capped_cylinder_arbitrary.b) ||
+				!se_sdf_json_get_f32(primitive_json, "radius", &primitive.capped_cylinder_arbitrary.radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_ROUNDED_CYLINDER:
+			if (!se_sdf_json_get_f32(primitive_json, "outer_radius", &primitive.rounded_cylinder.outer_radius) ||
+				!se_sdf_json_get_f32(primitive_json, "corner_radius", &primitive.rounded_cylinder.corner_radius) ||
+				!se_sdf_json_get_f32(primitive_json, "half_height", &primitive.rounded_cylinder.half_height)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CAPPED_CONE:
+			if (!se_sdf_json_get_f32(primitive_json, "height", &primitive.capped_cone.height) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_base", &primitive.capped_cone.radius_base) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_top", &primitive.capped_cone.radius_top)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.capped_cone_arbitrary.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.capped_cone_arbitrary.b) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_a", &primitive.capped_cone_arbitrary.radius_a) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_b", &primitive.capped_cone_arbitrary.radius_b)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_SOLID_ANGLE:
+			if (!se_sdf_json_read_vec2_field(primitive_json, "angle_sin_cos", &primitive.solid_angle.angle_sin_cos) ||
+				!se_sdf_json_get_f32(primitive_json, "radius", &primitive.solid_angle.radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CUT_SPHERE:
+			if (!se_sdf_json_get_f32(primitive_json, "radius", &primitive.cut_sphere.radius) ||
+				!se_sdf_json_get_f32(primitive_json, "cut_height", &primitive.cut_sphere.cut_height)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE:
+			if (!se_sdf_json_get_f32(primitive_json, "radius", &primitive.cut_hollow_sphere.radius) ||
+				!se_sdf_json_get_f32(primitive_json, "cut_height", &primitive.cut_hollow_sphere.cut_height) ||
+				!se_sdf_json_get_f32(primitive_json, "thickness", &primitive.cut_hollow_sphere.thickness)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_DEATH_STAR:
+			if (!se_sdf_json_get_f32(primitive_json, "radius_a", &primitive.death_star.radius_a) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_b", &primitive.death_star.radius_b) ||
+				!se_sdf_json_get_f32(primitive_json, "separation", &primitive.death_star.separation)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_ROUND_CONE:
+			if (!se_sdf_json_get_f32(primitive_json, "radius_base", &primitive.round_cone.radius_base) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_top", &primitive.round_cone.radius_top) ||
+				!se_sdf_json_get_f32(primitive_json, "height", &primitive.round_cone.height)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.round_cone_arbitrary.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.round_cone_arbitrary.b) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_a", &primitive.round_cone_arbitrary.radius_a) ||
+				!se_sdf_json_get_f32(primitive_json, "radius_b", &primitive.round_cone_arbitrary.radius_b)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_VESICA_SEGMENT:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.vesica_segment.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.vesica_segment.b) ||
+				!se_sdf_json_get_f32(primitive_json, "width", &primitive.vesica_segment.width)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_RHOMBUS:
+			if (!se_sdf_json_get_f32(primitive_json, "length_a", &primitive.rhombus.length_a) ||
+				!se_sdf_json_get_f32(primitive_json, "length_b", &primitive.rhombus.length_b) ||
+				!se_sdf_json_get_f32(primitive_json, "height", &primitive.rhombus.height) ||
+				!se_sdf_json_get_f32(primitive_json, "corner_radius", &primitive.rhombus.corner_radius)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_OCTAHEDRON:
+			if (!se_sdf_json_get_f32(primitive_json, "size", &primitive.octahedron.size)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND:
+			if (!se_sdf_json_get_f32(primitive_json, "size", &primitive.octahedron_bound.size)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_PYRAMID:
+			if (!se_sdf_json_get_f32(primitive_json, "height", &primitive.pyramid.height)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_TRIANGLE:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.triangle.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.triangle.b) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "c", &primitive.triangle.c)) return 0;
+			break;
+		case SE_SDF_PRIMITIVE_QUAD:
+			if (!se_sdf_json_read_vec3_field(primitive_json, "a", &primitive.quad.a) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "b", &primitive.quad.b) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "c", &primitive.quad.c) ||
+				!se_sdf_json_read_vec3_field(primitive_json, "d", &primitive.quad.d)) return 0;
+			break;
+		default:
+			return 0;
+	}
+
+	if (!se_sdf_runtime_validate_primitive_desc(&primitive)) {
+		return 0;
+	}
+	*out_primitive = primitive;
+	return 1;
+}
+
+static b8 se_sdf_json_node_index_of(
+	const se_sdf_node_handles* node_handles,
+	const se_sdf_node_handle node,
+	u32* out_index
+) {
+	if (!node_handles || !out_index || node == SE_SDF_NODE_NULL) {
+		return 0;
+	}
+	for (u32 i = 0u; i < (u32)s_array_get_size((se_sdf_node_handles*)node_handles); ++i) {
+		const se_sdf_node_handle* handle = s_array_get((se_sdf_node_handles*)node_handles, s_array_handle((se_sdf_node_handles*)node_handles, i));
+		if (handle && *handle == node) {
+			*out_index = i;
+			return 1;
+		}
+	}
+	return 0;
+}
 
 static void se_sdf_runtime_init_storage(void) {
 	if (se_sdf_runtime_scene_storage_initialized) {
@@ -815,6 +1399,342 @@ b8 se_sdf_scene_validate(
 	}
 
 	return 1;
+}
+
+s_json* se_sdf_to_json(const se_sdf_scene_handle scene) {
+	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	if (!scene_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return NULL;
+	}
+
+	s_json* root = s_json_object_empty(NULL);
+	if (!root) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+	if (!se_sdf_json_add_string(root, "format", SE_SDF_JSON_FORMAT) ||
+		!se_sdf_json_add_u32(root, "version", SE_SDF_JSON_VERSION)) {
+		s_json_free(root);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+
+	se_sdf_node_handles node_handles = {0};
+	s_array_init(&node_handles);
+	s_array_reserve(&node_handles, s_array_get_size(&scene_ptr->nodes));
+	for (sz i = 0; i < s_array_get_size(&scene_ptr->nodes); ++i) {
+		const se_sdf_node_handle handle = s_array_handle(&scene_ptr->nodes, (u32)i);
+		se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, handle);
+		if (!node) {
+			continue;
+		}
+		s_array_add(&node_handles, handle);
+	}
+
+	i32 root_index = -1;
+	if (scene_ptr->root != SE_SDF_NODE_NULL) {
+		u32 root_u32 = 0u;
+		if (!se_sdf_json_node_index_of(&node_handles, scene_ptr->root, &root_u32)) {
+			s_array_clear(&node_handles);
+			s_json_free(root);
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return NULL;
+		}
+		root_index = (i32)root_u32;
+	}
+	if (!se_sdf_json_add_i32(root, "root_index", root_index)) {
+		s_array_clear(&node_handles);
+		s_json_free(root);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+
+	s_json* nodes_json = se_sdf_json_add_array(root, "nodes");
+	if (!nodes_json) {
+		s_array_clear(&node_handles);
+		s_json_free(root);
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+
+	for (sz i = 0; i < s_array_get_size(&node_handles); ++i) {
+		se_sdf_node_handle* handle = s_array_get(&node_handles, s_array_handle(&node_handles, (u32)i));
+		if (!handle) {
+			continue;
+		}
+		se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, *handle);
+		if (!node) {
+			continue;
+		}
+
+		s_json* node_json = se_sdf_json_add_object(nodes_json, NULL);
+		s_json* children_json = se_sdf_json_add_array(node_json, "children");
+		if (!node_json ||
+			!children_json ||
+			!se_sdf_json_add_bool(node_json, "is_group", node->is_group) ||
+			!se_sdf_json_add_mat4(node_json, "transform", &node->transform) ||
+			!se_sdf_json_add_i32(node_json, "operation", (i32)node->operation) ||
+			!se_sdf_json_add_f32(node_json, "operation_amount", node->operation_amount) ||
+			!se_sdf_json_add_vec3(node_json, "control_translation", &node->control_translation) ||
+			!se_sdf_json_add_vec3(node_json, "control_rotation", &node->control_rotation) ||
+			!se_sdf_json_add_vec3(node_json, "control_scale", &node->control_scale) ||
+			!se_sdf_json_add_bool(node_json, "control_trs_initialized", node->control_trs_initialized)) {
+			s_array_clear(&node_handles);
+			s_json_free(root);
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return NULL;
+		}
+
+		if (!node->is_group && !se_sdf_json_add_primitive_desc(node_json, "primitive", &node->primitive)) {
+			s_array_clear(&node_handles);
+			s_json_free(root);
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return NULL;
+		}
+
+		for (sz child_i = 0; child_i < s_array_get_size(&node->children); ++child_i) {
+			se_sdf_node_handle* child_handle = s_array_get(&node->children, s_array_handle(&node->children, (u32)child_i));
+			if (!child_handle || *child_handle == SE_SDF_NODE_NULL) {
+				s_array_clear(&node_handles);
+				s_json_free(root);
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				return NULL;
+			}
+			u32 child_index = 0u;
+			if (!se_sdf_json_node_index_of(&node_handles, *child_handle, &child_index) ||
+				!se_sdf_json_add_u32(children_json, NULL, child_index)) {
+				s_array_clear(&node_handles);
+				s_json_free(root);
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				return NULL;
+			}
+		}
+	}
+
+	s_array_clear(&node_handles);
+	se_set_last_error(SE_RESULT_OK);
+	return root;
+}
+
+b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
+	if (!root || root->type != S_JSON_OBJECT) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+	if (!se_sdf_runtime_scene_from_handle(scene)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+
+	const c8* format = NULL;
+	u32 version = 0u;
+	i32 root_index = -1;
+	const s_json* nodes_json = se_sdf_json_get_required(root, "nodes", S_JSON_ARRAY);
+	if (!se_sdf_json_get_string(root, "format", &format) ||
+		!se_sdf_json_get_u32(root, "version", &version) ||
+		!se_sdf_json_get_i32(root, "root_index", &root_index) ||
+		!nodes_json) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+	if (strcmp(format, SE_SDF_JSON_FORMAT) != 0 || version != SE_SDF_JSON_VERSION) {
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		return 0;
+	}
+	if (root_index < -1 || (root_index >= 0 && (sz)root_index >= nodes_json->as.children.count)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+
+	se_sdf_scene_desc temp_desc = SE_SDF_SCENE_DESC_DEFAULTS;
+	temp_desc.initial_node_capacity = nodes_json->as.children.count;
+	const se_sdf_scene_handle temp_scene = se_sdf_scene_create(&temp_desc);
+	if (temp_scene == SE_SDF_SCENE_NULL) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return 0;
+	}
+	se_sdf_runtime_scene* temp_scene_ptr = se_sdf_runtime_scene_from_handle(temp_scene);
+	if (!temp_scene_ptr) {
+		se_sdf_scene_destroy(temp_scene);
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return 0;
+	}
+
+	se_sdf_node_handles created_handles = {0};
+	s_array_init(&created_handles);
+	s_array_reserve(&created_handles, nodes_json->as.children.count);
+
+	for (sz i = 0; i < nodes_json->as.children.count; ++i) {
+		const s_json* node_json = s_json_at(nodes_json, i);
+		if (!node_json || node_json->type != S_JSON_OBJECT) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+
+		b8 is_group = 0;
+		i32 operation_i32 = 0;
+		f32 operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT;
+		s_mat4 transform = s_mat4_identity;
+		s_vec3 control_translation = s_vec3(0.0f, 0.0f, 0.0f);
+		s_vec3 control_rotation = s_vec3(0.0f, 0.0f, 0.0f);
+		s_vec3 control_scale = s_vec3(1.0f, 1.0f, 1.0f);
+		b8 control_trs_initialized = 0;
+		if (!se_sdf_json_get_bool(node_json, "is_group", &is_group) ||
+			!se_sdf_json_get_i32(node_json, "operation", &operation_i32) ||
+			!se_sdf_json_get_f32(node_json, "operation_amount", &operation_amount) ||
+			!se_sdf_json_read_mat4_field(node_json, "transform", &transform)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		if (operation_i32 < (i32)SE_SDF_OP_NONE || operation_i32 > (i32)SE_SDF_OP_SMOOTH_SUBTRACTION) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+
+		const s_json* control_translation_json = s_json_get(node_json, "control_translation");
+		const s_json* control_rotation_json = s_json_get(node_json, "control_rotation");
+		const s_json* control_scale_json = s_json_get(node_json, "control_scale");
+		const s_json* control_initialized_json = s_json_get(node_json, "control_trs_initialized");
+		if (control_translation_json && !se_sdf_json_read_vec3_node(control_translation_json, &control_translation)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		if (control_rotation_json && !se_sdf_json_read_vec3_node(control_rotation_json, &control_rotation)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		if (control_scale_json && !se_sdf_json_read_vec3_node(control_scale_json, &control_scale)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		if (control_initialized_json) {
+			if (control_initialized_json->type != S_JSON_BOOL) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				goto fail;
+			}
+			control_trs_initialized = control_initialized_json->as.boolean;
+		}
+
+		se_sdf_node_handle node_handle = SE_SDF_NODE_NULL;
+		if (is_group) {
+			se_sdf_node_group_desc group_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
+			group_desc.transform = transform;
+			group_desc.operation = (se_sdf_operation)operation_i32;
+			group_desc.operation_amount = operation_amount;
+			node_handle = se_sdf_node_create_group(temp_scene, &group_desc);
+		} else {
+			const s_json* primitive_json = se_sdf_json_get_required(node_json, "primitive", S_JSON_OBJECT);
+			se_sdf_primitive_desc primitive = {0};
+			if (!primitive_json || !se_sdf_json_read_primitive_desc(primitive_json, &primitive)) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				goto fail;
+			}
+
+			se_sdf_node_primitive_desc primitive_desc = {0};
+			primitive_desc.transform = transform;
+			primitive_desc.operation = (se_sdf_operation)operation_i32;
+			primitive_desc.operation_amount = operation_amount;
+			primitive_desc.primitive = primitive;
+			node_handle = se_sdf_node_create_primitive(temp_scene, &primitive_desc);
+		}
+
+		if (node_handle == SE_SDF_NODE_NULL) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		s_array_add(&created_handles, node_handle);
+
+		se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(temp_scene_ptr, temp_scene, node_handle);
+		if (!node_ptr) {
+			se_set_last_error(SE_RESULT_NOT_FOUND);
+			goto fail;
+		}
+		node_ptr->control_translation = control_translation;
+		node_ptr->control_rotation = control_rotation;
+		node_ptr->control_scale = control_scale;
+		node_ptr->control_trs_initialized = control_trs_initialized;
+	}
+
+	for (sz i = 0; i < nodes_json->as.children.count; ++i) {
+		const s_json* node_json = s_json_at(nodes_json, i);
+		const s_json* children_json = se_sdf_json_get_required(node_json, "children", S_JSON_ARRAY);
+		if (!children_json) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		se_sdf_node_handle* parent_handle = s_array_get(&created_handles, s_array_handle(&created_handles, (u32)i));
+		if (!parent_handle || *parent_handle == SE_SDF_NODE_NULL) {
+			se_set_last_error(SE_RESULT_NOT_FOUND);
+			goto fail;
+		}
+
+		for (sz child_i = 0; child_i < children_json->as.children.count; ++child_i) {
+			const s_json* child_index_json = s_json_at(children_json, child_i);
+			u32 child_index = 0u;
+			if (!se_sdf_json_number_to_u32(child_index_json, &child_index) ||
+				(sz)child_index >= s_array_get_size(&created_handles)) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				goto fail;
+			}
+			se_sdf_node_handle* child_handle = s_array_get(&created_handles, s_array_handle(&created_handles, child_index));
+			if (!child_handle || *child_handle == SE_SDF_NODE_NULL ||
+				!se_sdf_node_add_child(temp_scene, *parent_handle, *child_handle)) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				goto fail;
+			}
+		}
+	}
+
+	se_sdf_node_handle resolved_root = SE_SDF_NODE_NULL;
+	if (root_index >= 0) {
+		se_sdf_node_handle* root_handle = s_array_get(&created_handles, s_array_handle(&created_handles, (u32)root_index));
+		if (!root_handle) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		resolved_root = *root_handle;
+	}
+	if (!se_sdf_scene_set_root(temp_scene, resolved_root)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		goto fail;
+	}
+
+	char validation_error[256] = {0};
+	if (!se_sdf_scene_validate(temp_scene, validation_error, sizeof(validation_error))) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		goto fail;
+	}
+
+	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	temp_scene_ptr = se_sdf_runtime_scene_from_handle(temp_scene);
+	if (!scene_ptr || !temp_scene_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		goto fail;
+	}
+
+	se_sdf_runtime_scene_release_nodes(scene_ptr);
+	scene_ptr->nodes = temp_scene_ptr->nodes;
+	scene_ptr->root = temp_scene_ptr->root;
+	for (sz i = 0; i < s_array_get_size(&scene_ptr->nodes); ++i) {
+		se_sdf_runtime_node* node = s_array_get(&scene_ptr->nodes, s_array_handle(&scene_ptr->nodes, (u32)i));
+		if (!node) {
+			continue;
+		}
+		node->owner_scene = scene;
+	}
+
+	s_array_init(&temp_scene_ptr->nodes);
+	temp_scene_ptr->root = SE_SDF_NODE_NULL;
+	se_sdf_scene_destroy(temp_scene);
+	s_array_clear(&created_handles);
+	se_set_last_error(SE_RESULT_OK);
+	return 1;
+
+fail:
+	s_array_clear(&created_handles);
+	se_sdf_scene_destroy(temp_scene);
+	return 0;
 }
 
 se_sdf_node_handle se_sdf_node_create_primitive(

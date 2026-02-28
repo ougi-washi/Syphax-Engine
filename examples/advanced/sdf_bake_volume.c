@@ -75,17 +75,16 @@ static b8 sdf_bake_parse_source(const c8* text, sdf_bake_source* out_source) {
 
 static void sdf_bake_print_usage(void) {
 	printf("sdf_bake_volume usage:\n");
-	printf("  ./bin/sdf_bake_volume [--source=cube|sphere|sponza] [--mesh-index=<n>] [--resolution=<n>] [--yaw-deg=<n>] [--pitch-deg=<n>]\n");
+	printf("  ./bin/sdf_bake_volume [--source=cube|sphere|sponza] [--resolution=<n>] [--yaw-deg=<n>] [--pitch-deg=<n>]\n");
 	printf("examples:\n");
 	printf("  ./bin/sdf_bake_volume\n");
 	printf("  ./bin/sdf_bake_volume --source=sphere\n");
-	printf("  ./bin/sdf_bake_volume --source=sponza --mesh-index=0 --resolution=20\n");
+	printf("  ./bin/sdf_bake_volume --source=sponza --resolution=20\n");
 	printf("  ./bin/sdf_bake_volume --source=sphere --yaw-deg=45 --pitch-deg=20\n");
 }
 
 static b8 sdf_bake_load_source_model(
 	const sdf_bake_source source,
-	const u32 sponza_mesh_index,
 	se_model_handle* out_model,
 	se_gltf_asset** out_asset
 ) {
@@ -111,7 +110,7 @@ static b8 sdf_bake_load_source_model(
 		return false;
 	}
 
-	*out_model = se_gltf_model_load_ex(*out_asset, (i32)sponza_mesh_index, SE_MESH_DATA_CPU_GPU);
+	*out_model = se_gltf_model_load_ex(*out_asset, -1, SE_MESH_DATA_CPU_GPU);
 	if (*out_model == S_HANDLE_NULL) {
 		se_gltf_free(*out_asset);
 		*out_asset = NULL;
@@ -237,7 +236,6 @@ static void sdf_bake_fit_proxy_model_to_bounds(
 
 int main(int argc, char** argv) {
 	sdf_bake_source source = SDF_BAKE_SOURCE_CUBE;
-	u32 sponza_mesh_index = 0u;
 	u32 resolution_override = 0u;
 	f32 camera_yaw_deg = 20.0f;
 	f32 camera_pitch_deg = 12.0f;
@@ -255,14 +253,6 @@ int main(int argc, char** argv) {
 			if (!sdf_bake_parse_source(value, &source)) {
 				printf("sdf_bake_volume :: unknown source '%s'\n", value);
 				sdf_bake_print_usage();
-				return 1;
-			}
-			continue;
-		}
-		if (strncmp(arg, "--mesh-index=", 13) == 0) {
-			const c8* value = arg + 13;
-			if (!sdf_bake_parse_u32(value, &sponza_mesh_index)) {
-				printf("sdf_bake_volume :: invalid mesh index '%s'\n", value);
 				return 1;
 			}
 			continue;
@@ -319,20 +309,16 @@ int main(int argc, char** argv) {
 
 	se_gltf_asset* asset = NULL;
 	se_model_handle source_model = S_HANDLE_NULL;
-	if (!sdf_bake_load_source_model(source, sponza_mesh_index, &source_model, &asset)) {
+	if (!sdf_bake_load_source_model(source, &source_model, &asset)) {
 		printf(
-			"sdf_bake_volume :: failed to load source model (source=%s, mesh-index=%u, error=%s)\n",
+			"sdf_bake_volume :: failed to load source model (source=%s, error=%s)\n",
 			sdf_bake_source_name(source),
-			sponza_mesh_index,
 			se_result_str(se_get_last_error()));
 		se_context_destroy(context);
 		return 1;
 	}
 
-	printf(
-		"sdf_bake_volume :: source=%s (mesh-index=%u)\n",
-		sdf_bake_source_name(source),
-		sponza_mesh_index);
+	printf("sdf_bake_volume :: source=%s\n", sdf_bake_source_name(source));
 
 	se_sdf_model_texture3d_desc bake_desc = SE_SDF_MODEL_TEXTURE3D_DESC_DEFAULTS;
 	u32 default_resolution = 96u;

@@ -836,15 +836,33 @@ se_model_handle se_gltf_model_load_ex(const se_gltf_asset *asset, const i32 mesh
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return S_HANDLE_NULL;
 	}
-	if (mesh_index < 0 || (sz)mesh_index >= s_array_get_size(&asset->meshes)) {
+	const sz mesh_count = s_array_get_size(&asset->meshes);
+	if (mesh_count == 0) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return S_HANDLE_NULL;
+	}
+
+	const b8 load_all_meshes = mesh_index < 0;
+	if (!load_all_meshes && (sz)mesh_index >= mesh_count) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return S_HANDLE_NULL;
 	}
 
 	se_gltf_meshes *meshes = (se_gltf_meshes *)&asset->meshes;
-	s_handle mesh_handle = s_array_handle(meshes, (u32)mesh_index);
-	se_gltf_mesh *mesh = s_array_get(meshes, mesh_handle);
-	if (mesh == NULL || s_array_get_size(&mesh->primitives) == 0) {
+	const sz first_mesh_index = load_all_meshes ? 0u: (sz)mesh_index;
+	const sz mesh_range_count = load_all_meshes ? mesh_count: 1u;
+	sz primitive_reserve_count = 0u;
+	for (sz mesh_offset = 0; mesh_offset < mesh_range_count; ++mesh_offset) {
+		const sz current_mesh_index = first_mesh_index + mesh_offset;
+		s_handle current_mesh_handle = s_array_handle(meshes, (u32)current_mesh_index);
+		se_gltf_mesh *current_mesh = s_array_get(meshes, current_mesh_handle);
+		if (current_mesh == NULL) {
+			se_set_last_error(SE_RESULT_IO);
+			return S_HANDLE_NULL;
+		}
+		primitive_reserve_count += s_array_get_size(&current_mesh->primitives);
+	}
+	if (primitive_reserve_count == 0u) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
 		return S_HANDLE_NULL;
 	}
@@ -853,192 +871,202 @@ se_model_handle se_gltf_model_load_ex(const se_gltf_asset *asset, const i32 mesh
 	se_model *model = s_array_get(&ctx->models, model_handle);
 	memset(model, 0, sizeof(*model));
 	s_array_init(&model->meshes);
-	s_array_reserve(&model->meshes, s_array_get_size(&mesh->primitives));
+	s_array_reserve(&model->meshes, primitive_reserve_count);
 
 	se_result error = SE_RESULT_IO;
 	se_gltf_accessors *accessors = (se_gltf_accessors *)&asset->accessors;
 
-	for (sz i = 0; i < s_array_get_size(&mesh->primitives); i++) {
-		s_handle prim_handle = s_array_handle(&mesh->primitives, (u32)i);
-		se_gltf_primitive *prim = s_array_get(&mesh->primitives, prim_handle);
-		if (prim == NULL) {
-			error = SE_RESULT_IO;
-			goto fail;
-		}
-		if (prim->has_mode && prim->mode != 4) {
-			error = SE_RESULT_UNSUPPORTED;
-			goto fail;
-		}
-
-		se_gltf_attribute *pos_attr = NULL;
-		se_gltf_attribute *norm_attr = NULL;
-		se_gltf_attribute *uv_attr = NULL;
-		for (sz a = 0; a < s_array_get_size(&prim->attributes.attributes); a++) {
-			s_handle attr_handle = s_array_handle(&prim->attributes.attributes, (u32)a);
-			se_gltf_attribute *attr = s_array_get(&prim->attributes.attributes, attr_handle);
-			if (attr == NULL) continue;
-			if (strcmp(attr->name, "POSITION") == 0) pos_attr = attr;
-			else if (strcmp(attr->name, "NORMAL") == 0) norm_attr = attr;
-			else if (strcmp(attr->name, "TEXCOORD_0") == 0) uv_attr = attr;
-		}
-
-		if (pos_attr == NULL || pos_attr->accessor < 0 || (sz)pos_attr->accessor >= s_array_get_size(&asset->accessors)) {
+	for (sz mesh_offset = 0; mesh_offset < mesh_range_count; ++mesh_offset) {
+		const sz current_mesh_index = first_mesh_index + mesh_offset;
+		s_handle mesh_handle = s_array_handle(meshes, (u32)current_mesh_index);
+		se_gltf_mesh *mesh = s_array_get(meshes, mesh_handle);
+		if (mesh == NULL) {
 			error = SE_RESULT_IO;
 			goto fail;
 		}
 
-		s_handle pos_handle = s_array_handle(accessors, (u32)pos_attr->accessor);
-		se_gltf_accessor *pos_acc = s_array_get(accessors, pos_handle);
-		if (pos_acc == NULL || pos_acc->component_type != 5126 || pos_acc->type != SE_GLTF_ACCESSOR_VEC3 || pos_acc->count == 0) {
-			error = SE_RESULT_UNSUPPORTED;
-			goto fail;
-		}
-
-		const u32 vertex_count = pos_acc->count;
-		se_gltf_accessor_view pos_view = {0};
-		if (!se_gltf_get_accessor_view(asset, pos_acc, sizeof(f32) * 3, sizeof(f32) * 3, vertex_count, &pos_view)) {
-			error = SE_RESULT_IO;
-			goto fail;
-		}
-
-		s_handle out_mesh_handle = s_array_increment(&model->meshes);
-		se_mesh *out_mesh = s_array_get(&model->meshes, out_mesh_handle);
-		memset(out_mesh, 0, sizeof(*out_mesh));
-		s_array_init(&out_mesh->cpu.vertices);
-		s_array_reserve(&out_mesh->cpu.vertices, vertex_count);
-
-		for (u32 v = 0; v < vertex_count; v++) {
-			const u8 *ptr = pos_view.data + ((sz)v * pos_view.stride);
-			const f32 *fptr = (const f32 *)ptr;
-			s_handle vertex_handle = s_array_increment(&out_mesh->cpu.vertices);
-			se_vertex_3d *new_vertex = s_array_get(&out_mesh->cpu.vertices, vertex_handle);
-			new_vertex->position = s_vec3(fptr[0], fptr[1], fptr[2]);
-			new_vertex->normal = s_vec3(0.0f, 0.0f, 1.0f);
-			new_vertex->uv = s_vec2(0.0f, 0.0f);
-		}
-
-		if (norm_attr != NULL) {
-			if (norm_attr->accessor < 0 || (sz)norm_attr->accessor >= s_array_get_size(&asset->accessors)) {
+		for (sz i = 0; i < s_array_get_size(&mesh->primitives); i++) {
+			s_handle prim_handle = s_array_handle(&mesh->primitives, (u32)i);
+			se_gltf_primitive *prim = s_array_get(&mesh->primitives, prim_handle);
+			if (prim == NULL) {
 				error = SE_RESULT_IO;
 				goto fail;
 			}
-			s_handle norm_handle = s_array_handle(accessors, (u32)norm_attr->accessor);
-			se_gltf_accessor *nacc = s_array_get(accessors, norm_handle);
-			if (nacc == NULL || nacc->component_type != 5126 || nacc->type != SE_GLTF_ACCESSOR_VEC3) {
+			if (prim->has_mode && prim->mode != 4) {
 				error = SE_RESULT_UNSUPPORTED;
 				goto fail;
 			}
-			if (nacc->count < vertex_count) {
+
+			se_gltf_attribute *pos_attr = NULL;
+			se_gltf_attribute *norm_attr = NULL;
+			se_gltf_attribute *uv_attr = NULL;
+			for (sz a = 0; a < s_array_get_size(&prim->attributes.attributes); a++) {
+				s_handle attr_handle = s_array_handle(&prim->attributes.attributes, (u32)a);
+				se_gltf_attribute *attr = s_array_get(&prim->attributes.attributes, attr_handle);
+				if (attr == NULL) continue;
+				if (strcmp(attr->name, "POSITION") == 0) pos_attr = attr;
+				else if (strcmp(attr->name, "NORMAL") == 0) norm_attr = attr;
+				else if (strcmp(attr->name, "TEXCOORD_0") == 0) uv_attr = attr;
+			}
+
+			if (pos_attr == NULL || pos_attr->accessor < 0 || (sz)pos_attr->accessor >= s_array_get_size(&asset->accessors)) {
 				error = SE_RESULT_IO;
 				goto fail;
 			}
 
-			se_gltf_accessor_view normal_view = {0};
-			if (!se_gltf_get_accessor_view(asset, nacc, sizeof(f32) * 3, sizeof(f32) * 3, vertex_count, &normal_view)) {
+			s_handle pos_handle = s_array_handle(accessors, (u32)pos_attr->accessor);
+			se_gltf_accessor *pos_acc = s_array_get(accessors, pos_handle);
+			if (pos_acc == NULL || pos_acc->component_type != 5126 || pos_acc->type != SE_GLTF_ACCESSOR_VEC3 || pos_acc->count == 0) {
+				error = SE_RESULT_UNSUPPORTED;
+				goto fail;
+			}
+
+			const u32 vertex_count = pos_acc->count;
+			se_gltf_accessor_view pos_view = {0};
+			if (!se_gltf_get_accessor_view(asset, pos_acc, sizeof(f32) * 3, sizeof(f32) * 3, vertex_count, &pos_view)) {
 				error = SE_RESULT_IO;
 				goto fail;
 			}
+
+			s_handle out_mesh_handle = s_array_increment(&model->meshes);
+			se_mesh *out_mesh = s_array_get(&model->meshes, out_mesh_handle);
+			memset(out_mesh, 0, sizeof(*out_mesh));
+			s_array_init(&out_mesh->cpu.vertices);
+			s_array_reserve(&out_mesh->cpu.vertices, vertex_count);
 
 			for (u32 v = 0; v < vertex_count; v++) {
-				const u8 *ptr = normal_view.data + ((sz)v * normal_view.stride);
+				const u8 *ptr = pos_view.data + ((sz)v * pos_view.stride);
 				const f32 *fptr = (const f32 *)ptr;
-				s_handle vertex_handle = s_array_handle(&out_mesh->cpu.vertices, v);
-				se_vertex_3d *current_vertex = s_array_get(&out_mesh->cpu.vertices, vertex_handle);
-				current_vertex->normal = s_vec3(fptr[0], fptr[1], fptr[2]);
-			}
-		}
-
-		if (uv_attr != NULL) {
-			if (uv_attr->accessor < 0 || (sz)uv_attr->accessor >= s_array_get_size(&asset->accessors)) {
-				error = SE_RESULT_IO;
-				goto fail;
-			}
-			s_handle uv_handle = s_array_handle(accessors, (u32)uv_attr->accessor);
-			se_gltf_accessor *uacc = s_array_get(accessors, uv_handle);
-			if (uacc == NULL || uacc->component_type != 5126 || uacc->type != SE_GLTF_ACCESSOR_VEC2) {
-				error = SE_RESULT_UNSUPPORTED;
-				goto fail;
-			}
-			if (uacc->count < vertex_count) {
-				error = SE_RESULT_IO;
-				goto fail;
+				s_handle vertex_handle = s_array_increment(&out_mesh->cpu.vertices);
+				se_vertex_3d *new_vertex = s_array_get(&out_mesh->cpu.vertices, vertex_handle);
+				new_vertex->position = s_vec3(fptr[0], fptr[1], fptr[2]);
+				new_vertex->normal = s_vec3(0.0f, 0.0f, 1.0f);
+				new_vertex->uv = s_vec2(0.0f, 0.0f);
 			}
 
-			se_gltf_accessor_view uv_view = {0};
-			if (!se_gltf_get_accessor_view(asset, uacc, sizeof(f32) * 2, sizeof(f32) * 2, vertex_count, &uv_view)) {
-				error = SE_RESULT_IO;
-				goto fail;
-			}
-
-			for (u32 v = 0; v < vertex_count; v++) {
-				const u8 *ptr = uv_view.data + ((sz)v * uv_view.stride);
-				const f32 *fptr = (const f32 *)ptr;
-				s_handle vertex_handle = s_array_handle(&out_mesh->cpu.vertices, v);
-				se_vertex_3d *current_vertex = s_array_get(&out_mesh->cpu.vertices, vertex_handle);
-				current_vertex->uv = s_vec2(fptr[0], fptr[1]);
-			}
-		}
-
-		u32 index_count = vertex_count;
-		if (prim->has_indices) {
-			if (prim->indices < 0 || (sz)prim->indices >= s_array_get_size(&asset->accessors)) {
-				error = SE_RESULT_IO;
-				goto fail;
-			}
-
-			s_handle index_handle = s_array_handle(accessors, (u32)prim->indices);
-			se_gltf_accessor *iacc = s_array_get(accessors, index_handle);
-			if (iacc == NULL || iacc->type != SE_GLTF_ACCESSOR_SCALAR || iacc->count == 0) {
-				error = SE_RESULT_UNSUPPORTED;
-				goto fail;
-			}
-
-			u32 component_size = 0;
-			if (iacc->component_type == 5125) component_size = 4;
-			else if (iacc->component_type == 5123) component_size = 2;
-			else if (iacc->component_type == 5121) component_size = 1;
-			else {
-				error = SE_RESULT_UNSUPPORTED;
-				goto fail;
-			}
-
-			index_count = iacc->count;
-			se_gltf_accessor_view idx_view = {0};
-			if (!se_gltf_get_accessor_view(asset, iacc, component_size, component_size, index_count, &idx_view)) {
-				error = SE_RESULT_IO;
-				goto fail;
-			}
-
-			s_array_init(&out_mesh->cpu.indices);
-			s_array_reserve(&out_mesh->cpu.indices, index_count);
-
-			for (u32 idx = 0; idx < index_count; idx++) {
-				const u8 *ptr = idx_view.data + ((sz)idx * idx_view.stride);
-				u32 value = 0;
-				if (iacc->component_type == 5125) value = *(const u32 *)ptr;
-				else if (iacc->component_type == 5123) value = *(const u16 *)ptr;
-				else value = *(const u8 *)ptr;
-				if (value >= vertex_count) {
+			if (norm_attr != NULL) {
+				if (norm_attr->accessor < 0 || (sz)norm_attr->accessor >= s_array_get_size(&asset->accessors)) {
 					error = SE_RESULT_IO;
 					goto fail;
 				}
-				s_handle idx_handle = s_array_increment(&out_mesh->cpu.indices);
-				u32 *index_ptr = s_array_get(&out_mesh->cpu.indices, idx_handle);
-				*index_ptr = value;
-			}
-		} else {
-			s_array_init(&out_mesh->cpu.indices);
-			s_array_reserve(&out_mesh->cpu.indices, index_count);
-			for (u32 idx = 0; idx < index_count; idx++) {
-				s_handle idx_handle = s_array_increment(&out_mesh->cpu.indices);
-				u32 *index_ptr = s_array_get(&out_mesh->cpu.indices, idx_handle);
-				*index_ptr = idx;
-			}
-		}
+				s_handle norm_handle = s_array_handle(accessors, (u32)norm_attr->accessor);
+				se_gltf_accessor *nacc = s_array_get(accessors, norm_handle);
+				if (nacc == NULL || nacc->component_type != 5126 || nacc->type != SE_GLTF_ACCESSOR_VEC3) {
+					error = SE_RESULT_UNSUPPORTED;
+					goto fail;
+				}
+				if (nacc->count < vertex_count) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
 
-		if (!se_gltf_mesh_finalize(out_mesh, asset->source_path, mesh_data_flags)) {
-			error = SE_RESULT_OUT_OF_MEMORY;
-			goto fail;
+				se_gltf_accessor_view normal_view = {0};
+				if (!se_gltf_get_accessor_view(asset, nacc, sizeof(f32) * 3, sizeof(f32) * 3, vertex_count, &normal_view)) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
+
+				for (u32 v = 0; v < vertex_count; v++) {
+					const u8 *ptr = normal_view.data + ((sz)v * normal_view.stride);
+					const f32 *fptr = (const f32 *)ptr;
+					s_handle vertex_handle = s_array_handle(&out_mesh->cpu.vertices, v);
+					se_vertex_3d *current_vertex = s_array_get(&out_mesh->cpu.vertices, vertex_handle);
+					current_vertex->normal = s_vec3(fptr[0], fptr[1], fptr[2]);
+				}
+			}
+
+			if (uv_attr != NULL) {
+				if (uv_attr->accessor < 0 || (sz)uv_attr->accessor >= s_array_get_size(&asset->accessors)) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
+				s_handle uv_handle = s_array_handle(accessors, (u32)uv_attr->accessor);
+				se_gltf_accessor *uacc = s_array_get(accessors, uv_handle);
+				if (uacc == NULL || uacc->component_type != 5126 || uacc->type != SE_GLTF_ACCESSOR_VEC2) {
+					error = SE_RESULT_UNSUPPORTED;
+					goto fail;
+				}
+				if (uacc->count < vertex_count) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
+
+				se_gltf_accessor_view uv_view = {0};
+				if (!se_gltf_get_accessor_view(asset, uacc, sizeof(f32) * 2, sizeof(f32) * 2, vertex_count, &uv_view)) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
+
+				for (u32 v = 0; v < vertex_count; v++) {
+					const u8 *ptr = uv_view.data + ((sz)v * uv_view.stride);
+					const f32 *fptr = (const f32 *)ptr;
+					s_handle vertex_handle = s_array_handle(&out_mesh->cpu.vertices, v);
+					se_vertex_3d *current_vertex = s_array_get(&out_mesh->cpu.vertices, vertex_handle);
+					current_vertex->uv = s_vec2(fptr[0], fptr[1]);
+				}
+			}
+
+			u32 index_count = vertex_count;
+			if (prim->has_indices) {
+				if (prim->indices < 0 || (sz)prim->indices >= s_array_get_size(&asset->accessors)) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
+
+				s_handle index_handle = s_array_handle(accessors, (u32)prim->indices);
+				se_gltf_accessor *iacc = s_array_get(accessors, index_handle);
+				if (iacc == NULL || iacc->type != SE_GLTF_ACCESSOR_SCALAR || iacc->count == 0) {
+					error = SE_RESULT_UNSUPPORTED;
+					goto fail;
+				}
+
+				u32 component_size = 0;
+				if (iacc->component_type == 5125) component_size = 4;
+				else if (iacc->component_type == 5123) component_size = 2;
+				else if (iacc->component_type == 5121) component_size = 1;
+				else {
+					error = SE_RESULT_UNSUPPORTED;
+					goto fail;
+				}
+
+				index_count = iacc->count;
+				se_gltf_accessor_view idx_view = {0};
+				if (!se_gltf_get_accessor_view(asset, iacc, component_size, component_size, index_count, &idx_view)) {
+					error = SE_RESULT_IO;
+					goto fail;
+				}
+
+				s_array_init(&out_mesh->cpu.indices);
+				s_array_reserve(&out_mesh->cpu.indices, index_count);
+
+				for (u32 idx = 0; idx < index_count; idx++) {
+					const u8 *ptr = idx_view.data + ((sz)idx * idx_view.stride);
+					u32 value = 0;
+					if (iacc->component_type == 5125) value = *(const u32 *)ptr;
+					else if (iacc->component_type == 5123) value = *(const u16 *)ptr;
+					else value = *(const u8 *)ptr;
+					if (value >= vertex_count) {
+						error = SE_RESULT_IO;
+						goto fail;
+					}
+					s_handle idx_handle = s_array_increment(&out_mesh->cpu.indices);
+					u32 *index_ptr = s_array_get(&out_mesh->cpu.indices, idx_handle);
+					*index_ptr = value;
+				}
+			} else {
+				s_array_init(&out_mesh->cpu.indices);
+				s_array_reserve(&out_mesh->cpu.indices, index_count);
+				for (u32 idx = 0; idx < index_count; idx++) {
+					s_handle idx_handle = s_array_increment(&out_mesh->cpu.indices);
+					u32 *index_ptr = s_array_get(&out_mesh->cpu.indices, idx_handle);
+					*index_ptr = idx;
+				}
+			}
+
+			if (!se_gltf_mesh_finalize(out_mesh, asset->source_path, mesh_data_flags)) {
+				error = SE_RESULT_OUT_OF_MEMORY;
+				goto fail;
+			}
 		}
 	}
 

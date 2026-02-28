@@ -6,6 +6,7 @@
 #include "se_camera.h"
 #include "se_audio.h"
 #include "se_debug.h"
+#include "se_texture.h"
 
 #define MAX_BUILDINGS 	1024 * 1024
 #define MAX_UNITS 		1024 * 1024
@@ -103,6 +104,57 @@ void bind_camera(se_camera_handle camera, se_input_handle *input) {
     se_input_bind(input, SE_KEY_S, SE_INPUT_DOWN, &move_camera_backward, &camera);
     se_input_bind(input, SE_KEY_D, SE_INPUT_DOWN, &move_camera_right, &camera); 
 }
+
+se_object_3d_handle generate_landscape_sdf(const c8* heightmap_texture, const f32 scale, const f32 height) {
+	if (!heightmap_texture || heightmap_texture[0] == '\0' || scale <= 0.0f || height <= 0.0f) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	const se_model_handle model = se_model_load_obj_simple(
+		SE_RESOURCE_PUBLIC("models/plane.obj"),
+		SE_RESOURCE_EXAMPLE("civilization/landscape_vs.glsl"),
+		SE_RESOURCE_EXAMPLE("civilization/landscape_fs.glsl"));
+	if (model == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+
+	const se_texture_handle heightmap = se_texture_load(heightmap_texture, SE_CLAMP);
+	if (heightmap == S_HANDLE_NULL) {
+		se_model_destroy(model);
+		return S_HANDLE_NULL;
+	}
+
+	se_context* context = se_current_context();
+	se_texture* heightmap_ptr = context ? s_array_get(&context->textures, heightmap) : NULL;
+	if (!heightmap_ptr) {
+		se_texture_destroy(heightmap);
+		se_model_destroy(model);
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return S_HANDLE_NULL;
+	}
+
+	const sz mesh_count = se_model_get_mesh_count(model);
+	for (sz i = 0; i < mesh_count; ++i) {
+		const se_shader_handle shader = se_model_get_mesh_shader(model, i);
+		if (shader == S_HANDLE_NULL) {
+			continue;
+		}
+		se_shader_set_texture(shader, "u_heightmap", heightmap_ptr->id);
+		se_shader_set_float(shader, "u_landscape_scale", scale);
+		se_shader_set_float(shader, "u_landscape_height", height);
+	}
+
+	const s_mat4 transform = s_mat4_identity;
+	const se_object_3d_handle object = se_object_3d_create(model, &transform, 0);
+	if (object == S_HANDLE_NULL) {
+		se_texture_destroy(heightmap);
+		se_model_destroy(model);
+		return S_HANDLE_NULL;
+	}
+	return object;
+}
+
 void init_world(world_t *world, se_window_handle window) {
     world->scene = se_scene_3d_create_for_window(window, 128);
     if (world->scene == S_HANDLE_NULL) {

@@ -8,6 +8,8 @@
 #include "se_camera.h"
 #include "se_physics.h"
 
+typedef struct s_json s_json;
+
 #define SE_SDF_MAX_STRING_LENGTH 4096
 
 typedef s_handle se_sdf_scene_handle;
@@ -321,6 +323,8 @@ extern void se_sdf_scene_clear(se_sdf_scene_handle scene);
 extern b8 se_sdf_scene_set_root(se_sdf_scene_handle scene, se_sdf_node_handle node);
 extern se_sdf_node_handle se_sdf_scene_get_root(se_sdf_scene_handle scene);
 extern b8 se_sdf_scene_validate(se_sdf_scene_handle scene, char* error_message, sz error_message_size);
+extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
+extern b8 se_sdf_from_json(se_sdf_scene_handle scene, const s_json* root);
 
 extern se_sdf_node_handle se_sdf_node_create_primitive(se_sdf_scene_handle scene, const se_sdf_node_primitive_desc* desc);
 extern se_sdf_node_handle se_sdf_node_create_group(se_sdf_scene_handle scene, const se_sdf_node_group_desc* desc);

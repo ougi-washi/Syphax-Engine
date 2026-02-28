@@ -5,10 +5,13 @@
 #include "se_graphics.h"
 #include "se_scene.h"
 #include "se_shader.h"
+#include "se_sdf.h"
 #include "se_ui.h"
 
 #include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 
 #define SHOWCASE_WIDTH 1400
@@ -19,13 +22,18 @@
 #define EDITOR_2D_GIZMO_PICK_RADIUS 0.050f
 #define EDITOR_2D_PICK_FALLBACK_RADIUS 0.12f
 #define EDITOR_3D_GIZMO_AXIS_LENGTH 1.25f
-#define EDITOR_3D_GIZMO_PICK_THRESHOLD_PX 12.0f
+#define EDITOR_3D_GIZMO_AXIS_THICKNESS 0.05f
+#define EDITOR_3D_GIZMO_CENTER_SIZE 0.16f
+#define EDITOR_3D_GIZMO_PICK_THRESHOLD_PX 18.0f
 #define EDITOR_3D_PICK_RADIUS 1.10f
 #define EDITOR_3D_PICK_FALLBACK_RADIUS_MIN 0.70f
+#define EDITOR_DETAILS_ITEM_LINES 12
+#define EDITOR_DETAILS_PROPERTY_LINES 12
 
 typedef enum {
 	EDITOR_TARGET_SCENE_2D = 0,
-	EDITOR_TARGET_SCENE_3D
+	EDITOR_TARGET_SCENE_3D,
+	EDITOR_TARGET_SDF
 } editor_target;
 
 typedef enum {
@@ -55,16 +63,31 @@ typedef struct {
 	se_scene_2d_handle scene_2d;
 	se_scene_3d_handle scene_3d;
 	se_camera_handle camera_3d;
+	se_scene_3d_handle sdf_camera_scene;
+	se_camera_handle sdf_camera;
+	se_sdf_scene_handle sdf_scene;
+	se_sdf_renderer_handle sdf_renderer;
 	se_model_handle cube_model;
+	se_model_handle gizmo_model_3d_x;
+	se_model_handle gizmo_model_3d_y;
+	se_model_handle gizmo_model_3d_z;
+	se_model_handle gizmo_model_3d_center;
 	s_vec3 camera_target_3d;
 	f32 camera_yaw_3d;
 	f32 camera_pitch_3d;
 	f32 camera_distance_3d;
+	s_vec3 camera_target_sdf;
+	f32 camera_yaw_sdf;
+	f32 camera_pitch_sdf;
+	f32 camera_distance_sdf;
 
 	se_ui_handle ui;
 	se_ui_widget_handle ui_panel;
 	se_ui_widget_handle ui_title;
 	se_ui_widget_handle ui_status;
+	se_ui_widget_handle ui_details_panel;
+	se_ui_widget_handle ui_details_title;
+	se_ui_widget_handle ui_details_body;
 
 	editor_object_2d_slots objects_2d;
 	editor_object_3d_slots objects_3d;
@@ -72,13 +95,21 @@ typedef struct {
 	se_object_2d_handle gizmo_2d_center;
 	se_object_2d_handle gizmo_2d_x;
 	se_object_2d_handle gizmo_2d_y;
+	se_object_3d_handle gizmo_3d_center;
+	se_object_3d_handle gizmo_3d_x;
+	se_object_3d_handle gizmo_3d_y;
+	se_object_3d_handle gizmo_3d_z;
 
 	se_object_2d_handle selected_2d;
 	se_object_3d_handle selected_3d;
 
 	editor_target target;
 	editor_gizmo_axis active_axis;
+	b8 details_scene_scope;
 	b8 dragging;
+	u32 details_item_index;
+	u32 details_property_index;
+	u32 details_component_index;
 
 	s_vec2 drag_start_mouse_ndc;
 	s_vec2 drag_start_pos_2d;
@@ -95,6 +126,24 @@ typedef struct {
 
 static void editor_apply_camera_pose_3d(editor_showcase_app* app);
 static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt);
+static void editor_apply_camera_pose_sdf(editor_showcase_app* app);
+static void editor_update_camera_sdf(editor_showcase_app* app, const f32 dt);
+
+static const c8* EDITOR_GIZMO_3D_VERTEX_SOURCE =
+	"#version 330 core\n"
+	"layout(location = 0) in vec3 in_position;\n"
+	"layout(location = 3) in mat4 in_instance_mvp;\n"
+	"void main() {\n"
+	"\tgl_Position = in_instance_mvp * vec4(in_position, 1.0);\n"
+	"}\n";
+
+static const c8* EDITOR_GIZMO_3D_FRAGMENT_SOURCE =
+	"#version 330 core\n"
+	"uniform vec3 u_color;\n"
+	"out vec4 frag_color;\n"
+	"void main() {\n"
+	"\tfrag_color = vec4(u_color, 1.0);\n"
+	"}\n";
 
 static f32 editor_clampf(const f32 value, const f32 min_value, const f32 max_value) {
 	if (value < min_value) {
@@ -130,6 +179,285 @@ static s_vec3 editor_color_from_index(const u32 index) {
 	const f32 g = 0.24f + 0.62f * fabsf(sinf(i * 1.47f + 1.19f));
 	const f32 b = 0.30f + 0.55f * fabsf(sinf(i * 1.73f + 2.41f));
 	return s_vec3(r, g, b);
+}
+
+static void editor_text_append(c8* text, const sz text_size, const c8* format, ...) {
+	sz len = 0u;
+	va_list args;
+	if (!text || text_size == 0u || !format) {
+		return;
+	}
+	len = strlen(text);
+	if (len + 1u >= text_size) {
+		return;
+	}
+	va_start(args, format);
+	(void)vsnprintf(text + len, text_size - len, format, args);
+	va_end(args);
+}
+
+static const c8* editor_target_name(const editor_target target) {
+	switch (target) {
+		case EDITOR_TARGET_SCENE_2D: return "scene_2d";
+		case EDITOR_TARGET_SCENE_3D: return "scene_3d";
+		case EDITOR_TARGET_SDF: return "sdf";
+		default: return "unknown";
+	}
+}
+
+static editor_target editor_target_from_env(void) {
+	const c8* value = getenv("SE_EDITOR_SHOWCASE_TARGET");
+	if (!value) {
+		return EDITOR_TARGET_SCENE_2D;
+	}
+	if (strcmp(value, "2d") == 0 || strcmp(value, "scene_2d") == 0) {
+		return EDITOR_TARGET_SCENE_2D;
+	}
+	if (strcmp(value, "3d") == 0 || strcmp(value, "scene_3d") == 0) {
+		return EDITOR_TARGET_SCENE_3D;
+	}
+	if (strcmp(value, "sdf") == 0) {
+		return EDITOR_TARGET_SDF;
+	}
+	return EDITOR_TARGET_SCENE_2D;
+}
+
+static void editor_set_gizmo_model_color(const se_model_handle model, const s_vec3* color) {
+	se_shader_handle shader = S_HANDLE_NULL;
+	if (model == S_HANDLE_NULL || !color) {
+		return;
+	}
+	shader = se_model_get_mesh_shader(model, 0u);
+	if (shader != S_HANDLE_NULL) {
+		se_shader_set_vec3(shader, "u_color", color);
+	}
+}
+
+static se_model_handle editor_create_colored_gizmo_model(const s_vec3* color) {
+	se_shader_handle shader = S_HANDLE_NULL;
+	se_model_handle model = S_HANDLE_NULL;
+	se_shaders_ptr shaders = {0};
+	shader = se_shader_load_from_memory(EDITOR_GIZMO_3D_VERTEX_SOURCE, EDITOR_GIZMO_3D_FRAGMENT_SOURCE);
+	if (shader == S_HANDLE_NULL) {
+		return S_HANDLE_NULL;
+	}
+	s_array_init(&shaders);
+	s_array_reserve(&shaders, 1u);
+	{
+		s_handle shader_entry = s_array_increment(&shaders);
+		se_shader_handle* slot = s_array_get(&shaders, shader_entry);
+		if (slot) {
+			*slot = shader;
+		}
+	}
+	model = se_model_load_obj_ex(SE_RESOURCE_PUBLIC("models/cube.obj"), &shaders, SE_MESH_DATA_GPU);
+	s_array_clear(&shaders);
+	if (model == S_HANDLE_NULL) {
+		se_shader_destroy(shader);
+		return S_HANDLE_NULL;
+	}
+	if (color) {
+		editor_set_gizmo_model_color(model, color);
+	}
+	return model;
+}
+
+static se_editor_category editor_active_details_category(const editor_showcase_app* app) {
+	if (!app) {
+		return SE_EDITOR_CATEGORY_COUNT;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_2D) {
+		return app->details_scene_scope ? SE_EDITOR_CATEGORY_SCENE_2D : SE_EDITOR_CATEGORY_OBJECT_2D;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		return app->details_scene_scope ? SE_EDITOR_CATEGORY_SCENE_3D : SE_EDITOR_CATEGORY_OBJECT_3D;
+	}
+	return SE_EDITOR_CATEGORY_SDF;
+}
+
+static const c8* editor_value_type_short(const se_editor_value_type type) {
+	switch (type) {
+		case SE_EDITOR_VALUE_BOOL: return "bool";
+		case SE_EDITOR_VALUE_INT: return "int";
+		case SE_EDITOR_VALUE_UINT: return "uint";
+		case SE_EDITOR_VALUE_U64: return "u64";
+		case SE_EDITOR_VALUE_FLOAT: return "float";
+		case SE_EDITOR_VALUE_DOUBLE: return "double";
+		case SE_EDITOR_VALUE_VEC2: return "vec2";
+		case SE_EDITOR_VALUE_VEC3: return "vec3";
+		case SE_EDITOR_VALUE_VEC4: return "vec4";
+		case SE_EDITOR_VALUE_MAT3: return "mat3";
+		case SE_EDITOR_VALUE_MAT4: return "mat4";
+		case SE_EDITOR_VALUE_HANDLE: return "handle";
+		case SE_EDITOR_VALUE_POINTER: return "ptr";
+		case SE_EDITOR_VALUE_TEXT: return "text";
+		case SE_EDITOR_VALUE_NONE:
+		default: return "none";
+	}
+}
+
+static void editor_format_value(const se_editor_value* value, c8* out_text, const sz out_text_size) {
+	if (!out_text || out_text_size == 0u) {
+		return;
+	}
+	out_text[0] = '\0';
+	if (!value) {
+		snprintf(out_text, out_text_size, "null");
+		return;
+	}
+	switch (value->type) {
+		case SE_EDITOR_VALUE_BOOL:
+			snprintf(out_text, out_text_size, "%s", value->bool_value ? "true" : "false");
+			break;
+		case SE_EDITOR_VALUE_INT:
+			snprintf(out_text, out_text_size, "%d", value->int_value);
+			break;
+		case SE_EDITOR_VALUE_UINT:
+			snprintf(out_text, out_text_size, "%u", value->uint_value);
+			break;
+		case SE_EDITOR_VALUE_U64:
+			snprintf(out_text, out_text_size, "%llu", (unsigned long long)value->u64_value);
+			break;
+		case SE_EDITOR_VALUE_FLOAT:
+			snprintf(out_text, out_text_size, "%.3f", value->float_value);
+			break;
+		case SE_EDITOR_VALUE_DOUBLE:
+			snprintf(out_text, out_text_size, "%.3f", value->double_value);
+			break;
+		case SE_EDITOR_VALUE_VEC2:
+			snprintf(out_text, out_text_size, "(%.3f, %.3f)", value->vec2_value.x, value->vec2_value.y);
+			break;
+		case SE_EDITOR_VALUE_VEC3:
+			snprintf(out_text, out_text_size, "(%.3f, %.3f, %.3f)", value->vec3_value.x, value->vec3_value.y, value->vec3_value.z);
+			break;
+		case SE_EDITOR_VALUE_VEC4:
+			snprintf(out_text, out_text_size, "(%.3f, %.3f, %.3f, %.3f)", value->vec4_value.x, value->vec4_value.y, value->vec4_value.z, value->vec4_value.w);
+			break;
+		case SE_EDITOR_VALUE_MAT3:
+			snprintf(
+				out_text,
+				out_text_size,
+				"[%.2f %.2f %.2f | %.2f %.2f %.2f | %.2f %.2f %.2f]",
+				value->mat3_value.m[0][0], value->mat3_value.m[0][1], value->mat3_value.m[0][2],
+				value->mat3_value.m[1][0], value->mat3_value.m[1][1], value->mat3_value.m[1][2],
+				value->mat3_value.m[2][0], value->mat3_value.m[2][1], value->mat3_value.m[2][2]);
+			break;
+		case SE_EDITOR_VALUE_MAT4:
+			snprintf(
+				out_text,
+				out_text_size,
+				"[%.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f]",
+				value->mat4_value.m[0][0], value->mat4_value.m[0][1], value->mat4_value.m[0][2], value->mat4_value.m[0][3],
+				value->mat4_value.m[1][0], value->mat4_value.m[1][1], value->mat4_value.m[1][2], value->mat4_value.m[1][3],
+				value->mat4_value.m[2][0], value->mat4_value.m[2][1], value->mat4_value.m[2][2], value->mat4_value.m[2][3],
+				value->mat4_value.m[3][0], value->mat4_value.m[3][1], value->mat4_value.m[3][2], value->mat4_value.m[3][3]);
+			break;
+		case SE_EDITOR_VALUE_HANDLE:
+			snprintf(out_text, out_text_size, "%llu", (unsigned long long)value->handle_value);
+			break;
+		case SE_EDITOR_VALUE_POINTER:
+			snprintf(out_text, out_text_size, "%p", value->pointer_value);
+			break;
+		case SE_EDITOR_VALUE_TEXT:
+			snprintf(out_text, out_text_size, "%s", value->text_value);
+			break;
+		case SE_EDITOR_VALUE_NONE:
+		default:
+			snprintf(out_text, out_text_size, "none");
+			break;
+	}
+}
+
+static u32 editor_value_component_count(const se_editor_value_type type) {
+	switch (type) {
+		case SE_EDITOR_VALUE_VEC2: return 2u;
+		case SE_EDITOR_VALUE_VEC3: return 3u;
+		case SE_EDITOR_VALUE_VEC4: return 4u;
+		case SE_EDITOR_VALUE_MAT3: return 9u;
+		case SE_EDITOR_VALUE_MAT4: return 16u;
+		default: return 1u;
+	}
+}
+
+static b8 editor_step_property_value(
+	const se_editor_property* property,
+	const i32 direction,
+	const u32 component_index,
+	const f32 amount,
+	se_editor_value* out_value
+) {
+	u64 u64_step = 1u;
+	if (!property || !out_value || !property->editable || direction == 0) {
+		return false;
+	}
+	*out_value = property->value;
+	switch (property->value.type) {
+		case SE_EDITOR_VALUE_BOOL:
+			out_value->bool_value = !property->value.bool_value;
+			return true;
+		case SE_EDITOR_VALUE_INT:
+			out_value->int_value += direction * s_max(1, (i32)roundf(amount));
+			return true;
+		case SE_EDITOR_VALUE_UINT:
+			if (direction < 0 && out_value->uint_value > 0u) {
+				out_value->uint_value--;
+			} else if (direction > 0) {
+				out_value->uint_value++;
+			}
+			return true;
+		case SE_EDITOR_VALUE_U64:
+			if (direction < 0) {
+				u64_step = out_value->u64_value > 0u ? 1u : 0u;
+				out_value->u64_value -= u64_step;
+			} else if (direction > 0) {
+				out_value->u64_value += 1u;
+			}
+			return true;
+		case SE_EDITOR_VALUE_FLOAT:
+			out_value->float_value += (f32)direction * amount;
+			return true;
+		case SE_EDITOR_VALUE_DOUBLE:
+			out_value->double_value += (f64)direction * (f64)amount;
+			return true;
+		case SE_EDITOR_VALUE_VEC2: {
+			f32* v = &out_value->vec2_value.x;
+			v[component_index % 2u] += (f32)direction * amount;
+			return true;
+		}
+		case SE_EDITOR_VALUE_VEC3: {
+			f32* v = &out_value->vec3_value.x;
+			v[component_index % 3u] += (f32)direction * amount;
+			return true;
+		}
+		case SE_EDITOR_VALUE_VEC4: {
+			f32* v = &out_value->vec4_value.x;
+			v[component_index % 4u] += (f32)direction * amount;
+			return true;
+		}
+		case SE_EDITOR_VALUE_MAT3: {
+			const u32 idx = component_index % 9u;
+			const u32 row = idx / 3u;
+			const u32 col = idx % 3u;
+			out_value->mat3_value.m[row][col] += (f32)direction * amount;
+			return true;
+		}
+		case SE_EDITOR_VALUE_MAT4: {
+			const u32 idx = component_index % 16u;
+			const u32 row = idx / 4u;
+			const u32 col = idx % 4u;
+			out_value->mat4_value.m[row][col] += (f32)direction * amount;
+			return true;
+		}
+		case SE_EDITOR_VALUE_HANDLE:
+			if (direction < 0 && out_value->handle_value > 0u) {
+				out_value->handle_value -= 1u;
+			} else if (direction > 0) {
+				out_value->handle_value += 1u;
+			}
+			return true;
+		default:
+			return false;
+	}
 }
 
 static b8 editor_get_mouse_framebuffer(editor_showcase_app* app, s_vec2* out_mouse, f32* out_width, f32* out_height) {
@@ -207,6 +535,24 @@ static b8 editor_apply_scene_3d_action(editor_showcase_app* app, const c8* actio
 	}
 	if (strcmp(action, "remove_object") == 0) {
 		se_scene_3d_remove_object(app->scene_3d, object);
+		return true;
+	}
+	return false;
+}
+
+static b8 editor_apply_sdf_action(editor_showcase_app* app, const c8* action, const se_editor_value* value, const se_editor_value* aux_value) {
+	se_editor_item sdf_item = {0};
+	if (!app || app->sdf_scene == SE_SDF_SCENE_NULL) {
+		return false;
+	}
+	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SDF, app->sdf_scene, &sdf_item)) {
+		if (se_editor_apply_action(app->editor, &sdf_item, action, value, aux_value)) {
+			return true;
+		}
+		editor_log_error(action);
+	}
+	if (strcmp(action, "clear") == 0) {
+		se_sdf_scene_clear(app->sdf_scene);
 		return true;
 	}
 	return false;
@@ -806,13 +1152,255 @@ static void editor_update_2d_gizmo_visuals(editor_showcase_app* app) {
 	editor_set_2d_object_color(app->gizmo_2d_y, &color_y);
 }
 
-static void editor_draw_3d_helpers(editor_showcase_app* app) {
-	(void)app;
+static void editor_update_3d_gizmo_visuals(editor_showcase_app* app) {
+	const s_vec3 hidden_pos = s_vec3(0.0f, -5000.0f, 0.0f);
+	s_vec3 origin = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 scale_center = s_vec3(EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE);
+	s_vec3 scale_x = s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS);
+	s_vec3 scale_y = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS);
+	s_vec3 scale_z = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH);
+	s_vec3 color_center = s_vec3(0.95f, 0.86f, 0.20f);
+	s_vec3 color_x = s_vec3(0.94f, 0.26f, 0.21f);
+	s_vec3 color_y = s_vec3(0.18f, 0.86f, 0.34f);
+	s_vec3 color_z = s_vec3(0.26f, 0.42f, 0.95f);
+	const f32 half_axis = EDITOR_3D_GIZMO_AXIS_LENGTH * 0.5f;
+	s_mat4 tc = s_mat4_identity;
+	s_mat4 tx = s_mat4_identity;
+	s_mat4 ty = s_mat4_identity;
+	s_mat4 tz = s_mat4_identity;
+	if (!app || app->gizmo_3d_center == S_HANDLE_NULL || app->gizmo_3d_x == S_HANDLE_NULL || app->gizmo_3d_y == S_HANDLE_NULL || app->gizmo_3d_z == S_HANDLE_NULL) {
+		return;
+	}
+	if (app->target != EDITOR_TARGET_SCENE_3D || app->selected_3d == S_HANDLE_NULL) {
+		tc = s_mat4_scale(&tc, &scale_center);
+		tx = s_mat4_scale(&tx, &scale_x);
+		ty = s_mat4_scale(&ty, &scale_y);
+		tz = s_mat4_scale(&tz, &scale_z);
+		s_mat4_set_translation(&tc, &hidden_pos);
+		s_mat4_set_translation(&tx, &hidden_pos);
+		s_mat4_set_translation(&ty, &hidden_pos);
+		s_mat4_set_translation(&tz, &hidden_pos);
+		se_object_3d_set_transform(app->gizmo_3d_center, &tc);
+		se_object_3d_set_transform(app->gizmo_3d_x, &tx);
+		se_object_3d_set_transform(app->gizmo_3d_y, &ty);
+		se_object_3d_set_transform(app->gizmo_3d_z, &tz);
+		return;
+	}
+	origin = editor_get_selected_3d_position(app);
+	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
+		scale_center = s_vec3(scale_center.x * 1.25f, scale_center.y * 1.25f, scale_center.z * 1.25f);
+		color_center = s_vec3(1.0f, 0.93f, 0.42f);
+	}
+	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_X) {
+		scale_x = s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH * 1.08f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f);
+		color_x = s_vec3(1.0f, 0.52f, 0.48f);
+	}
+	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_Y) {
+		scale_y = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_LENGTH * 1.08f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f);
+		color_y = s_vec3(0.45f, 1.0f, 0.56f);
+	}
+	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_Z) {
+		scale_z = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_LENGTH * 1.08f);
+		color_z = s_vec3(0.52f, 0.66f, 1.0f);
+	}
+	tc = s_mat4_scale(&tc, &scale_center);
+	tx = s_mat4_scale(&tx, &scale_x);
+	ty = s_mat4_scale(&ty, &scale_y);
+	tz = s_mat4_scale(&tz, &scale_z);
+	s_mat4_set_translation(&tc, &origin);
+	s_mat4_set_translation(&tx, &s_vec3(origin.x + half_axis, origin.y, origin.z));
+	s_mat4_set_translation(&ty, &s_vec3(origin.x, origin.y + half_axis, origin.z));
+	s_mat4_set_translation(&tz, &s_vec3(origin.x, origin.y, origin.z + half_axis));
+	se_object_3d_set_transform(app->gizmo_3d_center, &tc);
+	se_object_3d_set_transform(app->gizmo_3d_x, &tx);
+	se_object_3d_set_transform(app->gizmo_3d_y, &ty);
+	se_object_3d_set_transform(app->gizmo_3d_z, &tz);
+	editor_set_gizmo_model_color(app->gizmo_model_3d_center, &color_center);
+	editor_set_gizmo_model_color(app->gizmo_model_3d_x, &color_x);
+	editor_set_gizmo_model_color(app->gizmo_model_3d_y, &color_y);
+	editor_set_gizmo_model_color(app->gizmo_model_3d_z, &color_z);
+}
+
+static b8 editor_adjust_selected_property(editor_showcase_app* app, const i32 direction) {
+	const se_editor_item* items = NULL;
+	const se_editor_property* properties = NULL;
+	se_editor_value next_value = se_editor_value_none();
+	se_editor_category category = SE_EDITOR_CATEGORY_COUNT;
+	sz item_count = 0u;
+	sz property_count = 0u;
+	u32 component_count = 1u;
+	se_editor_item selected_item = {0};
+	const f32 amount = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 0.25f : 0.05f;
+	if (!app || !app->editor || direction == 0) {
+		return false;
+	}
+	category = editor_active_details_category(app);
+	if (category == SE_EDITOR_CATEGORY_COUNT) {
+		return false;
+	}
+	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(category), &items, &item_count) || item_count == 0u) {
+		return false;
+	}
+	if (app->details_item_index >= (u32)item_count) {
+		app->details_item_index = (u32)item_count - 1u;
+	}
+	selected_item = items[app->details_item_index];
+	if (!se_editor_collect_properties(app->editor, &selected_item, &properties, &property_count) || property_count == 0u) {
+		return false;
+	}
+	if (app->details_property_index >= (u32)property_count) {
+		app->details_property_index = (u32)property_count - 1u;
+	}
+	component_count = editor_value_component_count(properties[app->details_property_index].value.type);
+	if (app->details_component_index >= component_count) {
+		app->details_component_index = component_count - 1u;
+	}
+	if (!editor_step_property_value(
+			&properties[app->details_property_index],
+			direction,
+			app->details_component_index,
+			amount,
+			&next_value)) {
+		return false;
+	}
+	if (!se_editor_apply_set(app->editor, &selected_item, properties[app->details_property_index].name, &next_value)) {
+		editor_log_error("details set");
+		return false;
+	}
+	return true;
+}
+
+static void editor_save_active_target_json(editor_showcase_app* app) {
+	if (!app || !app->editor) {
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_2D) {
+		(void)se_editor_scene_2d_json_save(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		(void)se_editor_scene_3d_json_save(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
+		return;
+	}
+	(void)se_editor_sdf_json_save(app->editor, app->sdf_scene, se_editor_get_sdf_json_path(app->editor));
+}
+
+static void editor_load_active_target_json(editor_showcase_app* app) {
+	if (!app || !app->editor) {
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_2D) {
+		(void)se_editor_scene_2d_json_load(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		(void)se_editor_scene_3d_json_load(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
+		return;
+	}
+	if (se_editor_sdf_json_load(app->editor, app->sdf_scene, se_editor_get_sdf_json_path(app->editor))) {
+		(void)se_sdf_scene_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
+	}
+}
+
+static void editor_update_details_panel(editor_showcase_app* app) {
+	const se_editor_item* items = NULL;
+	const se_editor_property* properties = NULL;
+	se_editor_category category = SE_EDITOR_CATEGORY_COUNT;
+	sz item_count = 0u;
+	sz property_count = 0u;
+	u32 item_begin = 0u;
+	u32 prop_begin = 0u;
+	c8 details_text[8192] = {0};
+	c8 value_text[768] = {0};
+	const c8* category_name = NULL;
+	if (!app || !app->editor || app->ui == S_HANDLE_NULL || app->ui_details_body == S_HANDLE_NULL || app->ui_details_title == S_HANDLE_NULL) {
+		return;
+	}
+	category = editor_active_details_category(app);
+	category_name = se_editor_category_name(category);
+	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(category), &items, &item_count) || item_count == 0u) {
+		snprintf(details_text, sizeof(details_text), "No items for category %s", category_name ? category_name : "unknown");
+		(void)se_ui_widget_set_text(app->ui, app->ui_details_body, details_text);
+		return;
+	}
+
+	if (app->details_item_index >= (u32)item_count) {
+		app->details_item_index = (u32)item_count - 1u;
+	}
+	if ((category == SE_EDITOR_CATEGORY_OBJECT_2D && app->selected_2d != S_HANDLE_NULL) ||
+		(category == SE_EDITOR_CATEGORY_OBJECT_3D && app->selected_3d != S_HANDLE_NULL)) {
+		const s_handle selected_handle =
+			category == SE_EDITOR_CATEGORY_OBJECT_2D ? app->selected_2d : app->selected_3d;
+		for (u32 i = 0u; i < (u32)item_count; ++i) {
+			if (items[i].handle == selected_handle) {
+				app->details_item_index = i;
+				break;
+			}
+		}
+	}
+	if (!se_editor_collect_properties(app->editor, &items[app->details_item_index], &properties, &property_count)) {
+		property_count = 0u;
+	}
+	if (property_count > 0u && app->details_property_index >= (u32)property_count) {
+		app->details_property_index = (u32)property_count - 1u;
+	}
+	if (property_count > 0u) {
+		const u32 comp_count = editor_value_component_count(properties[app->details_property_index].value.type);
+		if (comp_count > 0u) {
+			app->details_component_index %= comp_count;
+		}
+	}
+
+	(void)se_ui_widget_set_text(
+		app->ui,
+		app->ui_details_title,
+		"Details | arrows=item/prop | PgUp/PgDn=component | +/- edit | F5 save | F9 load");
+
+	editor_text_append(details_text, sizeof(details_text), "Mode: %s | Scope: %s\n", editor_target_name(app->target), app->details_scene_scope ? "scene" : "object");
+	editor_text_append(details_text, sizeof(details_text), "Category: %s\n", category_name ? category_name : "unknown");
+	editor_text_append(details_text, sizeof(details_text), "Items (%zu):\n", item_count);
+	item_begin = app->details_item_index >= (EDITOR_DETAILS_ITEM_LINES / 2u) ? app->details_item_index - (EDITOR_DETAILS_ITEM_LINES / 2u) : 0u;
+	for (u32 i = item_begin; i < (u32)item_count && i < item_begin + EDITOR_DETAILS_ITEM_LINES; ++i) {
+		editor_text_append(
+			details_text,
+			sizeof(details_text),
+			"%c [%u] %s (h=%llu)\n",
+			i == app->details_item_index ? '>' : ' ',
+			i,
+			items[i].label,
+			(unsigned long long)items[i].handle);
+	}
+	editor_text_append(details_text, sizeof(details_text), "\nProperties (%zu):\n", property_count);
+	if (property_count == 0u) {
+		editor_text_append(details_text, sizeof(details_text), "  none\n");
+	} else {
+		prop_begin = app->details_property_index >= (EDITOR_DETAILS_PROPERTY_LINES / 2u)
+			? app->details_property_index - (EDITOR_DETAILS_PROPERTY_LINES / 2u)
+			: 0u;
+		for (u32 i = prop_begin; i < (u32)property_count && i < prop_begin + EDITOR_DETAILS_PROPERTY_LINES; ++i) {
+			editor_format_value(&properties[i].value, value_text, sizeof(value_text));
+			editor_text_append(
+				details_text,
+				sizeof(details_text),
+				"%c %s%s [%s] = %s\n",
+				i == app->details_property_index ? '>' : ' ',
+				properties[i].name,
+				properties[i].editable ? "*" : "",
+				editor_value_type_short(properties[i].value.type),
+				value_text);
+		}
+		editor_text_append(
+			details_text,
+			sizeof(details_text),
+			"\nSelected component: %u/%u\n",
+			app->details_component_index + 1u,
+			editor_value_component_count(properties[app->details_property_index].value.type));
+	}
+	(void)se_ui_widget_set_text(app->ui, app->ui_details_body, details_text);
 }
 
 static void editor_update_ui_status(editor_showcase_app* app) {
-	c8 status[512] = {0};
-	const c8* target_name = "scene_2d";
+	c8 status[640] = {0};
 	const c8* axis_name = "none";
 	f64 now = 0.0;
 	if (!app || app->ui == S_HANDLE_NULL || app->ui_status == S_HANDLE_NULL) {
@@ -821,9 +1409,6 @@ static void editor_update_ui_status(editor_showcase_app* app) {
 	now = se_window_get_time(app->window);
 	if (now < app->next_status_time) {
 		return;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		target_name = "scene_3d";
 	}
 	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
 		axis_name = "free";
@@ -837,21 +1422,73 @@ static void editor_update_ui_status(editor_showcase_app* app) {
 	snprintf(
 		status,
 		sizeof(status),
-		"Mode=%s | Drag=%s axis=%s | selected2d=%llu selected3d=%llu | objects2d=%zu objects3d=%zu | Tab switch mode | N add | Delete remove | LMB select/drag gizmo",
-		target_name,
+		"Mode=%s | Drag=%s axis=%s | 2D=%zu 3D=%zu | Tab cycle mode | G scene/object details | N add | Delete remove | LMB select+gizmo | F5 save JSON | F9 load JSON",
+		editor_target_name(app->target),
 		app->dragging ? "on" : "off",
 		axis_name,
-		(unsigned long long)app->selected_2d,
-		(unsigned long long)app->selected_3d,
 		s_array_get_size(&app->objects_2d),
 		s_array_get_size(&app->objects_3d));
 	(void)se_ui_widget_set_text(app->ui, app->ui_status, status);
 	app->next_status_time = now + 0.08;
 }
 
+static void editor_update_details_controls(editor_showcase_app* app) {
+	if (!app || !app->editor) {
+		return;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_G) &&
+		(app->target == EDITOR_TARGET_SCENE_2D || app->target == EDITOR_TARGET_SCENE_3D)) {
+		app->details_scene_scope = !app->details_scene_scope;
+		app->details_item_index = 0u;
+		app->details_property_index = 0u;
+		app->details_component_index = 0u;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_UP) && app->details_item_index > 0u) {
+		app->details_item_index--;
+		app->details_property_index = 0u;
+		app->details_component_index = 0u;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_DOWN)) {
+		app->details_item_index++;
+		app->details_property_index = 0u;
+		app->details_component_index = 0u;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_LEFT) && app->details_property_index > 0u) {
+		app->details_property_index--;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_RIGHT)) {
+		app->details_property_index++;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_PAGE_UP) && app->details_component_index > 0u) {
+		app->details_component_index--;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_PAGE_DOWN)) {
+		app->details_component_index++;
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_MINUS)) {
+		(void)editor_adjust_selected_property(app, -1);
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_EQUAL)) {
+		(void)editor_adjust_selected_property(app, 1);
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_ENTER)) {
+		(void)editor_adjust_selected_property(app, 1);
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_F5)) {
+		editor_save_active_target_json(app);
+	}
+	if (se_window_is_key_pressed(app->window, SE_KEY_F9)) {
+		editor_load_active_target_json(app);
+	}
+	if (app->target == EDITOR_TARGET_SDF && se_window_is_key_pressed(app->window, SE_KEY_C)) {
+		(void)editor_apply_sdf_action(app, "clear", NULL, NULL);
+	}
+}
+
 static b8 editor_setup_ui(editor_showcase_app* app) {
 	se_ui_style root_style = SE_UI_STYLE_DEFAULT;
 	se_ui_style panel_style = SE_UI_STYLE_DEFAULT;
+	se_ui_widget_handle root = S_HANDLE_NULL;
 	if (!app || app->window == S_HANDLE_NULL) {
 		return false;
 	}
@@ -860,7 +1497,7 @@ static b8 editor_setup_ui(editor_showcase_app* app) {
 		return false;
 	}
 
-	se_ui_widget_handle root = se_ui_create_root(app->ui);
+	root = se_ui_create_root(app->ui);
 	root_style.normal.background_color.w = 0.0f;
 	root_style.hovered.background_color.w = 0.0f;
 	root_style.pressed.background_color.w = 0.0f;
@@ -876,22 +1513,22 @@ static b8 editor_setup_ui(editor_showcase_app* app) {
 	app->ui_panel = se_ui_add_panel(root, {
 		.id = "editor_hud",
 		.position = s_vec2(0.012f, 0.012f),
-		.size = s_vec2(0.976f, 0.095f)
+		.size = s_vec2(0.98f, 0.12f)
 	});
-	se_ui_vstack(app->ui, app->ui_panel, 0.005f, se_ui_edge_all(0.008f));
+	se_ui_vstack(app->ui, app->ui_panel, 0.004f, se_ui_edge_all(0.010f));
 
 	app->ui_title = se_ui_add_text(app->ui_panel, {
 		.id = "editor_title",
-		.text = "Advanced Editor Showcase | 2D+3D Scene Editing",
-		.size = s_vec2(0.95f, 0.038f),
-		.font_size = 20.0f
+		.text = "Advanced Editor Showcase | 2D + 3D + SDF Scene Kit",
+		.size = s_vec2(0.96f, 0.048f),
+		.font_size = 28.0f
 	});
 
 	app->ui_status = se_ui_add_text(app->ui_panel, {
 		.id = "editor_status",
 		.text = "Initializing editor state...",
-		.size = s_vec2(0.95f, 0.032f),
-		.font_size = 14.0f
+		.size = s_vec2(0.96f, 0.050f),
+		.font_size = 18.0f
 	});
 
 	panel_style.normal.background_color = s_vec4(0.03f, 0.06f, 0.10f, 0.92f);
@@ -903,11 +1540,50 @@ static b8 editor_setup_ui(editor_showcase_app* app) {
 	panel_style.disabled = panel_style.normal;
 	panel_style.focused = panel_style.normal;
 	(void)se_ui_widget_set_style(app->ui, app->ui_panel, &panel_style);
+
+	app->ui_details_panel = se_ui_add_panel(root, {
+		.id = "editor_details",
+		.position = s_vec2(0.655f, 0.145f),
+		.size = s_vec2(0.324f, 0.842f)
+	});
+	se_ui_vstack(app->ui, app->ui_details_panel, 0.005f, se_ui_edge_all(0.010f));
+
+	app->ui_details_title = se_ui_add_text(app->ui_details_panel, {
+		.id = "details_title",
+		.text = "Details",
+		.size = s_vec2(0.96f, 0.060f),
+		.font_size = 23.0f
+	});
+	app->ui_details_body = se_ui_add_text(app->ui_details_panel, {
+		.id = "details_body",
+		.text = "Collecting editor properties...",
+		.size = s_vec2(0.96f, 0.75f),
+		.font_size = 18.0f
+	});
+
+	panel_style.normal.background_color = s_vec4(0.06f, 0.07f, 0.09f, 0.93f);
+	panel_style.normal.border_color = s_vec4(0.35f, 0.78f, 0.40f, 0.95f);
+	panel_style.normal.text_color = s_vec4(0.95f, 0.97f, 1.0f, 1.0f);
+	panel_style.hovered = panel_style.normal;
+	panel_style.pressed = panel_style.normal;
+	panel_style.disabled = panel_style.normal;
+	panel_style.focused = panel_style.normal;
+	(void)se_ui_widget_set_style(app->ui, app->ui_details_panel, &panel_style);
 	return true;
 }
 
 static b8 editor_setup_scenes(editor_showcase_app* app) {
 	se_editor_config editor_config = SE_EDITOR_CONFIG_DEFAULTS;
+	se_sdf_node_group_desc sdf_root_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
+	se_sdf_node_primitive_desc box_desc = {0};
+	se_sdf_node_primitive_desc sphere_desc = {0};
+	se_sdf_node_handle sdf_root = SE_SDF_NODE_NULL;
+	se_sdf_node_handle sdf_box = SE_SDF_NODE_NULL;
+	se_sdf_node_handle sdf_sphere = SE_SDF_NODE_NULL;
+	s_mat4 hidden_center = s_mat4_identity;
+	s_mat4 hidden_x = s_mat4_identity;
+	s_mat4 hidden_y = s_mat4_identity;
+	s_mat4 hidden_z = s_mat4_identity;
 	if (!app) {
 		return false;
 	}
@@ -935,6 +1611,10 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	se_camera_set_target_mode(app->camera_3d, true);
 	se_camera_set_aspect_from_window(app->camera_3d, app->window);
 	se_camera_set_perspective(app->camera_3d, 52.0f, 0.05f, 220.0f);
+	app->camera_target_sdf = s_vec3(0.0f, 0.0f, 0.0f);
+	app->camera_yaw_sdf = 0.70f;
+	app->camera_pitch_sdf = 0.34f;
+	app->camera_distance_sdf = 6.8f;
 
 	app->cube_model = se_model_load_obj_simple(
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
@@ -944,18 +1624,86 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 		editor_log_error("load cube model");
 		return false;
 	}
+	app->gizmo_model_3d_x = editor_create_colored_gizmo_model(&s_vec3(0.94f, 0.26f, 0.21f));
+	app->gizmo_model_3d_y = editor_create_colored_gizmo_model(&s_vec3(0.18f, 0.86f, 0.34f));
+	app->gizmo_model_3d_z = editor_create_colored_gizmo_model(&s_vec3(0.26f, 0.42f, 0.95f));
+	app->gizmo_model_3d_center = editor_create_colored_gizmo_model(&s_vec3(0.95f, 0.86f, 0.20f));
+	if (app->gizmo_model_3d_x == S_HANDLE_NULL ||
+		app->gizmo_model_3d_y == S_HANDLE_NULL ||
+		app->gizmo_model_3d_z == S_HANDLE_NULL ||
+		app->gizmo_model_3d_center == S_HANDLE_NULL) {
+		editor_log_error("create 3d gizmo models");
+		return false;
+	}
+
+	app->sdf_camera_scene = se_scene_3d_create_for_window(app->window, 1);
+	if (app->sdf_camera_scene == S_HANDLE_NULL) {
+		editor_log_error("create sdf camera scene");
+		return false;
+	}
+	app->sdf_camera = se_scene_3d_get_camera(app->sdf_camera_scene);
+	if (app->sdf_camera == S_HANDLE_NULL) {
+		editor_log_error("sdf camera");
+		return false;
+	}
+	se_camera_set_target_mode(app->sdf_camera, true);
+	se_camera_set_aspect_from_window(app->sdf_camera, app->window);
+	se_camera_set_perspective(app->sdf_camera, 52.0f, 0.05f, 200.0f);
+
+	app->sdf_scene = se_sdf_scene_create(NULL);
+	if (app->sdf_scene == SE_SDF_SCENE_NULL) {
+		editor_log_error("create sdf scene");
+		return false;
+	}
+	sdf_root_desc.operation = SE_SDF_OP_SMOOTH_UNION;
+	sdf_root_desc.operation_amount = 0.35f;
+	sdf_root = se_sdf_node_create_group(app->sdf_scene, &sdf_root_desc);
+	if (sdf_root == SE_SDF_NODE_NULL || !se_sdf_scene_set_root(app->sdf_scene, sdf_root)) {
+		editor_log_error("sdf root");
+		return false;
+	}
+	box_desc.transform = s_mat4_identity;
+	box_desc.operation = SE_SDF_OP_UNION;
+	box_desc.primitive.type = SE_SDF_PRIMITIVE_BOX;
+	box_desc.primitive.box.size = s_vec3(1.40f, 1.00f, 1.10f);
+	sphere_desc.transform = s_mat4_identity;
+	s_mat4_set_translation(&sphere_desc.transform, &s_vec3(0.45f, 0.25f, 0.0f));
+	sphere_desc.operation = SE_SDF_OP_UNION;
+	sphere_desc.primitive.type = SE_SDF_PRIMITIVE_SPHERE;
+	sphere_desc.primitive.sphere.radius = 0.82f;
+	sdf_box = se_sdf_node_create_primitive(app->sdf_scene, &box_desc);
+	sdf_sphere = se_sdf_node_create_primitive(app->sdf_scene, &sphere_desc);
+	if (sdf_box == SE_SDF_NODE_NULL || sdf_sphere == SE_SDF_NODE_NULL ||
+		!se_sdf_node_add_child(app->sdf_scene, sdf_root, sdf_box) ||
+		!se_sdf_node_add_child(app->sdf_scene, sdf_root, sdf_sphere)) {
+		editor_log_error("sdf nodes");
+		return false;
+	}
+	app->sdf_renderer = se_sdf_renderer_create(NULL);
+	if (app->sdf_renderer == SE_SDF_RENDERER_NULL || !se_sdf_renderer_set_scene(app->sdf_renderer, app->sdf_scene)) {
+		editor_log_error("sdf renderer");
+		return false;
+	}
+	(void)se_sdf_scene_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
 
 	editor_config.context = app->context;
 	editor_config.window = app->window;
+	editor_config.focused_scene_2d = app->scene_2d;
+	editor_config.focused_scene_3d = app->scene_3d;
+	editor_config.focused_sdf = app->sdf_scene;
+	editor_config.focused_sdf_camera = app->sdf_camera;
+	editor_config.scene_2d_json_path = "scene2d_editor_showcase.json";
+	editor_config.scene_3d_json_path = "scene3d_editor_showcase.json";
+	editor_config.sdf_json_path = "sdf_editor_showcase.json";
 	app->editor = se_editor_create(&editor_config);
 	if (!app->editor) {
 		editor_log_error("create editor");
 		return false;
 	}
 
-	app->gizmo_2d_center = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
-	app->gizmo_2d_x = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
-	app->gizmo_2d_y = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
+	app->gizmo_2d_center = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
+	app->gizmo_2d_x = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
+	app->gizmo_2d_y = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
 	if (app->gizmo_2d_center == S_HANDLE_NULL || app->gizmo_2d_x == S_HANDLE_NULL || app->gizmo_2d_y == S_HANDLE_NULL) {
 		editor_log_error("create 2d gizmo objects");
 		return false;
@@ -970,6 +1718,27 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	se_object_2d_set_position(app->gizmo_2d_x, &s_vec2(-3.0f, -3.0f));
 	se_object_2d_set_position(app->gizmo_2d_y, &s_vec2(-3.0f, -3.0f));
 
+	hidden_center = s_mat4_scale(&hidden_center, &s_vec3(EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE));
+	hidden_x = s_mat4_scale(&hidden_x, &s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS));
+	hidden_y = s_mat4_scale(&hidden_y, &s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS));
+	hidden_z = s_mat4_scale(&hidden_z, &s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH));
+	s_mat4_set_translation(&hidden_center, &s_vec3(0.0f, -5000.0f, 0.0f));
+	s_mat4_set_translation(&hidden_x, &s_vec3(0.0f, -5000.0f, 0.0f));
+	s_mat4_set_translation(&hidden_y, &s_vec3(0.0f, -5000.0f, 0.0f));
+	s_mat4_set_translation(&hidden_z, &s_vec3(0.0f, -5000.0f, 0.0f));
+	app->gizmo_3d_center = se_object_3d_create(app->gizmo_model_3d_center, &hidden_center, 0);
+	app->gizmo_3d_x = se_object_3d_create(app->gizmo_model_3d_x, &hidden_x, 0);
+	app->gizmo_3d_y = se_object_3d_create(app->gizmo_model_3d_y, &hidden_y, 0);
+	app->gizmo_3d_z = se_object_3d_create(app->gizmo_model_3d_z, &hidden_z, 0);
+	if (app->gizmo_3d_center == S_HANDLE_NULL || app->gizmo_3d_x == S_HANDLE_NULL || app->gizmo_3d_y == S_HANDLE_NULL || app->gizmo_3d_z == S_HANDLE_NULL) {
+		editor_log_error("create 3d gizmo objects");
+		return false;
+	}
+	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_center);
+	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_x);
+	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_y);
+	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_z);
+
 	app->selected_2d = editor_spawn_object_2d(app, &s_vec2(-0.60f, -0.30f));
 	(void)editor_spawn_object_2d(app, &s_vec2(-0.10f, -0.05f));
 	(void)editor_spawn_object_2d(app, &s_vec2(0.44f, 0.26f));
@@ -978,6 +1747,7 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	(void)editor_spawn_object_3d(app, &s_vec3(0.0f, 0.35f, 0.0f));
 	(void)editor_spawn_object_3d(app, &s_vec3(1.25f, 0.35f, 0.55f));
 	editor_apply_camera_pose_3d(app);
+	editor_apply_camera_pose_sdf(app);
 
 	return true;
 }
@@ -1032,7 +1802,9 @@ static void editor_remove_selected_object(editor_showcase_app* app) {
 		editor_delete_object_2d(app, app->selected_2d);
 		return;
 	}
-	editor_delete_object_3d(app, app->selected_3d);
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		editor_delete_object_3d(app, app->selected_3d);
+	}
 }
 
 static b8 editor_is_alt_down(editor_showcase_app* app) {
@@ -1053,6 +1825,19 @@ static void editor_apply_camera_pose_3d(editor_showcase_app* app) {
 	se_camera_set_location(app->camera_3d, &position);
 	se_camera_set_target(app->camera_3d, &app->camera_target_3d);
 	se_camera_set_aspect_from_window(app->camera_3d, app->window);
+}
+
+static void editor_apply_camera_pose_sdf(editor_showcase_app* app) {
+	if (!app || app->sdf_camera == S_HANDLE_NULL) {
+		return;
+	}
+	const s_vec3 rotation = s_vec3(app->camera_pitch_sdf, app->camera_yaw_sdf, 0.0f);
+	se_camera_set_rotation(app->sdf_camera, &rotation);
+	const s_vec3 forward = se_camera_get_forward_vector(app->sdf_camera);
+	const s_vec3 position = s_vec3_sub(&app->camera_target_sdf, &s_vec3_muls(&forward, app->camera_distance_sdf));
+	se_camera_set_location(app->sdf_camera, &position);
+	se_camera_set_target(app->sdf_camera, &app->camera_target_sdf);
+	se_camera_set_aspect_from_window(app->sdf_camera, app->window);
 }
 
 static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt) {
@@ -1105,6 +1890,57 @@ static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt) {
 
 	app->camera_distance_3d = editor_clampf(app->camera_distance_3d, 1.5f, 120.0f);
 	editor_apply_camera_pose_3d(app);
+}
+
+static void editor_update_camera_sdf(editor_showcase_app* app, const f32 dt) {
+	s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
+	s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
+	if (!app || app->target != EDITOR_TARGET_SDF || app->dragging || app->sdf_camera == S_HANDLE_NULL) {
+		return;
+	}
+	const b8 alt = editor_is_alt_down(app);
+	se_window_get_mouse_delta(app->window, &mouse_delta);
+	se_window_get_scroll_delta(app->window, &scroll_delta);
+
+	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
+		app->camera_yaw_sdf += mouse_delta.x * 0.007f;
+		app->camera_pitch_sdf = editor_clampf(app->camera_pitch_sdf - mouse_delta.y * 0.007f, -1.45f, 1.45f);
+	}
+	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_MIDDLE)) {
+		const s_vec3 right = se_camera_get_right_vector(app->sdf_camera);
+		const s_vec3 up = se_camera_get_up_vector(app->sdf_camera);
+		const f32 pan_scale = s_max(0.01f, app->camera_distance_sdf * 0.0025f);
+		s_vec3 pan = s_vec3_muls(&right, -mouse_delta.x * pan_scale);
+		pan = s_vec3_add(&pan, &s_vec3_muls(&up, mouse_delta.y * pan_scale));
+		app->camera_target_sdf = s_vec3_add(&app->camera_target_sdf, &pan);
+	}
+	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT)) {
+		app->camera_distance_sdf += mouse_delta.y * 0.028f * s_max(1.0f, app->camera_distance_sdf);
+	}
+	if (fabsf(scroll_delta.y) > 0.0001f) {
+		app->camera_distance_sdf -= scroll_delta.y * 0.9f;
+	}
+
+	if (se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT) && !alt) {
+		const s_vec3 forward = se_camera_get_forward_vector(app->sdf_camera);
+		const s_vec3 right = se_camera_get_right_vector(app->sdf_camera);
+		s_vec3 move = s_vec3(0.0f, 0.0f, 0.0f);
+		if (se_window_is_key_down(app->window, SE_KEY_W)) move = s_vec3_add(&move, &forward);
+		if (se_window_is_key_down(app->window, SE_KEY_S)) move = s_vec3_sub(&move, &forward);
+		if (se_window_is_key_down(app->window, SE_KEY_D)) move = s_vec3_add(&move, &right);
+		if (se_window_is_key_down(app->window, SE_KEY_A)) move = s_vec3_sub(&move, &right);
+		if (se_window_is_key_down(app->window, SE_KEY_E)) move.y += 1.0f;
+		if (se_window_is_key_down(app->window, SE_KEY_Q)) move.y -= 1.0f;
+		const f32 move_len = s_vec3_length(&move);
+		if (move_len > 0.0001f) {
+			const f32 speed = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 12.0f : 6.0f;
+			move = s_vec3_muls(&s_vec3_divs(&move, move_len), speed * s_max(dt, 0.0f));
+			app->camera_target_sdf = s_vec3_add(&app->camera_target_sdf, &move);
+		}
+	}
+
+	app->camera_distance_sdf = editor_clampf(app->camera_distance_sdf, 1.5f, 120.0f);
+	editor_apply_camera_pose_sdf(app);
 }
 
 static void editor_update_scene_2d_interaction(editor_showcase_app* app) {
@@ -1185,6 +2021,19 @@ static void editor_cleanup(editor_showcase_app* app) {
 		se_scene_3d_destroy_full(app->scene_3d, true, true);
 		app->scene_3d = S_HANDLE_NULL;
 	}
+	if (app->sdf_renderer != SE_SDF_RENDERER_NULL) {
+		se_sdf_renderer_destroy(app->sdf_renderer);
+		app->sdf_renderer = SE_SDF_RENDERER_NULL;
+	}
+	if (app->sdf_scene != SE_SDF_SCENE_NULL) {
+		se_sdf_scene_destroy(app->sdf_scene);
+		app->sdf_scene = SE_SDF_SCENE_NULL;
+	}
+	if (app->sdf_camera_scene != S_HANDLE_NULL) {
+		se_scene_3d_destroy(app->sdf_camera_scene);
+		app->sdf_camera_scene = S_HANDLE_NULL;
+	}
+	se_sdf_shutdown();
 	s_array_clear(&app->objects_2d);
 	s_array_clear(&app->objects_3d);
 	if (app->context) {
@@ -1200,8 +2049,12 @@ int main(void) {
 
 	s_array_init(&app.objects_2d);
 	s_array_init(&app.objects_3d);
-	app.target = EDITOR_TARGET_SCENE_2D;
+	app.target = editor_target_from_env();
 	app.active_axis = EDITOR_GIZMO_AXIS_NONE;
+	app.details_scene_scope = false;
+	app.details_item_index = 0u;
+	app.details_property_index = 0u;
+	app.details_component_index = 0u;
 
 	app.context = se_context_create();
 	if (!app.context) {
@@ -1231,11 +2084,16 @@ int main(void) {
 	}
 
 	printf("editor_showcase controls:\n");
-	printf("  Tab: switch active editor target (scene_2d / scene_3d)\n");
+	printf("  Tab: cycle active editor target (scene_2d / scene_3d / sdf)\n");
+	printf("  G: toggle details scope (scene/object) for 2D/3D targets\n");
+	printf("  Up/Down: select item | Left/Right: select property | PgUp/PgDn: select component\n");
+	printf("  +/- or Enter: edit selected property (editable fields only)\n");
+	printf("  F5 save json | F9 load json for active target\n");
 	printf("  Left Mouse: select and drag with gizmo handles\n");
-	printf("  N: add object at cursor\n");
+	printf("  N: add object at cursor (2D/3D)\n");
 	printf("  Delete/Backspace: remove selected object\n");
-	printf("  3D camera: Alt+LMB orbit, Alt+MMB pan, Alt+RMB or wheel zoom, RMB+WASDQE fly\n");
+	printf("  3D/SDF camera: Alt+LMB orbit, Alt+MMB pan, Alt+RMB or wheel zoom, RMB+WASDQE fly\n");
+	printf("  SDF mode: C clears SDF scene\n");
 	printf("  Esc: quit\n");
 
 	while (!se_window_should_close(app.window)) {
@@ -1247,7 +2105,10 @@ int main(void) {
 			if (app.dragging) {
 				editor_end_drag(&app);
 			}
-			app.target = (app.target == EDITOR_TARGET_SCENE_2D) ? EDITOR_TARGET_SCENE_3D : EDITOR_TARGET_SCENE_2D;
+			app.target = (editor_target)(((u32)app.target + 1u) % 3u);
+			app.details_item_index = 0u;
+			app.details_property_index = 0u;
+			app.details_component_index = 0u;
 		}
 		if (se_window_is_key_pressed(app.window, SE_KEY_N)) {
 			editor_add_object_from_cursor(&app);
@@ -1255,16 +2116,19 @@ int main(void) {
 		if (se_window_is_key_pressed(app.window, SE_KEY_DELETE) || se_window_is_key_pressed(app.window, SE_KEY_BACKSPACE)) {
 			editor_remove_selected_object(&app);
 		}
+		editor_update_details_controls(&app);
 
 		editor_update_camera_3d(&app, dt);
+		editor_update_camera_sdf(&app, dt);
 
 		editor_update_scene_2d_interaction(&app);
 		editor_update_scene_3d_interaction(&app);
 
 		editor_update_2d_object_colors(&app);
 		editor_update_2d_gizmo_visuals(&app);
-		editor_draw_3d_helpers(&app);
+		editor_update_3d_gizmo_visuals(&app);
 		editor_update_ui_status(&app);
+		editor_update_details_panel(&app);
 
 		if (app.ui != S_HANDLE_NULL) {
 			se_ui_tick(app.ui);
@@ -1273,8 +2137,22 @@ int main(void) {
 		se_render_clear();
 		if (app.target == EDITOR_TARGET_SCENE_2D) {
 			se_scene_2d_draw(app.scene_2d, app.window);
-		} else {
+		} else if (app.target == EDITOR_TARGET_SCENE_3D) {
 			se_scene_3d_draw(app.scene_3d, app.window);
+		} else {
+			u32 fb_w = 0;
+			u32 fb_h = 0;
+			se_window_get_framebuffer_size(app.window, &fb_w, &fb_h);
+			if (app.sdf_camera != S_HANDLE_NULL) {
+				se_camera_set_aspect(app.sdf_camera, fb_w > 0u ? (f32)fb_w : 1280.0f, fb_h > 0u ? (f32)fb_h : 720.0f);
+			}
+			se_sdf_frame_desc frame = SE_SDF_FRAME_DESC_DEFAULTS;
+			frame.resolution = s_vec2(fb_w > 0u ? (f32)fb_w : 1280.0f, fb_h > 0u ? (f32)fb_h : 720.0f);
+			frame.time_seconds = (f32)se_window_get_time(app.window);
+			(void)se_sdf_frame_set_camera(&frame, app.sdf_camera);
+			if (app.sdf_renderer != SE_SDF_RENDERER_NULL) {
+				(void)se_sdf_renderer_render(app.sdf_renderer, &frame);
+			}
 		}
 		if (app.ui != S_HANDLE_NULL) {
 			se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));

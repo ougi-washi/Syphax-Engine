@@ -7,6 +7,7 @@
 #include "se_scene.h"
 #include "se_texture.h"
 
+/* mesh_index < 0 loads all meshes from the asset into a single model. */
 extern se_model_handle se_gltf_model_load_ex(const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags);
 extern se_model_handle se_gltf_model_load(const se_gltf_asset *asset, const i32 mesh_index);
 extern se_model_handle se_gltf_model_load_first(const char *path, const se_gltf_load_params *params);

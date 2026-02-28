@@ -12,6 +12,8 @@
 #include "se_render_buffer.h"
 #include "se_framebuffer.h"
 
+typedef struct s_json s_json;
+
 #define SE_MAX_SCENES 128
 #define SE_MAX_2D_OBJECTS 1024
 #define SE_MAX_3D_OBJECTS 1024
@@ -171,6 +173,8 @@ extern void se_scene_2d_draw(const se_scene_2d_handle scene, const se_window_han
 extern void se_scene_2d_add_object(const se_scene_2d_handle scene, const se_object_2d_handle object);
 extern void se_scene_2d_remove_object(const se_scene_2d_handle scene, const se_object_2d_handle object);
 extern b8 se_scene_2d_pick_object(const se_scene_2d_handle scene, const s_vec2* point_ndc, se_scene_pick_filter_2d filter, void* user_data, se_object_2d_handle* out_object);
+extern s_json* se_scene_2d_to_json(const se_scene_2d_handle scene);
+extern b8 se_scene_2d_from_json(const se_scene_2d_handle scene, const s_json* root);
 
 // 3D scene functions
 extern se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 object_count);
@@ -195,6 +199,8 @@ extern void se_scene_3d_add_post_process_buffer(const se_scene_3d_handle scene, 
 extern void se_scene_3d_remove_post_process_buffer(const se_scene_3d_handle scene, const se_render_buffer_handle buffer);
 extern se_scene_3d_custom_render_handle se_scene_3d_register_custom_render(const se_scene_3d_handle scene, se_scene_3d_custom_render_callback callback, void* user_data);
 extern b8 se_scene_3d_unregister_custom_render(const se_scene_3d_handle scene, const se_scene_3d_custom_render_handle callback_handle);
+extern s_json* se_scene_3d_to_json(const se_scene_3d_handle scene);
+extern b8 se_scene_3d_from_json(const se_scene_3d_handle scene, const s_json* root);
 
 // 3D objects functions
 extern se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat4 *transform, const sz max_instances_count);

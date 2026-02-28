@@ -4,9 +4,12 @@
 
 #include "se_graphics.h"
 #include "se_ext.h"
+#include "se_sdf.h"
 #include "se_texture.h"
 
 #include "syphax/s_array.h"
+#include "syphax/s_files.h"
+#include "syphax/s_json.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +58,13 @@ struct se_editor {
 	se_simulation_handle focused_simulation;
 	se_vfx_2d_handle focused_vfx_2d;
 	se_vfx_3d_handle focused_vfx_3d;
+	se_scene_2d_handle focused_scene_2d;
+	se_scene_3d_handle focused_scene_3d;
+	se_sdf_scene_handle focused_sdf;
+	se_camera_handle focused_sdf_camera;
+	c8 scene_2d_json_path[SE_MAX_PATH_LENGTH];
+	c8 scene_3d_json_path[SE_MAX_PATH_LENGTH];
+	c8 sdf_json_path[SE_MAX_PATH_LENGTH];
 
 	se_editor_audio_clip_refs clips;
 	se_editor_audio_stream_refs streams;
@@ -391,6 +401,8 @@ struct se_editor {
 #define SE_EDITOR_NAME_SCENE3D "scene3d"
 #define SE_EDITOR_NAME_SCENE3D_MS "scene3d_ms"
 #define SE_EDITOR_NAME_SCENE3D_U "scene3d[%u]"
+#define SE_EDITOR_NAME_SDF "sdf"
+#define SE_EDITOR_NAME_SDF_U "sdf[%u]"
 #define SE_EDITOR_NAME_SCROLLBOX_SELECTED "scrollbox_selected"
 #define SE_EDITOR_NAME_SCROLLBOX_SET_SELECTED "scrollbox_set_selected"
 #define SE_EDITOR_NAME_SCROLLBOX_SINGLE_SELECT "scrollbox_single_select"
@@ -501,9 +513,21 @@ struct se_editor {
 #define SE_EDITOR_NAME_WINDOW_U "window[%u]"
 #define SE_EDITOR_NAME_WINDOW_UPDATE_MS "window_update_ms"
 #define SE_EDITOR_NAME_Z_ORDER "z_order"
+#define SE_EDITOR_NAME_JSON_PATH "json_path"
+#define SE_EDITOR_NAME_ROOT "root"
+#define SE_EDITOR_NAME_VALID "valid"
+#define SE_EDITOR_NAME_MESSAGE "message"
+#define SE_EDITOR_NAME_BOUNDS_VALID "bounds_valid"
+#define SE_EDITOR_NAME_CENTER "center"
+#define SE_EDITOR_NAME_RADIUS "radius"
+#define SE_EDITOR_NAME_HAS_UNBOUNDED_PRIMITIVES "has_unbounded_primitives"
 #define SE_EDITOR_NAME_STYLE_FIELD_FORMAT "%s_%s"
 #define SE_EDITOR_NAME_DISABLED_PREFIX "disabled_"
 #define SE_EDITOR_NAME_FOCUSED_PREFIX "focused_"
+
+#define SE_EDITOR_DEFAULT_SCENE_2D_JSON_PATH "scene2d_snapshot.json"
+#define SE_EDITOR_DEFAULT_SCENE_3D_JSON_PATH "scene3d_snapshot.json"
+#define SE_EDITOR_DEFAULT_SDF_JSON_PATH "sdf_snapshot.json"
 
 static void se_editor_copy_text(c8* dst, sz dst_size, const c8* src) {
 	if (!dst || dst_size == 0u) {
@@ -630,9 +654,51 @@ static b8 se_editor_context_has_vfx_3d(const se_context* context, se_vfx_3d_hand
 	return false;
 }
 
+static b8 se_editor_context_has_scene_2d(const se_context* context, se_scene_2d_handle handle) {
+	if (!context || handle == S_HANDLE_NULL) {
+		return false;
+	}
+	for (sz i = 0; i < s_array_get_size(&context->scenes_2d); ++i) {
+		if (s_array_handle(&context->scenes_2d, (u32)i) == handle) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static b8 se_editor_context_has_scene_3d(const se_context* context, se_scene_3d_handle handle) {
+	if (!context || handle == S_HANDLE_NULL) {
+		return false;
+	}
+	for (sz i = 0; i < s_array_get_size(&context->scenes_3d); ++i) {
+		if (s_array_handle(&context->scenes_3d, (u32)i) == handle) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static void se_editor_set_default_json_paths(se_editor* editor) {
+	if (!editor) {
+		return;
+	}
+	if (editor->scene_2d_json_path[0] == '\0') {
+		se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), SE_EDITOR_DEFAULT_SCENE_2D_JSON_PATH);
+	}
+	if (editor->scene_3d_json_path[0] == '\0') {
+		se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), SE_EDITOR_DEFAULT_SCENE_3D_JSON_PATH);
+	}
+	if (editor->sdf_json_path[0] == '\0') {
+		se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), SE_EDITOR_DEFAULT_SDF_JSON_PATH);
+	}
+}
+
 static void se_editor_refresh_defaults_internal(se_editor* editor) {
 	se_context* context = se_editor_context(editor);
 	if (!editor || !context) {
+		if (editor) {
+			se_editor_set_default_json_paths(editor);
+		}
 		return;
 	}
 	if (editor->window != S_HANDLE_NULL && !se_editor_context_has_window(context, editor->window)) {
@@ -659,6 +725,24 @@ static void se_editor_refresh_defaults_internal(se_editor* editor) {
 	if (editor->focused_vfx_3d == S_HANDLE_NULL && s_array_get_size(&context->vfx_3ds) > 0) {
 		editor->focused_vfx_3d = s_array_handle(&context->vfx_3ds, 0u);
 	}
+	if (editor->focused_scene_2d != S_HANDLE_NULL &&
+		!se_editor_context_has_scene_2d(context, editor->focused_scene_2d)) {
+		editor->focused_scene_2d = S_HANDLE_NULL;
+	}
+	if (editor->focused_scene_2d == S_HANDLE_NULL && s_array_get_size(&context->scenes_2d) > 0) {
+		editor->focused_scene_2d = s_array_handle(&context->scenes_2d, 0u);
+	}
+	if (editor->focused_scene_3d != S_HANDLE_NULL &&
+		!se_editor_context_has_scene_3d(context, editor->focused_scene_3d)) {
+		editor->focused_scene_3d = S_HANDLE_NULL;
+	}
+	if (editor->focused_scene_3d == S_HANDLE_NULL && s_array_get_size(&context->scenes_3d) > 0) {
+		editor->focused_scene_3d = s_array_handle(&context->scenes_3d, 0u);
+	}
+	if (editor->focused_sdf_camera != S_HANDLE_NULL && !se_camera_get(editor->focused_sdf_camera)) {
+		editor->focused_sdf_camera = S_HANDLE_NULL;
+	}
+	se_editor_set_default_json_paths(editor);
 }
 
 static b8 se_editor_trace_summary_collect(se_editor_trace_summary* out_summary) {
@@ -1062,6 +1146,51 @@ static const c8* se_editor_value_as_text(const se_editor_value* value) {
 		return NULL;
 	}
 	return value->text_value;
+}
+
+static b8 se_editor_json_write_file(const c8* path, s_json* root) {
+	c8* text = NULL;
+	b8 ok = false;
+	if (!path || path[0] == '\0' || !root) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	text = s_json_stringify(root);
+	if (!text) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	ok = s_file_write(path, text, strlen(text));
+	free(text);
+	if (!ok) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+static b8 se_editor_json_read_file(const c8* path, s_json** out_root) {
+	c8* text = NULL;
+	s_json* root = NULL;
+	if (!path || path[0] == '\0' || !out_root) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_root = NULL;
+	if (!s_file_read(path, &text, NULL)) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	root = s_json_parse(text);
+	free(text);
+	if (!root) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	*out_root = root;
+	se_set_last_error(SE_RESULT_OK);
+	return true;
 }
 
 static se_editor_command se_editor_command_make_internal(se_editor_command_type type, const se_editor_item* item, const c8* name, const se_editor_value* value, const se_editor_value* aux_value) {
@@ -1495,6 +1624,7 @@ static b8 se_editor_collect_scene_2d_properties(se_editor* editor, const se_edit
 			se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_OUTPUT_AUTO_RESIZE, framebuffer->auto_resize, true);
 		}
 	}
+	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->scene_2d_json_path, true);
 	return true;
 }
 
@@ -1535,6 +1665,31 @@ static b8 se_editor_collect_scene_3d_properties(se_editor* editor, const se_edit
 			se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_OUTPUT_AUTO_RESIZE, framebuffer->auto_resize, true);
 		}
 	}
+	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->scene_3d_json_path, true);
+	return true;
+}
+
+static b8 se_editor_collect_sdf_properties(se_editor* editor, const se_editor_item* item) {
+	const se_sdf_scene_handle scene = (se_sdf_scene_handle)item->handle;
+	se_sdf_scene_bounds bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
+	c8 validation_message[SE_MAX_PATH_LENGTH] = {0};
+	const b8 valid = se_sdf_scene_validate(scene, validation_message, sizeof(validation_message));
+	if (scene == SE_SDF_SCENE_NULL) {
+		return false;
+	}
+	se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_ROOT, se_sdf_scene_get_root(scene), true);
+	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_VALID, valid, false);
+	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_MESSAGE, validation_message, false);
+	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_BOUNDS_VALID, se_sdf_scene_calculate_bounds(scene, &bounds), false);
+	if (bounds.valid) {
+		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_BOUNDS_MIN, bounds.min, false);
+		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_BOUNDS_MAX, bounds.max, false);
+		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_CENTER, bounds.center, false);
+		se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, bounds.radius, false);
+		se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_HAS_UNBOUNDED_PRIMITIVES, bounds.has_unbounded_primitives, false);
+	}
+	se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_CAMERA, editor->focused_sdf_camera, true);
+	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->sdf_json_path, true);
 	return true;
 }
 
@@ -2464,8 +2619,17 @@ static b8 se_editor_apply_scene_2d_command(se_editor* editor, const se_editor_co
 	se_scene_2d* scene = se_editor_scene_2d_ptr(editor, scene_handle);
 	s_vec2 vec2_value = {0};
 	s_handle handle_value = S_HANDLE_NULL;
+	const c8* path = NULL;
 	if (!scene) {
 		return false;
+	}
+	if (strcmp(command->name, SE_EDITOR_NAME_JSON_PATH) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			return false;
+		}
+		se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), path);
+		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_OUTPUT_SIZE) == 0) {
 		if (!se_editor_value_as_vec2(&command->value, &vec2_value) || scene->output == S_HANDLE_NULL) {
@@ -2564,6 +2728,20 @@ static b8 se_editor_apply_scene_2d_command(se_editor* editor, const se_editor_co
 		se_scene_2d_remove_object(scene_handle, (se_object_2d_handle)handle_value);
 		return true;
 	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_SAVE_FILE) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			path = editor->scene_2d_json_path;
+		}
+		return se_editor_scene_2d_json_save(editor, scene_handle, path);
+	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_LOAD_FILE) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			path = editor->scene_2d_json_path;
+		}
+		return se_editor_scene_2d_json_load(editor, scene_handle, path);
+	}
 	return false;
 }
 
@@ -2659,9 +2837,18 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 	se_scene_3d* scene = se_editor_scene_3d_ptr(editor, scene_handle);
 	s_vec2 vec2_value = {0};
 	s_handle handle_value = S_HANDLE_NULL;
+	const c8* path = NULL;
 	b8 bool_value = false;
 	if (!scene) {
 		return false;
+	}
+	if (strcmp(command->name, SE_EDITOR_NAME_JSON_PATH) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			return false;
+		}
+		se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), path);
+		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_CAMERA) == 0) {
 		if (!se_editor_value_as_handle(&command->value, &handle_value)) {
@@ -2773,6 +2960,73 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 			return false;
 		}
 		se_scene_3d_remove_post_process_buffer(scene_handle, (se_render_buffer_handle)handle_value);
+		return true;
+	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_SAVE_FILE) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			path = editor->scene_3d_json_path;
+		}
+		return se_editor_scene_3d_json_save(editor, scene_handle, path);
+	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_LOAD_FILE) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			path = editor->scene_3d_json_path;
+		}
+		return se_editor_scene_3d_json_load(editor, scene_handle, path);
+	}
+	return false;
+}
+
+static b8 se_editor_apply_sdf_command(se_editor* editor, const se_editor_command* command) {
+	const se_sdf_scene_handle scene = (se_sdf_scene_handle)command->item.handle;
+	s_handle handle_value = S_HANDLE_NULL;
+	const c8* path = NULL;
+	b8 align_camera = true;
+	if (!editor || scene == SE_SDF_SCENE_NULL) {
+		return false;
+	}
+	if (strcmp(command->name, SE_EDITOR_NAME_CAMERA) == 0) {
+		if (!se_editor_value_as_handle(&command->value, &handle_value)) {
+			return false;
+		}
+		editor->focused_sdf_camera = (se_camera_handle)handle_value;
+		return true;
+	}
+	if (strcmp(command->name, SE_EDITOR_NAME_JSON_PATH) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			return false;
+		}
+		se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), path);
+		return true;
+	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_CLEAR) == 0) {
+		se_sdf_scene_clear(scene);
+		return true;
+	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_SAVE_FILE) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			path = editor->sdf_json_path;
+		}
+		return se_editor_sdf_json_save(editor, scene, path);
+	}
+	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_LOAD_FILE) == 0) {
+		path = se_editor_value_as_text(&command->value);
+		if (!path || path[0] == '\0') {
+			path = editor->sdf_json_path;
+		}
+		if (!se_editor_sdf_json_load(editor, scene, path)) {
+			return false;
+		}
+		if (se_editor_value_as_bool(&command->aux_value, &align_camera) && !align_camera) {
+			return true;
+		}
+		if (editor->focused_sdf_camera != S_HANDLE_NULL) {
+			(void)se_sdf_scene_align_camera(scene, editor->focused_sdf_camera, NULL, NULL);
+		}
 		return true;
 	}
 	return false;
@@ -4476,6 +4730,7 @@ const c8* se_editor_category_name(se_editor_category category) {
 		case SE_EDITOR_CATEGORY_OBJECT_2D: return SE_EDITOR_NAME_OBJECT2D;
 		case SE_EDITOR_CATEGORY_SCENE_3D: return SE_EDITOR_NAME_SCENE3D;
 		case SE_EDITOR_CATEGORY_OBJECT_3D: return SE_EDITOR_NAME_OBJECT3D;
+		case SE_EDITOR_CATEGORY_SDF: return SE_EDITOR_NAME_SDF;
 		case SE_EDITOR_CATEGORY_UI: return SE_EDITOR_NAME_UI;
 		case SE_EDITOR_CATEGORY_UI_WIDGET: return SE_EDITOR_NAME_UI_WIDGET;
 		case SE_EDITOR_CATEGORY_VFX_2D: return SE_EDITOR_NAME_VFX2D;
@@ -4517,6 +4772,7 @@ se_editor_category se_editor_category_from_name(const c8* name) {
 		{ SE_EDITOR_NAME_SCENE, SE_EDITOR_CATEGORY_SCENE_2D },
 		{ SE_EDITOR_NAME_SCENE2, SE_EDITOR_CATEGORY_SCENE_2D },
 		{ SE_EDITOR_NAME_SCENE3, SE_EDITOR_CATEGORY_SCENE_3D },
+		{ SE_EDITOR_NAME_SDF, SE_EDITOR_CATEGORY_SDF },
 		{ SE_EDITOR_NAME_OBJECT2, SE_EDITOR_CATEGORY_OBJECT_2D },
 		{ SE_EDITOR_NAME_OBJECT3, SE_EDITOR_CATEGORY_OBJECT_3D }
 	};
@@ -4595,6 +4851,13 @@ se_editor* se_editor_create(const se_editor_config* config) {
 	editor->focused_simulation = cfg.focused_simulation;
 	editor->focused_vfx_2d = cfg.focused_vfx_2d;
 	editor->focused_vfx_3d = cfg.focused_vfx_3d;
+	editor->focused_scene_2d = cfg.focused_scene_2d;
+	editor->focused_scene_3d = cfg.focused_scene_3d;
+	editor->focused_sdf = cfg.focused_sdf;
+	editor->focused_sdf_camera = cfg.focused_sdf_camera;
+	se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), cfg.scene_2d_json_path);
+	se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), cfg.scene_3d_json_path);
+	se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), cfg.sdf_json_path);
 	se_editor_refresh_defaults_internal(editor);
 
 	se_set_last_error(SE_RESULT_OK);
@@ -4626,6 +4889,10 @@ void se_editor_reset(se_editor* editor) {
 	editor->focused_simulation = S_HANDLE_NULL;
 	editor->focused_vfx_2d = S_HANDLE_NULL;
 	editor->focused_vfx_3d = S_HANDLE_NULL;
+	editor->focused_scene_2d = S_HANDLE_NULL;
+	editor->focused_scene_3d = S_HANDLE_NULL;
+	editor->focused_sdf = SE_SDF_SCENE_NULL;
+	editor->focused_sdf_camera = S_HANDLE_NULL;
 	se_editor_refresh_defaults_internal(editor);
 }
 
@@ -4778,6 +5045,309 @@ se_vfx_3d_handle se_editor_get_focused_vfx_3d(const se_editor* editor) {
 	return editor->focused_vfx_3d;
 }
 
+void se_editor_set_focused_scene_2d(se_editor* editor, se_scene_2d_handle scene) {
+	if (!editor) {
+		return;
+	}
+	editor->focused_scene_2d = scene;
+	se_editor_refresh_defaults_internal(editor);
+}
+
+se_scene_2d_handle se_editor_get_focused_scene_2d(const se_editor* editor) {
+	if (!editor) {
+		return S_HANDLE_NULL;
+	}
+	return editor->focused_scene_2d;
+}
+
+void se_editor_set_focused_scene_3d(se_editor* editor, se_scene_3d_handle scene) {
+	if (!editor) {
+		return;
+	}
+	editor->focused_scene_3d = scene;
+	se_editor_refresh_defaults_internal(editor);
+}
+
+se_scene_3d_handle se_editor_get_focused_scene_3d(const se_editor* editor) {
+	if (!editor) {
+		return S_HANDLE_NULL;
+	}
+	return editor->focused_scene_3d;
+}
+
+void se_editor_set_focused_sdf(se_editor* editor, se_sdf_scene_handle scene) {
+	if (!editor) {
+		return;
+	}
+	editor->focused_sdf = scene;
+}
+
+se_sdf_scene_handle se_editor_get_focused_sdf(const se_editor* editor) {
+	if (!editor) {
+		return SE_SDF_SCENE_NULL;
+	}
+	return editor->focused_sdf;
+}
+
+void se_editor_set_focused_sdf_camera(se_editor* editor, se_camera_handle camera) {
+	if (!editor) {
+		return;
+	}
+	editor->focused_sdf_camera = camera;
+	se_editor_refresh_defaults_internal(editor);
+}
+
+se_camera_handle se_editor_get_focused_sdf_camera(const se_editor* editor) {
+	if (!editor) {
+		return S_HANDLE_NULL;
+	}
+	return editor->focused_sdf_camera;
+}
+
+void se_editor_set_scene_2d_json_path(se_editor* editor, const c8* path) {
+	if (!editor) {
+		return;
+	}
+	se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), path);
+	se_editor_set_default_json_paths(editor);
+}
+
+const c8* se_editor_get_scene_2d_json_path(const se_editor* editor) {
+	if (!editor) {
+		return NULL;
+	}
+	return editor->scene_2d_json_path;
+}
+
+void se_editor_set_scene_3d_json_path(se_editor* editor, const c8* path) {
+	if (!editor) {
+		return;
+	}
+	se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), path);
+	se_editor_set_default_json_paths(editor);
+}
+
+const c8* se_editor_get_scene_3d_json_path(const se_editor* editor) {
+	if (!editor) {
+		return NULL;
+	}
+	return editor->scene_3d_json_path;
+}
+
+void se_editor_set_sdf_json_path(se_editor* editor, const c8* path) {
+	if (!editor) {
+		return;
+	}
+	se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), path);
+	se_editor_set_default_json_paths(editor);
+}
+
+const c8* se_editor_get_sdf_json_path(const se_editor* editor) {
+	if (!editor) {
+		return NULL;
+	}
+	return editor->sdf_json_path;
+}
+
+b8 se_editor_scene_2d_json_save(se_editor* editor, se_scene_2d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	(void)editor;
+	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	root = se_scene_2d_to_json(scene);
+	if (!root) {
+		return false;
+	}
+	if (!se_editor_json_write_file(path, root)) {
+		s_json_free(root);
+		return false;
+	}
+	s_json_free(root);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_scene_2d_json_load(se_editor* editor, se_scene_2d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	(void)editor;
+	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_editor_json_read_file(path, &root)) {
+		return false;
+	}
+	if (!se_scene_2d_from_json(scene, root)) {
+		s_json_free(root);
+		return false;
+	}
+	s_json_free(root);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_scene_3d_json_save(se_editor* editor, se_scene_3d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	(void)editor;
+	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	root = se_scene_3d_to_json(scene);
+	if (!root) {
+		return false;
+	}
+	if (!se_editor_json_write_file(path, root)) {
+		s_json_free(root);
+		return false;
+	}
+	s_json_free(root);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_scene_3d_json_load(se_editor* editor, se_scene_3d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	(void)editor;
+	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_editor_json_read_file(path, &root)) {
+		return false;
+	}
+	if (!se_scene_3d_from_json(scene, root)) {
+		s_json_free(root);
+		return false;
+	}
+	s_json_free(root);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_sdf_json_save(se_editor* editor, se_sdf_scene_handle scene, const c8* path) {
+	s_json* root = NULL;
+	(void)editor;
+	if (scene == SE_SDF_SCENE_NULL || !path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	root = se_sdf_to_json(scene);
+	if (!root) {
+		return false;
+	}
+	if (!se_editor_json_write_file(path, root)) {
+		s_json_free(root);
+		return false;
+	}
+	s_json_free(root);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_sdf_json_load(se_editor* editor, se_sdf_scene_handle scene, const c8* path) {
+	s_json* root = NULL;
+	(void)editor;
+	if (scene == SE_SDF_SCENE_NULL || !path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_editor_json_read_file(path, &root)) {
+		return false;
+	}
+	if (!se_sdf_from_json(scene, root)) {
+		s_json_free(root);
+		return false;
+	}
+	s_json_free(root);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_scene_kit_json_save(
+	se_editor* editor,
+	const c8* scene_2d_path,
+	const c8* scene_3d_path,
+	const c8* sdf_path
+) {
+	const c8* use_scene_2d_path = scene_2d_path;
+	const c8* use_scene_3d_path = scene_3d_path;
+	const c8* use_sdf_path = sdf_path;
+	if (!editor) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_editor_set_default_json_paths(editor);
+	if (!use_scene_2d_path || use_scene_2d_path[0] == '\0') {
+		use_scene_2d_path = editor->scene_2d_json_path;
+	}
+	if (!use_scene_3d_path || use_scene_3d_path[0] == '\0') {
+		use_scene_3d_path = editor->scene_3d_json_path;
+	}
+	if (!use_sdf_path || use_sdf_path[0] == '\0') {
+		use_sdf_path = editor->sdf_json_path;
+	}
+	if (editor->focused_scene_2d != S_HANDLE_NULL &&
+		!se_editor_scene_2d_json_save(editor, editor->focused_scene_2d, use_scene_2d_path)) {
+		return false;
+	}
+	if (editor->focused_scene_3d != S_HANDLE_NULL &&
+		!se_editor_scene_3d_json_save(editor, editor->focused_scene_3d, use_scene_3d_path)) {
+		return false;
+	}
+	if (editor->focused_sdf != SE_SDF_SCENE_NULL &&
+		!se_editor_sdf_json_save(editor, editor->focused_sdf, use_sdf_path)) {
+		return false;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_scene_kit_json_load(
+	se_editor* editor,
+	const c8* scene_2d_path,
+	const c8* scene_3d_path,
+	const c8* sdf_path,
+	b8 align_sdf_camera
+) {
+	const c8* use_scene_2d_path = scene_2d_path;
+	const c8* use_scene_3d_path = scene_3d_path;
+	const c8* use_sdf_path = sdf_path;
+	if (!editor) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_editor_set_default_json_paths(editor);
+	if (!use_scene_2d_path || use_scene_2d_path[0] == '\0') {
+		use_scene_2d_path = editor->scene_2d_json_path;
+	}
+	if (!use_scene_3d_path || use_scene_3d_path[0] == '\0') {
+		use_scene_3d_path = editor->scene_3d_json_path;
+	}
+	if (!use_sdf_path || use_sdf_path[0] == '\0') {
+		use_sdf_path = editor->sdf_json_path;
+	}
+	if (editor->focused_scene_2d != S_HANDLE_NULL &&
+		!se_editor_scene_2d_json_load(editor, editor->focused_scene_2d, use_scene_2d_path)) {
+		return false;
+	}
+	if (editor->focused_scene_3d != S_HANDLE_NULL &&
+		!se_editor_scene_3d_json_load(editor, editor->focused_scene_3d, use_scene_3d_path)) {
+		return false;
+	}
+	if (editor->focused_sdf != SE_SDF_SCENE_NULL &&
+		!se_editor_sdf_json_load(editor, editor->focused_sdf, use_sdf_path)) {
+		return false;
+	}
+	if (align_sdf_camera && editor->focused_sdf != SE_SDF_SCENE_NULL && editor->focused_sdf_camera != S_HANDLE_NULL) {
+		(void)se_sdf_scene_align_camera(editor->focused_sdf, editor->focused_sdf_camera, NULL, NULL);
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 b8 se_editor_track_audio_clip(se_editor* editor, se_audio_clip* clip, const c8* label) {
 	if (!editor || !clip) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
@@ -4917,6 +5487,7 @@ b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts) {
 	out_counts->audio_clips = (u32)s_array_get_size(&editor->clips);
 	out_counts->audio_streams = (u32)s_array_get_size(&editor->streams);
 	out_counts->audio_captures = (u32)s_array_get_size(&editor->captures);
+	out_counts->sdf_scenes = editor->focused_sdf != SE_SDF_SCENE_NULL ? 1u : 0u;
 	out_counts->queued_commands = (u32)s_array_get_size(&editor->queue);
 	if (editor->physics_2d) {
 		out_counts->physics_2d_bodies = se_physics_world_2d_get_body_count(editor->physics_2d);
@@ -5003,6 +5574,18 @@ b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_m
 			snprintf(label, sizeof(label), SE_EDITOR_NAME_PHYSICS3D_BODY_U, i);
 			se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, body_handle, editor->physics_3d, NULL, NULL, i, label);
 		}
+	}
+	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_SDF) && editor->focused_sdf != SE_SDF_SCENE_NULL) {
+		snprintf(label, sizeof(label), SE_EDITOR_NAME_SDF_U, 0u);
+		se_editor_push_item(
+			&editor->items,
+			SE_EDITOR_CATEGORY_SDF,
+			editor->focused_sdf,
+			S_HANDLE_NULL,
+			NULL,
+			NULL,
+			0u,
+			label);
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_AUDIO_CLIP)) {
 		for (sz i = 0; i < s_array_get_size(&editor->clips); ++i) {
@@ -5199,6 +5782,9 @@ b8 se_editor_collect_properties(se_editor* editor, const se_editor_item* item, c
 			break;
 		case SE_EDITOR_CATEGORY_OBJECT_3D:
 			ok = se_editor_collect_object_3d_properties(editor, item);
+			break;
+		case SE_EDITOR_CATEGORY_SDF:
+			ok = se_editor_collect_sdf_properties(editor, item);
 			break;
 		case SE_EDITOR_CATEGORY_UI:
 			ok = se_editor_collect_ui_properties(editor, item);
@@ -5548,6 +6134,9 @@ b8 se_editor_apply_command(se_editor* editor, const se_editor_command* command) 
 			break;
 		case SE_EDITOR_CATEGORY_OBJECT_3D:
 			ok = se_editor_apply_object_3d_command(editor, command);
+			break;
+		case SE_EDITOR_CATEGORY_SDF:
+			ok = se_editor_apply_sdf_command(editor, command);
 			break;
 		case SE_EDITOR_CATEGORY_UI:
 			ok = se_editor_apply_ui_command(editor, command);
