@@ -2,6 +2,7 @@
 
 #include "se_window.h"
 #include "se_scene.h"
+#include "se_sdf.h"
 #include "se_graphics.h"
 #include "se_camera.h"
 #include "se_audio.h"
@@ -49,11 +50,10 @@ typedef struct unit_t {
 typedef struct world_t {
     se_scene_3d_handle scene;
 
-    se_object_3d_handle landscape;
+    se_sdf_scene_handle landscape;
     se_object_3d_handle buildings;
     se_object_3d_handle units;
-	
-	se_model_handle landscape_model;
+
     se_model_handle building_model;
     se_model_handle unit_model;
 
@@ -105,56 +105,6 @@ void bind_camera(se_camera_handle camera, se_input_handle *input) {
     se_input_bind(input, SE_KEY_D, SE_INPUT_DOWN, &move_camera_right, &camera); 
 }
 
-se_object_3d_handle generate_landscape_sdf(const c8* heightmap_texture, const f32 scale, const f32 height) {
-	if (!heightmap_texture || heightmap_texture[0] == '\0' || scale <= 0.0f || height <= 0.0f) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return S_HANDLE_NULL;
-	}
-
-	const se_model_handle model = se_model_load_obj_simple(
-		SE_RESOURCE_PUBLIC("models/plane.obj"),
-		SE_RESOURCE_EXAMPLE("civilization/landscape_vs.glsl"),
-		SE_RESOURCE_EXAMPLE("civilization/landscape_fs.glsl"));
-	if (model == S_HANDLE_NULL) {
-		return S_HANDLE_NULL;
-	}
-
-	const se_texture_handle heightmap = se_texture_load(heightmap_texture, SE_CLAMP);
-	if (heightmap == S_HANDLE_NULL) {
-		se_model_destroy(model);
-		return S_HANDLE_NULL;
-	}
-
-	se_context* context = se_current_context();
-	se_texture* heightmap_ptr = context ? s_array_get(&context->textures, heightmap) : NULL;
-	if (!heightmap_ptr) {
-		se_texture_destroy(heightmap);
-		se_model_destroy(model);
-		se_set_last_error(SE_RESULT_NOT_FOUND);
-		return S_HANDLE_NULL;
-	}
-
-	const sz mesh_count = se_model_get_mesh_count(model);
-	for (sz i = 0; i < mesh_count; ++i) {
-		const se_shader_handle shader = se_model_get_mesh_shader(model, i);
-		if (shader == S_HANDLE_NULL) {
-			continue;
-		}
-		se_shader_set_texture(shader, "u_heightmap", heightmap_ptr->id);
-		se_shader_set_float(shader, "u_landscape_scale", scale);
-		se_shader_set_float(shader, "u_landscape_height", height);
-	}
-
-	const s_mat4 transform = s_mat4_identity;
-	const se_object_3d_handle object = se_object_3d_create(model, &transform, 0);
-	if (object == S_HANDLE_NULL) {
-		se_texture_destroy(heightmap);
-		se_model_destroy(model);
-		return S_HANDLE_NULL;
-	}
-	return object;
-}
-
 void init_world(world_t *world, se_window_handle window) {
     world->scene = se_scene_3d_create_for_window(window, 128);
     if (world->scene == S_HANDLE_NULL) {
@@ -162,32 +112,23 @@ void init_world(world_t *world, se_window_handle window) {
         return;
     }
 
-	world->landscape_model = se_model_load_obj_simple(	SE_RESOURCE_PUBLIC("models/plane.obj"), 
-														SE_RESOURCE_EXAMPLE("civilization/landscape_vs.glsl"), 
-														SE_RESOURCE_EXAMPLE("civilization/landscape_fs.glsl"));
-	world->building_model = se_model_load_obj_simple(	SE_RESOURCE_PUBLIC("models/cube.obj"),
-														SE_RESOURCE_EXAMPLE("civilization/building_vs.glsl"),
-														SE_RESOURCE_EXAMPLE("civilization/building_fs.glsl"));
-	world->unit_model = se_model_load_obj_simple(		SE_RESOURCE_PUBLIC("models/sphere.obj"),
-														SE_RESOURCE_EXAMPLE("civilization/unit_vs.glsl"),
-														SE_RESOURCE_EXAMPLE("civilization/unit_fs.glsl"));
+	b8 landscape_loaded = se_sdf_from_json_file(world->landscape, SE_RESOURCE_EXAMPLE("civilization/landscape.json"));
+	b8 buildings_loaded = se_object_3d_from_json_file(world->buildings, SE_RESOURCE_EXAMPLE("civilization/buildings.json"));
+	b8 units_loaded = se_object_3d_from_json_file(world->units, SE_RESOURCE_EXAMPLE("civilization/units.json"));
 
-	world->landscape = create_object(world, world->landscape_model, 0);
-    world->buildings = create_object(world, world->building_model, MAX_BUILDINGS);
-    world->units = create_object(world, world->unit_model, MAX_UNITS);
+	if (!landscape_loaded || !buildings_loaded || !units_loaded) {
+		se_log("civilization :: failed to load");
+		return;
+	}
 
-	se_scene_3d_handle scene = world->scene;
+	se_object_3d_handle landscape_object_3d = se_sdf_scene_to_object_3d(world->landscape);
+	se_scene_3d_add_object(world->scene, landscape_object_3d);
+	se_scene_3d_add_object(world->scene, world->buildings);
+	se_scene_3d_add_object(world->scene, world->units);
 
-	se_scene_3d_add_object(scene, world->landscape);
-	se_scene_3d_add_object(scene, world->buildings);
-	se_scene_3d_add_object(scene, world->units);
-
-	se_object_3d_set_scale(world->landscape, &s_vec3(LANDSCAPE_SIZE, LANDSCAPE_SIZE, LANDSCAPE_SIZE));
-
-	se_camera_handle camera = se_scene_3d_get_camera(scene);
+	se_camera_handle camera = se_scene_3d_get_camera(world->scene);
 	se_camera_set_location(camera, &s_vec3(.0f, 5.0f, -1.f));
 	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
-    
     world->input = se_input_create(window, 128);
     bind_camera(camera, world->input);
 }

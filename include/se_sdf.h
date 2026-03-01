@@ -318,6 +318,8 @@ typedef struct {
 #define SE_SDF_NODE_GROUP_DESC_DEFAULTS ((se_sdf_node_group_desc){ .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION, .operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT })
 
 extern se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc);
+extern se_object_2d_handle se_sdf_scene_to_object_2d(se_sdf_scene_handle scene);
+extern se_object_3d_handle se_sdf_scene_to_object_3d(se_sdf_scene_handle scene);
 extern void se_sdf_scene_destroy(se_sdf_scene_handle scene);
 extern void se_sdf_scene_clear(se_sdf_scene_handle scene);
 extern b8 se_sdf_scene_set_root(se_sdf_scene_handle scene, se_sdf_node_handle node);
@@ -325,6 +327,7 @@ extern se_sdf_node_handle se_sdf_scene_get_root(se_sdf_scene_handle scene);
 extern b8 se_sdf_scene_validate(se_sdf_scene_handle scene, char* error_message, sz error_message_size);
 extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
 extern b8 se_sdf_from_json(se_sdf_scene_handle scene, const s_json* root);
+extern b8 se_sdf_from_json_file(se_sdf_scene_handle scene, const c8* path);
 
 extern se_sdf_node_handle se_sdf_node_create_primitive(se_sdf_scene_handle scene, const se_sdf_node_primitive_desc* desc);
 extern se_sdf_node_handle se_sdf_node_create_group(se_sdf_scene_handle scene, const se_sdf_node_group_desc* desc);

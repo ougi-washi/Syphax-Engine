@@ -75,6 +75,30 @@ extern void se_object_2d_destroy(const se_object_2d_handle object);
 
 No inline description found in header comments.
 
+### `se_object_2d_from_json`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_2d_from_json(const se_object_2d_handle object, const s_json* root);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_2d_from_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_2d_from_json_file(const se_object_2d_handle object, const c8* path);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_object_2d_get_box_2d`
 
 <div class="api-signature">
@@ -363,6 +387,30 @@ extern void se_object_2d_set_transform(const se_object_2d_handle object, const s
 
 No inline description found in header comments.
 
+### `se_object_2d_to_json`
+
+<div class="api-signature">
+
+```c
+extern s_json* se_object_2d_to_json(const se_object_2d_handle object);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_2d_to_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_2d_to_json_file(const se_object_2d_handle object, const c8* path);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_object_2d_update_uniforms`
 
 <div class="api-signature">
@@ -411,12 +459,48 @@ extern se_object_3d_handle se_object_3d_create(const se_model_handle model, cons
 
 3D objects functions
 
+### `se_object_3d_create_custom`
+
+<div class="api-signature">
+
+```c
+extern se_object_3d_handle se_object_3d_create_custom(se_object_custom *custom, const s_mat4 *transform);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_object_3d_destroy`
 
 <div class="api-signature">
 
 ```c
 extern void se_object_3d_destroy(const se_object_3d_handle object);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_from_json`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_3d_from_json(const se_object_3d_handle object, const s_json* root);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_from_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_3d_from_json_file(const se_object_3d_handle object, const c8* path);
 ```
 
 </div>
@@ -639,6 +723,30 @@ extern void se_object_3d_set_transform(const se_object_3d_handle object, const s
 
 No inline description found in header comments.
 
+### `se_object_3d_to_json`
+
+<div class="api-signature">
+
+```c
+extern s_json* se_object_3d_to_json(const se_object_3d_handle object);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_to_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_3d_to_json_file(const se_object_3d_handle object, const c8* path);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_object_custom_set_data`
 
 <div class="api-signature">
@@ -723,6 +831,18 @@ extern void se_scene_2d_draw(const se_scene_2d_handle scene, const se_window_han
 
 No inline description found in header comments.
 
+### `se_scene_2d_from_json`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_2d_from_json(const se_scene_2d_handle scene, const s_json* root);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_scene_2d_pick_object`
 
 <div class="api-signature">
@@ -789,6 +909,18 @@ No inline description found in header comments.
 
 ```c
 extern void se_scene_2d_set_auto_resize(const se_scene_2d_handle scene, const se_window_handle window, const s_vec2 *ratio);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_scene_2d_to_json`
+
+<div class="api-signature">
+
+```c
+extern s_json* se_scene_2d_to_json(const se_scene_2d_handle scene);
 ```
 
 </div>
@@ -897,6 +1029,18 @@ Destroys every object referenced by the scene. Optional flags can also destroy r
 
 ```c
 extern void se_scene_3d_draw(const se_scene_3d_handle scene, const se_window_handle window);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_scene_3d_from_json`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_3d_from_json(const se_scene_3d_handle scene, const s_json* root);
 ```
 
 </div>
@@ -1035,6 +1179,18 @@ extern void se_scene_3d_set_culling(const se_scene_3d_handle scene, const b8 ena
 
 No inline description found in header comments.
 
+### `se_scene_3d_to_json`
+
+<div class="api-signature">
+
+```c
+extern s_json* se_scene_3d_to_json(const se_scene_3d_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_scene_3d_unregister_custom_render`
 
 <div class="api-signature">
@@ -1052,6 +1208,18 @@ No inline description found in header comments.
 No enums found in this header.
 
 ## Typedefs
+
+### `s_json`
+
+<div class="api-signature">
+
+```c
+typedef struct s_json s_json;
+```
+
+</div>
+
+No inline description found in header comments.
 
 ### `se_instance_id`
 
@@ -1118,7 +1286,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_object_3d { se_model_handle model; s_mat4 transform; se_instances instances; se_mesh_instances mesh_instances; se_transforms render_transforms; b8 is_visible : 1; } se_object_3d;
+typedef struct se_object_3d { s_mat4 transform; union { struct { se_model_handle model; se_instances instances; se_mesh_instances mesh_instances; se_transforms render_transforms; }; se_object_custom custom; }; b8 is_custom : 1; b8 is_visible : 1; } se_object_3d;
 ```
 
 </div>

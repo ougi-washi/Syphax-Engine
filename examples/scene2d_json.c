@@ -48,6 +48,7 @@ static b8 scene_json_load(const se_scene_2d_handle scene, const c8* path) {
 
 int main(void) {
 	const c8* json_path = "scene2d_snapshot.json";
+	const c8* object_json_path = "scene2d_object_snapshot.json";
 	se_context* context = se_context_create();
 	se_window_handle window = se_window_create("Syphax - Scene2D JSON", 1280, 720);
 	if (window == S_HANDLE_NULL) {
@@ -82,6 +83,13 @@ int main(void) {
 		metadata.m[0][3] = 7.0f;
 		se_object_2d_set_instance_metadata(button, second_id, &metadata);
 		se_object_2d_set_instance_active(button, second_id, false);
+	}
+	if (!se_object_2d_to_json_file(button, object_json_path) ||
+		!se_object_2d_from_json_file(button, object_json_path)) {
+		printf("scene2d_json :: object save/load failed (%s)\n", se_result_str(se_get_last_error()));
+		se_scene_2d_destroy_full(source_scene, true);
+		se_context_destroy(context);
+		return 1;
 	}
 
 	if (!scene_json_save(source_scene, json_path)) {

@@ -7,6 +7,8 @@
 #include "se_quad.h"
 #include "se_shader.h"
 #include "se_texture.h"
+#include "se_scene.h"
+#include "syphax/s_files.h"
 #include "syphax/s_json.h"
 #include "render/se_gl.h"
 #include <string.h>
@@ -48,36 +50,46 @@ typedef struct {
 	s_vec3 control_rotation;
 	s_vec3 control_scale;
 	b8 control_trs_initialized;
-} se_sdf_runtime_node;
-typedef s_array(se_sdf_runtime_node, se_sdf_runtime_nodes);
+} se_sdf_node;
+typedef s_array(se_sdf_node, se_sdf_nodes);
+
+typedef struct se_sdf_scene {
+	se_sdf_nodes nodes;
+	se_sdf_node_handle root;
+	se_sdf_renderer_handle implicit_renderer;
+	se_camera_handle implicit_camera;
+} se_sdf_scene;
+typedef s_array(se_sdf_scene, se_sdf_scenes);
 
 typedef struct {
-	se_sdf_runtime_nodes nodes;
-	se_sdf_node_handle root;
-} se_sdf_runtime_scene;
-typedef s_array(se_sdf_runtime_scene, se_sdf_runtime_scenes);
+	se_sdf_scene_handle scene;
+} se_sdf_scene_object_2d_data;
+
+typedef struct {
+	se_sdf_scene_handle scene;
+} se_sdf_scene_object_3d_data;
 
 typedef enum {
-	SE_SDF_RUNTIME_NODE_BIND_TRANSLATION,
-	SE_SDF_RUNTIME_NODE_BIND_ROTATION,
-	SE_SDF_RUNTIME_NODE_BIND_SCALE
-} se_sdf_runtime_node_bind_target;
+	SE_SDF_NODE_BIND_TRANSLATION,
+	SE_SDF_NODE_BIND_ROTATION,
+	SE_SDF_NODE_BIND_SCALE
+} se_sdf_node_bind_target;
 
 typedef struct {
 	se_sdf_scene_handle scene;
 	se_sdf_node_handle node;
 	se_sdf_control_handle control;
-	se_sdf_runtime_node_bind_target target;
-} se_sdf_runtime_node_binding;
-typedef s_array(se_sdf_runtime_node_binding, se_sdf_runtime_node_bindings);
+	se_sdf_node_bind_target target;
+} se_sdf_node_binding;
+typedef s_array(se_sdf_node_binding, se_sdf_node_bindings);
 
 typedef struct {
 	se_sdf_scene_handle scene;
 	se_sdf_node_handle node;
 	se_sdf_primitive_param param;
 	se_sdf_control_handle control;
-} se_sdf_runtime_primitive_binding;
-typedef s_array(se_sdf_runtime_primitive_binding, se_sdf_runtime_primitive_bindings);
+} se_sdf_primitive_binding;
+typedef s_array(se_sdf_primitive_binding, se_sdf_primitive_bindings);
 
 typedef union {
 	f32 f;
@@ -86,14 +98,14 @@ typedef union {
 	s_vec4 vec4;
 	i32 i;
 	s_mat4 mat4;
-} se_sdf_runtime_control_value;
+} se_sdf_control_value;
 
 typedef struct {
 	char name[64];
 	char uniform_name[96];
 	se_sdf_control_type type;
-	se_sdf_runtime_control_value value;
-	se_sdf_runtime_control_value last_uploaded_value;
+	se_sdf_control_value value;
+	se_sdf_control_value last_uploaded_value;
 	union {
 		const f32* f;
 		const s_vec2* vec2;
@@ -106,17 +118,17 @@ typedef struct {
 	b8 has_binding;
 	b8 has_last_uploaded_value;
 	b8 dirty;
-} se_sdf_runtime_control;
-typedef s_array(se_sdf_runtime_control, se_sdf_runtime_controls);
+} se_sdf_control;
+typedef s_array(se_sdf_control, se_sdf_controls);
 
-typedef struct {
+typedef struct se_sdf_renderer {
 	se_sdf_renderer_desc desc;
 	se_sdf_raymarch_quality quality;
 	se_sdf_renderer_debug debug;
 	se_sdf_scene_handle scene;
-	se_sdf_runtime_controls controls;
-	se_sdf_runtime_node_bindings node_bindings;
-	se_sdf_runtime_primitive_bindings primitive_bindings;
+	se_sdf_controls controls;
+	se_sdf_node_bindings node_bindings;
+	se_sdf_primitive_bindings primitive_bindings;
 	se_sdf_string generated_fragment_source;
 	sz last_uniform_write_count;
 	sz total_uniform_write_count;
@@ -147,64 +159,60 @@ typedef struct {
 	se_sdf_build_diagnostics diagnostics;
 	u64 render_generation;
 	b8 built;
-} se_sdf_runtime_renderer;
-typedef s_array(se_sdf_runtime_renderer, se_sdf_runtime_renderers);
+} se_sdf_renderer;
+typedef s_array(se_sdf_renderer, se_sdf_renderers);
 
-// TODO: move from here, not thread safe. Maybe we should use se_context instead?
-static se_sdf_runtime_scenes se_sdf_runtime_scene_storage;
-static se_sdf_runtime_renderers se_sdf_runtime_renderer_storage;
-static b8 se_sdf_runtime_scene_storage_initialized = 0;
-static se_sdf_runtime_renderer* se_sdf_codegen_active_renderer = NULL;
+static se_sdf_renderer* se_sdf_codegen_active_renderer = NULL;
 
-static void se_sdf_runtime_control_clear_binding(se_sdf_runtime_control* control);
-static b8 se_sdf_runtime_control_value_equals(
+static void se_sdf_control_clear_binding(se_sdf_control* control);
+static b8 se_sdf_control_value_equals(
 	se_sdf_control_type type,
-	const se_sdf_runtime_control_value* a,
-	const se_sdf_runtime_control_value* b
+	const se_sdf_control_value* a,
+	const se_sdf_control_value* b
 );
-static b8 se_sdf_runtime_is_valid_primitive_type(const se_sdf_primitive_type type);
-static b8 se_sdf_runtime_validate_primitive_desc(const se_sdf_primitive_desc* primitive);
-static void se_sdf_runtime_sync_control_bindings(se_sdf_runtime_renderer* renderer);
-static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer);
-static b8 se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_apply_renderer_shading_bindings(se_sdf_runtime_renderer* renderer);
-static b8 se_sdf_runtime_emit_control_uniform_declarations(
-	se_sdf_runtime_renderer* renderer,
+static b8 se_sdf_is_valid_primitive_type(const se_sdf_primitive_type type);
+static b8 se_sdf_validate_primitive_desc(const se_sdf_primitive_desc* primitive);
+static void se_sdf_sync_control_bindings(se_sdf_renderer* renderer);
+static b8 se_sdf_apply_node_bindings(se_sdf_renderer* renderer);
+static b8 se_sdf_apply_primitive_bindings(se_sdf_renderer* renderer);
+static void se_sdf_apply_renderer_shading_bindings(se_sdf_renderer* renderer);
+static b8 se_sdf_emit_control_uniform_declarations(
+	se_sdf_renderer* renderer,
 	se_sdf_string* out
 );
-static const char* se_sdf_runtime_find_node_binding_uniform_name(
-	se_sdf_runtime_renderer* renderer,
+static const char* se_sdf_find_node_binding_uniform_name(
+	se_sdf_renderer* renderer,
 	se_sdf_scene_handle scene,
 	se_sdf_node_handle node,
-	se_sdf_runtime_node_bind_target target
+	se_sdf_node_bind_target target
 );
-static const char* se_sdf_runtime_find_primitive_binding_uniform_name(
-	se_sdf_runtime_renderer* renderer,
+static const char* se_sdf_find_primitive_binding_uniform_name(
+	se_sdf_renderer* renderer,
 	se_sdf_scene_handle scene,
 	se_sdf_node_handle node,
 	se_sdf_primitive_param param
 );
-static b8 se_sdf_runtime_renderer_has_live_shader(const se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_renderer_release_shader(se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_renderer_release_quad(se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_renderer_invalidate_gpu_state(se_sdf_runtime_renderer* renderer);
-static void se_sdf_runtime_renderer_refresh_context_state(se_sdf_runtime_renderer* renderer);
-static s_vec3 se_sdf_runtime_mul_mat4_point(const s_mat4* mat, const s_vec3* point);
-static void se_sdf_runtime_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point);
-static void se_sdf_runtime_scene_bounds_expand_transformed_aabb(
+static b8 se_sdf_renderer_has_live_shader(const se_sdf_renderer* renderer);
+static void se_sdf_renderer_release_shader(se_sdf_renderer* renderer);
+static void se_sdf_renderer_release_quad(se_sdf_renderer* renderer);
+static void se_sdf_renderer_invalidate_gpu_state(se_sdf_renderer* renderer);
+static void se_sdf_renderer_refresh_context_state(se_sdf_renderer* renderer);
+static s_vec3 se_sdf_mul_mat4_point(const s_mat4* mat, const s_vec3* point);
+static void se_sdf_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point);
+static void se_sdf_scene_bounds_expand_transformed_aabb(
 	se_sdf_scene_bounds* bounds,
 	const s_mat4* transform,
 	const s_vec3* local_min,
 	const s_vec3* local_max
 );
-static b8 se_sdf_runtime_get_primitive_local_bounds(
+static b8 se_sdf_get_primitive_local_bounds(
 	const se_sdf_primitive_desc* primitive,
 	s_vec3* out_min,
 	s_vec3* out_max,
 	b8* out_unbounded
 );
-static void se_sdf_runtime_collect_scene_bounds_recursive(
-	se_sdf_runtime_scene* scene_ptr,
+static void se_sdf_collect_scene_bounds_recursive(
+	se_sdf_scene* scene_ptr,
 	se_sdf_scene_handle scene,
 	se_sdf_node_handle node_handle,
 	const s_mat4* parent_transform,
@@ -212,7 +220,7 @@ static void se_sdf_runtime_collect_scene_bounds_recursive(
 	sz depth,
 	sz max_depth
 );
-static s_mat4 se_sdf_runtime_transform_trs(
+static s_mat4 se_sdf_transform_trs(
 	f32 tx,
 	f32 ty,
 	f32 tz,
@@ -638,7 +646,7 @@ static b8 se_sdf_json_read_primitive_desc(const s_json* primitive_json, se_sdf_p
 	}
 	se_sdf_primitive_desc primitive = {0};
 	primitive.type = (se_sdf_primitive_type)type_u32;
-	if (!se_sdf_runtime_is_valid_primitive_type(primitive.type)) {
+	if (!se_sdf_is_valid_primitive_type(primitive.type)) {
 		return 0;
 	}
 
@@ -785,7 +793,7 @@ static b8 se_sdf_json_read_primitive_desc(const s_json* primitive_json, se_sdf_p
 			return 0;
 	}
 
-	if (!se_sdf_runtime_validate_primitive_desc(&primitive)) {
+	if (!se_sdf_validate_primitive_desc(&primitive)) {
 		return 0;
 	}
 	*out_primitive = primitive;
@@ -810,25 +818,36 @@ static b8 se_sdf_json_node_index_of(
 	return 0;
 }
 
-static void se_sdf_runtime_init_storage(void) {
-	if (se_sdf_runtime_scene_storage_initialized) {
-		return;
+static b8 se_sdf_get_context(se_context** out_context) {
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		return 0;
 	}
-	s_array_init(&se_sdf_runtime_scene_storage);
-	s_array_init(&se_sdf_runtime_renderer_storage);
-	se_sdf_runtime_scene_storage_initialized = 1;
+	if (s_array_get_capacity(&ctx->sdf_scenes) == 0) {
+		s_array_init(&ctx->sdf_scenes);
+	}
+	if (s_array_get_capacity(&ctx->sdf_renderers) == 0) {
+		s_array_init(&ctx->sdf_renderers);
+	}
+	if (out_context) {
+		*out_context = ctx;
+	}
+	return 1;
 }
 
-static se_sdf_runtime_renderer* se_sdf_runtime_renderer_from_handle(const se_sdf_renderer_handle renderer) {
+static se_sdf_renderer* se_sdf_renderer_from_handle(const se_sdf_renderer_handle renderer) {
 	if (renderer == SE_SDF_RENDERER_NULL) {
 		return NULL;
 	}
-	se_sdf_runtime_init_storage();
-	return s_array_get(&se_sdf_runtime_renderer_storage, renderer);
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return NULL;
+	}
+	return s_array_get(&ctx->sdf_renderers, renderer);
 }
 
-static void se_sdf_runtime_set_diagnostics(
-	se_sdf_runtime_renderer* renderer,
+static void se_sdf_set_diagnostics(
+	se_sdf_renderer* renderer,
 	const b8 success,
 	const char* stage,
 	const char* fmt,
@@ -851,7 +870,7 @@ static void se_sdf_runtime_set_diagnostics(
 	va_end(args);
 }
 
-static b8 se_sdf_runtime_renderer_has_live_shader(const se_sdf_runtime_renderer* renderer) {
+static b8 se_sdf_renderer_has_live_shader(const se_sdf_renderer* renderer) {
 	if (!renderer || renderer->shader == S_HANDLE_NULL) {
 		return 0;
 	}
@@ -863,7 +882,7 @@ static b8 se_sdf_runtime_renderer_has_live_shader(const se_sdf_runtime_renderer*
 	return shader_ptr != NULL && shader_ptr->program != 0;
 }
 
-static void se_sdf_runtime_renderer_release_shader(se_sdf_runtime_renderer* renderer) {
+static void se_sdf_renderer_release_shader(se_sdf_renderer* renderer) {
 	if (!renderer || renderer->shader == S_HANDLE_NULL) {
 		return;
 	}
@@ -874,7 +893,7 @@ static void se_sdf_runtime_renderer_release_shader(se_sdf_runtime_renderer* rend
 	renderer->shader = S_HANDLE_NULL;
 }
 
-static void se_sdf_runtime_renderer_release_quad(se_sdf_runtime_renderer* renderer) {
+static void se_sdf_renderer_release_quad(se_sdf_renderer* renderer) {
 	if (!renderer || !renderer->quad_ready) {
 		return;
 	}
@@ -885,15 +904,15 @@ static void se_sdf_runtime_renderer_release_quad(se_sdf_runtime_renderer* render
 	renderer->quad_ready = 0;
 }
 
-static void se_sdf_runtime_renderer_invalidate_gpu_state(se_sdf_runtime_renderer* renderer) {
+static void se_sdf_renderer_invalidate_gpu_state(se_sdf_renderer* renderer) {
 	if (!renderer) {
 		return;
 	}
-	se_sdf_runtime_renderer_release_shader(renderer);
-	se_sdf_runtime_renderer_release_quad(renderer);
+	se_sdf_renderer_release_shader(renderer);
+	se_sdf_renderer_release_quad(renderer);
 	renderer->built = 0;
 	for (sz i = 0; i < s_array_get_size(&renderer->controls); ++i) {
-		se_sdf_runtime_control* control = s_array_get(&renderer->controls, s_array_handle(&renderer->controls, (u32)i));
+		se_sdf_control* control = s_array_get(&renderer->controls, s_array_handle(&renderer->controls, (u32)i));
 		if (!control) {
 			continue;
 		}
@@ -903,52 +922,168 @@ static void se_sdf_runtime_renderer_invalidate_gpu_state(se_sdf_runtime_renderer
 	}
 }
 
-static void se_sdf_runtime_renderer_refresh_context_state(se_sdf_runtime_renderer* renderer) {
+static void se_sdf_renderer_refresh_context_state(se_sdf_renderer* renderer) {
 	if (!renderer) {
 		return;
 	}
 	const u64 current_generation = se_render_get_generation();
 	if (renderer->render_generation != 0 && current_generation != 0 &&
 		renderer->render_generation != current_generation) {
-		se_sdf_runtime_renderer_invalidate_gpu_state(renderer);
+		se_sdf_renderer_invalidate_gpu_state(renderer);
 	}
 	renderer->render_generation = current_generation;
 
-	if (renderer->shader != S_HANDLE_NULL && !se_sdf_runtime_renderer_has_live_shader(renderer)) {
+	if (renderer->shader != S_HANDLE_NULL && !se_sdf_renderer_has_live_shader(renderer)) {
 		renderer->shader = S_HANDLE_NULL;
 		renderer->built = 0;
 	}
 }
 
-static se_sdf_runtime_scene* se_sdf_runtime_scene_from_handle(const se_sdf_scene_handle scene) {
+static se_sdf_scene* se_sdf_scene_from_handle(const se_sdf_scene_handle scene) {
 	if (scene == SE_SDF_SCENE_NULL) {
 		return NULL;
 	}
-	se_sdf_runtime_init_storage();
-	return s_array_get(&se_sdf_runtime_scene_storage, scene);
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return NULL;
+	}
+	return s_array_get(&ctx->sdf_scenes, scene);
 }
 
-static se_sdf_runtime_node* se_sdf_runtime_node_from_handle(
-	se_sdf_runtime_scene* scene_ptr,
+static void se_sdf_scene_release_implicit_resources(se_sdf_scene* scene_ptr) {
+	if (!scene_ptr) {
+		return;
+	}
+	if (scene_ptr->implicit_renderer != SE_SDF_RENDERER_NULL) {
+		se_sdf_renderer_destroy(scene_ptr->implicit_renderer);
+		scene_ptr->implicit_renderer = SE_SDF_RENDERER_NULL;
+	}
+	if (scene_ptr->implicit_camera != S_HANDLE_NULL) {
+		if (se_camera_get(scene_ptr->implicit_camera)) {
+			se_camera_destroy(scene_ptr->implicit_camera);
+		}
+		scene_ptr->implicit_camera = S_HANDLE_NULL;
+	}
+}
+
+static b8 se_sdf_scene_prepare_implicit_render(
+	const se_sdf_scene_handle scene,
+	se_sdf_scene* scene_ptr
+) {
+	if (!scene_ptr) {
+		return 0;
+	}
+
+	b8 created_renderer = 0;
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(scene_ptr->implicit_renderer);
+	if (!renderer_ptr) {
+		scene_ptr->implicit_renderer = se_sdf_renderer_create(NULL);
+		if (scene_ptr->implicit_renderer == SE_SDF_RENDERER_NULL) {
+			return 0;
+		}
+		created_renderer = 1;
+		if (!se_sdf_renderer_set_scene(scene_ptr->implicit_renderer, scene)) {
+			se_sdf_renderer_destroy(scene_ptr->implicit_renderer);
+			scene_ptr->implicit_renderer = SE_SDF_RENDERER_NULL;
+			return 0;
+		}
+	}
+
+	if (scene_ptr->implicit_camera == S_HANDLE_NULL || !se_camera_get(scene_ptr->implicit_camera)) {
+		scene_ptr->implicit_camera = se_camera_create();
+		if (scene_ptr->implicit_camera == S_HANDLE_NULL) {
+			if (created_renderer && scene_ptr->implicit_renderer != SE_SDF_RENDERER_NULL) {
+				se_sdf_renderer_destroy(scene_ptr->implicit_renderer);
+				scene_ptr->implicit_renderer = SE_SDF_RENDERER_NULL;
+			}
+			return 0;
+		}
+		se_camera_set_target_mode(scene_ptr->implicit_camera, 1);
+		(void)se_sdf_scene_align_camera(scene, scene_ptr->implicit_camera, NULL, NULL);
+	}
+	return 1;
+}
+
+static se_window_handle se_sdf_first_window_handle(void) {
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		return S_HANDLE_NULL;
+	}
+	for (u32 i = 0; i < (u32)s_array_get_size(&ctx->windows); ++i) {
+		se_window_handle handle = s_array_handle(&ctx->windows, i);
+		if (s_array_get(&ctx->windows, handle)) {
+			return handle;
+		}
+	}
+	return S_HANDLE_NULL;
+}
+
+static void se_sdf_scene_object_render(const se_sdf_scene_handle scene) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		return;
+	}
+	if (!se_sdf_scene_prepare_implicit_render(scene, scene_ptr)) {
+		return;
+	}
+
+	GLint viewport[4] = {0, 0, 1, 1};
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	const f32 width = viewport[2] > 0 ? (f32)viewport[2] : 1.0f;
+	const f32 height = viewport[3] > 0 ? (f32)viewport[3] : 1.0f;
+
+	se_sdf_frame_desc frame = SE_SDF_FRAME_DESC_DEFAULTS;
+	frame.resolution = s_vec2(width, height);
+	if (scene_ptr->implicit_camera != S_HANDLE_NULL) {
+		se_camera_set_aspect(scene_ptr->implicit_camera, width, height);
+		(void)se_sdf_frame_set_camera(&frame, scene_ptr->implicit_camera);
+	}
+
+	se_window_handle window = se_sdf_first_window_handle();
+	if (window != S_HANDLE_NULL) {
+		frame.time_seconds = (f32)se_window_get_time(window);
+	}
+
+	(void)se_sdf_renderer_render(scene_ptr->implicit_renderer, &frame);
+}
+
+static void se_sdf_scene_object_2d_render(void* data) {
+	se_sdf_scene_object_2d_data* render_data = (se_sdf_scene_object_2d_data*)data;
+	if (!render_data) {
+		return;
+	}
+	se_sdf_scene_object_render(render_data->scene);
+}
+
+static void se_sdf_scene_object_3d_render(void* data) {
+	se_sdf_scene_object_3d_data* render_data = (se_sdf_scene_object_3d_data*)data;
+	if (!render_data) {
+		return;
+	}
+	se_sdf_scene_object_render(render_data->scene);
+}
+
+static se_sdf_node* se_sdf_node_from_handle(
+	se_sdf_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node
 ) {
 	if (!scene_ptr || node == SE_SDF_NODE_NULL) {
 		return NULL;
 	}
-	se_sdf_runtime_node* node_ptr = s_array_get(&scene_ptr->nodes, node);
+	se_sdf_node* node_ptr = s_array_get(&scene_ptr->nodes, node);
 	if (!node_ptr || node_ptr->owner_scene != scene) {
 		return NULL;
 	}
 	return node_ptr;
 }
 
-static void se_sdf_runtime_scene_release_nodes(se_sdf_runtime_scene* scene_ptr) {
+static void se_sdf_scene_release_nodes(se_sdf_scene* scene_ptr) {
 	if (!scene_ptr) {
 		return;
 	}
 	for (sz i = 0; i < s_array_get_size(&scene_ptr->nodes); ++i) {
-		se_sdf_runtime_node* node = s_array_get(&scene_ptr->nodes, s_array_handle(&scene_ptr->nodes, (u32)i));
+		se_sdf_node* node = s_array_get(&scene_ptr->nodes, s_array_handle(&scene_ptr->nodes, (u32)i));
 		if (node) {
 			s_array_clear(&node->children);
 		}
@@ -957,7 +1092,7 @@ static void se_sdf_runtime_scene_release_nodes(se_sdf_runtime_scene* scene_ptr) 
 	scene_ptr->root = SE_SDF_NODE_NULL;
 }
 
-static b8 se_sdf_runtime_remove_child_entry(se_sdf_runtime_node* parent_node, const se_sdf_node_handle child) {
+static b8 se_sdf_remove_child_entry(se_sdf_node* parent_node, const se_sdf_node_handle child) {
 	if (!parent_node || child == SE_SDF_NODE_NULL) {
 		return 0;
 	}
@@ -972,7 +1107,7 @@ static b8 se_sdf_runtime_remove_child_entry(se_sdf_runtime_node* parent_node, co
 	return 0;
 }
 
-static b8 se_sdf_runtime_has_child_entry(se_sdf_runtime_node* parent_node, const se_sdf_node_handle child) {
+static b8 se_sdf_has_child_entry(se_sdf_node* parent_node, const se_sdf_node_handle child) {
 	if (!parent_node || child == SE_SDF_NODE_NULL) {
 		return 0;
 	}
@@ -985,7 +1120,7 @@ static b8 se_sdf_runtime_has_child_entry(se_sdf_runtime_node* parent_node, const
 	return 0;
 }
 
-static b8 se_sdf_runtime_is_valid_primitive_type(const se_sdf_primitive_type type) {
+static b8 se_sdf_is_valid_primitive_type(const se_sdf_primitive_type type) {
 	switch (type) {
 		case SE_SDF_PRIMITIVE_SPHERE:
 		case SE_SDF_PRIMITIVE_BOX:
@@ -1025,12 +1160,12 @@ static b8 se_sdf_runtime_is_valid_primitive_type(const se_sdf_primitive_type typ
 	}
 }
 
-static b8 se_sdf_runtime_vec3_all_positive(const s_vec3 v) {
+static b8 se_sdf_vec3_all_positive(const s_vec3 v) {
 	return v.x > 0.0f && v.y > 0.0f && v.z > 0.0f;
 }
 
-static b8 se_sdf_runtime_validate_primitive_desc(const se_sdf_primitive_desc* primitive) {
-	if (!primitive || !se_sdf_runtime_is_valid_primitive_type(primitive->type)) {
+static b8 se_sdf_validate_primitive_desc(const se_sdf_primitive_desc* primitive) {
+	if (!primitive || !se_sdf_is_valid_primitive_type(primitive->type)) {
 		return 0;
 	}
 
@@ -1038,12 +1173,12 @@ static b8 se_sdf_runtime_validate_primitive_desc(const se_sdf_primitive_desc* pr
 		case SE_SDF_PRIMITIVE_SPHERE:
 			return primitive->sphere.radius > 0.0f;
 		case SE_SDF_PRIMITIVE_BOX:
-			return se_sdf_runtime_vec3_all_positive(primitive->box.size);
+			return se_sdf_vec3_all_positive(primitive->box.size);
 		case SE_SDF_PRIMITIVE_ROUND_BOX:
-			return se_sdf_runtime_vec3_all_positive(primitive->round_box.size) &&
+			return se_sdf_vec3_all_positive(primitive->round_box.size) &&
 				primitive->round_box.roundness >= 0.0f;
 		case SE_SDF_PRIMITIVE_BOX_FRAME:
-			return se_sdf_runtime_vec3_all_positive(primitive->box_frame.size) &&
+			return se_sdf_vec3_all_positive(primitive->box_frame.size) &&
 				primitive->box_frame.thickness >= 0.0f;
 		case SE_SDF_PRIMITIVE_TORUS:
 			return primitive->torus.radii.x > 0.0f && primitive->torus.radii.y > 0.0f;
@@ -1075,7 +1210,7 @@ static b8 se_sdf_runtime_validate_primitive_desc(const se_sdf_primitive_desc* pr
 	}
 }
 
-static b8 se_sdf_runtime_operation_child_count_is_legal(
+static b8 se_sdf_operation_child_count_is_legal(
 	const se_sdf_operation operation,
 	const sz child_count
 ) {
@@ -1085,7 +1220,7 @@ static b8 se_sdf_runtime_operation_child_count_is_legal(
 	return 1;
 }
 
-static b8 se_sdf_runtime_operation_is_smooth(const se_sdf_operation operation) {
+static b8 se_sdf_operation_is_smooth(const se_sdf_operation operation) {
 	switch (operation) {
 		case SE_SDF_OP_SMOOTH_UNION:
 		case SE_SDF_OP_SMOOTH_INTERSECTION:
@@ -1096,11 +1231,11 @@ static b8 se_sdf_runtime_operation_is_smooth(const se_sdf_operation operation) {
 	}
 }
 
-static f32 se_sdf_runtime_sanitize_operation_amount(
+static f32 se_sdf_sanitize_operation_amount(
 	const se_sdf_operation operation,
 	const f32 operation_amount
 ) {
-	if (!se_sdf_runtime_operation_is_smooth(operation)) {
+	if (!se_sdf_operation_is_smooth(operation)) {
 		return operation_amount;
 	}
 	if (!isfinite(operation_amount) || operation_amount <= 0.000001f) {
@@ -1109,8 +1244,8 @@ static f32 se_sdf_runtime_sanitize_operation_amount(
 	return operation_amount;
 }
 
-static b8 se_sdf_runtime_is_ancestor(
-	se_sdf_runtime_scene* scene_ptr,
+static b8 se_sdf_is_ancestor(
+	se_sdf_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle ancestor,
 	se_sdf_node_handle node
@@ -1124,7 +1259,7 @@ static b8 se_sdf_runtime_is_ancestor(
 		if (node == ancestor) {
 			return 1;
 		}
-		se_sdf_runtime_node* current = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+		se_sdf_node* current = se_sdf_node_from_handle(scene_ptr, scene, node);
 		if (!current) {
 			return 0;
 		}
@@ -1133,28 +1268,28 @@ static b8 se_sdf_runtime_is_ancestor(
 	return 0;
 }
 
-static void se_sdf_runtime_detach_from_parent(
-	se_sdf_runtime_scene* scene_ptr,
+static void se_sdf_detach_from_parent(
+	se_sdf_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node_handle
 ) {
-	se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, node_handle);
+	se_sdf_node* node = se_sdf_node_from_handle(scene_ptr, scene, node_handle);
 	if (!node || node->parent == SE_SDF_NODE_NULL) {
 		return;
 	}
-	se_sdf_runtime_node* parent = se_sdf_runtime_node_from_handle(scene_ptr, scene, node->parent);
+	se_sdf_node* parent = se_sdf_node_from_handle(scene_ptr, scene, node->parent);
 	if (parent) {
-		se_sdf_runtime_remove_child_entry(parent, node_handle);
+		se_sdf_remove_child_entry(parent, node_handle);
 	}
 	node->parent = SE_SDF_NODE_NULL;
 }
 
-static void se_sdf_runtime_destroy_node_recursive(
-	se_sdf_runtime_scene* scene_ptr,
+static void se_sdf_destroy_node_recursive(
+	se_sdf_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node_handle
 ) {
-	se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, node_handle);
+	se_sdf_node* node = se_sdf_node_from_handle(scene_ptr, scene, node_handle);
 	if (!node) {
 		return;
 	}
@@ -1171,17 +1306,17 @@ static void se_sdf_runtime_destroy_node_recursive(
 	for (sz i = 0; i < s_array_get_size(&children_copy); ++i) {
 		se_sdf_node_handle* child = s_array_get(&children_copy, s_array_handle(&children_copy, (u32)i));
 		if (child) {
-			se_sdf_runtime_destroy_node_recursive(scene_ptr, scene, *child);
+			se_sdf_destroy_node_recursive(scene_ptr, scene, *child);
 		}
 	}
 	s_array_clear(&children_copy);
 
-	node = se_sdf_runtime_node_from_handle(scene_ptr, scene, node_handle);
+	node = se_sdf_node_from_handle(scene_ptr, scene, node_handle);
 	if (!node) {
 		return;
 	}
 
-	se_sdf_runtime_detach_from_parent(scene_ptr, scene, node_handle);
+	se_sdf_detach_from_parent(scene_ptr, scene, node_handle);
 	if (scene_ptr->root == node_handle) {
 		scene_ptr->root = SE_SDF_NODE_NULL;
 	}
@@ -1191,20 +1326,25 @@ static void se_sdf_runtime_destroy_node_recursive(
 }
 
 se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc) {
-	se_sdf_runtime_init_storage();
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return SE_SDF_SCENE_NULL;
+	}
 	se_sdf_scene_desc scene_desc = SE_SDF_SCENE_DESC_DEFAULTS;
 	if (desc) {
 		scene_desc = *desc;
 	}
 
-	se_sdf_scene_handle scene_handle = s_array_increment(&se_sdf_runtime_scene_storage);
-	se_sdf_runtime_scene* scene = s_array_get(&se_sdf_runtime_scene_storage, scene_handle);
+	se_sdf_scene_handle scene_handle = s_array_increment(&ctx->sdf_scenes);
+	se_sdf_scene* scene = s_array_get(&ctx->sdf_scenes, scene_handle);
 	if (!scene) {
 		return SE_SDF_SCENE_NULL;
 	}
 	memset(scene, 0, sizeof(*scene));
 	s_array_init(&scene->nodes);
 	scene->root = SE_SDF_NODE_NULL;
+	scene->implicit_renderer = SE_SDF_RENDERER_NULL;
+	scene->implicit_camera = S_HANDLE_NULL;
 
 	if (scene_desc.initial_node_capacity > 0) {
 		s_array_reserve(&scene->nodes, scene_desc.initial_node_capacity);
@@ -1213,25 +1353,110 @@ se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc) {
 	return scene_handle;
 }
 
+se_object_2d_handle se_sdf_scene_to_object_2d(se_sdf_scene_handle scene) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	const b8 had_renderer = se_sdf_renderer_from_handle(scene_ptr->implicit_renderer) != NULL;
+	const b8 had_camera = (scene_ptr->implicit_camera != S_HANDLE_NULL) &&
+		(se_camera_get(scene_ptr->implicit_camera) != NULL);
+	if (!se_sdf_scene_prepare_implicit_render(scene, scene_ptr)) {
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		}
+		return S_HANDLE_NULL;
+	}
+
+	se_object_custom custom = {0};
+	custom.render = se_sdf_scene_object_2d_render;
+	const se_sdf_scene_object_2d_data custom_data = {
+		.scene = scene
+	};
+	se_object_custom_set_data(&custom, &custom_data, sizeof(custom_data));
+
+	se_object_2d_handle object = se_object_2d_create_custom(&custom, &s_mat3_identity);
+	if (object == S_HANDLE_NULL) {
+		if (!had_renderer && scene_ptr->implicit_renderer != SE_SDF_RENDERER_NULL) {
+			se_sdf_renderer_destroy(scene_ptr->implicit_renderer);
+			scene_ptr->implicit_renderer = SE_SDF_RENDERER_NULL;
+		}
+		if (!had_camera && scene_ptr->implicit_camera != S_HANDLE_NULL && se_camera_get(scene_ptr->implicit_camera)) {
+			se_camera_destroy(scene_ptr->implicit_camera);
+			scene_ptr->implicit_camera = S_HANDLE_NULL;
+		}
+		return S_HANDLE_NULL;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return object;
+}
+
+se_object_3d_handle se_sdf_scene_to_object_3d(se_sdf_scene_handle scene) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	const b8 had_renderer = se_sdf_renderer_from_handle(scene_ptr->implicit_renderer) != NULL;
+	const b8 had_camera = (scene_ptr->implicit_camera != S_HANDLE_NULL) &&
+		(se_camera_get(scene_ptr->implicit_camera) != NULL);
+	if (!se_sdf_scene_prepare_implicit_render(scene, scene_ptr)) {
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		}
+		return S_HANDLE_NULL;
+	}
+
+	se_object_custom custom = {0};
+	custom.render = se_sdf_scene_object_3d_render;
+	const se_sdf_scene_object_3d_data custom_data = {
+		.scene = scene
+	};
+	se_object_custom_set_data(&custom, &custom_data, sizeof(custom_data));
+
+	se_object_3d_handle object = se_object_3d_create_custom(&custom, &s_mat4_identity);
+	if (object == S_HANDLE_NULL) {
+		if (!had_renderer && scene_ptr->implicit_renderer != SE_SDF_RENDERER_NULL) {
+			se_sdf_renderer_destroy(scene_ptr->implicit_renderer);
+			scene_ptr->implicit_renderer = SE_SDF_RENDERER_NULL;
+		}
+		if (!had_camera && scene_ptr->implicit_camera != S_HANDLE_NULL && se_camera_get(scene_ptr->implicit_camera)) {
+			se_camera_destroy(scene_ptr->implicit_camera);
+			scene_ptr->implicit_camera = S_HANDLE_NULL;
+		}
+		return S_HANDLE_NULL;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return object;
+}
+
 void se_sdf_scene_destroy(const se_sdf_scene_handle scene) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return;
 	}
-	se_sdf_runtime_scene_release_nodes(scene_ptr);
-	s_array_remove(&se_sdf_runtime_scene_storage, scene);
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return;
+	}
+	se_sdf_scene_release_implicit_resources(scene_ptr);
+	se_sdf_scene_release_nodes(scene_ptr);
+	s_array_remove(&ctx->sdf_scenes, scene);
 }
 
 void se_sdf_scene_clear(const se_sdf_scene_handle scene) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return;
 	}
-	se_sdf_runtime_scene_release_nodes(scene_ptr);
+	se_sdf_scene_release_nodes(scene_ptr);
 }
 
 b8 se_sdf_scene_set_root(const se_sdf_scene_handle scene, const se_sdf_node_handle node) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
@@ -1239,7 +1464,7 @@ b8 se_sdf_scene_set_root(const se_sdf_scene_handle scene, const se_sdf_node_hand
 		scene_ptr->root = SE_SDF_NODE_NULL;
 		return 1;
 	}
-	se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
 	if (!node_ptr) {
 		return 0;
 	}
@@ -1248,14 +1473,14 @@ b8 se_sdf_scene_set_root(const se_sdf_scene_handle scene, const se_sdf_node_hand
 }
 
 se_sdf_node_handle se_sdf_scene_get_root(const se_sdf_scene_handle scene) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return SE_SDF_NODE_NULL;
 	}
 	return scene_ptr->root;
 }
 
-static void se_sdf_runtime_write_scene_error(
+static void se_sdf_write_scene_error(
 	char* error_message,
 	const sz error_message_size,
 	const char* fmt,
@@ -1279,15 +1504,15 @@ b8 se_sdf_scene_validate(
 		error_message[0] = '\0';
 	}
 
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
-		se_sdf_runtime_write_scene_error(error_message, error_message_size, "invalid scene handle");
+		se_sdf_write_scene_error(error_message, error_message_size, "invalid scene handle");
 		return 0;
 	}
 
 	if (scene_ptr->root != SE_SDF_NODE_NULL &&
-		!se_sdf_runtime_node_from_handle(scene_ptr, scene, scene_ptr->root)) {
-		se_sdf_runtime_write_scene_error(
+		!se_sdf_node_from_handle(scene_ptr, scene, scene_ptr->root)) {
+		se_sdf_write_scene_error(
 			error_message, error_message_size, "root handle is invalid (slot=%u)", s_handle_slot(scene_ptr->root));
 		return 0;
 	}
@@ -1295,37 +1520,37 @@ b8 se_sdf_scene_validate(
 	const sz node_count = s_array_get_size(&scene_ptr->nodes);
 	for (sz i = 0; i < node_count; ++i) {
 		se_sdf_node_handle handle = s_array_handle(&scene_ptr->nodes, (u32)i);
-		se_sdf_runtime_node* node = s_array_get(&scene_ptr->nodes, handle);
+		se_sdf_node* node = s_array_get(&scene_ptr->nodes, handle);
 		if (!node) {
 			continue;
 		}
 
 		if (node->owner_scene != scene) {
-			se_sdf_runtime_write_scene_error(
+			se_sdf_write_scene_error(
 				error_message, error_message_size,
 				"node owner mismatch (node_slot=%u)", s_handle_slot(handle));
 			return 0;
 		}
 
-		if (!node->is_group && !se_sdf_runtime_validate_primitive_desc(&node->primitive)) {
-			se_sdf_runtime_write_scene_error(
+		if (!node->is_group && !se_sdf_validate_primitive_desc(&node->primitive)) {
+			se_sdf_write_scene_error(
 				error_message, error_message_size,
 				"invalid primitive parameters (node_slot=%u, type=%d)",
 				s_handle_slot(handle), (int)node->primitive.type);
 			return 0;
 		}
 
-		if (!se_sdf_runtime_operation_child_count_is_legal(
+		if (!se_sdf_operation_child_count_is_legal(
 				node->operation, s_array_get_size(&node->children))) {
-			se_sdf_runtime_write_scene_error(
+			se_sdf_write_scene_error(
 				error_message, error_message_size,
 				"illegal operation for child count (node_slot=%u, op=%d, child_count=%zu)",
 				s_handle_slot(handle), (int)node->operation, s_array_get_size(&node->children));
 			return 0;
 		}
-		if (se_sdf_runtime_operation_is_smooth(node->operation) &&
+		if (se_sdf_operation_is_smooth(node->operation) &&
 			(!isfinite(node->operation_amount) || node->operation_amount <= 0.000001f)) {
-			se_sdf_runtime_write_scene_error(
+			se_sdf_write_scene_error(
 				error_message, error_message_size,
 				"invalid smooth operation amount (node_slot=%u, amount=%.6f)",
 				s_handle_slot(handle), (double)node->operation_amount);
@@ -1333,16 +1558,16 @@ b8 se_sdf_scene_validate(
 		}
 
 		if (node->parent != SE_SDF_NODE_NULL) {
-			se_sdf_runtime_node* parent = se_sdf_runtime_node_from_handle(scene_ptr, scene, node->parent);
+			se_sdf_node* parent = se_sdf_node_from_handle(scene_ptr, scene, node->parent);
 			if (!parent) {
-				se_sdf_runtime_write_scene_error(
+				se_sdf_write_scene_error(
 					error_message, error_message_size,
 					"invalid parent handle (node_slot=%u, parent_slot=%u)",
 					s_handle_slot(handle), s_handle_slot(node->parent));
 				return 0;
 			}
-			if (!se_sdf_runtime_has_child_entry(parent, handle)) {
-				se_sdf_runtime_write_scene_error(
+			if (!se_sdf_has_child_entry(parent, handle)) {
+				se_sdf_write_scene_error(
 					error_message, error_message_size,
 					"parent link missing child entry (node_slot=%u, parent_slot=%u)",
 					s_handle_slot(handle), s_handle_slot(node->parent));
@@ -1353,21 +1578,21 @@ b8 se_sdf_scene_validate(
 		for (sz child_i = 0; child_i < s_array_get_size(&node->children); ++child_i) {
 			se_sdf_node_handle* child_handle = s_array_get(&node->children, s_array_handle(&node->children, (u32)child_i));
 			if (!child_handle || *child_handle == SE_SDF_NODE_NULL || *child_handle == handle) {
-				se_sdf_runtime_write_scene_error(
+				se_sdf_write_scene_error(
 					error_message, error_message_size,
 					"invalid child link (parent_slot=%u)", s_handle_slot(handle));
 				return 0;
 			}
-			se_sdf_runtime_node* child = se_sdf_runtime_node_from_handle(scene_ptr, scene, *child_handle);
+			se_sdf_node* child = se_sdf_node_from_handle(scene_ptr, scene, *child_handle);
 			if (!child) {
-				se_sdf_runtime_write_scene_error(
+				se_sdf_write_scene_error(
 					error_message, error_message_size,
 					"dangling child handle (parent_slot=%u, child_slot=%u)",
 					s_handle_slot(handle), s_handle_slot(*child_handle));
 				return 0;
 			}
 			if (child->parent != handle) {
-				se_sdf_runtime_write_scene_error(
+				se_sdf_write_scene_error(
 					error_message, error_message_size,
 					"child parent mismatch (parent_slot=%u, child_slot=%u, child_parent_slot=%u)",
 					s_handle_slot(handle),
@@ -1381,9 +1606,9 @@ b8 se_sdf_scene_validate(
 		sz depth = 0;
 		const sz max_depth = node_count + 1;
 		while (walker != SE_SDF_NODE_NULL && depth++ < max_depth) {
-			se_sdf_runtime_node* current = se_sdf_runtime_node_from_handle(scene_ptr, scene, walker);
+			se_sdf_node* current = se_sdf_node_from_handle(scene_ptr, scene, walker);
 			if (!current) {
-				se_sdf_runtime_write_scene_error(
+				se_sdf_write_scene_error(
 					error_message, error_message_size,
 					"invalid ancestor chain (node_slot=%u)", s_handle_slot(handle));
 				return 0;
@@ -1391,7 +1616,7 @@ b8 se_sdf_scene_validate(
 			walker = current->parent;
 		}
 		if (walker != SE_SDF_NODE_NULL) {
-			se_sdf_runtime_write_scene_error(
+			se_sdf_write_scene_error(
 				error_message, error_message_size,
 				"cycle detected in parent chain (node_slot=%u)", s_handle_slot(handle));
 			return 0;
@@ -1402,7 +1627,7 @@ b8 se_sdf_scene_validate(
 }
 
 s_json* se_sdf_to_json(const se_sdf_scene_handle scene) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return NULL;
@@ -1425,7 +1650,7 @@ s_json* se_sdf_to_json(const se_sdf_scene_handle scene) {
 	s_array_reserve(&node_handles, s_array_get_size(&scene_ptr->nodes));
 	for (sz i = 0; i < s_array_get_size(&scene_ptr->nodes); ++i) {
 		const se_sdf_node_handle handle = s_array_handle(&scene_ptr->nodes, (u32)i);
-		se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, handle);
+		se_sdf_node* node = se_sdf_node_from_handle(scene_ptr, scene, handle);
 		if (!node) {
 			continue;
 		}
@@ -1463,7 +1688,7 @@ s_json* se_sdf_to_json(const se_sdf_scene_handle scene) {
 		if (!handle) {
 			continue;
 		}
-		se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, *handle);
+		se_sdf_node* node = se_sdf_node_from_handle(scene_ptr, scene, *handle);
 		if (!node) {
 			continue;
 		}
@@ -1522,7 +1747,7 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return 0;
 	}
-	if (!se_sdf_runtime_scene_from_handle(scene)) {
+	if (!se_sdf_scene_from_handle(scene)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return 0;
 	}
@@ -1554,7 +1779,7 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return 0;
 	}
-	se_sdf_runtime_scene* temp_scene_ptr = se_sdf_runtime_scene_from_handle(temp_scene);
+	se_sdf_scene* temp_scene_ptr = se_sdf_scene_from_handle(temp_scene);
 	if (!temp_scene_ptr) {
 		se_sdf_scene_destroy(temp_scene);
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -1645,7 +1870,7 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 		}
 		s_array_add(&created_handles, node_handle);
 
-		se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(temp_scene_ptr, temp_scene, node_handle);
+		se_sdf_node* node_ptr = se_sdf_node_from_handle(temp_scene_ptr, temp_scene, node_handle);
 		if (!node_ptr) {
 			se_set_last_error(SE_RESULT_NOT_FOUND);
 			goto fail;
@@ -1706,18 +1931,18 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 		goto fail;
 	}
 
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
-	temp_scene_ptr = se_sdf_runtime_scene_from_handle(temp_scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	temp_scene_ptr = se_sdf_scene_from_handle(temp_scene);
 	if (!scene_ptr || !temp_scene_ptr) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
 		goto fail;
 	}
 
-	se_sdf_runtime_scene_release_nodes(scene_ptr);
+	se_sdf_scene_release_nodes(scene_ptr);
 	scene_ptr->nodes = temp_scene_ptr->nodes;
 	scene_ptr->root = temp_scene_ptr->root;
 	for (sz i = 0; i < s_array_get_size(&scene_ptr->nodes); ++i) {
-		se_sdf_runtime_node* node = s_array_get(&scene_ptr->nodes, s_array_handle(&scene_ptr->nodes, (u32)i));
+		se_sdf_node* node = s_array_get(&scene_ptr->nodes, s_array_handle(&scene_ptr->nodes, (u32)i));
 		if (!node) {
 			continue;
 		}
@@ -1737,17 +1962,41 @@ fail:
 	return 0;
 }
 
+b8 se_sdf_from_json_file(const se_sdf_scene_handle scene, const c8* path) {
+	if (!path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+
+	c8* text = NULL;
+	if (!s_file_read(path, &text, NULL)) {
+		se_set_last_error(SE_RESULT_IO);
+		return 0;
+	}
+
+	s_json* root = s_json_parse(text);
+	free(text);
+	if (!root) {
+		se_set_last_error(SE_RESULT_IO);
+		return 0;
+	}
+
+	const b8 ok = se_sdf_from_json(scene, root);
+	s_json_free(root);
+	return ok;
+}
+
 se_sdf_node_handle se_sdf_node_create_primitive(
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_primitive_desc* desc
 ) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
-	if (!scene_ptr || !desc || !se_sdf_runtime_validate_primitive_desc(&desc->primitive)) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr || !desc || !se_sdf_validate_primitive_desc(&desc->primitive)) {
 		return SE_SDF_NODE_NULL;
 	}
 
 	se_sdf_node_handle node_handle = s_array_increment(&scene_ptr->nodes);
-	se_sdf_runtime_node* node = s_array_get(&scene_ptr->nodes, node_handle);
+	se_sdf_node* node = s_array_get(&scene_ptr->nodes, node_handle);
 	if (!node) {
 		return SE_SDF_NODE_NULL;
 	}
@@ -1755,7 +2004,7 @@ se_sdf_node_handle se_sdf_node_create_primitive(
 	node->owner_scene = scene;
 	node->transform = desc->transform;
 	node->operation = desc->operation;
-	node->operation_amount = se_sdf_runtime_sanitize_operation_amount(desc->operation, desc->operation_amount);
+	node->operation_amount = se_sdf_sanitize_operation_amount(desc->operation, desc->operation_amount);
 	node->primitive = desc->primitive;
 	node->parent = SE_SDF_NODE_NULL;
 	node->is_group = 0;
@@ -1771,7 +2020,7 @@ se_sdf_node_handle se_sdf_node_create_group(
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_group_desc* desc
 ) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return SE_SDF_NODE_NULL;
 	}
@@ -1782,7 +2031,7 @@ se_sdf_node_handle se_sdf_node_create_group(
 	}
 
 	se_sdf_node_handle node_handle = s_array_increment(&scene_ptr->nodes);
-	se_sdf_runtime_node* node = s_array_get(&scene_ptr->nodes, node_handle);
+	se_sdf_node* node = s_array_get(&scene_ptr->nodes, node_handle);
 	if (!node) {
 		return SE_SDF_NODE_NULL;
 	}
@@ -1790,7 +2039,7 @@ se_sdf_node_handle se_sdf_node_create_group(
 	node->owner_scene = scene;
 	node->transform = group_desc.transform;
 	node->operation = group_desc.operation;
-	node->operation_amount = se_sdf_runtime_sanitize_operation_amount(group_desc.operation, group_desc.operation_amount);
+	node->operation_amount = se_sdf_sanitize_operation_amount(group_desc.operation, group_desc.operation_amount);
 	node->parent = SE_SDF_NODE_NULL;
 	node->is_group = 1;
 	node->control_translation = s_vec3(0.0f, 0.0f, 0.0f);
@@ -1802,14 +2051,14 @@ se_sdf_node_handle se_sdf_node_create_group(
 }
 
 void se_sdf_node_destroy(const se_sdf_scene_handle scene, const se_sdf_node_handle node) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return;
 	}
-	if (!se_sdf_runtime_node_from_handle(scene_ptr, scene, node)) {
+	if (!se_sdf_node_from_handle(scene_ptr, scene, node)) {
 		return;
 	}
-	se_sdf_runtime_destroy_node_recursive(scene_ptr, scene, node);
+	se_sdf_destroy_node_recursive(scene_ptr, scene, node);
 }
 
 b8 se_sdf_node_add_child(
@@ -1820,29 +2069,29 @@ b8 se_sdf_node_add_child(
 	if (parent == child || parent == SE_SDF_NODE_NULL || child == SE_SDF_NODE_NULL) {
 		return 0;
 	}
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
 
-	se_sdf_runtime_node* parent_node = se_sdf_runtime_node_from_handle(scene_ptr, scene, parent);
-	se_sdf_runtime_node* child_node = se_sdf_runtime_node_from_handle(scene_ptr, scene, child);
+	se_sdf_node* parent_node = se_sdf_node_from_handle(scene_ptr, scene, parent);
+	se_sdf_node* child_node = se_sdf_node_from_handle(scene_ptr, scene, child);
 	if (!parent_node || !child_node) {
 		return 0;
 	}
 
-	if (se_sdf_runtime_is_ancestor(scene_ptr, scene, child, parent)) {
+	if (se_sdf_is_ancestor(scene_ptr, scene, child, parent)) {
 		return 0;
 	}
 
 	if (child_node->parent != SE_SDF_NODE_NULL && child_node->parent != parent) {
-		se_sdf_runtime_node* old_parent = se_sdf_runtime_node_from_handle(scene_ptr, scene, child_node->parent);
+		se_sdf_node* old_parent = se_sdf_node_from_handle(scene_ptr, scene, child_node->parent);
 		if (old_parent) {
-			se_sdf_runtime_remove_child_entry(old_parent, child);
+			se_sdf_remove_child_entry(old_parent, child);
 		}
 	}
 
-	if (!se_sdf_runtime_has_child_entry(parent_node, child)) {
+	if (!se_sdf_has_child_entry(parent_node, child)) {
 		s_array_add(&parent_node->children, child);
 	}
 	child_node->parent = parent;
@@ -1854,21 +2103,21 @@ b8 se_sdf_node_remove_child(
 	const se_sdf_node_handle parent,
 	const se_sdf_node_handle child
 ) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_node* parent_node = se_sdf_runtime_node_from_handle(scene_ptr, scene, parent);
+	se_sdf_node* parent_node = se_sdf_node_from_handle(scene_ptr, scene, parent);
 	if (!parent_node) {
 		return 0;
 	}
 
-	b8 removed = se_sdf_runtime_remove_child_entry(parent_node, child);
+	b8 removed = se_sdf_remove_child_entry(parent_node, child);
 	if (!removed) {
 		return 0;
 	}
 
-	se_sdf_runtime_node* child_node = se_sdf_runtime_node_from_handle(scene_ptr, scene, child);
+	se_sdf_node* child_node = se_sdf_node_from_handle(scene_ptr, scene, child);
 	if (child_node && child_node->parent == parent) {
 		child_node->parent = SE_SDF_NODE_NULL;
 	}
@@ -1880,19 +2129,19 @@ b8 se_sdf_node_set_operation(
 	const se_sdf_node_handle node,
 	const se_sdf_operation operation
 ) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
 	if (!node_ptr) {
 		return 0;
 	}
-	if (!se_sdf_runtime_operation_child_count_is_legal(operation, s_array_get_size(&node_ptr->children))) {
+	if (!se_sdf_operation_child_count_is_legal(operation, s_array_get_size(&node_ptr->children))) {
 		return 0;
 	}
 	node_ptr->operation = operation;
-	node_ptr->operation_amount = se_sdf_runtime_sanitize_operation_amount(operation, node_ptr->operation_amount);
+	node_ptr->operation_amount = se_sdf_sanitize_operation_amount(operation, node_ptr->operation_amount);
 	return 1;
 }
 
@@ -1904,11 +2153,11 @@ b8 se_sdf_node_set_transform(
 	if (!transform) {
 		return 0;
 	}
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
 	if (!node_ptr) {
 		return 0;
 	}
@@ -1918,18 +2167,18 @@ b8 se_sdf_node_set_transform(
 }
 
 s_mat4 se_sdf_node_get_transform(const se_sdf_scene_handle scene, const se_sdf_node_handle node) {
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return s_mat4_identity;
 	}
-	se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
 	if (!node_ptr) {
 		return s_mat4_identity;
 	}
 	return node_ptr->transform;
 }
 
-static s_mat4 se_sdf_runtime_transform_trs(
+static s_mat4 se_sdf_transform_trs(
 	const f32 tx,
 	const f32 ty,
 	const f32 tz,
@@ -1972,24 +2221,24 @@ static s_mat4 se_sdf_transform_grid_cell(
 	const i32 col = index % safe_columns;
 	const f32 x = ((f32)col - half_width) * spacing;
 	const f32 z = ((f32)row - half_depth) * spacing;
-	return se_sdf_runtime_transform_trs(x, y, z, 0.0f, yaw, 0.0f, sx, sy, sz);
+	return se_sdf_transform_trs(x, y, z, 0.0f, yaw, 0.0f, sx, sy, sz);
 }
 
-static se_sdf_primitive_desc se_sdf_runtime_default_sphere_primitive(void) {
+static se_sdf_primitive_desc se_sdf_default_sphere_primitive(void) {
 	se_sdf_primitive_desc primitive = {0};
 	primitive.type = SE_SDF_PRIMITIVE_SPHERE;
 	primitive.sphere.radius = 0.82f;
 	return primitive;
 }
 
-static se_sdf_primitive_desc se_sdf_runtime_default_box_primitive(void) {
+static se_sdf_primitive_desc se_sdf_default_box_primitive(void) {
 	se_sdf_primitive_desc primitive = {0};
 	primitive.type = SE_SDF_PRIMITIVE_BOX;
 	primitive.box.size = s_vec3(0.60f, 0.60f, 0.60f);
 	return primitive;
 }
 
-static se_sdf_primitive_desc se_sdf_runtime_gallery_primitive(const i32 index) {
+static se_sdf_primitive_desc se_sdf_gallery_primitive(const i32 index) {
 	se_sdf_primitive_desc primitive = {0};
 	switch (index % 12) {
 		case 0:
@@ -2110,7 +2359,7 @@ b8 se_sdf_scene_build_single_object_preset(
 		return 0;
 	}
 
-	se_sdf_primitive_desc fallback = se_sdf_runtime_default_sphere_primitive();
+	se_sdf_primitive_desc fallback = se_sdf_default_sphere_primitive();
 	const se_sdf_primitive_desc* selected = primitive ? primitive : &fallback;
 	const s_mat4 object_transform = transform ? *transform : s_mat4_identity;
 	se_sdf_node_handle object = se_sdf_node_spawn_primitive(scene, root, selected, &object_transform, SE_SDF_OP_UNION);
@@ -2148,7 +2397,7 @@ b8 se_sdf_scene_build_grid_preset(
 		return 0;
 	}
 
-	se_sdf_primitive_desc fallback = se_sdf_runtime_default_sphere_primitive();
+	se_sdf_primitive_desc fallback = se_sdf_default_sphere_primitive();
 	const se_sdf_primitive_desc* selected = primitive ? primitive : &fallback;
 	const i32 total_cells = columns * rows;
 	for (i32 i = 0; i < total_cells; ++i) {
@@ -2195,7 +2444,7 @@ b8 se_sdf_scene_build_primitive_gallery_preset(
 	for (i32 i = 0; i < total_cells; ++i) {
 		const s_mat4 node_transform = se_sdf_transform_grid_cell(
 			i, columns, rows, spacing, 0.08f, 0.17f * (f32)i, 1.0f, 1.0f, 1.0f);
-		se_sdf_primitive_desc primitive = se_sdf_runtime_gallery_primitive(i);
+		se_sdf_primitive_desc primitive = se_sdf_gallery_primitive(i);
 		se_sdf_node_handle node = se_sdf_node_spawn_primitive(scene, root, &primitive, &node_transform, SE_SDF_OP_UNION);
 		if (node == SE_SDF_NODE_NULL) {
 			return 0;
@@ -2234,8 +2483,8 @@ b8 se_sdf_scene_build_orbit_showcase_preset(
 		return 0;
 	}
 
-	se_sdf_primitive_desc center_fallback = se_sdf_runtime_default_sphere_primitive();
-	se_sdf_primitive_desc orbit_fallback = se_sdf_runtime_default_box_primitive();
+	se_sdf_primitive_desc center_fallback = se_sdf_default_sphere_primitive();
+	se_sdf_primitive_desc orbit_fallback = se_sdf_default_box_primitive();
 	const se_sdf_primitive_desc* center = center_primitive ? center_primitive : &center_fallback;
 	const se_sdf_primitive_desc* orbit = orbit_primitive ? orbit_primitive : &orbit_fallback;
 
@@ -2250,7 +2499,7 @@ b8 se_sdf_scene_build_orbit_showcase_preset(
 		const f32 x = cosf(t) * orbit_radius;
 		const f32 z = sinf(t) * orbit_radius;
 		const f32 yaw = -t;
-		const s_mat4 orbit_transform = se_sdf_runtime_transform_trs(
+		const s_mat4 orbit_transform = se_sdf_transform_trs(
 			x, 0.35f, z, 0.0f, yaw, 0.0f, 0.72f, 0.72f, 0.72f
 		);
 		se_sdf_node_handle orbit_node = se_sdf_node_spawn_primitive(scene, root, orbit, &orbit_transform, SE_SDF_OP_UNION);
@@ -2264,7 +2513,7 @@ b8 se_sdf_scene_build_orbit_showcase_preset(
 	return 1;
 }
 
-static s_vec3 se_sdf_runtime_mul_mat4_point(const s_mat4* mat, const s_vec3* point) {
+static s_vec3 se_sdf_mul_mat4_point(const s_mat4* mat, const s_vec3* point) {
 	if (!mat || !point) {
 		return s_vec3(0.0f, 0.0f, 0.0f);
 	}
@@ -2279,7 +2528,7 @@ static s_vec3 se_sdf_runtime_mul_mat4_point(const s_mat4* mat, const s_vec3* poi
 	return s_vec3(x, y, z);
 }
 
-static void se_sdf_runtime_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point) {
+static void se_sdf_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point) {
 	if (!bounds || !point) {
 		return;
 	}
@@ -2297,7 +2546,7 @@ static void se_sdf_runtime_scene_bounds_expand_point(se_sdf_scene_bounds* bounds
 	if (point->z > bounds->max.z) bounds->max.z = point->z;
 }
 
-static void se_sdf_runtime_scene_bounds_expand_transformed_aabb(
+static void se_sdf_scene_bounds_expand_transformed_aabb(
 	se_sdf_scene_bounds* bounds,
 	const s_mat4* transform,
 	const s_vec3* local_min,
@@ -2314,14 +2563,14 @@ static void se_sdf_runtime_scene_bounds_expand_transformed_aabb(
 					iy ? local_max->y : local_min->y,
 					iz ? local_max->z : local_min->z
 				);
-				const s_vec3 world_point = se_sdf_runtime_mul_mat4_point(transform, &local_point);
-				se_sdf_runtime_scene_bounds_expand_point(bounds, &world_point);
+				const s_vec3 world_point = se_sdf_mul_mat4_point(transform, &local_point);
+				se_sdf_scene_bounds_expand_point(bounds, &world_point);
 			}
 		}
 	}
 }
 
-static void se_sdf_runtime_bounds_from_points(
+static void se_sdf_bounds_from_points(
 	const s_vec3* points,
 	const sz count,
 	const f32 inflate,
@@ -2354,7 +2603,7 @@ static void se_sdf_runtime_bounds_from_points(
 	*out_max = max_v;
 }
 
-static b8 se_sdf_runtime_get_primitive_local_bounds(
+static b8 se_sdf_get_primitive_local_bounds(
 	const se_sdf_primitive_desc* primitive,
 	s_vec3* out_min,
 	s_vec3* out_max,
@@ -2446,7 +2695,7 @@ static b8 se_sdf_runtime_get_primitive_local_bounds(
 		}
 		case SE_SDF_PRIMITIVE_CAPSULE: {
 			const s_vec3 points[2] = { primitive->capsule.a, primitive->capsule.b };
-			se_sdf_runtime_bounds_from_points(points, 2, fabsf(primitive->capsule.radius), out_min, out_max);
+			se_sdf_bounds_from_points(points, 2, fabsf(primitive->capsule.radius), out_min, out_max);
 			return 1;
 		}
 		case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE: {
@@ -2465,7 +2714,7 @@ static b8 se_sdf_runtime_get_primitive_local_bounds(
 		}
 		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY: {
 			const s_vec3 points[2] = { primitive->capped_cylinder_arbitrary.a, primitive->capped_cylinder_arbitrary.b };
-			se_sdf_runtime_bounds_from_points(points, 2, fabsf(primitive->capped_cylinder_arbitrary.radius), out_min, out_max);
+			se_sdf_bounds_from_points(points, 2, fabsf(primitive->capped_cylinder_arbitrary.radius), out_min, out_max);
 			return 1;
 		}
 		case SE_SDF_PRIMITIVE_ROUNDED_CYLINDER: {
@@ -2485,7 +2734,7 @@ static b8 se_sdf_runtime_get_primitive_local_bounds(
 		case SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY: {
 			const s_vec3 points[2] = { primitive->capped_cone_arbitrary.a, primitive->capped_cone_arbitrary.b };
 			const f32 radial = fmaxf(fabsf(primitive->capped_cone_arbitrary.radius_a), fabsf(primitive->capped_cone_arbitrary.radius_b));
-			se_sdf_runtime_bounds_from_points(points, 2, radial, out_min, out_max);
+			se_sdf_bounds_from_points(points, 2, radial, out_min, out_max);
 			return 1;
 		}
 		case SE_SDF_PRIMITIVE_SOLID_ANGLE: {
@@ -2528,12 +2777,12 @@ static b8 se_sdf_runtime_get_primitive_local_bounds(
 		case SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY: {
 			const s_vec3 points[2] = { primitive->round_cone_arbitrary.a, primitive->round_cone_arbitrary.b };
 			const f32 radial = fmaxf(fabsf(primitive->round_cone_arbitrary.radius_a), fabsf(primitive->round_cone_arbitrary.radius_b));
-			se_sdf_runtime_bounds_from_points(points, 2, radial, out_min, out_max);
+			se_sdf_bounds_from_points(points, 2, radial, out_min, out_max);
 			return 1;
 		}
 		case SE_SDF_PRIMITIVE_VESICA_SEGMENT: {
 			const s_vec3 points[2] = { primitive->vesica_segment.a, primitive->vesica_segment.b };
-			se_sdf_runtime_bounds_from_points(points, 2, fabsf(primitive->vesica_segment.width), out_min, out_max);
+			se_sdf_bounds_from_points(points, 2, fabsf(primitive->vesica_segment.width), out_min, out_max);
 			return 1;
 		}
 		case SE_SDF_PRIMITIVE_RHOMBUS: {
@@ -2566,12 +2815,12 @@ static b8 se_sdf_runtime_get_primitive_local_bounds(
 		}
 		case SE_SDF_PRIMITIVE_TRIANGLE: {
 			const s_vec3 points[3] = { primitive->triangle.a, primitive->triangle.b, primitive->triangle.c };
-			se_sdf_runtime_bounds_from_points(points, 3, 0.0f, out_min, out_max);
+			se_sdf_bounds_from_points(points, 3, 0.0f, out_min, out_max);
 			return 1;
 		}
 		case SE_SDF_PRIMITIVE_QUAD: {
 			const s_vec3 points[4] = { primitive->quad.a, primitive->quad.b, primitive->quad.c, primitive->quad.d };
-			se_sdf_runtime_bounds_from_points(points, 4, 0.0f, out_min, out_max);
+			se_sdf_bounds_from_points(points, 4, 0.0f, out_min, out_max);
 			return 1;
 		}
 		default:
@@ -2581,8 +2830,8 @@ static b8 se_sdf_runtime_get_primitive_local_bounds(
 	return 0;
 }
 
-static void se_sdf_runtime_collect_scene_bounds_recursive(
-	se_sdf_runtime_scene* scene_ptr,
+static void se_sdf_collect_scene_bounds_recursive(
+	se_sdf_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node_handle,
 	const s_mat4* parent_transform,
@@ -2593,7 +2842,7 @@ static void se_sdf_runtime_collect_scene_bounds_recursive(
 	if (!scene_ptr || !bounds || node_handle == SE_SDF_NODE_NULL || depth > max_depth) {
 		return;
 	}
-	se_sdf_runtime_node* node = se_sdf_runtime_node_from_handle(scene_ptr, scene, node_handle);
+	se_sdf_node* node = se_sdf_node_from_handle(scene_ptr, scene, node_handle);
 	if (!node) {
 		return;
 	}
@@ -2607,8 +2856,8 @@ static void se_sdf_runtime_collect_scene_bounds_recursive(
 		s_vec3 local_min = s_vec3(0.0f, 0.0f, 0.0f);
 		s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
 		b8 is_unbounded = 0;
-		if (se_sdf_runtime_get_primitive_local_bounds(&node->primitive, &local_min, &local_max, &is_unbounded)) {
-			se_sdf_runtime_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
+		if (se_sdf_get_primitive_local_bounds(&node->primitive, &local_min, &local_max, &is_unbounded)) {
+			se_sdf_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
 		}
 		if (is_unbounded) {
 			bounds->has_unbounded_primitives = 1;
@@ -2620,7 +2869,7 @@ static void se_sdf_runtime_collect_scene_bounds_recursive(
 		if (!child) {
 			continue;
 		}
-		se_sdf_runtime_collect_scene_bounds_recursive(
+		se_sdf_collect_scene_bounds_recursive(
 			scene_ptr,
 			scene,
 			*child,
@@ -2639,13 +2888,13 @@ b8 se_sdf_scene_calculate_bounds(const se_sdf_scene_handle scene, se_sdf_scene_b
 
 	*out_bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
 
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr || scene_ptr->root == SE_SDF_NODE_NULL) {
 		return 0;
 	}
 
 	const sz max_depth = s_array_get_size(&scene_ptr->nodes) + 1;
-	se_sdf_runtime_collect_scene_bounds_recursive(
+	se_sdf_collect_scene_bounds_recursive(
 		scene_ptr,
 		scene,
 		scene_ptr->root,
@@ -2767,27 +3016,27 @@ b8 se_sdf_scene_align_camera(
 }
 
 typedef enum {
-	SE_SDF_RUNTIME_PHYSICS_DETAIL_NEAR = 0,
-	SE_SDF_RUNTIME_PHYSICS_DETAIL_MID,
-	SE_SDF_RUNTIME_PHYSICS_DETAIL_FAR
-} se_sdf_runtime_physics_detail_tier;
+	SE_SDF_PHYSICS_DETAIL_NEAR = 0,
+	SE_SDF_PHYSICS_DETAIL_MID,
+	SE_SDF_PHYSICS_DETAIL_FAR
+} se_sdf_physics_detail_tier;
 
 typedef struct {
 	s_vec3 offset;
 	s_vec3 half_extents;
 	f32 volume;
-} se_sdf_runtime_physics_box;
-typedef s_array(se_sdf_runtime_physics_box, se_sdf_runtime_physics_boxes);
-typedef s_array(u8, se_sdf_runtime_u8_array);
+} se_sdf_physics_box;
+typedef s_array(se_sdf_physics_box, se_sdf_physics_boxes);
+typedef s_array(u8, se_sdf_u8_array);
 
-static b8 se_sdf_runtime_physics_vec3_is_finite(const s_vec3* v) {
+static b8 se_sdf_physics_vec3_is_finite(const s_vec3* v) {
 	if (!v) {
 		return 0;
 	}
 	return isfinite(v->x) && isfinite(v->y) && isfinite(v->z);
 }
 
-static f32 se_sdf_runtime_physics_clampf(const f32 v, const f32 min_v, const f32 max_v) {
+static f32 se_sdf_physics_clampf(const f32 v, const f32 min_v, const f32 max_v) {
 	if (v < min_v) {
 		return min_v;
 	}
@@ -2797,7 +3046,7 @@ static f32 se_sdf_runtime_physics_clampf(const f32 v, const f32 min_v, const f32
 	return v;
 }
 
-static i32 se_sdf_runtime_physics_clampi(const i32 v, const i32 min_v, const i32 max_v) {
+static i32 se_sdf_physics_clampi(const i32 v, const i32 min_v, const i32 max_v) {
 	if (v < min_v) {
 		return min_v;
 	}
@@ -2807,19 +3056,19 @@ static i32 se_sdf_runtime_physics_clampi(const i32 v, const i32 min_v, const i32
 	return v;
 }
 
-static f32 se_sdf_runtime_physics_length2(const f32 x, const f32 y) {
+static f32 se_sdf_physics_length2(const f32 x, const f32 y) {
 	return sqrtf(x * x + y * y);
 }
 
-static f32 se_sdf_runtime_physics_length3(const f32 x, const f32 y, const f32 z) {
+static f32 se_sdf_physics_length3(const f32 x, const f32 y, const f32 z) {
 	return sqrtf(x * x + y * y + z * z);
 }
 
-static f32 se_sdf_runtime_physics_dot2(const f32 ax, const f32 ay, const f32 bx, const f32 by) {
+static f32 se_sdf_physics_dot2(const f32 ax, const f32 ay, const f32 bx, const f32 by) {
 	return ax * bx + ay * by;
 }
 
-static f32 se_sdf_runtime_physics_box_distance(const s_vec3* p, const s_vec3* half_extents) {
+static f32 se_sdf_physics_box_distance(const s_vec3* p, const s_vec3* half_extents) {
 	if (!p || !half_extents) {
 		return 1e9f;
 	}
@@ -2834,7 +3083,7 @@ static f32 se_sdf_runtime_physics_box_distance(const s_vec3* p, const s_vec3* ha
 	return outside + inside;
 }
 
-static b8 se_sdf_runtime_physics_object_to_primitive_desc(
+static b8 se_sdf_physics_object_to_primitive_desc(
 	const se_sdf_object* object,
 	se_sdf_primitive_desc* out
 ) {
@@ -3021,7 +3270,7 @@ static b8 se_sdf_runtime_physics_object_to_primitive_desc(
 	return 0;
 }
 
-static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
+static f32 se_sdf_physics_eval_primitive_distance_local(
 	se_sdf_object* object,
 	const s_vec3* local_point
 ) {
@@ -3031,14 +3280,14 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 
 	switch (object->type) {
 		case SE_SDF_SPHERE:
-			return se_sdf_runtime_physics_length3(local_point->x, local_point->y, local_point->z) - fabsf(object->sphere.radius);
+			return se_sdf_physics_length3(local_point->x, local_point->y, local_point->z) - fabsf(object->sphere.radius);
 		case SE_SDF_BOX: {
 			const s_vec3 half = s_vec3(
 				fabsf(object->box.size.x),
 				fabsf(object->box.size.y),
 				fabsf(object->box.size.z)
 			);
-			return se_sdf_runtime_physics_box_distance(local_point, &half);
+			return se_sdf_physics_box_distance(local_point, &half);
 		}
 		case SE_SDF_ROUND_BOX: {
 			const f32 r = fabsf(object->round_box.roundness);
@@ -3047,14 +3296,14 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 				fabsf(object->round_box.size.y) + r,
 				fabsf(object->round_box.size.z) + r
 			);
-			return se_sdf_runtime_physics_box_distance(local_point, &half) - r;
+			return se_sdf_physics_box_distance(local_point, &half) - r;
 		}
 		case SE_SDF_TORUS: {
 			const f32 major_r = fabsf(object->torus.radii.x);
 			const f32 minor_r = fabsf(object->torus.radii.y);
-			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z) - major_r;
+			const f32 qx = se_sdf_physics_length2(local_point->x, local_point->z) - major_r;
 			const f32 qy = local_point->y;
-			return se_sdf_runtime_physics_length2(qx, qy) - minor_r;
+			return se_sdf_physics_length2(qx, qy) - minor_r;
 		}
 		case SE_SDF_CAPSULE: {
 			const s_vec3 pa = s_vec3_sub(local_point, &object->capsule.a);
@@ -3062,7 +3311,7 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 			const f32 ba_len2 = s_vec3_dot(&ba, &ba);
 			f32 h = 0.0f;
 			if (ba_len2 > 0.000001f) {
-				h = se_sdf_runtime_physics_clampf(s_vec3_dot(&pa, &ba) / ba_len2, 0.0f, 1.0f);
+				h = se_sdf_physics_clampf(s_vec3_dot(&pa, &ba) / ba_len2, 0.0f, 1.0f);
 			}
 			const s_vec3 q = s_vec3_sub(&pa, &s_vec3_muls(&ba, h));
 			return s_vec3_length(&q) - fabsf(object->capsule.radius);
@@ -3070,20 +3319,20 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 		case SE_SDF_VERTICAL_CAPSULE: {
 			s_vec3 q = *local_point;
 			const f32 h = fmaxf(fabsf(object->vertical_capsule.height), 0.0f);
-			q.y -= se_sdf_runtime_physics_clampf(q.y, 0.0f, h);
+			q.y -= se_sdf_physics_clampf(q.y, 0.0f, h);
 			return s_vec3_length(&q) - fabsf(object->vertical_capsule.radius);
 		}
 		case SE_SDF_CAPPED_CYLINDER: {
 			const f32 r = fabsf(object->capped_cylinder.radius);
 			const f32 h = fabsf(object->capped_cylinder.half_height);
-			const f32 dx = fabsf(se_sdf_runtime_physics_length2(local_point->x, local_point->z)) - r;
+			const f32 dx = fabsf(se_sdf_physics_length2(local_point->x, local_point->z)) - r;
 			const f32 dy = fabsf(local_point->y) - h;
 			const f32 ox = fmaxf(dx, 0.0f);
 			const f32 oy = fmaxf(dy, 0.0f);
-			return fminf(fmaxf(dx, dy), 0.0f) + se_sdf_runtime_physics_length2(ox, oy);
+			return fminf(fmaxf(dx, dy), 0.0f) + se_sdf_physics_length2(ox, oy);
 		}
 		case SE_SDF_CONE: {
-			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qx = se_sdf_physics_length2(local_point->x, local_point->z);
 			const f32 qy = local_point->y;
 			const f32 sx = object->cone.angle_sin_cos.x;
 			const f32 sy = object->cone.angle_sin_cos.y;
@@ -3097,7 +3346,7 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 			const f32 k2_dot = k2x * k2x + k2y * k2y;
 			f32 t = 0.0f;
 			if (k2_dot > 0.000001f) {
-				t = se_sdf_runtime_physics_clampf(
+				t = se_sdf_physics_clampf(
 					((k1x - qx) * k2x + (k1y - qy) * k2y) / k2_dot,
 					0.0f,
 					1.0f
@@ -3111,13 +3360,13 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 		case SE_SDF_CONE_INFINITE: {
 			const f32 sx = object->cone_infinite.angle_sin_cos.x;
 			const f32 sy = object->cone_infinite.angle_sin_cos.y;
-			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qx = se_sdf_physics_length2(local_point->x, local_point->z);
 			const f32 qy = -local_point->y;
-			const f32 dot_v = se_sdf_runtime_physics_dot2(qx, qy, sx, sy);
+			const f32 dot_v = se_sdf_physics_dot2(qx, qy, sx, sy);
 			const f32 m = fmaxf(dot_v, 0.0f);
 			const f32 wx = qx - sx * m;
 			const f32 wy = qy - sy * m;
-			const f32 d = se_sdf_runtime_physics_length2(wx, wy);
+			const f32 d = se_sdf_physics_length2(wx, wy);
 			return d * ((qx * sy - qy * sx < 0.0f) ? -1.0f : 1.0f);
 		}
 		case SE_SDF_PLANE: {
@@ -3127,36 +3376,36 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 		case SE_SDF_CYLINDER: {
 			const f32 dx = local_point->x - object->cylinder.axis_and_radius.x;
 			const f32 dz = local_point->z - object->cylinder.axis_and_radius.y;
-			return se_sdf_runtime_physics_length2(dx, dz) - fabsf(object->cylinder.axis_and_radius.z);
+			return se_sdf_physics_length2(dx, dz) - fabsf(object->cylinder.axis_and_radius.z);
 		}
 		case SE_SDF_CUT_SPHERE: {
 			const f32 r = fabsf(object->cut_sphere.radius);
 			const f32 ch = object->cut_sphere.cut_height;
 			const f32 w = sqrtf(fmaxf(r * r - ch * ch, 0.0f));
-			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qx = se_sdf_physics_length2(local_point->x, local_point->z);
 			const f32 qy = local_point->y;
 			const f32 s = fmaxf(
 				(ch - r) * qx * qx + w * w * (ch + r - 2.0f * qy),
 				ch * qx - w * qy
 			);
 			if (s < 0.0f) {
-				return se_sdf_runtime_physics_length2(qx, qy) - r;
+				return se_sdf_physics_length2(qx, qy) - r;
 			}
 			if (qx < w) {
 				return ch - qy;
 			}
-			return se_sdf_runtime_physics_length2(qx - w, qy - ch);
+			return se_sdf_physics_length2(qx - w, qy - ch);
 		}
 		case SE_SDF_CUT_HOLLOW_SPHERE: {
 			const f32 r = fabsf(object->cut_hollow_sphere.radius);
 			const f32 ch = object->cut_hollow_sphere.cut_height;
 			const f32 t = fabsf(object->cut_hollow_sphere.thickness);
 			const f32 w = sqrtf(fmaxf(r * r - ch * ch, 0.0f));
-			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qx = se_sdf_physics_length2(local_point->x, local_point->z);
 			const f32 qy = local_point->y;
 			const f32 candidate = (ch * qx < w * qy)
-				? se_sdf_runtime_physics_length2(qx - w, qy - ch)
-				: fabsf(se_sdf_runtime_physics_length2(qx, qy) - r);
+				? se_sdf_physics_length2(qx - w, qy - ch)
+				: fabsf(se_sdf_physics_length2(qx, qy) - r);
 			return candidate - t;
 		}
 		case SE_SDF_ROUND_CONE: {
@@ -3165,27 +3414,27 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 			const f32 h = fmaxf(fabsf(object->round_cone.height), 0.0001f);
 			const f32 b = (r1 - r2) / h;
 			const f32 a = sqrtf(fmaxf(1.0f - b * b, 0.0f));
-			const f32 qx = se_sdf_runtime_physics_length2(local_point->x, local_point->z);
+			const f32 qx = se_sdf_physics_length2(local_point->x, local_point->z);
 			const f32 qy = local_point->y;
-			const f32 k = se_sdf_runtime_physics_dot2(qx, qy, -b, a);
+			const f32 k = se_sdf_physics_dot2(qx, qy, -b, a);
 			if (k < 0.0f) {
-				return se_sdf_runtime_physics_length2(qx, qy) - r1;
+				return se_sdf_physics_length2(qx, qy) - r1;
 			}
 			if (k > a * h) {
-				return se_sdf_runtime_physics_length2(qx, qy - h) - r2;
+				return se_sdf_physics_length2(qx, qy - h) - r2;
 			}
-			return se_sdf_runtime_physics_dot2(qx, qy, a, b) - r1;
+			return se_sdf_physics_dot2(qx, qy, a, b) - r1;
 		}
 		case SE_SDF_NONE:
 		default: {
 			se_sdf_primitive_desc primitive = {0};
-			if (!se_sdf_runtime_physics_object_to_primitive_desc(object, &primitive)) {
+			if (!se_sdf_physics_object_to_primitive_desc(object, &primitive)) {
 				return 1e9f;
 			}
 			s_vec3 local_min = s_vec3(0.0f, 0.0f, 0.0f);
 			s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
 			b8 is_unbounded = 0;
-			if (!se_sdf_runtime_get_primitive_local_bounds(&primitive, &local_min, &local_max, &is_unbounded)) {
+			if (!se_sdf_get_primitive_local_bounds(&primitive, &local_min, &local_max, &is_unbounded)) {
 				return is_unbounded ? 1e9f : 0.0f;
 			}
 			const s_vec3 center = s_vec3(
@@ -3199,12 +3448,12 @@ static f32 se_sdf_runtime_physics_eval_primitive_distance_local(
 				fmaxf((local_max.z - local_min.z) * 0.5f, 0.0001f)
 			);
 			const s_vec3 p = s_vec3_sub(local_point, &center);
-			return se_sdf_runtime_physics_box_distance(&p, &half);
+			return se_sdf_physics_box_distance(&p, &half);
 		}
 	}
 }
 
-static f32 se_sdf_runtime_physics_apply_operation(
+static f32 se_sdf_physics_apply_operation(
 	const se_sdf_operation operation,
 	const f32 lhs,
 	const f32 rhs
@@ -3225,7 +3474,7 @@ static f32 se_sdf_runtime_physics_apply_operation(
 	}
 }
 
-static f32 se_sdf_runtime_physics_apply_noise(
+static f32 se_sdf_physics_apply_noise(
 	const se_sdf_noise* noise,
 	const s_vec3* local_point,
 	const f32 distance
@@ -3240,7 +3489,7 @@ static f32 se_sdf_runtime_physics_apply_noise(
 	return distance + noise->offset + noise->scale * n;
 }
 
-static f32 se_sdf_runtime_physics_eval_object_distance_recursive(
+static f32 se_sdf_physics_eval_object_distance_recursive(
 	se_sdf_object* object,
 	const s_vec3* world_point,
 	const s_mat4* parent_transform,
@@ -3253,8 +3502,8 @@ static f32 se_sdf_runtime_physics_eval_object_distance_recursive(
 
 	const s_mat4 world_transform = s_mat4_mul(parent_transform, &object->transform);
 	const s_mat4 inverse_transform = s_mat4_inverse(&world_transform);
-	const s_vec3 local_point = se_sdf_runtime_mul_mat4_point(&inverse_transform, world_point);
-	if (!se_sdf_runtime_physics_vec3_is_finite(&local_point)) {
+	const s_vec3 local_point = se_sdf_mul_mat4_point(&inverse_transform, world_point);
+	if (!se_sdf_physics_vec3_is_finite(&local_point)) {
 		return 1e9f;
 	}
 
@@ -3262,7 +3511,7 @@ static f32 se_sdf_runtime_physics_eval_object_distance_recursive(
 	f32 distance = 1e9f;
 	if (child_count > 0) {
 		se_sdf_object* first = s_array_get(&object->children, s_array_handle(&object->children, 0));
-		distance = se_sdf_runtime_physics_eval_object_distance_recursive(
+		distance = se_sdf_physics_eval_object_distance_recursive(
 			first,
 			world_point,
 			&world_transform,
@@ -3271,24 +3520,24 @@ static f32 se_sdf_runtime_physics_eval_object_distance_recursive(
 		);
 		for (sz i = 1; i < child_count; ++i) {
 			se_sdf_object* child = s_array_get(&object->children, s_array_handle(&object->children, (u32)i));
-			const f32 rhs = se_sdf_runtime_physics_eval_object_distance_recursive(
+			const f32 rhs = se_sdf_physics_eval_object_distance_recursive(
 				child,
 				world_point,
 				&world_transform,
 				depth + 1,
 				max_depth
 			);
-			distance = se_sdf_runtime_physics_apply_operation(object->operation, distance, rhs);
+			distance = se_sdf_physics_apply_operation(object->operation, distance, rhs);
 		}
 	} else {
-		distance = se_sdf_runtime_physics_eval_primitive_distance_local(object, &local_point);
+		distance = se_sdf_physics_eval_primitive_distance_local(object, &local_point);
 	}
 
-	distance = se_sdf_runtime_physics_apply_noise(&object->noise, &local_point, distance);
+	distance = se_sdf_physics_apply_noise(&object->noise, &local_point, distance);
 	return isfinite(distance) ? distance : 1e9f;
 }
 
-static void se_sdf_runtime_physics_collect_object_bounds_recursive(
+static void se_sdf_physics_collect_object_bounds_recursive(
 	se_sdf_object* object,
 	const s_mat4* parent_transform,
 	se_sdf_scene_bounds* bounds,
@@ -3304,12 +3553,12 @@ static void se_sdf_runtime_physics_collect_object_bounds_recursive(
 
 	if (child_count == 0 && object->type != SE_SDF_NONE) {
 		se_sdf_primitive_desc primitive = {0};
-		if (se_sdf_runtime_physics_object_to_primitive_desc(object, &primitive)) {
+		if (se_sdf_physics_object_to_primitive_desc(object, &primitive)) {
 			s_vec3 local_min = s_vec3(0.0f, 0.0f, 0.0f);
 			s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
 			b8 is_unbounded = 0;
-			if (se_sdf_runtime_get_primitive_local_bounds(&primitive, &local_min, &local_max, &is_unbounded)) {
-				se_sdf_runtime_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
+			if (se_sdf_get_primitive_local_bounds(&primitive, &local_min, &local_max, &is_unbounded)) {
+				se_sdf_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
 			} else if (is_unbounded) {
 				bounds->has_unbounded_primitives = 1;
 			}
@@ -3318,7 +3567,7 @@ static void se_sdf_runtime_physics_collect_object_bounds_recursive(
 
 	for (sz i = 0; i < child_count; ++i) {
 		se_sdf_object* child = s_array_get(&object->children, s_array_handle(&object->children, (u32)i));
-		se_sdf_runtime_physics_collect_object_bounds_recursive(
+		se_sdf_physics_collect_object_bounds_recursive(
 			child,
 			&world_transform,
 			bounds,
@@ -3328,7 +3577,7 @@ static void se_sdf_runtime_physics_collect_object_bounds_recursive(
 	}
 }
 
-static void se_sdf_runtime_physics_finalize_bounds(se_sdf_scene_bounds* bounds) {
+static void se_sdf_physics_finalize_bounds(se_sdf_scene_bounds* bounds) {
 	if (!bounds || !bounds->valid) {
 		return;
 	}
@@ -3345,26 +3594,26 @@ static void se_sdf_runtime_physics_finalize_bounds(se_sdf_scene_bounds* bounds) 
 	bounds->radius = 0.5f * sqrtf(span.x * span.x + span.y * span.y + span.z * span.z);
 }
 
-static se_sdf_runtime_physics_detail_tier se_sdf_runtime_physics_pick_tier(
+static se_sdf_physics_detail_tier se_sdf_physics_pick_tier(
 	const se_sdf_scene_bounds* bounds,
 	const s_vec3* reference_position
 ) {
 	if (!bounds || !bounds->valid || !reference_position) {
-		return SE_SDF_RUNTIME_PHYSICS_DETAIL_MID;
+		return SE_SDF_PHYSICS_DETAIL_MID;
 	}
 	const s_vec3 delta = s_vec3_sub(reference_position, &bounds->center);
 	const f32 distance = s_vec3_length(&delta);
 	const f32 normalized = distance / fmaxf(bounds->radius, 0.001f);
 	if (normalized > 8.0f) {
-		return SE_SDF_RUNTIME_PHYSICS_DETAIL_FAR;
+		return SE_SDF_PHYSICS_DETAIL_FAR;
 	}
 	if (normalized > 2.0f) {
-		return SE_SDF_RUNTIME_PHYSICS_DETAIL_MID;
+		return SE_SDF_PHYSICS_DETAIL_MID;
 	}
-	return SE_SDF_RUNTIME_PHYSICS_DETAIL_NEAR;
+	return SE_SDF_PHYSICS_DETAIL_NEAR;
 }
 
-static b8 se_sdf_runtime_physics_extract_simple_transform(
+static b8 se_sdf_physics_extract_simple_transform(
 	const s_mat4* transform,
 	s_vec3* out_translation,
 	s_vec3* out_scale
@@ -3389,7 +3638,7 @@ static b8 se_sdf_runtime_physics_extract_simple_transform(
 	return (out_scale->x > eps && out_scale->y > eps && out_scale->z > eps);
 }
 
-static b8 se_sdf_runtime_physics_try_add_simple_shape(
+static b8 se_sdf_physics_try_add_simple_shape(
 	se_physics_world_3d_handle world,
 	se_physics_body_3d_handle body,
 	se_sdf_object* object,
@@ -3400,7 +3649,7 @@ static b8 se_sdf_runtime_physics_try_add_simple_shape(
 	}
 	s_vec3 offset = s_vec3(0.0f, 0.0f, 0.0f);
 	s_vec3 scale = s_vec3(1.0f, 1.0f, 1.0f);
-	if (!se_sdf_runtime_physics_extract_simple_transform(&object->transform, &offset, &scale)) {
+	if (!se_sdf_physics_extract_simple_transform(&object->transform, &offset, &scale)) {
 		return 0;
 	}
 
@@ -3437,7 +3686,7 @@ static b8 se_sdf_runtime_physics_try_add_simple_shape(
 	return 0;
 }
 
-static sz se_sdf_runtime_physics_voxel_index(
+static sz se_sdf_physics_voxel_index(
 	const i32 x,
 	const i32 y,
 	const i32 z,
@@ -3447,8 +3696,8 @@ static sz se_sdf_runtime_physics_voxel_index(
 	return (sz)x + (sz)nx * ((sz)y + (sz)ny * (sz)z);
 }
 
-static void se_sdf_runtime_physics_u8_array_set_count(
-	se_sdf_runtime_u8_array* array,
+static void se_sdf_physics_u8_array_set_count(
+	se_sdf_u8_array* array,
 	const sz count,
 	const u8 fill_value
 ) {
@@ -3462,7 +3711,7 @@ static void se_sdf_runtime_physics_u8_array_set_count(
 	}
 }
 
-static void se_sdf_runtime_physics_build_voxel_occupancy(
+static void se_sdf_physics_build_voxel_occupancy(
 	se_sdf_object* object,
 	const s_vec3* bounds_min,
 	const s_vec3* cell_size,
@@ -3470,7 +3719,7 @@ static void se_sdf_runtime_physics_build_voxel_occupancy(
 	const i32 ny,
 	const i32 nz,
 	const f32 inside_bias,
-	se_sdf_runtime_u8_array* out_occupancy
+	se_sdf_u8_array* out_occupancy
 ) {
 	if (!object || !bounds_min || !cell_size || !out_occupancy) {
 		return;
@@ -3484,7 +3733,7 @@ static void se_sdf_runtime_physics_build_voxel_occupancy(
 					bounds_min->y + ((f32)y + 0.5f) * cell_size->y,
 					bounds_min->z + ((f32)z + 0.5f) * cell_size->z
 				);
-				const f32 distance = se_sdf_runtime_physics_eval_object_distance_recursive(
+				const f32 distance = se_sdf_physics_eval_object_distance_recursive(
 					object,
 					&sample_point,
 					&identity,
@@ -3498,36 +3747,36 @@ static void se_sdf_runtime_physics_build_voxel_occupancy(
 	}
 }
 
-static void se_sdf_runtime_physics_greedy_merge_voxels(
+static void se_sdf_physics_greedy_merge_voxels(
 	const s_vec3* bounds_min,
 	const s_vec3* cell_size,
 	const i32 nx,
 	const i32 ny,
 	const i32 nz,
-	se_sdf_runtime_u8_array* occupancy,
-	se_sdf_runtime_physics_boxes* out_boxes
+	se_sdf_u8_array* occupancy,
+	se_sdf_physics_boxes* out_boxes
 ) {
 	if (!bounds_min || !cell_size || !occupancy || !out_boxes) {
 		return;
 	}
 
-	se_sdf_runtime_u8_array used;
+	se_sdf_u8_array used;
 	s_array_init(&used);
-	se_sdf_runtime_physics_u8_array_set_count(&used, s_array_get_size(occupancy), 0u);
+	se_sdf_physics_u8_array_set_count(&used, s_array_get_size(occupancy), 0u);
 	u8* occ_data = s_array_get_data(occupancy);
 	u8* used_data = s_array_get_data(&used);
 
 	for (i32 z = 0; z < nz; ++z) {
 		for (i32 y = 0; y < ny; ++y) {
 			for (i32 x = 0; x < nx; ++x) {
-				const sz start_idx = se_sdf_runtime_physics_voxel_index(x, y, z, nx, ny);
+				const sz start_idx = se_sdf_physics_voxel_index(x, y, z, nx, ny);
 				if (!occ_data[start_idx] || used_data[start_idx]) {
 					continue;
 				}
 
 				i32 x2 = x;
 				while (x2 + 1 < nx) {
-					const sz idx = se_sdf_runtime_physics_voxel_index(x2 + 1, y, z, nx, ny);
+					const sz idx = se_sdf_physics_voxel_index(x2 + 1, y, z, nx, ny);
 					if (!occ_data[idx] || used_data[idx]) {
 						break;
 					}
@@ -3541,7 +3790,7 @@ static void se_sdf_runtime_physics_greedy_merge_voxels(
 					}
 					b8 can_expand_y = 1;
 					for (i32 xx = x; xx <= x2; ++xx) {
-						const sz idx = se_sdf_runtime_physics_voxel_index(xx, y2 + 1, z, nx, ny);
+						const sz idx = se_sdf_physics_voxel_index(xx, y2 + 1, z, nx, ny);
 						if (!occ_data[idx] || used_data[idx]) {
 							can_expand_y = 0;
 							break;
@@ -3561,7 +3810,7 @@ static void se_sdf_runtime_physics_greedy_merge_voxels(
 					b8 can_expand_z = 1;
 					for (i32 yy = y; yy <= y2 && can_expand_z; ++yy) {
 						for (i32 xx = x; xx <= x2; ++xx) {
-							const sz idx = se_sdf_runtime_physics_voxel_index(xx, yy, z2 + 1, nx, ny);
+							const sz idx = se_sdf_physics_voxel_index(xx, yy, z2 + 1, nx, ny);
 							if (!occ_data[idx] || used_data[idx]) {
 								can_expand_z = 0;
 								break;
@@ -3577,7 +3826,7 @@ static void se_sdf_runtime_physics_greedy_merge_voxels(
 				for (i32 zz = z; zz <= z2; ++zz) {
 					for (i32 yy = y; yy <= y2; ++yy) {
 						for (i32 xx = x; xx <= x2; ++xx) {
-							const sz idx = se_sdf_runtime_physics_voxel_index(xx, yy, zz, nx, ny);
+							const sz idx = se_sdf_physics_voxel_index(xx, yy, zz, nx, ny);
 							used_data[idx] = 1u;
 						}
 					}
@@ -3593,7 +3842,7 @@ static void se_sdf_runtime_physics_greedy_merge_voxels(
 					bounds_min->y + (f32)(y2 + 1) * cell_size->y,
 					bounds_min->z + (f32)(z2 + 1) * cell_size->z
 				);
-				se_sdf_runtime_physics_box box = {0};
+				se_sdf_physics_box box = {0};
 				box.offset = s_vec3(
 					(min_v.x + max_v.x) * 0.5f,
 					(min_v.y + max_v.y) * 0.5f,
@@ -3613,10 +3862,10 @@ static void se_sdf_runtime_physics_greedy_merge_voxels(
 	s_array_clear(&used);
 }
 
-static u32 se_sdf_runtime_physics_add_boxes_with_budget(
+static u32 se_sdf_physics_add_boxes_with_budget(
 	se_physics_world_3d_handle world,
 	se_physics_body_3d_handle body,
-	se_sdf_runtime_physics_boxes* boxes,
+	se_sdf_physics_boxes* boxes,
 	const u32 budget,
 	const b8 is_trigger
 ) {
@@ -3629,7 +3878,7 @@ static u32 se_sdf_runtime_physics_add_boxes_with_budget(
 	const sz box_count = s_array_get_size(boxes);
 	if (box_count <= (sz)budget) {
 		for (sz i = 0; i < box_count; ++i) {
-			se_sdf_runtime_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)i));
+			se_sdf_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)i));
 			if (!box) {
 				continue;
 			}
@@ -3640,9 +3889,9 @@ static u32 se_sdf_runtime_physics_add_boxes_with_budget(
 		return added;
 	}
 
-	se_sdf_runtime_u8_array selected;
+	se_sdf_u8_array selected;
 	s_array_init(&selected);
-	se_sdf_runtime_physics_u8_array_set_count(&selected, box_count, 0u);
+	se_sdf_physics_u8_array_set_count(&selected, box_count, 0u);
 	u8* selected_data = s_array_get_data(&selected);
 
 	for (u32 pick = 0; pick < budget; ++pick) {
@@ -3652,7 +3901,7 @@ static u32 se_sdf_runtime_physics_add_boxes_with_budget(
 			if (selected_data[i] != 0u) {
 				continue;
 			}
-			se_sdf_runtime_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)i));
+			se_sdf_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)i));
 			if (!box) {
 				continue;
 			}
@@ -3665,7 +3914,7 @@ static u32 se_sdf_runtime_physics_add_boxes_with_budget(
 			break;
 		}
 		selected_data[best_index] = 1u;
-		se_sdf_runtime_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)best_index));
+		se_sdf_physics_box* box = s_array_get(boxes, s_array_handle(boxes, (u32)best_index));
 		if (box &&
 			se_physics_body_3d_add_box(world, body, &box->offset, &box->half_extents, &rotation, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL) {
 			++added;
@@ -3702,16 +3951,16 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 
 	se_sdf_scene_bounds bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
 	const s_mat4 identity = s_mat4_identity;
-	se_sdf_runtime_physics_collect_object_bounds_recursive(root, &identity, &bounds, 0, 128);
+	se_sdf_physics_collect_object_bounds_recursive(root, &identity, &bounds, 0, 128);
 
 	if (!bounds.valid) {
-		const s_vec3 origin_local = se_sdf_runtime_mul_mat4_point(&root->transform, &s_vec3(0.0f, 0.0f, 0.0f));
+		const s_vec3 origin_local = se_sdf_mul_mat4_point(&root->transform, &s_vec3(0.0f, 0.0f, 0.0f));
 		const s_vec3 fallback_half = s_vec3(2.0f, 2.0f, 2.0f);
 		bounds.min = s_vec3_sub(&origin_local, &fallback_half);
 		bounds.max = s_vec3_add(&origin_local, &fallback_half);
 		bounds.valid = 1;
 	}
-	se_sdf_runtime_physics_finalize_bounds(&bounds);
+	se_sdf_physics_finalize_bounds(&bounds);
 
 	if (bounds.has_unbounded_primitives) {
 		s_vec3 half = s_vec3(
@@ -3724,7 +3973,7 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 		half.z = fmaxf(half.z, 64.0f);
 		bounds.min = s_vec3_sub(&bounds.center, &half);
 		bounds.max = s_vec3_add(&bounds.center, &half);
-		se_sdf_runtime_physics_finalize_bounds(&bounds);
+		se_sdf_physics_finalize_bounds(&bounds);
 	}
 
 	s_vec3 span = s_vec3(
@@ -3745,14 +3994,14 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 			bounds.max.y - bounds.min.y,
 			bounds.max.z - bounds.min.z
 		);
-		se_sdf_runtime_physics_finalize_bounds(&bounds);
+		se_sdf_physics_finalize_bounds(&bounds);
 	}
 
 	const s_vec3 reference_local = s_vec3_sub(reference_position, &body_cfg.position);
-	const se_sdf_runtime_physics_detail_tier detail_tier = se_sdf_runtime_physics_pick_tier(&bounds, &reference_local);
+	const se_sdf_physics_detail_tier detail_tier = se_sdf_physics_pick_tier(&bounds, &reference_local);
 	const u32 world_shape_budget = s_max((u32)1u, se_physics_world_3d_get_shapes_per_body(world));
 
-	if (se_sdf_runtime_physics_try_add_simple_shape(world, body, root, is_trigger)) {
+	if (se_sdf_physics_try_add_simple_shape(world, body, root, is_trigger)) {
 		return body;
 	}
 
@@ -3762,7 +4011,7 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 		fmaxf(span.z * 0.5f, 0.05f)
 	);
 
-	if (detail_tier == SE_SDF_RUNTIME_PHYSICS_DETAIL_FAR) {
+	if (detail_tier == SE_SDF_PHYSICS_DETAIL_FAR) {
 		if (se_physics_body_3d_add_aabb(world, body, &bounds.center, &aabb_half, is_trigger) != SE_PHYSICS_SHAPE_3D_HANDLE_NULL) {
 			return body;
 		}
@@ -3772,7 +4021,7 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 
 	u32 shape_budget = world_shape_budget;
 	i32 base_resolution = 22;
-	if (detail_tier == SE_SDF_RUNTIME_PHYSICS_DETAIL_MID) {
+	if (detail_tier == SE_SDF_PHYSICS_DETAIL_MID) {
 		shape_budget = s_max((u32)1u, world_shape_budget / 2u);
 		base_resolution = 14;
 	}
@@ -3786,9 +4035,9 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 
 	const f32 max_span = fmaxf(span.x, fmaxf(span.y, span.z));
 	const f32 safe_max_span = fmaxf(max_span, 0.0001f);
-	const i32 nx = se_sdf_runtime_physics_clampi((i32)ceilf((f32)base_resolution * span.x / safe_max_span), 4, base_resolution);
-	const i32 ny = se_sdf_runtime_physics_clampi((i32)ceilf((f32)base_resolution * span.y / safe_max_span), 4, base_resolution);
-	const i32 nz = se_sdf_runtime_physics_clampi((i32)ceilf((f32)base_resolution * span.z / safe_max_span), 4, base_resolution);
+	const i32 nx = se_sdf_physics_clampi((i32)ceilf((f32)base_resolution * span.x / safe_max_span), 4, base_resolution);
+	const i32 ny = se_sdf_physics_clampi((i32)ceilf((f32)base_resolution * span.y / safe_max_span), 4, base_resolution);
+	const i32 nz = se_sdf_physics_clampi((i32)ceilf((f32)base_resolution * span.z / safe_max_span), 4, base_resolution);
 	const s_vec3 cell_size = s_vec3(
 		span.x / (f32)nx,
 		span.y / (f32)ny,
@@ -3797,12 +4046,12 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 	const f32 min_cell = fmaxf(fminf(cell_size.x, fminf(cell_size.y, cell_size.z)), 0.0001f);
 	const f32 inside_bias = min_cell * 0.15f;
 
-	se_sdf_runtime_u8_array occupancy;
-	se_sdf_runtime_physics_boxes boxes;
+	se_sdf_u8_array occupancy;
+	se_sdf_physics_boxes boxes;
 	s_array_init(&occupancy);
 	s_array_init(&boxes);
 
-	se_sdf_runtime_physics_build_voxel_occupancy(
+	se_sdf_physics_build_voxel_occupancy(
 		root,
 		&bounds.min,
 		&cell_size,
@@ -3812,7 +4061,7 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 		inside_bias,
 		&occupancy
 	);
-	se_sdf_runtime_physics_greedy_merge_voxels(
+	se_sdf_physics_greedy_merge_voxels(
 		&bounds.min,
 		&cell_size,
 		nx,
@@ -3822,7 +4071,7 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 		&boxes
 	);
 
-	const u32 added = se_sdf_runtime_physics_add_boxes_with_budget(world, body, &boxes, shape_budget, is_trigger);
+	const u32 added = se_sdf_physics_add_boxes_with_budget(world, body, &boxes, shape_budget, is_trigger);
 	s_array_clear(&boxes);
 	s_array_clear(&occupancy);
 
@@ -3838,20 +4087,20 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 	return SE_PHYSICS_BODY_3D_HANDLE_NULL;
 }
 
-static void se_sdf_runtime_free_legacy_object(se_sdf_object* obj) {
+static void se_sdf_free_legacy_object(se_sdf_object* obj) {
 	if (!obj) {
 		return;
 	}
 	for (sz i = 0; i < s_array_get_size(&obj->children); ++i) {
 		se_sdf_object* child = s_array_get(&obj->children, s_array_handle(&obj->children, (u32)i));
 		if (child) {
-			se_sdf_runtime_free_legacy_object(child);
+			se_sdf_free_legacy_object(child);
 		}
 	}
 	s_array_clear(&obj->children);
 }
 
-static b8 se_sdf_runtime_copy_primitive_to_legacy_object(
+static b8 se_sdf_copy_primitive_to_legacy_object(
 	const se_sdf_primitive_desc* primitive,
 	se_sdf_object* out
 ) {
@@ -3986,8 +4235,8 @@ static b8 se_sdf_runtime_copy_primitive_to_legacy_object(
 	return 1;
 }
 
-static b8 se_sdf_runtime_build_legacy_object_recursive(
-	se_sdf_runtime_scene* scene_ptr,
+static b8 se_sdf_build_legacy_object_recursive(
+	se_sdf_scene* scene_ptr,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node_handle,
 	se_sdf_object* out
@@ -3995,7 +4244,7 @@ static b8 se_sdf_runtime_build_legacy_object_recursive(
 	if (!scene_ptr || !out || node_handle == SE_SDF_NODE_NULL) {
 		return 0;
 	}
-	se_sdf_runtime_node* runtime_node = se_sdf_runtime_node_from_handle(scene_ptr, scene, node_handle);
+	se_sdf_node* runtime_node = se_sdf_node_from_handle(scene_ptr, scene, node_handle);
 	if (!runtime_node) {
 		return 0;
 	}
@@ -4013,8 +4262,8 @@ static b8 se_sdf_runtime_build_legacy_object_recursive(
 		out->type = SE_SDF_NONE;
 	} else {
 		out->type = (se_sdf_object_type)runtime_node->primitive.type;
-		if (!se_sdf_runtime_copy_primitive_to_legacy_object(&runtime_node->primitive, out)) {
-			se_sdf_runtime_free_legacy_object(out);
+		if (!se_sdf_copy_primitive_to_legacy_object(&runtime_node->primitive, out)) {
+			se_sdf_free_legacy_object(out);
 			return 0;
 		}
 	}
@@ -4025,8 +4274,8 @@ static b8 se_sdf_runtime_build_legacy_object_recursive(
 			continue;
 		}
 		se_sdf_object child = {0};
-		if (!se_sdf_runtime_build_legacy_object_recursive(scene_ptr, scene, *child_handle, &child)) {
-			se_sdf_runtime_free_legacy_object(out);
+		if (!se_sdf_build_legacy_object_recursive(scene_ptr, scene, *child_handle, &child)) {
+			se_sdf_free_legacy_object(out);
 			return 0;
 		}
 		s_array_add(&out->children, child);
@@ -4036,7 +4285,10 @@ static b8 se_sdf_runtime_build_legacy_object_recursive(
 }
 
 se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) {
-	se_sdf_runtime_init_storage();
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return SE_SDF_RENDERER_NULL;
+	}
 	se_sdf_renderer_desc renderer_desc = SE_SDF_RENDERER_DESC_DEFAULTS;
 	if (desc) {
 		renderer_desc = *desc;
@@ -4045,8 +4297,8 @@ se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) 
 		}
 	}
 
-	se_sdf_renderer_handle handle = s_array_increment(&se_sdf_runtime_renderer_storage);
-	se_sdf_runtime_renderer* renderer = s_array_get(&se_sdf_runtime_renderer_storage, handle);
+	se_sdf_renderer_handle handle = s_array_increment(&ctx->sdf_renderers);
+	se_sdf_renderer* renderer = s_array_get(&ctx->sdf_renderers, handle);
 	if (!renderer) {
 		return SE_SDF_RENDERER_NULL;
 	}
@@ -4090,55 +4342,59 @@ se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) 
 	renderer->stylized_desaturate_control = SE_SDF_CONTROL_NULL;
 	renderer->stylized_gamma_control = SE_SDF_CONTROL_NULL;
 	renderer->render_generation = se_render_get_generation();
-	se_sdf_runtime_set_diagnostics(renderer, 1, "init", "renderer created");
+	se_sdf_set_diagnostics(renderer, 1, "init", "renderer created");
 	return handle;
 }
 
 void se_sdf_renderer_destroy(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return;
 	}
-	se_sdf_runtime_renderer_invalidate_gpu_state(renderer_ptr);
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return;
+	}
+	se_sdf_renderer_invalidate_gpu_state(renderer_ptr);
 	s_array_clear(&renderer_ptr->controls);
 	s_array_clear(&renderer_ptr->node_bindings);
 	s_array_clear(&renderer_ptr->primitive_bindings);
 	se_sdf_string_free(&renderer_ptr->generated_fragment_source);
-	s_array_remove(&se_sdf_runtime_renderer_storage, renderer);
+	s_array_remove(&ctx->sdf_renderers, renderer);
 }
 
 void se_sdf_shutdown(void) {
-	if (!se_sdf_runtime_scene_storage_initialized) {
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
 		return;
 	}
 
-	while (s_array_get_size(&se_sdf_runtime_renderer_storage) > 0) {
+	while (s_array_get_size(&ctx->sdf_renderers) > 0) {
 		se_sdf_renderer_handle renderer_handle = s_array_handle(
-			&se_sdf_runtime_renderer_storage,
-			(u32)(s_array_get_size(&se_sdf_runtime_renderer_storage) - 1)
+			&ctx->sdf_renderers,
+			(u32)(s_array_get_size(&ctx->sdf_renderers) - 1)
 		);
 		se_sdf_renderer_destroy(renderer_handle);
 	}
 
-	while (s_array_get_size(&se_sdf_runtime_scene_storage) > 0) {
+	while (s_array_get_size(&ctx->sdf_scenes) > 0) {
 		se_sdf_scene_handle scene_handle = s_array_handle(
-			&se_sdf_runtime_scene_storage,
-			(u32)(s_array_get_size(&se_sdf_runtime_scene_storage) - 1)
+			&ctx->sdf_scenes,
+			(u32)(s_array_get_size(&ctx->sdf_scenes) - 1)
 		);
 		se_sdf_scene_destroy(scene_handle);
 	}
 
-	s_array_clear(&se_sdf_runtime_renderer_storage);
-	s_array_clear(&se_sdf_runtime_scene_storage);
-	se_sdf_runtime_scene_storage_initialized = 0;
+	s_array_clear(&ctx->sdf_renderers);
+	s_array_clear(&ctx->sdf_scenes);
 }
 
 b8 se_sdf_renderer_set_scene(const se_sdf_renderer_handle renderer, const se_sdf_scene_handle scene) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
-	if (scene != SE_SDF_SCENE_NULL && !se_sdf_runtime_scene_from_handle(scene)) {
+	if (scene != SE_SDF_SCENE_NULL && !se_sdf_scene_from_handle(scene)) {
 		return 0;
 	}
 	renderer_ptr->scene = scene;
@@ -4147,7 +4403,7 @@ b8 se_sdf_renderer_set_scene(const se_sdf_renderer_handle renderer, const se_sdf
 }
 
 b8 se_sdf_renderer_set_quality(const se_sdf_renderer_handle renderer, const se_sdf_raymarch_quality* quality) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !quality) {
 		return 0;
 	}
@@ -4177,7 +4433,7 @@ b8 se_sdf_renderer_set_quality(const se_sdf_renderer_handle renderer, const se_s
 }
 
 b8 se_sdf_renderer_set_debug(const se_sdf_renderer_handle renderer, const se_sdf_renderer_debug* debug) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !debug) {
 		return 0;
 	}
@@ -4186,7 +4442,7 @@ b8 se_sdf_renderer_set_debug(const se_sdf_renderer_handle renderer, const se_sdf
 }
 
 b8 se_sdf_renderer_set_material(const se_sdf_renderer_handle renderer, const se_sdf_material_desc* material) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !material) {
 		return 0;
 	}
@@ -4195,7 +4451,7 @@ b8 se_sdf_renderer_set_material(const se_sdf_renderer_handle renderer, const se_
 }
 
 b8 se_sdf_renderer_set_stylized(const se_sdf_renderer_handle renderer, const se_sdf_stylized_desc* stylized) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !stylized) {
 		return 0;
 	}
@@ -4204,7 +4460,7 @@ b8 se_sdf_renderer_set_stylized(const se_sdf_renderer_handle renderer, const se_
 }
 
 se_sdf_stylized_desc se_sdf_renderer_get_stylized(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return SE_SDF_STYLIZED_DESC_DEFAULTS;
 	}
@@ -4212,7 +4468,7 @@ se_sdf_stylized_desc se_sdf_renderer_get_stylized(const se_sdf_renderer_handle r
 }
 
 b8 se_sdf_renderer_set_base_color(const se_sdf_renderer_handle renderer, const s_vec3* base_color) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !base_color) {
 		return 0;
 	}
@@ -4227,7 +4483,7 @@ b8 se_sdf_renderer_set_light_rig(
 	const s_vec3* fog_color,
 	const f32 fog_density
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !light_direction || !light_color || !fog_color) {
 		return 0;
 	}
@@ -4239,16 +4495,16 @@ b8 se_sdf_renderer_set_light_rig(
 }
 
 b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_renderer_refresh_context_state(renderer_ptr);
+	se_sdf_renderer_refresh_context_state(renderer_ptr);
 
 	se_sdf_string_free(&renderer_ptr->generated_fragment_source);
 	se_sdf_string_init(&renderer_ptr->generated_fragment_source, renderer_ptr->desc.shader_source_capacity);
 	if (!renderer_ptr->generated_fragment_source.data) {
-		se_sdf_runtime_set_diagnostics(
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"codegen_alloc",
@@ -4261,8 +4517,8 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 	char map_name[32] = "map";
 	if (!se_sdf_codegen_emit_fragment_prelude(&renderer_ptr->generated_fragment_source) ||
 		!se_sdf_codegen_emit_uniform_block(&renderer_ptr->generated_fragment_source) ||
-		!se_sdf_runtime_emit_control_uniform_declarations(renderer_ptr, &renderer_ptr->generated_fragment_source)) {
-		se_sdf_runtime_set_diagnostics(
+		!se_sdf_emit_control_uniform_declarations(renderer_ptr, &renderer_ptr->generated_fragment_source)) {
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"codegen_emit",
@@ -4273,11 +4529,11 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 
 	b8 emitted_map = 0;
 	if (renderer_ptr->scene != SE_SDF_SCENE_NULL) {
-		se_sdf_runtime_scene* runtime_scene = se_sdf_runtime_scene_from_handle(renderer_ptr->scene);
+		se_sdf_scene* runtime_scene = se_sdf_scene_from_handle(renderer_ptr->scene);
 		if (runtime_scene && runtime_scene->root != SE_SDF_NODE_NULL) {
 			char validation_error[256] = {0};
 			if (!se_sdf_scene_validate(renderer_ptr->scene, validation_error, sizeof(validation_error))) {
-				se_sdf_runtime_set_diagnostics(
+				se_sdf_set_diagnostics(
 					renderer_ptr,
 					0,
 					"scene_validate",
@@ -4287,13 +4543,13 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 				return 0;
 			}
 			se_sdf_object legacy_root = {0};
-			if (!se_sdf_runtime_build_legacy_object_recursive(
+			if (!se_sdf_build_legacy_object_recursive(
 				runtime_scene,
 				renderer_ptr->scene,
 				runtime_scene->root,
 				&legacy_root
 			)) {
-				se_sdf_runtime_set_diagnostics(
+				se_sdf_set_diagnostics(
 					renderer_ptr,
 					0,
 					"scene_codegen",
@@ -4305,14 +4561,14 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 			se_sdf_codegen_active_renderer = renderer_ptr;
 			se_sdf_generate_distance_function(&renderer_ptr->generated_fragment_source, &legacy_root, map_name);
 			se_sdf_codegen_active_renderer = NULL;
-			se_sdf_runtime_free_legacy_object(&legacy_root);
+			se_sdf_free_legacy_object(&legacy_root);
 			emitted_map = 1;
 		}
 	}
 
 	if (!emitted_map) {
 		if (!se_sdf_codegen_emit_map_stub(&renderer_ptr->generated_fragment_source, map_name)) {
-			se_sdf_runtime_set_diagnostics(
+			se_sdf_set_diagnostics(
 				renderer_ptr,
 				0,
 				"codegen_emit",
@@ -4329,7 +4585,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 		if (preview > 120) {
 			preview = 120;
 		}
-		se_sdf_runtime_set_diagnostics(
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"codegen_emit",
@@ -4341,13 +4597,13 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 		return 0;
 	}
 
-	se_sdf_runtime_renderer_release_shader(renderer_ptr);
+	se_sdf_renderer_release_shader(renderer_ptr);
 	renderer_ptr->shader = se_shader_load_from_memory(
 		se_sdf_fullscreen_vertex_shader,
 		renderer_ptr->generated_fragment_source.data
 	);
 	if (renderer_ptr->shader == S_HANDLE_NULL) {
-		se_sdf_runtime_set_diagnostics(
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"shader_compile",
@@ -4361,7 +4617,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 	}
 
 	for (sz i = 0; i < s_array_get_size(&renderer_ptr->controls); ++i) {
-		se_sdf_runtime_control* control = s_array_get(&renderer_ptr->controls, s_array_handle(&renderer_ptr->controls, (u32)i));
+		se_sdf_control* control = s_array_get(&renderer_ptr->controls, s_array_handle(&renderer_ptr->controls, (u32)i));
 		if (!control) {
 			continue;
 		}
@@ -4373,7 +4629,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 	renderer_ptr->built = 1;
 	renderer_ptr->render_generation = se_render_get_generation();
 	renderer_ptr->last_uniform_write_count = 0;
-	se_sdf_runtime_set_diagnostics(
+	se_sdf_set_diagnostics(
 		renderer_ptr,
 		1,
 		"build_complete",
@@ -4385,7 +4641,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 }
 
 b8 se_sdf_renderer_rebuild_if_dirty(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
@@ -4416,12 +4672,12 @@ b8 se_sdf_frame_set_scene_depth_texture(se_sdf_frame_desc* frame, const u32 dept
 }
 
 b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_frame_desc* frame) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !frame) {
 		return 0;
 	}
 	if (!se_render_has_context()) {
-		se_sdf_runtime_set_diagnostics(
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"render_context",
@@ -4429,16 +4685,16 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 		);
 		return 0;
 	}
-	se_sdf_runtime_renderer_refresh_context_state(renderer_ptr);
+	se_sdf_renderer_refresh_context_state(renderer_ptr);
 	if (!renderer_ptr->built) {
 		if (!se_sdf_renderer_build(renderer)) {
 			return 0;
 		}
 	}
-	se_sdf_runtime_sync_control_bindings(renderer_ptr);
-	(void)se_sdf_runtime_apply_node_bindings(renderer_ptr);
-	(void)se_sdf_runtime_apply_primitive_bindings(renderer_ptr);
-	se_sdf_runtime_apply_renderer_shading_bindings(renderer_ptr);
+	se_sdf_sync_control_bindings(renderer_ptr);
+	(void)se_sdf_apply_node_bindings(renderer_ptr);
+	(void)se_sdf_apply_primitive_bindings(renderer_ptr);
+	se_sdf_apply_renderer_shading_bindings(renderer_ptr);
 	if (renderer_ptr->shader == S_HANDLE_NULL) {
 		return 0;
 	}
@@ -4448,7 +4704,7 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	if (resolution.y <= 0.0f) resolution.y = 1.0f;
 	f32 time_value = renderer_ptr->debug.freeze_time ? 0.0f : frame->time_seconds;
 	if (frame->camera == S_HANDLE_NULL) {
-		se_sdf_runtime_set_diagnostics(
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"frame_camera",
@@ -4458,7 +4714,7 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	}
 	se_camera* camera_ptr = se_camera_get(frame->camera);
 	if (!camera_ptr) {
-		se_sdf_runtime_set_diagnostics(
+		se_sdf_set_diagnostics(
 			renderer_ptr,
 			0,
 			"frame_camera",
@@ -4525,12 +4781,12 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 
 	renderer_ptr->last_uniform_write_count = 0;
 	for (sz i = 0; i < s_array_get_size(&renderer_ptr->controls); ++i) {
-		se_sdf_runtime_control* control = s_array_get(&renderer_ptr->controls, s_array_handle(&renderer_ptr->controls, (u32)i));
+		se_sdf_control* control = s_array_get(&renderer_ptr->controls, s_array_handle(&renderer_ptr->controls, (u32)i));
 		if (!control || control->cached_uniform_location < 0 || !control->dirty) {
 			continue;
 		}
 		if (control->has_last_uploaded_value &&
-			se_sdf_runtime_control_value_equals(control->type, &control->value, &control->last_uploaded_value)) {
+			se_sdf_control_value_equals(control->type, &control->value, &control->last_uploaded_value)) {
 			control->dirty = 0;
 			continue;
 		}
@@ -4604,7 +4860,7 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 }
 
 const char* se_sdf_renderer_get_generated_fragment_source(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return NULL;
 	}
@@ -4612,7 +4868,7 @@ const char* se_sdf_renderer_get_generated_fragment_source(const se_sdf_renderer_
 }
 
 sz se_sdf_renderer_get_generated_fragment_source_size(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
@@ -4620,7 +4876,7 @@ sz se_sdf_renderer_get_generated_fragment_source_size(const se_sdf_renderer_hand
 }
 
 b8 se_sdf_renderer_dump_shader_source(const se_sdf_renderer_handle renderer, const char* path) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !path || path[0] == '\0') {
 		return 0;
 	}
@@ -4638,7 +4894,7 @@ b8 se_sdf_renderer_dump_shader_source(const se_sdf_renderer_handle renderer, con
 }
 
 sz se_sdf_renderer_get_last_uniform_write_count(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
@@ -4646,7 +4902,7 @@ sz se_sdf_renderer_get_last_uniform_write_count(const se_sdf_renderer_handle ren
 }
 
 sz se_sdf_renderer_get_total_uniform_write_count(const se_sdf_renderer_handle renderer) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
@@ -4657,11 +4913,11 @@ const char* se_sdf_control_get_uniform_name(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || control == SE_SDF_CONTROL_NULL) {
 		return NULL;
 	}
-	se_sdf_runtime_control* control_ptr = s_array_get(&renderer_ptr->controls, control);
+	se_sdf_control* control_ptr = s_array_get(&renderer_ptr->controls, control);
 	if (!control_ptr) {
 		return NULL;
 	}
@@ -4670,15 +4926,15 @@ const char* se_sdf_control_get_uniform_name(
 
 se_sdf_build_diagnostics se_sdf_renderer_get_last_build_diagnostics(const se_sdf_renderer_handle renderer) {
 	se_sdf_build_diagnostics diagnostics = {0};
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return diagnostics;
 	}
 	return renderer_ptr->diagnostics;
 }
 
-static se_sdf_control_handle se_sdf_runtime_find_control_handle(
-	se_sdf_runtime_renderer* renderer,
+static se_sdf_control_handle se_sdf_find_control_handle(
+	se_sdf_renderer* renderer,
 	const char* name
 ) {
 	if (!renderer || !name || name[0] == '\0') {
@@ -4686,7 +4942,7 @@ static se_sdf_control_handle se_sdf_runtime_find_control_handle(
 	}
 	for (sz i = 0; i < s_array_get_size(&renderer->controls); ++i) {
 		s_handle control_handle = s_array_handle(&renderer->controls, (u32)i);
-		se_sdf_runtime_control* control = s_array_get(&renderer->controls, control_handle);
+		se_sdf_control* control = s_array_get(&renderer->controls, control_handle);
 		if (control && strcmp(control->name, name) == 0) {
 			return control_handle;
 		}
@@ -4694,7 +4950,7 @@ static se_sdf_control_handle se_sdf_runtime_find_control_handle(
 	return SE_SDF_CONTROL_NULL;
 }
 
-static void se_sdf_runtime_make_control_uniform_name(
+static void se_sdf_make_control_uniform_name(
 	const s_handle control_handle,
 	const char* name,
 	char* out_name,
@@ -4729,10 +4985,10 @@ static void se_sdf_runtime_make_control_uniform_name(
 	out_name[write_index] = '\0';
 }
 
-static b8 se_sdf_runtime_control_value_equals(
+static b8 se_sdf_control_value_equals(
 	const se_sdf_control_type type,
-	const se_sdf_runtime_control_value* a,
-	const se_sdf_runtime_control_value* b
+	const se_sdf_control_value* a,
+	const se_sdf_control_value* b
 ) {
 	if (!a || !b) {
 		return 0;
@@ -4755,14 +5011,14 @@ static b8 se_sdf_runtime_control_value_equals(
 	}
 }
 
-static b8 se_sdf_runtime_control_assign_value(
-	se_sdf_runtime_control* control,
-	const se_sdf_runtime_control_value* value
+static b8 se_sdf_control_assign_value(
+	se_sdf_control* control,
+	const se_sdf_control_value* value
 ) {
 	if (!control || !value) {
 		return 0;
 	}
-	if (se_sdf_runtime_control_value_equals(control->type, &control->value, value)) {
+	if (se_sdf_control_value_equals(control->type, &control->value, value)) {
 		return 0;
 	}
 	control->value = *value;
@@ -4770,8 +5026,8 @@ static b8 se_sdf_runtime_control_assign_value(
 	return 1;
 }
 
-static se_sdf_runtime_control* se_sdf_runtime_get_or_create_control(
-	se_sdf_runtime_renderer* renderer,
+static se_sdf_control* se_sdf_get_or_create_control(
+	se_sdf_renderer* renderer,
 	const char* name,
 	const se_sdf_control_type type,
 	se_sdf_control_handle* out_handle
@@ -4779,13 +5035,13 @@ static se_sdf_runtime_control* se_sdf_runtime_get_or_create_control(
 	if (!renderer || !name || name[0] == '\0') {
 		return NULL;
 	}
-	se_sdf_control_handle handle = se_sdf_runtime_find_control_handle(renderer, name);
+	se_sdf_control_handle handle = se_sdf_find_control_handle(renderer, name);
 	b8 created = 0;
 	if (handle == SE_SDF_CONTROL_NULL) {
 		handle = s_array_increment(&renderer->controls);
 		created = 1;
 	}
-	se_sdf_runtime_control* control = s_array_get(&renderer->controls, handle);
+	se_sdf_control* control = s_array_get(&renderer->controls, handle);
 	if (!control) {
 		return NULL;
 	}
@@ -4793,11 +5049,11 @@ static se_sdf_runtime_control* se_sdf_runtime_get_or_create_control(
 		memset(control, 0, sizeof(*control));
 		strncpy(control->name, name, sizeof(control->name) - 1);
 		control->name[sizeof(control->name) - 1] = '\0';
-		se_sdf_runtime_make_control_uniform_name(handle, name, control->uniform_name, sizeof(control->uniform_name));
+		se_sdf_make_control_uniform_name(handle, name, control->uniform_name, sizeof(control->uniform_name));
 		control->cached_uniform_location = -1;
 	}
 	if (control->type != type) {
-		se_sdf_runtime_control_clear_binding(control);
+		se_sdf_control_clear_binding(control);
 		renderer->built = 0;
 	}
 	control->type = type;
@@ -4811,22 +5067,22 @@ static se_sdf_runtime_control* se_sdf_runtime_get_or_create_control(
 	return control;
 }
 
-static se_sdf_runtime_control* se_sdf_runtime_control_from_handle(
-	se_sdf_runtime_renderer* renderer,
+static se_sdf_control* se_sdf_control_from_handle(
+	se_sdf_renderer* renderer,
 	const se_sdf_control_handle control,
 	const se_sdf_control_type expected_type
 ) {
 	if (!renderer || control == SE_SDF_CONTROL_NULL) {
 		return NULL;
 	}
-	se_sdf_runtime_control* control_ptr = s_array_get(&renderer->controls, control);
+	se_sdf_control* control_ptr = s_array_get(&renderer->controls, control);
 	if (!control_ptr || control_ptr->type != expected_type) {
 		return NULL;
 	}
 	return control_ptr;
 }
 
-static void se_sdf_runtime_control_clear_binding(se_sdf_runtime_control* control) {
+static void se_sdf_control_clear_binding(se_sdf_control* control) {
 	if (!control) {
 		return;
 	}
@@ -4834,12 +5090,12 @@ static void se_sdf_runtime_control_clear_binding(se_sdf_runtime_control* control
 	control->has_binding = 0;
 }
 
-static void se_sdf_runtime_sync_control_bindings(se_sdf_runtime_renderer* renderer) {
+static void se_sdf_sync_control_bindings(se_sdf_renderer* renderer) {
 	if (!renderer) {
 		return;
 	}
 	for (sz i = 0; i < s_array_get_size(&renderer->controls); ++i) {
-		se_sdf_runtime_control* control = s_array_get(&renderer->controls, s_array_handle(&renderer->controls, (u32)i));
+		se_sdf_control* control = s_array_get(&renderer->controls, s_array_handle(&renderer->controls, (u32)i));
 		if (!control || !control->has_binding) {
 			continue;
 		}
@@ -4847,59 +5103,59 @@ static void se_sdf_runtime_sync_control_bindings(se_sdf_runtime_renderer* render
 		switch (control->type) {
 			case SE_SDF_CONTROL_FLOAT:
 				if (control->binding.f) {
-					se_sdf_runtime_control_value v = {.f = *control->binding.f};
-					se_sdf_runtime_control_assign_value(control, &v);
+					se_sdf_control_value v = {.f = *control->binding.f};
+					se_sdf_control_assign_value(control, &v);
 				}
-				else se_sdf_runtime_control_clear_binding(control);
+				else se_sdf_control_clear_binding(control);
 				break;
 			case SE_SDF_CONTROL_VEC2:
 				if (control->binding.vec2) {
-					se_sdf_runtime_control_value v = {.vec2 = *control->binding.vec2};
-					se_sdf_runtime_control_assign_value(control, &v);
+					se_sdf_control_value v = {.vec2 = *control->binding.vec2};
+					se_sdf_control_assign_value(control, &v);
 				}
-				else se_sdf_runtime_control_clear_binding(control);
+				else se_sdf_control_clear_binding(control);
 				break;
 			case SE_SDF_CONTROL_VEC3:
 				if (control->binding.vec3) {
-					se_sdf_runtime_control_value v = {.vec3 = *control->binding.vec3};
-					se_sdf_runtime_control_assign_value(control, &v);
+					se_sdf_control_value v = {.vec3 = *control->binding.vec3};
+					se_sdf_control_assign_value(control, &v);
 				}
-				else se_sdf_runtime_control_clear_binding(control);
+				else se_sdf_control_clear_binding(control);
 				break;
 			case SE_SDF_CONTROL_VEC4:
 				if (control->binding.vec4) {
-					se_sdf_runtime_control_value v = {.vec4 = *control->binding.vec4};
-					se_sdf_runtime_control_assign_value(control, &v);
+					se_sdf_control_value v = {.vec4 = *control->binding.vec4};
+					se_sdf_control_assign_value(control, &v);
 				}
-				else se_sdf_runtime_control_clear_binding(control);
+				else se_sdf_control_clear_binding(control);
 				break;
 			case SE_SDF_CONTROL_INT:
 				if (control->binding.i) {
-					se_sdf_runtime_control_value v = {.i = *control->binding.i};
-					se_sdf_runtime_control_assign_value(control, &v);
+					se_sdf_control_value v = {.i = *control->binding.i};
+					se_sdf_control_assign_value(control, &v);
 				}
-				else se_sdf_runtime_control_clear_binding(control);
+				else se_sdf_control_clear_binding(control);
 				break;
 			case SE_SDF_CONTROL_MAT4:
 				if (control->binding.mat4) {
-					se_sdf_runtime_control_value v = {.mat4 = *control->binding.mat4};
-					se_sdf_runtime_control_assign_value(control, &v);
+					se_sdf_control_value v = {.mat4 = *control->binding.mat4};
+					se_sdf_control_assign_value(control, &v);
 				}
-				else se_sdf_runtime_control_clear_binding(control);
+				else se_sdf_control_clear_binding(control);
 				break;
 			default:
-				se_sdf_runtime_control_clear_binding(control);
+				se_sdf_control_clear_binding(control);
 				break;
 		}
 	}
 }
 
-static f32 se_sdf_runtime_abs_or_one(const f32 value) {
+static f32 se_sdf_abs_or_one(const f32 value) {
 	const f32 abs_value = fabsf(value);
 	return abs_value < 0.000001f ? 1.0f : abs_value;
 }
 
-static void se_sdf_runtime_node_init_control_trs(se_sdf_runtime_node* node) {
+static void se_sdf_node_init_control_trs(se_sdf_node* node) {
 	if (!node || node->control_trs_initialized) {
 		return;
 	}
@@ -4910,14 +5166,14 @@ static void se_sdf_runtime_node_init_control_trs(se_sdf_runtime_node* node) {
 	);
 	node->control_rotation = s_vec3(0.0f, 0.0f, 0.0f);
 	node->control_scale = s_vec3(
-		se_sdf_runtime_abs_or_one(node->transform.m[0][0]),
-		se_sdf_runtime_abs_or_one(node->transform.m[1][1]),
-		se_sdf_runtime_abs_or_one(node->transform.m[2][2])
+		se_sdf_abs_or_one(node->transform.m[0][0]),
+		se_sdf_abs_or_one(node->transform.m[1][1]),
+		se_sdf_abs_or_one(node->transform.m[2][2])
 	);
 	node->control_trs_initialized = 1;
 }
 
-static void se_sdf_runtime_node_apply_control_trs(se_sdf_runtime_node* node) {
+static void se_sdf_node_apply_control_trs(se_sdf_node* node) {
 	if (!node) {
 		return;
 	}
@@ -4936,32 +5192,32 @@ static void se_sdf_runtime_node_apply_control_trs(se_sdf_runtime_node* node) {
 	node->transform = transform;
 }
 
-static b8 se_sdf_runtime_bind_node_target(
-	se_sdf_runtime_renderer* renderer,
+static b8 se_sdf_bind_node_target(
+	se_sdf_renderer* renderer,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node,
 	const se_sdf_control_handle control,
-	const se_sdf_runtime_node_bind_target target
+	const se_sdf_node_bind_target target
 ) {
 	if (!renderer || scene == SE_SDF_SCENE_NULL || node == SE_SDF_NODE_NULL || control == SE_SDF_CONTROL_NULL) {
 		return 0;
 	}
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(renderer, control, SE_SDF_CONTROL_VEC3);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(renderer, control, SE_SDF_CONTROL_VEC3);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
 	if (!node_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_node_init_control_trs(node_ptr);
+	se_sdf_node_init_control_trs(node_ptr);
 
 	for (sz i = 0; i < s_array_get_size(&renderer->node_bindings); ++i) {
-		se_sdf_runtime_node_binding* binding = s_array_get(&renderer->node_bindings, s_array_handle(&renderer->node_bindings, (u32)i));
+		se_sdf_node_binding* binding = s_array_get(&renderer->node_bindings, s_array_handle(&renderer->node_bindings, (u32)i));
 		if (!binding) {
 			continue;
 		}
@@ -4973,7 +5229,7 @@ static b8 se_sdf_runtime_bind_node_target(
 		}
 	}
 
-	se_sdf_runtime_node_binding binding = {0};
+	se_sdf_node_binding binding = {0};
 	binding.scene = scene;
 	binding.node = node;
 	binding.control = control;
@@ -4983,35 +5239,35 @@ static b8 se_sdf_runtime_bind_node_target(
 	return 1;
 }
 
-static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer) {
+static b8 se_sdf_apply_node_bindings(se_sdf_renderer* renderer) {
 	if (!renderer) {
 		return 0;
 	}
 	b8 changed = 0;
 
 	for (sz i = 0; i < s_array_get_size(&renderer->node_bindings); ++i) {
-		se_sdf_runtime_node_binding* binding = s_array_get(&renderer->node_bindings, s_array_handle(&renderer->node_bindings, (u32)i));
+		se_sdf_node_binding* binding = s_array_get(&renderer->node_bindings, s_array_handle(&renderer->node_bindings, (u32)i));
 		if (!binding) {
 			continue;
 		}
 
-		se_sdf_runtime_control* control = se_sdf_runtime_control_from_handle(renderer, binding->control, SE_SDF_CONTROL_VEC3);
+		se_sdf_control* control = se_sdf_control_from_handle(renderer, binding->control, SE_SDF_CONTROL_VEC3);
 		if (!control) {
 			continue;
 		}
-		se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(binding->scene);
+		se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(binding->scene);
 		if (!scene_ptr) {
 			continue;
 		}
-		se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, binding->scene, binding->node);
+		se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, binding->scene, binding->node);
 		if (!node_ptr) {
 			continue;
 		}
 
-		se_sdf_runtime_node_init_control_trs(node_ptr);
+		se_sdf_node_init_control_trs(node_ptr);
 		b8 node_changed = 0;
 		switch (binding->target) {
-			case SE_SDF_RUNTIME_NODE_BIND_TRANSLATION:
+			case SE_SDF_NODE_BIND_TRANSLATION:
 				node_changed = (node_ptr->control_translation.x != control->value.vec3.x) ||
 					(node_ptr->control_translation.y != control->value.vec3.y) ||
 					(node_ptr->control_translation.z != control->value.vec3.z);
@@ -5019,7 +5275,7 @@ static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer) 
 					node_ptr->control_translation = control->value.vec3;
 				}
 				break;
-			case SE_SDF_RUNTIME_NODE_BIND_ROTATION:
+			case SE_SDF_NODE_BIND_ROTATION:
 				node_changed = (node_ptr->control_rotation.x != control->value.vec3.x) ||
 					(node_ptr->control_rotation.y != control->value.vec3.y) ||
 					(node_ptr->control_rotation.z != control->value.vec3.z);
@@ -5027,7 +5283,7 @@ static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer) 
 					node_ptr->control_rotation = control->value.vec3;
 				}
 				break;
-			case SE_SDF_RUNTIME_NODE_BIND_SCALE:
+			case SE_SDF_NODE_BIND_SCALE:
 				node_changed = (node_ptr->control_scale.x != control->value.vec3.x) ||
 					(node_ptr->control_scale.y != control->value.vec3.y) ||
 					(node_ptr->control_scale.z != control->value.vec3.z);
@@ -5039,15 +5295,15 @@ static b8 se_sdf_runtime_apply_node_bindings(se_sdf_runtime_renderer* renderer) 
 				break;
 		}
 		if (node_changed) {
-			se_sdf_runtime_node_apply_control_trs(node_ptr);
+			se_sdf_node_apply_control_trs(node_ptr);
 			changed = 1;
 		}
 	}
 	return changed;
 }
 
-static b8 se_sdf_runtime_apply_primitive_param_float(
-	se_sdf_runtime_node* node,
+static b8 se_sdf_apply_primitive_param_float(
+	se_sdf_node* node,
 	const se_sdf_primitive_param param,
 	const f32 value
 ) {
@@ -5176,119 +5432,119 @@ static b8 se_sdf_runtime_apply_primitive_param_float(
 	return 0;
 }
 
-static b8 se_sdf_runtime_apply_primitive_bindings(se_sdf_runtime_renderer* renderer) {
+static b8 se_sdf_apply_primitive_bindings(se_sdf_renderer* renderer) {
 	if (!renderer) {
 		return 0;
 	}
 	b8 changed = 0;
 
 	for (sz i = 0; i < s_array_get_size(&renderer->primitive_bindings); ++i) {
-		se_sdf_runtime_primitive_binding* binding = s_array_get(&renderer->primitive_bindings, s_array_handle(&renderer->primitive_bindings, (u32)i));
+		se_sdf_primitive_binding* binding = s_array_get(&renderer->primitive_bindings, s_array_handle(&renderer->primitive_bindings, (u32)i));
 		if (!binding) {
 			continue;
 		}
-		se_sdf_runtime_control* control = se_sdf_runtime_control_from_handle(renderer, binding->control, SE_SDF_CONTROL_FLOAT);
+		se_sdf_control* control = se_sdf_control_from_handle(renderer, binding->control, SE_SDF_CONTROL_FLOAT);
 		if (!control) {
 			continue;
 		}
-		se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(binding->scene);
+		se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(binding->scene);
 		if (!scene_ptr) {
 			continue;
 		}
-		se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, binding->scene, binding->node);
+		se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, binding->scene, binding->node);
 		if (!node_ptr) {
 			continue;
 		}
-		if (se_sdf_runtime_apply_primitive_param_float(node_ptr, binding->param, control->value.f)) {
+		if (se_sdf_apply_primitive_param_float(node_ptr, binding->param, control->value.f)) {
 			changed = 1;
 		}
 	}
 	return changed;
 }
 
-static void se_sdf_runtime_apply_renderer_shading_bindings(se_sdf_runtime_renderer* renderer) {
+static void se_sdf_apply_renderer_shading_bindings(se_sdf_renderer* renderer) {
 	if (!renderer) {
 		return;
 	}
-	se_sdf_runtime_control* control = NULL;
+	se_sdf_control* control = NULL;
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->material_base_color_control, SE_SDF_CONTROL_VEC3);
+	control = se_sdf_control_from_handle(renderer, renderer->material_base_color_control, SE_SDF_CONTROL_VEC3);
 	if (control) {
 		renderer->material.base_color = control->value.vec3;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->lighting_direction_control, SE_SDF_CONTROL_VEC3);
+	control = se_sdf_control_from_handle(renderer, renderer->lighting_direction_control, SE_SDF_CONTROL_VEC3);
 	if (control) {
 		renderer->lighting_direction = control->value.vec3;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->lighting_color_control, SE_SDF_CONTROL_VEC3);
+	control = se_sdf_control_from_handle(renderer, renderer->lighting_color_control, SE_SDF_CONTROL_VEC3);
 	if (control) {
 		renderer->lighting_color = control->value.vec3;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->fog_color_control, SE_SDF_CONTROL_VEC3);
+	control = se_sdf_control_from_handle(renderer, renderer->fog_color_control, SE_SDF_CONTROL_VEC3);
 	if (control) {
 		renderer->fog_color = control->value.vec3;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->fog_density_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->fog_density_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->fog_density = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_band_levels_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_band_levels_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.band_levels = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_rim_power_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_rim_power_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.rim_power = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_rim_strength_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_rim_strength_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.rim_strength = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_fill_strength_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_fill_strength_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.fill_strength = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_back_strength_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_back_strength_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.back_strength = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_checker_scale_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_checker_scale_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.checker_scale = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_checker_strength_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_checker_strength_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.checker_strength = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_ground_blend_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_ground_blend_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.ground_blend = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_desaturate_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_desaturate_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.desaturate = control->value.f;
 	}
 
-	control = se_sdf_runtime_control_from_handle(renderer, renderer->stylized_gamma_control, SE_SDF_CONTROL_FLOAT);
+	control = se_sdf_control_from_handle(renderer, renderer->stylized_gamma_control, SE_SDF_CONTROL_FLOAT);
 	if (control) {
 		renderer->stylized.gamma = control->value.f;
 	}
 }
 
-static const char* se_sdf_runtime_control_glsl_type(const se_sdf_control_type type) {
+static const char* se_sdf_control_glsl_type(const se_sdf_control_type type) {
 	switch (type) {
 		case SE_SDF_CONTROL_FLOAT: return "float";
 		case SE_SDF_CONTROL_VEC2: return "vec2";
@@ -5300,8 +5556,8 @@ static const char* se_sdf_runtime_control_glsl_type(const se_sdf_control_type ty
 	}
 }
 
-static b8 se_sdf_runtime_emit_control_uniform_declarations(
-	se_sdf_runtime_renderer* renderer,
+static b8 se_sdf_emit_control_uniform_declarations(
+	se_sdf_renderer* renderer,
 	se_sdf_string* out
 ) {
 	if (!renderer || !out) {
@@ -5310,14 +5566,14 @@ static b8 se_sdf_runtime_emit_control_uniform_declarations(
 
 	sz declared_count = 0;
 	for (sz i = 0; i < s_array_get_size(&renderer->controls); ++i) {
-		const se_sdf_runtime_control* control = s_array_get(
+		const se_sdf_control* control = s_array_get(
 			&renderer->controls,
 			s_array_handle(&renderer->controls, (u32)i)
 		);
 		if (!control || control->uniform_name[0] == '\0') {
 			continue;
 		}
-		const char* glsl_type = se_sdf_runtime_control_glsl_type(control->type);
+		const char* glsl_type = se_sdf_control_glsl_type(control->type);
 		if (!glsl_type) {
 			continue;
 		}
@@ -5330,25 +5586,25 @@ static b8 se_sdf_runtime_emit_control_uniform_declarations(
 	return !out->oom;
 }
 
-static const char* se_sdf_runtime_find_node_binding_uniform_name(
-	se_sdf_runtime_renderer* renderer,
+static const char* se_sdf_find_node_binding_uniform_name(
+	se_sdf_renderer* renderer,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node,
-	const se_sdf_runtime_node_bind_target target
+	const se_sdf_node_bind_target target
 ) {
 	if (!renderer || scene == SE_SDF_SCENE_NULL || node == SE_SDF_NODE_NULL) {
 		return NULL;
 	}
 
 	for (sz i = 0; i < s_array_get_size(&renderer->node_bindings); ++i) {
-		const se_sdf_runtime_node_binding* binding = s_array_get(
+		const se_sdf_node_binding* binding = s_array_get(
 			&renderer->node_bindings,
 			s_array_handle(&renderer->node_bindings, (u32)i)
 		);
 		if (!binding || binding->scene != scene || binding->node != node || binding->target != target) {
 			continue;
 		}
-		const se_sdf_runtime_control* control = s_array_get(&renderer->controls, binding->control);
+		const se_sdf_control* control = s_array_get(&renderer->controls, binding->control);
 		if (!control || control->type != SE_SDF_CONTROL_VEC3 || control->uniform_name[0] == '\0') {
 			continue;
 		}
@@ -5357,8 +5613,8 @@ static const char* se_sdf_runtime_find_node_binding_uniform_name(
 	return NULL;
 }
 
-static const char* se_sdf_runtime_find_primitive_binding_uniform_name(
-	se_sdf_runtime_renderer* renderer,
+static const char* se_sdf_find_primitive_binding_uniform_name(
+	se_sdf_renderer* renderer,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node,
 	const se_sdf_primitive_param param
@@ -5368,14 +5624,14 @@ static const char* se_sdf_runtime_find_primitive_binding_uniform_name(
 	}
 
 	for (sz i = 0; i < s_array_get_size(&renderer->primitive_bindings); ++i) {
-		const se_sdf_runtime_primitive_binding* binding = s_array_get(
+		const se_sdf_primitive_binding* binding = s_array_get(
 			&renderer->primitive_bindings,
 			s_array_handle(&renderer->primitive_bindings, (u32)i)
 		);
 		if (!binding || binding->scene != scene || binding->node != node || binding->param != param) {
 			continue;
 		}
-		const se_sdf_runtime_control* control = s_array_get(&renderer->controls, binding->control);
+		const se_sdf_control* control = s_array_get(&renderer->controls, binding->control);
 		if (!control || control->type != SE_SDF_CONTROL_FLOAT || control->uniform_name[0] == '\0') {
 			continue;
 		}
@@ -5389,12 +5645,12 @@ se_sdf_control_handle se_sdf_control_define_float(
 	const char* name,
 	const f32 default_value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return SE_SDF_CONTROL_NULL;
 	}
 	se_sdf_control_handle handle = SE_SDF_CONTROL_NULL;
-	se_sdf_runtime_control* control = se_sdf_runtime_get_or_create_control(
+	se_sdf_control* control = se_sdf_get_or_create_control(
 		renderer_ptr, name, SE_SDF_CONTROL_FLOAT, &handle);
 	if (!control) {
 		return SE_SDF_CONTROL_NULL;
@@ -5408,12 +5664,12 @@ se_sdf_control_handle se_sdf_control_define_vec2(
 	const char* name,
 	const s_vec2* default_value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !default_value) {
 		return SE_SDF_CONTROL_NULL;
 	}
 	se_sdf_control_handle handle = SE_SDF_CONTROL_NULL;
-	se_sdf_runtime_control* control = se_sdf_runtime_get_or_create_control(
+	se_sdf_control* control = se_sdf_get_or_create_control(
 		renderer_ptr, name, SE_SDF_CONTROL_VEC2, &handle);
 	if (!control) {
 		return SE_SDF_CONTROL_NULL;
@@ -5427,12 +5683,12 @@ se_sdf_control_handle se_sdf_control_define_vec3(
 	const char* name,
 	const s_vec3* default_value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !default_value) {
 		return SE_SDF_CONTROL_NULL;
 	}
 	se_sdf_control_handle handle = SE_SDF_CONTROL_NULL;
-	se_sdf_runtime_control* control = se_sdf_runtime_get_or_create_control(
+	se_sdf_control* control = se_sdf_get_or_create_control(
 		renderer_ptr, name, SE_SDF_CONTROL_VEC3, &handle);
 	if (!control) {
 		return SE_SDF_CONTROL_NULL;
@@ -5446,12 +5702,12 @@ se_sdf_control_handle se_sdf_control_define_vec4(
 	const char* name,
 	const s_vec4* default_value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !default_value) {
 		return SE_SDF_CONTROL_NULL;
 	}
 	se_sdf_control_handle handle = SE_SDF_CONTROL_NULL;
-	se_sdf_runtime_control* control = se_sdf_runtime_get_or_create_control(
+	se_sdf_control* control = se_sdf_get_or_create_control(
 		renderer_ptr, name, SE_SDF_CONTROL_VEC4, &handle);
 	if (!control) {
 		return SE_SDF_CONTROL_NULL;
@@ -5465,12 +5721,12 @@ se_sdf_control_handle se_sdf_control_define_int(
 	const char* name,
 	const i32 default_value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return SE_SDF_CONTROL_NULL;
 	}
 	se_sdf_control_handle handle = SE_SDF_CONTROL_NULL;
-	se_sdf_runtime_control* control = se_sdf_runtime_get_or_create_control(
+	se_sdf_control* control = se_sdf_get_or_create_control(
 		renderer_ptr, name, SE_SDF_CONTROL_INT, &handle);
 	if (!control) {
 		return SE_SDF_CONTROL_NULL;
@@ -5484,12 +5740,12 @@ se_sdf_control_handle se_sdf_control_define_mat4(
 	const char* name,
 	const s_mat4* default_value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr || !default_value) {
 		return SE_SDF_CONTROL_NULL;
 	}
 	se_sdf_control_handle handle = SE_SDF_CONTROL_NULL;
-	se_sdf_runtime_control* control = se_sdf_runtime_get_or_create_control(
+	se_sdf_control* control = se_sdf_get_or_create_control(
 		renderer_ptr, name, SE_SDF_CONTROL_MAT4, &handle);
 	if (!control) {
 		return SE_SDF_CONTROL_NULL;
@@ -5503,14 +5759,14 @@ b8 se_sdf_control_set_float(
 	const se_sdf_control_handle control,
 	const f32 value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_FLOAT);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_control_value v = {.f = value};
-	se_sdf_runtime_control_assign_value(control_ptr, &v);
+	se_sdf_control_value v = {.f = value};
+	se_sdf_control_assign_value(control_ptr, &v);
 	return 1;
 }
 
@@ -5522,14 +5778,14 @@ b8 se_sdf_control_set_vec2(
 	if (!value) {
 		return 0;
 	}
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_VEC2);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_control_value v = {.vec2 = *value};
-	se_sdf_runtime_control_assign_value(control_ptr, &v);
+	se_sdf_control_value v = {.vec2 = *value};
+	se_sdf_control_assign_value(control_ptr, &v);
 	return 1;
 }
 
@@ -5541,14 +5797,14 @@ b8 se_sdf_control_set_vec3(
 	if (!value) {
 		return 0;
 	}
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_VEC3);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_control_value v = {.vec3 = *value};
-	se_sdf_runtime_control_assign_value(control_ptr, &v);
+	se_sdf_control_value v = {.vec3 = *value};
+	se_sdf_control_assign_value(control_ptr, &v);
 	return 1;
 }
 
@@ -5560,14 +5816,14 @@ b8 se_sdf_control_set_vec4(
 	if (!value) {
 		return 0;
 	}
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_VEC4);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_control_value v = {.vec4 = *value};
-	se_sdf_runtime_control_assign_value(control_ptr, &v);
+	se_sdf_control_value v = {.vec4 = *value};
+	se_sdf_control_assign_value(control_ptr, &v);
 	return 1;
 }
 
@@ -5576,14 +5832,14 @@ b8 se_sdf_control_set_int(
 	const se_sdf_control_handle control,
 	const i32 value
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_INT);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_control_value v = {.i = value};
-	se_sdf_runtime_control_assign_value(control_ptr, &v);
+	se_sdf_control_value v = {.i = value};
+	se_sdf_control_assign_value(control_ptr, &v);
 	return 1;
 }
 
@@ -5595,14 +5851,14 @@ b8 se_sdf_control_set_mat4(
 	if (!value) {
 		return 0;
 	}
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_MAT4);
 	if (!control_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_control_value v = {.mat4 = *value};
-	se_sdf_runtime_control_assign_value(control_ptr, &v);
+	se_sdf_control_value v = {.mat4 = *value};
+	se_sdf_control_assign_value(control_ptr, &v);
 	return 1;
 }
 
@@ -5611,8 +5867,8 @@ b8 se_sdf_control_bind_ptr_float(
 	const se_sdf_control_handle control,
 	const f32* value_ptr
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_FLOAT);
 	if (!control_ptr) {
 		return 0;
@@ -5627,8 +5883,8 @@ b8 se_sdf_control_bind_ptr_vec2(
 	const se_sdf_control_handle control,
 	const s_vec2* value_ptr
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_VEC2);
 	if (!control_ptr) {
 		return 0;
@@ -5643,8 +5899,8 @@ b8 se_sdf_control_bind_ptr_vec3(
 	const se_sdf_control_handle control,
 	const s_vec3* value_ptr
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_VEC3);
 	if (!control_ptr) {
 		return 0;
@@ -5659,8 +5915,8 @@ b8 se_sdf_control_bind_ptr_vec4(
 	const se_sdf_control_handle control,
 	const s_vec4* value_ptr
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_VEC4);
 	if (!control_ptr) {
 		return 0;
@@ -5675,8 +5931,8 @@ b8 se_sdf_control_bind_ptr_int(
 	const se_sdf_control_handle control,
 	const i32* value_ptr
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_INT);
 	if (!control_ptr) {
 		return 0;
@@ -5691,8 +5947,8 @@ b8 se_sdf_control_bind_ptr_mat4(
 	const se_sdf_control_handle control,
 	const s_mat4* value_ptr
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	se_sdf_runtime_control* control_ptr = se_sdf_runtime_control_from_handle(
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	se_sdf_control* control_ptr = se_sdf_control_from_handle(
 		renderer_ptr, control, SE_SDF_CONTROL_MAT4);
 	if (!control_ptr) {
 		return 0;
@@ -5708,12 +5964,12 @@ b8 se_sdf_control_bind_node_translation(
 	const se_sdf_node_handle node,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
-	return se_sdf_runtime_bind_node_target(
-		renderer_ptr, scene, node, control, SE_SDF_RUNTIME_NODE_BIND_TRANSLATION);
+	return se_sdf_bind_node_target(
+		renderer_ptr, scene, node, control, SE_SDF_NODE_BIND_TRANSLATION);
 }
 
 b8 se_sdf_control_bind_node_rotation(
@@ -5722,12 +5978,12 @@ b8 se_sdf_control_bind_node_rotation(
 	const se_sdf_node_handle node,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
-	return se_sdf_runtime_bind_node_target(
-		renderer_ptr, scene, node, control, SE_SDF_RUNTIME_NODE_BIND_ROTATION);
+	return se_sdf_bind_node_target(
+		renderer_ptr, scene, node, control, SE_SDF_NODE_BIND_ROTATION);
 }
 
 b8 se_sdf_control_bind_node_scale(
@@ -5736,16 +5992,16 @@ b8 se_sdf_control_bind_node_scale(
 	const se_sdf_node_handle node,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
-	return se_sdf_runtime_bind_node_target(
-		renderer_ptr, scene, node, control, SE_SDF_RUNTIME_NODE_BIND_SCALE);
+	return se_sdf_bind_node_target(
+		renderer_ptr, scene, node, control, SE_SDF_NODE_BIND_SCALE);
 }
 
-static b8 se_sdf_runtime_bind_primitive_param_float(
-	se_sdf_runtime_renderer* renderer,
+static b8 se_sdf_bind_primitive_param_float(
+	se_sdf_renderer* renderer,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node,
 	const se_sdf_primitive_param param,
@@ -5754,20 +6010,20 @@ static b8 se_sdf_runtime_bind_primitive_param_float(
 	if (!renderer || scene == SE_SDF_SCENE_NULL || node == SE_SDF_NODE_NULL || control == SE_SDF_CONTROL_NULL) {
 		return 0;
 	}
-	if (!se_sdf_runtime_control_from_handle(renderer, control, SE_SDF_CONTROL_FLOAT)) {
+	if (!se_sdf_control_from_handle(renderer, control, SE_SDF_CONTROL_FLOAT)) {
 		return 0;
 	}
-	se_sdf_runtime_scene* scene_ptr = se_sdf_runtime_scene_from_handle(scene);
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
 	if (!scene_ptr) {
 		return 0;
 	}
-	se_sdf_runtime_node* node_ptr = se_sdf_runtime_node_from_handle(scene_ptr, scene, node);
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
 	if (!node_ptr || node_ptr->is_group) {
 		return 0;
 	}
 
 	for (sz i = 0; i < s_array_get_size(&renderer->primitive_bindings); ++i) {
-		se_sdf_runtime_primitive_binding* binding = s_array_get(&renderer->primitive_bindings, s_array_handle(&renderer->primitive_bindings, (u32)i));
+		se_sdf_primitive_binding* binding = s_array_get(&renderer->primitive_bindings, s_array_handle(&renderer->primitive_bindings, (u32)i));
 		if (!binding) {
 			continue;
 		}
@@ -5778,7 +6034,7 @@ static b8 se_sdf_runtime_bind_primitive_param_float(
 		}
 	}
 
-	se_sdf_runtime_primitive_binding binding = {0};
+	se_sdf_primitive_binding binding = {0};
 	binding.scene = scene;
 	binding.node = node;
 	binding.param = param;
@@ -5795,22 +6051,22 @@ b8 se_sdf_control_bind_primitive_param_float(
 	const se_sdf_primitive_param param,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
 	}
-	return se_sdf_runtime_bind_primitive_param_float(renderer_ptr, scene, node, param, control);
+	return se_sdf_bind_primitive_param_float(renderer_ptr, scene, node, param, control);
 }
 
-static b8 se_sdf_runtime_bind_renderer_float_control(
-	se_sdf_runtime_renderer* renderer,
+static b8 se_sdf_bind_renderer_float_control(
+	se_sdf_renderer* renderer,
 	se_sdf_control_handle* target_handle,
 	const se_sdf_control_handle control
 ) {
 	if (!renderer || !target_handle) {
 		return 0;
 	}
-	if (!se_sdf_runtime_control_from_handle(renderer, control, SE_SDF_CONTROL_FLOAT)) {
+	if (!se_sdf_control_from_handle(renderer, control, SE_SDF_CONTROL_FLOAT)) {
 		return 0;
 	}
 	*target_handle = control;
@@ -5821,8 +6077,8 @@ b8 se_sdf_control_bind_material_base_color(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	if (!renderer_ptr || !se_sdf_runtime_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	if (!renderer_ptr || !se_sdf_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
 		return 0;
 	}
 	renderer_ptr->material_base_color_control = control;
@@ -5833,8 +6089,8 @@ b8 se_sdf_control_bind_lighting_direction(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	if (!renderer_ptr || !se_sdf_runtime_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	if (!renderer_ptr || !se_sdf_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
 		return 0;
 	}
 	renderer_ptr->lighting_direction_control = control;
@@ -5845,8 +6101,8 @@ b8 se_sdf_control_bind_lighting_color(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	if (!renderer_ptr || !se_sdf_runtime_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	if (!renderer_ptr || !se_sdf_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
 		return 0;
 	}
 	renderer_ptr->lighting_color_control = control;
@@ -5857,8 +6113,8 @@ b8 se_sdf_control_bind_fog_color(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	if (!renderer_ptr || !se_sdf_runtime_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	if (!renderer_ptr || !se_sdf_control_from_handle(renderer_ptr, control, SE_SDF_CONTROL_VEC3)) {
 		return 0;
 	}
 	renderer_ptr->fog_color_control = control;
@@ -5869,88 +6125,88 @@ b8 se_sdf_control_bind_fog_density(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->fog_density_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->fog_density_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_band_levels(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_band_levels_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_band_levels_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_rim_power(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_rim_power_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_rim_power_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_rim_strength(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_rim_strength_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_rim_strength_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_fill_strength(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_fill_strength_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_fill_strength_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_back_strength(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_back_strength_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_back_strength_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_checker_scale(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_checker_scale_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_checker_scale_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_checker_strength(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_checker_strength_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_checker_strength_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_ground_blend(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_ground_blend_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_ground_blend_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_desaturate(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_desaturate_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_desaturate_control, control);
 }
 
 b8 se_sdf_control_bind_stylized_gamma(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
-	se_sdf_runtime_renderer* renderer_ptr = se_sdf_runtime_renderer_from_handle(renderer);
-	return se_sdf_runtime_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_gamma_control, control);
+	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
+	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_gamma_control, control);
 }
 
 // ============================================================================
@@ -6714,7 +6970,7 @@ void se_sdf_gen_transform(se_sdf_string* out, const char* p_var, s_mat4 transfor
 }
 
 void se_sdf_gen_operation(se_sdf_string* out, se_sdf_operation op, const char* d1, const char* d2) {
-	const f32 smooth_amount = se_sdf_runtime_sanitize_operation_amount(op, SE_SDF_OPERATION_AMOUNT_DEFAULT);
+	const f32 smooth_amount = se_sdf_sanitize_operation_amount(op, SE_SDF_OPERATION_AMOUNT_DEFAULT);
 	switch (op) {
 		case SE_SDF_OP_UNION:
 			se_sdf_string_append(out, "min(%s, %s)", d1, d2);
@@ -6849,7 +7105,7 @@ static b8 se_sdf_extract_block_parts(
 
 static const char* se_sdf_codegen_get_node_bind_uniform(
 	const se_sdf_object* obj,
-	const se_sdf_runtime_node_bind_target target
+	const se_sdf_node_bind_target target
 ) {
 	if (!obj || !se_sdf_codegen_active_renderer) {
 		return NULL;
@@ -6857,7 +7113,7 @@ static const char* se_sdf_codegen_get_node_bind_uniform(
 	if (obj->source_scene == SE_SDF_SCENE_NULL || obj->source_node == SE_SDF_NODE_NULL) {
 		return NULL;
 	}
-	return se_sdf_runtime_find_node_binding_uniform_name(
+	return se_sdf_find_node_binding_uniform_name(
 		se_sdf_codegen_active_renderer,
 		obj->source_scene,
 		obj->source_node,
@@ -6875,7 +7131,7 @@ static const char* se_sdf_codegen_get_primitive_bind_uniform(
 	if (obj->source_scene == SE_SDF_SCENE_NULL || obj->source_node == SE_SDF_NODE_NULL) {
 		return NULL;
 	}
-	return se_sdf_runtime_find_primitive_binding_uniform_name(
+	return se_sdf_find_primitive_binding_uniform_name(
 		se_sdf_codegen_active_renderer,
 		obj->source_scene,
 		obj->source_node,
@@ -7222,7 +7478,7 @@ static void se_sdf_emit_operation(
 	se_sdf_string* out, se_sdf_operation op, f32 operation_amount,
 	const char* d1, const char* d2, u32 indent
 ) {
-	const f32 smooth_amount = se_sdf_runtime_sanitize_operation_amount(op, operation_amount);
+	const f32 smooth_amount = se_sdf_sanitize_operation_amount(op, operation_amount);
 	se_sdf_emit_indent(out, indent);
 	switch (op) {
 		case SE_SDF_OP_UNION:
@@ -7273,9 +7529,9 @@ static void se_sdf_emit_object_eval(
 ) {
     const char* local_p = p_var;
     char transformed_p[32];
-	const char* translation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_RUNTIME_NODE_BIND_TRANSLATION);
-	const char* rotation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_RUNTIME_NODE_BIND_ROTATION);
-	const char* scale_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_RUNTIME_NODE_BIND_SCALE);
+	const char* translation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_TRANSLATION);
+	const char* rotation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_ROTATION);
+	const char* scale_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_SCALE);
 	const b8 has_dynamic_trs = (translation_uniform != NULL) || (rotation_uniform != NULL) || (scale_uniform != NULL);
 
 	if (has_dynamic_trs) {
@@ -7286,9 +7542,9 @@ static void se_sdf_emit_object_eval(
 		);
 		const s_vec3 base_rotation = s_vec3(0.0f, 0.0f, 0.0f);
 		const s_vec3 base_scale = s_vec3(
-			se_sdf_runtime_abs_or_one(obj->transform.m[0][0]),
-			se_sdf_runtime_abs_or_one(obj->transform.m[1][1]),
-			se_sdf_runtime_abs_or_one(obj->transform.m[2][2])
+			se_sdf_abs_or_one(obj->transform.m[0][0]),
+			se_sdf_abs_or_one(obj->transform.m[1][1]),
+			se_sdf_abs_or_one(obj->transform.m[2][2])
 		);
 		const b8 has_non_identity_scale =
 			(fabsf(base_scale.x - 1.0f) > 0.000001f) ||
@@ -7764,9 +8020,9 @@ b8 se_sdf_bake_model_texture3d(
 				continue;
 			}
 
-			const s_vec3 p0 = se_sdf_runtime_mul_mat4_point(&mesh->matrix, &v0->position);
-			const s_vec3 p1 = se_sdf_runtime_mul_mat4_point(&mesh->matrix, &v1->position);
-			const s_vec3 p2 = se_sdf_runtime_mul_mat4_point(&mesh->matrix, &v2->position);
+			const s_vec3 p0 = se_sdf_mul_mat4_point(&mesh->matrix, &v0->position);
+			const s_vec3 p1 = se_sdf_mul_mat4_point(&mesh->matrix, &v1->position);
+			const s_vec3 p2 = se_sdf_mul_mat4_point(&mesh->matrix, &v2->position);
 
 			se_sdf_bake_triangle tri = {0};
 			tri.a = p0;

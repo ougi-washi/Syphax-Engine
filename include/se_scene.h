@@ -81,11 +81,17 @@ typedef se_object_2d_handle se_object_2d_ptr;
 typedef s_array(se_object_2d_handle, se_objects_2d_ptr);
 
 typedef struct se_object_3d {
-	se_model_handle model;
 	s_mat4 transform;
-	se_instances instances;
-	se_mesh_instances mesh_instances;
-	se_transforms render_transforms;
+	union {
+		struct {
+			se_model_handle model;
+			se_instances instances;
+			se_mesh_instances mesh_instances;
+			se_transforms render_transforms;
+		};
+		se_object_custom custom;
+	};
+	b8 is_custom : 1;
 	b8 is_visible : 1;
 } se_object_3d;
 
@@ -156,6 +162,10 @@ extern b8 se_object_2d_get_instance_metadata(const se_object_2d_handle object, c
 extern void se_object_2d_set_instances_dirty(const se_object_2d_handle object, const b8 dirty);
 extern b8 se_object_2d_are_instances_dirty(const se_object_2d_handle object);
 extern sz se_object_2d_get_instance_count(const se_object_2d_handle object);
+extern s_json* se_object_2d_to_json(const se_object_2d_handle object);
+extern b8 se_object_2d_to_json_file(const se_object_2d_handle object, const c8* path);
+extern b8 se_object_2d_from_json(const se_object_2d_handle object, const s_json* root);
+extern b8 se_object_2d_from_json_file(const se_object_2d_handle object, const c8* path);
 
 // 2D scene functions
 extern se_scene_2d_handle se_scene_2d_create(const s_vec2 *size, const u16 object_count);
@@ -204,6 +214,7 @@ extern b8 se_scene_3d_from_json(const se_scene_3d_handle scene, const s_json* ro
 
 // 3D objects functions
 extern se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat4 *transform, const sz max_instances_count);
+extern se_object_3d_handle se_object_3d_create_custom(se_object_custom *custom, const s_mat4 *transform);
 extern void se_object_3d_destroy(const se_object_3d_handle object);
 extern void se_object_3d_set_transform(const se_object_3d_handle object, const s_mat4 *transform);
 extern void se_object_3d_set_location(const se_object_3d_handle object, const s_vec3 *location);
@@ -225,5 +236,9 @@ extern b8 se_object_3d_get_instance_metadata(const se_object_3d_handle object, c
 extern void se_object_3d_set_instances_dirty(const se_object_3d_handle object, const b8 dirty);
 extern b8 se_object_3d_are_instances_dirty(const se_object_3d_handle object);
 extern sz se_object_3d_get_instance_count(const se_object_3d_handle object);
+extern s_json* se_object_3d_to_json(const se_object_3d_handle object);
+extern b8 se_object_3d_to_json_file(const se_object_3d_handle object, const c8* path);
+extern b8 se_object_3d_from_json(const se_object_3d_handle object, const s_json* root);
+extern b8 se_object_3d_from_json_file(const se_object_3d_handle object, const c8* path);
 
 #endif // SE_SCENE_H

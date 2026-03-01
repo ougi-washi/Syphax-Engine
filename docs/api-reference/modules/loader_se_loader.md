@@ -49,7 +49,7 @@ extern se_model_handle se_gltf_model_load_ex(const se_gltf_asset *asset, const i
 
 </div>
 
-No inline description found in header comments.
+mesh_index < 0 loads all meshes from the asset into a single model.
 
 ### `se_gltf_model_load_first`
 

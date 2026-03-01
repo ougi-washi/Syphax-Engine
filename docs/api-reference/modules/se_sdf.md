@@ -507,6 +507,30 @@ extern b8 se_sdf_frame_set_scene_depth_texture(se_sdf_frame_desc* frame, u32 dep
 
 No inline description found in header comments.
 
+### `se_sdf_from_json`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_from_json(se_sdf_scene_handle scene, const s_json* root);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_from_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_from_json_file(se_sdf_scene_handle scene, const c8* path);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_node_add_child`
 
 <div class="api-signature">
@@ -987,6 +1011,30 @@ extern b8 se_sdf_scene_set_root(se_sdf_scene_handle scene, se_sdf_node_handle no
 
 No inline description found in header comments.
 
+### `se_sdf_scene_to_object_2d`
+
+<div class="api-signature">
+
+```c
+extern se_object_2d_handle se_sdf_scene_to_object_2d(se_sdf_scene_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_scene_to_object_3d`
+
+<div class="api-signature">
+
+```c
+extern se_object_3d_handle se_sdf_scene_to_object_3d(se_sdf_scene_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_scene_validate`
 
 <div class="api-signature">
@@ -1005,6 +1053,18 @@ No inline description found in header comments.
 
 ```c
 extern void se_sdf_shutdown(void);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_to_json`
+
+<div class="api-signature">
+
+```c
+extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
 ```
 
 </div>
@@ -1086,6 +1146,18 @@ typedef enum { SE_SDF_SHADING_STYLIZED, SE_SDF_SHADING_LIT_PBR, SE_SDF_SHADING_U
 No inline description found in header comments.
 
 ## Typedefs
+
+### `s_json`
+
+<div class="api-signature">
+
+```c
+typedef struct s_json s_json;
+```
+
+</div>
+
+No inline description found in header comments.
 
 ### `se_sdf_box_desc`
 

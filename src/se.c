@@ -9,6 +9,7 @@
 #include "se_physics.h"
 #include "se_render_buffer.h"
 #include "se_scene.h"
+#include "se_sdf.h"
 #include "se_shader.h"
 #include "se_simulation.h"
 #include "se_text.h"
@@ -118,6 +119,14 @@ static void se_context_log_leaks(se_context *context) {
 			s_array_get_size(&context->vfx_2ds),
 			s_array_get_size(&context->vfx_3ds));
 	}
+	if (s_array_get_size(&context->sdf_scenes) > 0 || s_array_get_size(&context->sdf_renderers) > 0) {
+		se_debug_log(
+			SE_DEBUG_LEVEL_WARN,
+			SE_DEBUG_CATEGORY_CORE,
+				"se_context_log_leaks :: context teardown with sdf alive (scenes=%zu, renderers=%zu)",
+			s_array_get_size(&context->sdf_scenes),
+			s_array_get_size(&context->sdf_renderers));
+	}
 }
 
 se_context *se_context_create(void) {
@@ -142,6 +151,8 @@ se_context *se_context_create(void) {
 	s_array_init(&context->scenes_2d);
 	s_array_init(&context->objects_3d);
 	s_array_init(&context->scenes_3d);
+	s_array_init(&context->sdf_scenes);
+	s_array_init(&context->sdf_renderers);
 	s_array_init(&context->vfx_2ds);
 	s_array_init(&context->vfx_3ds);
 	s_array_init(&context->ui_roots);
@@ -181,6 +192,7 @@ void se_context_destroy(se_context *context) {
 	}
 	context->ui_text_handle = NULL;
 	context->default_text_handle = NULL;
+	se_sdf_shutdown();
 
 	while (s_array_get_size(&context->vfx_2ds) > 0) {
 		se_vfx_2d_handle vfx_handle = s_array_handle(&context->vfx_2ds, (u32)(s_array_get_size(&context->vfx_2ds) - 1));

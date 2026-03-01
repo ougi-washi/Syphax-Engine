@@ -1,6 +1,5 @@
 // Syphax-Engine - Ougi Washi
 
-#include "se_camera.h"
 #include "se_graphics.h"
 #include "se_scene.h"
 #include "se_sdf.h"
@@ -32,20 +31,7 @@ static b8 sdf_json_save(const se_sdf_scene_handle scene, const c8* path) {
 }
 
 static b8 sdf_json_load(const se_sdf_scene_handle scene, const c8* path) {
-	c8* text = NULL;
-	if (!s_file_read(path, &text, NULL)) {
-		se_set_last_error(SE_RESULT_IO);
-		return 0;
-	}
-	s_json* root = s_json_parse(text);
-	free(text);
-	if (!root) {
-		se_set_last_error(SE_RESULT_IO);
-		return 0;
-	}
-	const b8 ok = se_sdf_from_json(scene, root);
-	s_json_free(root);
-	return ok;
+	return se_sdf_from_json_file(scene, path);
 }
 
 int main(void) {
@@ -103,20 +89,29 @@ int main(void) {
 	}
 	se_sdf_scene_destroy(source_scene);
 
-	se_scene_3d_handle camera_scene = se_scene_3d_create_for_window(window, 1);
-	se_camera_handle camera = se_scene_3d_get_camera(camera_scene);
-	se_camera_set_target_mode(camera, 1);
-	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
 	u32 initial_fb_w = 0;
 	u32 initial_fb_h = 0;
 	se_window_get_framebuffer_size(window, &initial_fb_w, &initial_fb_h);
 	const f32 initial_width = initial_fb_w > 0 ? (f32)initial_fb_w : 1280.0f;
 	const f32 initial_height = initial_fb_h > 0 ? (f32)initial_fb_h : 720.0f;
-	se_camera_set_aspect(camera, initial_width, initial_height);
-	(void)se_sdf_scene_align_camera(loaded_scene, camera, NULL, NULL);
+	se_scene_2d_handle scene_2d = se_scene_2d_create(&s_vec2(initial_width, initial_height), 1);
+	if (scene_2d == S_HANDLE_NULL) {
+		printf("sdf_json :: scene_2d create failed (%s)\n", se_result_str(se_get_last_error()));
+		se_sdf_scene_destroy(loaded_scene);
+		se_context_destroy(context);
+		return 1;
+	}
+	se_scene_2d_set_auto_resize(scene_2d, window, &s_vec2(1.0f, 1.0f));
 
-	se_sdf_renderer_handle renderer = se_sdf_renderer_create(NULL);
-	se_sdf_renderer_set_scene(renderer, loaded_scene);
+	se_object_2d_handle sdf_object = se_sdf_scene_to_object_2d(loaded_scene);
+	if (sdf_object == S_HANDLE_NULL) {
+		printf("sdf_json :: se_sdf_scene_to_object_2d failed (%s)\n", se_result_str(se_get_last_error()));
+		se_scene_2d_destroy(scene_2d);
+		se_sdf_scene_destroy(loaded_scene);
+		se_context_destroy(context);
+		return 1;
+	}
+	se_scene_2d_add_object(scene_2d, sdf_object);
 
 	printf("sdf_json :: saved and loaded %s\n", json_path);
 	printf("sdf_json controls:\n");
@@ -124,24 +119,12 @@ int main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
-		u32 fb_w = 0;
-		u32 fb_h = 0;
-		se_window_get_framebuffer_size(window, &fb_w, &fb_h);
-		const f32 width = fb_w > 0 ? (f32)fb_w : 1280.0f;
-		const f32 height = fb_h > 0 ? (f32)fb_h : 720.0f;
-		se_camera_set_aspect(camera, width, height);
-		se_render_clear();
-		se_sdf_frame_desc frame = SE_SDF_FRAME_DESC_DEFAULTS;
-		frame.resolution = s_vec2(width, height);
-		frame.time_seconds = (f32)se_window_get_time(window);
-		se_sdf_frame_set_camera(&frame, camera);
-		se_sdf_renderer_render(renderer, &frame);
+		se_scene_2d_draw(scene_2d, window);
 		se_window_end_frame(window);
 	}
 
-	se_sdf_renderer_destroy(renderer);
+	se_scene_2d_destroy_full(scene_2d, 0);
 	se_sdf_scene_destroy(loaded_scene);
-	se_scene_3d_destroy(camera_scene);
 	se_sdf_shutdown();
 	se_context_destroy(context);
 	return 0;

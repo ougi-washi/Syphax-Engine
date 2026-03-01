@@ -49,6 +49,7 @@ static b8 scene_json_load(const se_scene_3d_handle scene, const c8* path) {
 
 int main(void) {
 	const c8* json_path = "scene3d_snapshot.json";
+	const c8* object_json_path = "scene3d_object_snapshot.json";
 	se_context* context = se_context_create();
 	se_window_handle window = se_window_create("Syphax - Scene3D JSON", 1280, 720);
 	if (window == S_HANDLE_NULL) {
@@ -79,18 +80,26 @@ int main(void) {
 	s_mat4_set_translation(&object_transform, &s_vec3(0.0f, 0.0f, 0.0f));
 	se_object_3d_set_transform(cubes, &object_transform);
 	se_object_3d_set_scale(cubes, &s_vec3(2.2f, 2.2f, 2.2f));
-
-	s_mat4 inactive_instance = s_mat4_identity;
-	s_mat4_set_translation(&inactive_instance, &s_vec3(2.4f, 0.0f, 0.0f));
-	s_mat4 inactive_buffer = s_mat4_identity;
-	const se_instance_id inactive_id = se_object_3d_add_instance(cubes, &inactive_instance, &inactive_buffer);
-	if (inactive_id >= 0) {
-		s_mat4 metadata = s_mat4_identity;
-		metadata.m[1][3] = 3.0f;
-		se_object_3d_set_instance_metadata(cubes, inactive_id, &metadata);
-		se_object_3d_set_instance_active(cubes, inactive_id, false);
-	}
 	se_scene_3d_set_culling(source_scene, false);
+
+	if (!se_object_3d_to_json_file(cubes, object_json_path)) {
+		printf("scene3d_json :: object save failed (%s)\n", se_result_str(se_get_last_error()));
+		se_scene_3d_destroy_full(source_scene, true, true);
+		se_context_destroy(context);
+		return 1;
+	}
+
+	s_mat4 edited_transform = s_mat4_identity;
+	s_mat4_set_translation(&edited_transform, &s_vec3(-2.0f, 0.0f, 0.0f));
+	se_object_3d_set_transform(cubes, &edited_transform);
+	se_object_3d_set_scale(cubes, &s_vec3(0.8f, 0.8f, 0.8f));
+
+	if (!se_object_3d_from_json_file(cubes, object_json_path)) {
+		printf("scene3d_json :: object load failed (%s)\n", se_result_str(se_get_last_error()));
+		se_scene_3d_destroy_full(source_scene, true, true);
+		se_context_destroy(context);
+		return 1;
+	}
 
 	if (!scene_json_save(source_scene, json_path)) {
 		printf("scene3d_json :: save failed (%s)\n", se_result_str(se_get_last_error()));
