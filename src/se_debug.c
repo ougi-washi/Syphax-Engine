@@ -546,7 +546,7 @@ void se_debug_dump_trace_stats(c8* out_buffer, sz out_buffer_size, u32 max_entri
 	}
 
 	se_debug_frame_timing frame_timing = {0};
-	(void)se_debug_get_last_frame_timing(&frame_timing);
+	(void)se_debug_get_frame_timing(&frame_timing);
 
 	sz cursor = 0u;
 	se_debug_buffer_append(
@@ -619,7 +619,7 @@ void se_debug_frame_end(void) {
 	pthread_mutex_unlock(&g_trace_mutex);
 }
 
-b8 se_debug_get_last_frame_timing(se_debug_frame_timing* out_timing) {
+b8 se_debug_get_frame_timing(se_debug_frame_timing* out_timing) {
 	if (!out_timing) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -631,12 +631,12 @@ b8 se_debug_get_last_frame_timing(se_debug_frame_timing* out_timing) {
 	return true;
 }
 
-void se_debug_dump_last_frame_timing(c8* out_buffer, const sz out_buffer_size) {
+void se_debug_dump_frame_timing(c8* out_buffer, const sz out_buffer_size) {
 	if (!out_buffer || out_buffer_size == 0) {
 		return;
 	}
 	se_debug_frame_timing timing = {0};
-	(void)se_debug_get_last_frame_timing(&timing);
+	(void)se_debug_get_frame_timing(&timing);
 	snprintf(
 		out_buffer,
 		out_buffer_size,
@@ -654,12 +654,12 @@ void se_debug_dump_last_frame_timing(c8* out_buffer, const sz out_buffer_size) {
 		timing.other_ms);
 }
 
-void se_debug_dump_last_frame_timing_lines(c8* out_buffer, const sz out_buffer_size) {
+void se_debug_dump_frame_timing_lines(c8* out_buffer, const sz out_buffer_size) {
 	if (!out_buffer || out_buffer_size == 0) {
 		return;
 	}
 	se_debug_frame_timing timing = {0};
-	(void)se_debug_get_last_frame_timing(&timing);
+	(void)se_debug_get_frame_timing(&timing);
 	snprintf(
 		out_buffer,
 		out_buffer_size,
@@ -752,7 +752,7 @@ void se_debug_render_overlay(const se_window_handle window, se_input_handle* inp
 	}
 
 	c8 timing_text[512] = {0};
-	se_debug_dump_last_frame_timing_lines(timing_text, sizeof(timing_text));
+	se_debug_dump_frame_timing_lines(timing_text, sizeof(timing_text));
 
 	c8 text[1536] = {0};
 	snprintf(

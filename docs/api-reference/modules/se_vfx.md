@@ -15,12 +15,144 @@ This page is generated from `include/se_vfx.h` and is deterministic.
 
 ## Functions
 
+### `se_vfx_2d_add_builtin_float_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_builtin_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_builtin_vec2_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_builtin_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_builtin_vec3_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_builtin_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_builtin_vec4_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_builtin_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_vfx_2d_add_emitter`
 
 <div class="api-signature">
 
 ```c
 extern se_vfx_emitter_2d_handle se_vfx_2d_add_emitter(se_vfx_2d_handle vfx, const se_vfx_emitter_2d_params* params);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_uniform_float_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_uniform_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_uniform_vec2_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_uniform_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_uniform_vec3_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_uniform_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_add_uniform_vec4_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_add_uniform_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_clear_builtin_track`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_clear_builtin_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_clear_tracks`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_clear_tracks(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_clear_uniform_track`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_clear_uniform_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name);
 ```
 
 </div>
@@ -63,102 +195,6 @@ extern b8 se_vfx_2d_draw(se_vfx_2d_handle vfx, se_window_handle window);
 
 No inline description found in header comments.
 
-### `se_vfx_2d_emitter_add_builtin_float_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_builtin_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_builtin_vec2_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_builtin_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_builtin_vec3_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_builtin_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_builtin_vec4_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_builtin_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_uniform_float_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_uniform_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_uniform_vec2_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_uniform_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_uniform_vec3_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_uniform_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_add_uniform_vec4_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_add_uniform_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_vfx_2d_emitter_burst`
 
 <div class="api-signature">
@@ -171,60 +207,12 @@ extern b8 se_vfx_2d_emitter_burst(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle
 
 No inline description found in header comments.
 
-### `se_vfx_2d_emitter_clear_builtin_track`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_clear_builtin_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_clear_tracks`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_clear_tracks(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_clear_uniform_track`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_clear_uniform_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_vfx_2d_emitter_set_blend_mode`
 
 <div class="api-signature">
 
 ```c
 extern b8 se_vfx_2d_emitter_set_blend_mode(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_blend_mode blend_mode);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_set_particle_callback`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_set_particle_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_particle_update_2d_callback callback, void* user_data);
 ```
 
 </div>
@@ -261,18 +249,6 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_vfx_2d_emitter_set_texture(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_texture_handle texture);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_2d_emitter_set_uniform_callback`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_2d_emitter_set_uniform_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_uniform_2d_callback callback, void* user_data);
 ```
 
 </div>
@@ -363,6 +339,30 @@ extern b8 se_vfx_2d_render(se_vfx_2d_handle vfx, se_window_handle window);
 
 No inline description found in header comments.
 
+### `se_vfx_2d_set_particle_callback`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_set_particle_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_particle_update_2d_callback callback, void* user_data);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_2d_set_uniform_callback`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_2d_set_uniform_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_uniform_2d_callback callback, void* user_data);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_vfx_2d_tick`
 
 <div class="api-signature">
@@ -387,12 +387,144 @@ extern b8 se_vfx_2d_tick_window(se_vfx_2d_handle vfx, se_window_handle window);
 
 No inline description found in header comments.
 
+### `se_vfx_3d_add_builtin_float_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_builtin_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_builtin_vec2_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_builtin_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_builtin_vec3_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_builtin_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_builtin_vec4_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_builtin_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_vfx_3d_add_emitter`
 
 <div class="api-signature">
 
 ```c
 extern se_vfx_emitter_3d_handle se_vfx_3d_add_emitter(se_vfx_3d_handle vfx, const se_vfx_emitter_3d_params* params);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_uniform_float_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_uniform_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_uniform_vec2_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_uniform_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_uniform_vec3_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_uniform_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_add_uniform_vec4_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_add_uniform_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_clear_builtin_track`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_clear_builtin_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_clear_tracks`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_clear_tracks(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_clear_uniform_track`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_clear_uniform_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name);
 ```
 
 </div>
@@ -435,144 +567,12 @@ extern b8 se_vfx_3d_draw(se_vfx_3d_handle vfx, se_window_handle window);
 
 No inline description found in header comments.
 
-### `se_vfx_3d_emitter_add_builtin_float_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_builtin_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_builtin_vec2_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_builtin_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_builtin_vec3_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_builtin_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_builtin_vec4_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_builtin_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_uniform_float_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_uniform_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_uniform_vec2_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_uniform_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_uniform_vec3_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_uniform_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_add_uniform_vec4_key`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_add_uniform_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_vfx_3d_emitter_burst`
 
 <div class="api-signature">
 
 ```c
 extern b8 se_vfx_3d_emitter_burst(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, u32 count);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_clear_builtin_track`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_clear_builtin_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_clear_tracks`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_clear_tracks(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_clear_uniform_track`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_clear_uniform_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name);
 ```
 
 </div>
@@ -597,18 +597,6 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_vfx_3d_emitter_set_model(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_model_handle model);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_set_particle_callback`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_set_particle_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_particle_update_3d_callback callback, void* user_data);
 ```
 
 </div>
@@ -645,18 +633,6 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_vfx_3d_emitter_set_texture(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_texture_handle texture);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_vfx_3d_emitter_set_uniform_callback`
-
-<div class="api-signature">
-
-```c
-extern b8 se_vfx_3d_emitter_set_uniform_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_uniform_3d_callback callback, void* user_data);
 ```
 
 </div>
@@ -741,6 +717,30 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_vfx_3d_render(se_vfx_3d_handle vfx, se_window_handle window, se_camera_handle camera);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_set_particle_callback`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_set_particle_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_particle_update_3d_callback callback, void* user_data);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_vfx_3d_set_uniform_callback`
+
+<div class="api-signature">
+
+```c
+extern b8 se_vfx_3d_set_uniform_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_uniform_3d_callback callback, void* user_data);
 ```
 
 </div>

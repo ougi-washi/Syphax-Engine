@@ -36,7 +36,7 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
+	se_render_set_background(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
 
 	se_scene_3d_handle scene = se_scene_3d_create_for_window(window, BODY_COUNT + 2);
 	se_model_handle cube_model = se_model_load_obj_simple(
@@ -77,7 +77,7 @@ int main(void) {
 
 	se_camera_handle camera = se_scene_3d_get_camera(scene);
 	se_camera_set_target_mode(camera, true);
-	se_camera_set_aspect_from_window(camera, window);
+	se_camera_set_window_aspect(camera, window);
 	se_camera_set_perspective(camera, 52.0f, 0.05f, 220.0f);
 	se_camera_set_location(camera, &s_vec3(12.0f, 8.0f, 14.0f));
 	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
@@ -99,13 +99,13 @@ int main(void) {
 		se_physics_world_3d_step(world, (f32)se_window_get_delta_time(window));
 		ground_position = se_physics_body_3d_get_position(world, ground);
 		s_mat4 ground_transform = physics_make_transform(&ground_position, &ground_half);
-		se_object_3d_set_instance_transform(cubes, ground_instance, &ground_transform);
+		se_object_3d_set_transform_by_id(cubes, ground_instance, &ground_transform);
 		for (sz i = 0; i < s_array_get_size(&slots); ++i) {
 			physics_slot_3d* slot = s_array_get(&slots, s_array_handle(&slots, (u32)i));
 			if (slot && slot->body) {
 				s_vec3 body_position = se_physics_body_3d_get_position(world, slot->body);
 				s_mat4 transform = physics_make_transform(&body_position, &slot->half_extents);
-				se_object_3d_set_instance_transform(cubes, slot->instance, &transform);
+				se_object_3d_set_transform_by_id(cubes, slot->instance, &transform);
 			}
 		}
 

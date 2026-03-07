@@ -76,14 +76,14 @@ i32 main(void) {
 		return 1;
 	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-	se_render_set_background_color(s_vec4(0.07f, 0.08f, 0.11f, 1.0f));
+	se_render_set_background(s_vec4(0.07f, 0.08f, 0.11f, 1.0f));
 
 	se_camera_handle camera_handle = se_camera_create();
 	if (camera_handle == S_HANDLE_NULL) {
 		se_context_destroy(context);
 		return 1;
 	}
-	se_camera_set_aspect_from_window(camera_handle, window);
+	se_camera_set_window_aspect(camera_handle, window);
 	se_camera_set_location(camera_handle, &s_vec3(0.0f, 1.2f, 4.2f));
 	se_camera_set_target(camera_handle, &s_vec3(0.0f, 0.6f, 0.0f));
 
@@ -141,30 +141,30 @@ i32 main(void) {
 		return 1;
 	}
 
-	se_vfx_2d_emitter_add_builtin_vec2_key(vfx_2d, emitter_2d, SE_VFX_TARGET_VELOCITY, SE_CURVE_SMOOTH, 0.0f, &s_vec2(0.0f, 0.9f));
-	se_vfx_2d_emitter_add_builtin_vec2_key(vfx_2d, emitter_2d, SE_VFX_TARGET_VELOCITY, SE_CURVE_SMOOTH, 1.0f, &s_vec2(0.0f, 0.15f));
-	se_vfx_2d_emitter_add_builtin_vec4_key(vfx_2d, emitter_2d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 0.0f, &s_vec4(1.0f, 0.84f, 0.35f, 1.0f));
-	se_vfx_2d_emitter_add_builtin_vec4_key(vfx_2d, emitter_2d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 1.0f, &s_vec4(1.0f, 0.2f, 0.1f, 0.0f));
-	se_vfx_2d_emitter_add_builtin_float_key(vfx_2d, emitter_2d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_OUT, 0.0f, 0.02f);
-	se_vfx_2d_emitter_add_builtin_float_key(vfx_2d, emitter_2d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_OUT, 1.0f, 0.09f);
+	se_vfx_2d_add_builtin_vec2_key(vfx_2d, emitter_2d, SE_VFX_TARGET_VELOCITY, SE_CURVE_SMOOTH, 0.0f, &s_vec2(0.0f, 0.9f));
+	se_vfx_2d_add_builtin_vec2_key(vfx_2d, emitter_2d, SE_VFX_TARGET_VELOCITY, SE_CURVE_SMOOTH, 1.0f, &s_vec2(0.0f, 0.15f));
+	se_vfx_2d_add_builtin_vec4_key(vfx_2d, emitter_2d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 0.0f, &s_vec4(1.0f, 0.84f, 0.35f, 1.0f));
+	se_vfx_2d_add_builtin_vec4_key(vfx_2d, emitter_2d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 1.0f, &s_vec4(1.0f, 0.2f, 0.1f, 0.0f));
+	se_vfx_2d_add_builtin_float_key(vfx_2d, emitter_2d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_OUT, 0.0f, 0.02f);
+	se_vfx_2d_add_builtin_float_key(vfx_2d, emitter_2d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_OUT, 1.0f, 0.09f);
 
-	se_vfx_3d_emitter_add_builtin_vec3_key(vfx_3d, emitter_3d, SE_VFX_TARGET_VELOCITY, SE_CURVE_LINEAR, 0.0f, &s_vec3(0.0f, 1.6f, 0.0f));
-	se_vfx_3d_emitter_add_builtin_vec3_key(vfx_3d, emitter_3d, SE_VFX_TARGET_VELOCITY, SE_CURVE_LINEAR, 1.0f, &s_vec3(0.0f, 0.4f, 0.0f));
-	se_vfx_3d_emitter_add_builtin_vec4_key(vfx_3d, emitter_3d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 0.0f, &s_vec4(0.1f, 0.35f, 1.0f, 0.95f));
-	se_vfx_3d_emitter_add_builtin_vec4_key(vfx_3d, emitter_3d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 1.0f, &s_vec4(0.05f, 0.2f, 0.85f, 0.0f));
-	se_vfx_3d_emitter_add_builtin_float_key(vfx_3d, emitter_3d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_IN_OUT, 0.0f, 0.06f);
-	se_vfx_3d_emitter_add_builtin_float_key(vfx_3d, emitter_3d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_IN_OUT, 1.0f, 0.22f);
+	se_vfx_3d_add_builtin_vec3_key(vfx_3d, emitter_3d, SE_VFX_TARGET_VELOCITY, SE_CURVE_LINEAR, 0.0f, &s_vec3(0.0f, 1.6f, 0.0f));
+	se_vfx_3d_add_builtin_vec3_key(vfx_3d, emitter_3d, SE_VFX_TARGET_VELOCITY, SE_CURVE_LINEAR, 1.0f, &s_vec3(0.0f, 0.4f, 0.0f));
+	se_vfx_3d_add_builtin_vec4_key(vfx_3d, emitter_3d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 0.0f, &s_vec4(0.1f, 0.35f, 1.0f, 0.95f));
+	se_vfx_3d_add_builtin_vec4_key(vfx_3d, emitter_3d, SE_VFX_TARGET_COLOR, SE_CURVE_LINEAR, 1.0f, &s_vec4(0.05f, 0.2f, 0.85f, 0.0f));
+	se_vfx_3d_add_builtin_float_key(vfx_3d, emitter_3d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_IN_OUT, 0.0f, 0.06f);
+	se_vfx_3d_add_builtin_float_key(vfx_3d, emitter_3d, SE_VFX_TARGET_SIZE, SE_CURVE_EASE_IN_OUT, 1.0f, 0.22f);
 
-	se_vfx_2d_emitter_add_uniform_float_key(vfx_2d, emitter_2d, "u_intensity", SE_CURVE_EASE_IN_OUT, 0.0f, 0.65f);
-	se_vfx_2d_emitter_add_uniform_float_key(vfx_2d, emitter_2d, "u_intensity", SE_CURVE_EASE_IN_OUT, 1.0f, 1.15f);
-	se_vfx_3d_emitter_add_uniform_float_key(vfx_3d, emitter_3d, "u_intensity", SE_CURVE_EASE_IN_OUT, 0.0f, 0.8f);
-	se_vfx_3d_emitter_add_uniform_float_key(vfx_3d, emitter_3d, "u_intensity", SE_CURVE_EASE_IN_OUT, 1.0f, 1.35f);
+	se_vfx_2d_add_uniform_float_key(vfx_2d, emitter_2d, "u_intensity", SE_CURVE_EASE_IN_OUT, 0.0f, 0.65f);
+	se_vfx_2d_add_uniform_float_key(vfx_2d, emitter_2d, "u_intensity", SE_CURVE_EASE_IN_OUT, 1.0f, 1.15f);
+	se_vfx_3d_add_uniform_float_key(vfx_3d, emitter_3d, "u_intensity", SE_CURVE_EASE_IN_OUT, 0.0f, 0.8f);
+	se_vfx_3d_add_uniform_float_key(vfx_3d, emitter_3d, "u_intensity", SE_CURVE_EASE_IN_OUT, 1.0f, 1.35f);
 
 	f32 scene_time = 0.0f;
 	se_vfx_uniform_anim uniform_anim_2d = {&scene_time, 0.9f, 0.2f, 2.0f};
 	se_vfx_uniform_anim uniform_anim_3d = {&scene_time, 1.05f, 0.25f, 1.6f};
-	se_vfx_2d_emitter_set_uniform_callback(vfx_2d, emitter_2d, se_vfx_uniform_callback_2d, &uniform_anim_2d);
-	se_vfx_3d_emitter_set_uniform_callback(vfx_3d, emitter_3d, se_vfx_uniform_callback_3d, &uniform_anim_3d);
+	se_vfx_2d_set_uniform_callback(vfx_2d, emitter_2d, se_vfx_uniform_callback_2d, &uniform_anim_2d);
+	se_vfx_3d_set_uniform_callback(vfx_3d, emitter_3d, se_vfx_uniform_callback_3d, &uniform_anim_3d);
 
 	b8 simulation_enabled = true;
 	b8 additive_blend = false;
@@ -175,7 +175,7 @@ i32 main(void) {
 		se_window_begin_frame(window);
 		se_context_reload_changed_shaders();
 		scene_time = (f32)se_window_get_time(window);
-		se_camera_set_aspect_from_window(camera_handle, window);
+		se_camera_set_window_aspect(camera_handle, window);
 
 		const f32 orbit = scene_time * 0.55f;
 		se_camera_set_location(camera_handle, &s_vec3(cosf(orbit) * 4.0f, 1.5f, sinf(orbit) * 4.0f));

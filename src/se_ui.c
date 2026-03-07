@@ -494,7 +494,7 @@ static void se_ui_object_set_rect_style(
 	buffer.m[3][1] = fx.y;
 	buffer.m[3][2] = fx.z;
 	buffer.m[3][3] = fx.w;
-	se_object_2d_set_instance_buffer(object, 0, &buffer);
+	se_object_2d_set_buffer_by_id(object, 0, &buffer);
 	se_ui_object_set_visible(ctx, object, visible);
 }
 
@@ -2372,7 +2372,7 @@ se_ui_handle se_ui_create(const se_window_handle window, const u16 widget_capaci
 		s_array_remove(&ctx->ui_roots, ui);
 		return S_HANDLE_NULL;
 	}
-	se_scene_2d_set_auto_resize(root->scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(root->scene, window, &s_vec2(1.0f, 1.0f));
 	root->dirty_layout = true;
 	root->dirty_visual = true;
 	root->dirty_text = true;
@@ -2440,7 +2440,7 @@ void se_ui_tick(const se_ui_handle ui) {
 	const f32 mouse_x = se_window_get_mouse_position_x(root->window);
 	const f32 mouse_y = se_window_get_mouse_position_y(root->window);
 	if (!se_window_pixel_to_normalized(root->window, mouse_x, mouse_y, &pointer_ndc)) {
-		se_window_get_mouse_position_normalized(root->window, &pointer_ndc);
+		se_window_get_mouse_normalized(root->window, &pointer_ndc);
 	}
 
 	root->dispatching = true;
@@ -2527,7 +2527,7 @@ void se_ui_tick(const se_ui_handle ui) {
 	}
 
 	s_vec2 scroll_delta = {0};
-	se_window_get_scroll_delta(root->window, &scroll_delta);
+	se_window_get_scroll(root->window, &scroll_delta);
 	if (fabsf(scroll_delta.y) > 0.0001f) {
 		se_ui_widget_handle scroll_target = root->capture_widget;
 		if (scroll_target == S_HANDLE_NULL && hit != S_HANDLE_NULL) {

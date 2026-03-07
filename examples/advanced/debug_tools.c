@@ -19,7 +19,7 @@ int main(void) {
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
 	se_window_set_vsync(window, false);
-	se_render_set_background_color(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
+	se_render_set_background(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
 
 	se_debug_set_level(SE_DEBUG_LEVEL_TRACE);
 	se_debug_set_category_mask(SE_DEBUG_CATEGORY_ALL);

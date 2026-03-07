@@ -3555,7 +3555,7 @@ b8 se_simulation_snapshot_load_file(const se_simulation_handle sim, const c8* pa
 	return se_simulation_snapshot_load_file_internal(sim_ptr, path);
 }
 
-b8 se_simulation_snapshot_save_memory(const se_simulation_handle sim, u8** out_data, sz* out_size) {
+b8 se_simulation_snapshot_save_bytes(const se_simulation_handle sim, u8** out_data, sz* out_size) {
 	const se_simulation* sim_ptr = se_simulation_from_handle_const(sim);
 	if (!sim_ptr) {
 		return false;
@@ -3563,7 +3563,7 @@ b8 se_simulation_snapshot_save_memory(const se_simulation_handle sim, u8** out_d
 	return se_simulation_snapshot_save_memory_internal(sim_ptr, out_data, out_size);
 }
 
-b8 se_simulation_snapshot_load_memory(const se_simulation_handle sim, const u8* data, const sz size) {
+b8 se_simulation_snapshot_load_bytes(const se_simulation_handle sim, const u8* data, const sz size) {
 	se_simulation* sim_ptr = se_simulation_from_handle_mut(sim);
 	if (!sim_ptr) {
 		return false;

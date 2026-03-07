@@ -191,7 +191,7 @@ int main(void) {
 
 	// Save a replay checkpoint in memory and to binary/json files.
 	sz replay_snapshot_size = 0u;
-	se_simulation_snapshot_save_memory(sim, &replay_snapshot_data, &replay_snapshot_size);
+	se_simulation_snapshot_save_bytes(sim, &replay_snapshot_data, &replay_snapshot_size);
 	se_simulation_snapshot_save_file(sim, snapshot_path);
 	se_simulation_json_save_file(sim, snapshot_json_path);
 
@@ -206,7 +206,7 @@ int main(void) {
 	sim_log_state("after replay run A", &replay_run_a);
 
 	// Restore checkpoint and replay the same inputs again (run B).
-	se_simulation_snapshot_load_memory(sim, replay_snapshot_data, replay_snapshot_size);
+	se_simulation_snapshot_load_bytes(sim, replay_snapshot_data, replay_snapshot_size);
 	se_log("22_simulation :: replay checkpoint restored");
 
 	sim_emit_replay_inputs(sim, player, replay_start_tick);

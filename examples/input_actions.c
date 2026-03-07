@@ -32,10 +32,10 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.06f, 0.07f, 0.10f, 1.0f));
+	se_render_set_background(s_vec4(0.06f, 0.07f, 0.10f, 1.0f));
 
 	se_scene_2d_handle scene = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), 4);
-	se_scene_2d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(scene, window, &s_vec2(1.0f, 1.0f));
 	se_object_2d_handle actor = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
 	se_object_2d_set_scale(actor, &s_vec2(0.10f, 0.10f));
 	se_scene_2d_add_object(scene, actor);

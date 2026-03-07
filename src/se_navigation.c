@@ -167,11 +167,11 @@ void se_navigation_grid_set_blocked_circle(se_navigation_grid* grid, const se_na
 	}
 }
 
-void se_navigation_grid_set_dynamic_obstacle(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked) {
+void se_navigation_grid_set_dynamic_cell(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked) {
 	se_navigation_grid_set_blocked(grid, cell, blocked);
 }
 
-void se_navigation_grid_set_dynamic_obstacle_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked) {
+void se_navigation_grid_set_dynamic_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked) {
 	se_navigation_grid_set_blocked_rect(grid, min_cell, max_cell, blocked);
 }
 

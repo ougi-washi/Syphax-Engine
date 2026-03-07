@@ -753,7 +753,7 @@ void se_render_clear(void) {
 	}
 }
 
-void se_render_set_background_color(const s_vec4 color) {
+void se_render_set_background(const s_vec4 color) {
 	glClearColor(color.x, color.y, color.z, color.w);
 }
 

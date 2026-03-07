@@ -13,12 +13,12 @@ int main(void) {
 	se_window_handle window = se_window_create("Syphax-Engine - sdf_playground", 1280, 720);
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.03f, 0.04f, 0.05f, 1.0f));
+	se_render_set_background(s_vec4(0.03f, 0.04f, 0.05f, 1.0f));
 
 	se_scene_3d_handle camera_scene = se_scene_3d_create_for_window(window, 1);
 	se_camera_handle camera = se_scene_3d_get_camera(camera_scene);
 	se_camera_set_target_mode(camera, true);
-	se_camera_set_aspect_from_window(camera, window);
+	se_camera_set_window_aspect(camera, window);
 	se_camera_set_perspective(camera, 52.0f, 0.05f, 200.0f);
 	se_camera_set_location(camera, &s_vec3(6.0f, 4.5f, 6.0f));
 	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
@@ -64,7 +64,7 @@ int main(void) {
 	se_sdf_renderer_handle renderer = se_sdf_renderer_create(NULL);
 	se_sdf_renderer_set_scene(renderer, sdf_scene);
 	se_sdf_control_handle ball_translation_control = se_sdf_control_define_vec3(renderer, "ball_translation", &ball_start);
-	se_sdf_control_bind_node_translation(renderer, sdf_scene, ball_node, ball_translation_control);
+	se_sdf_control_bind_node_position(renderer, sdf_scene, ball_node, ball_translation_control);
 
 	se_physics_world_params_3d world_params = SE_PHYSICS_WORLD_PARAMS_3D_DEFAULTS;
 	world_params.gravity = s_vec3(0.0f, -9.81f, 0.0f);

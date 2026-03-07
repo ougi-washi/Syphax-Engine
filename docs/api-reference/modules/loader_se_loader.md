@@ -39,18 +39,6 @@ extern se_model_handle se_gltf_model_load(const se_gltf_asset *asset, const i32 
 
 No inline description found in header comments.
 
-### `se_gltf_model_load_ex`
-
-<div class="api-signature">
-
-```c
-extern se_model_handle se_gltf_model_load_ex(const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags);
-```
-
-</div>
-
-mesh_index < 0 loads all meshes from the asset into a single model.
-
 ### `se_gltf_model_load_first`
 
 <div class="api-signature">
@@ -62,6 +50,18 @@ extern se_model_handle se_gltf_model_load_first(const char *path, const se_gltf_
 </div>
 
 No inline description found in header comments.
+
+### `se_gltf_model_load_with_flags`
+
+<div class="api-signature">
+
+```c
+extern se_model_handle se_gltf_model_load_with_flags(const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags);
+```
+
+</div>
+
+mesh_index < 0 loads all meshes from the asset into a single model.
 
 ### `se_gltf_scene_compute_bounds`
 

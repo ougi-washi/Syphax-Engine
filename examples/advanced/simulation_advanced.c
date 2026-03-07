@@ -288,7 +288,7 @@ int main(void) {
 	// Save initial checkpoint in memory and binary file.
 	u8* snapshot_data = NULL;
 	sz snapshot_size = 0u;
-	if (!se_simulation_snapshot_save_memory(sim, &snapshot_data, &snapshot_size)) {
+	if (!se_simulation_snapshot_save_bytes(sim, &snapshot_data, &snapshot_size)) {
 		se_log("23_simulation_advanced :: save memory snapshot failed");
 		se_simulation_destroy(sim);
 		se_context_destroy(ctx);
@@ -325,7 +325,7 @@ int main(void) {
 	}
 	memcpy(corrupted_snapshot_data, snapshot_data, snapshot_size);
 	corrupted_snapshot_data[snapshot_size - 1u] ^= 0xFFu;
-	if (se_simulation_snapshot_load_memory(sim, corrupted_snapshot_data, snapshot_size)) {
+	if (se_simulation_snapshot_load_bytes(sim, corrupted_snapshot_data, snapshot_size)) {
 		se_log("23_simulation_advanced :: corrupted snapshot load should fail");
 		free(corrupted_snapshot_data);
 		se_simulation_snapshot_free(snapshot_data);
@@ -361,7 +361,7 @@ int main(void) {
 	se_simulation_component_set(sim, unit, SIM_COMPONENT_HEALTH, &after_step_health, sizeof(after_step_health));
 	se_simulation_step(sim, 2u);
 
-	if (!se_simulation_snapshot_load_memory(sim, snapshot_data, snapshot_size)) {
+	if (!se_simulation_snapshot_load_bytes(sim, snapshot_data, snapshot_size)) {
 		se_log("23_simulation_advanced :: load memory snapshot failed");
 		se_simulation_snapshot_free(snapshot_data);
 		se_simulation_destroy(sim);
@@ -615,7 +615,7 @@ int main(void) {
 	// Save advanced replay checkpoint in binary and JSON.
 	u8* advanced_snapshot_data = NULL;
 	sz advanced_snapshot_size = 0u;
-	if (!se_simulation_snapshot_save_memory(sim, &advanced_snapshot_data, &advanced_snapshot_size) || advanced_snapshot_size == 0u) {
+	if (!se_simulation_snapshot_save_bytes(sim, &advanced_snapshot_data, &advanced_snapshot_size) || advanced_snapshot_size == 0u) {
 		se_log("23_simulation_advanced :: save advanced snapshot failed");
 		se_simulation_destroy(sim);
 		se_context_destroy(ctx);
@@ -715,7 +715,7 @@ int main(void) {
 	se_log("23_simulation_advanced :: advanced baseline reference captured");
 
 	// Restore binary checkpoint, replay continuation, and compare with baseline.
-	if (!se_simulation_snapshot_load_memory(sim, advanced_snapshot_data, advanced_snapshot_size)) {
+	if (!se_simulation_snapshot_load_bytes(sim, advanced_snapshot_data, advanced_snapshot_size)) {
 		se_log("23_simulation_advanced :: advanced binary load failed");
 		s_json_free(advanced_snapshot_json);
 		se_simulation_snapshot_free(advanced_snapshot_data);

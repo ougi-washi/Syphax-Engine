@@ -195,35 +195,35 @@ extern b8 se_vfx_3d_emitter_set_blend_mode(se_vfx_3d_handle vfx, se_vfx_emitter_
 extern b8 se_vfx_2d_emitter_set_spawn(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, f32 spawn_rate, u32 burst_count, f32 lifetime_min, f32 lifetime_max);
 extern b8 se_vfx_3d_emitter_set_spawn(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, f32 spawn_rate, u32 burst_count, f32 lifetime_min, f32 lifetime_max);
 
-extern b8 se_vfx_2d_emitter_set_particle_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_particle_update_2d_callback callback, void* user_data);
-extern b8 se_vfx_3d_emitter_set_particle_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_particle_update_3d_callback callback, void* user_data);
-extern b8 se_vfx_2d_emitter_set_uniform_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_uniform_2d_callback callback, void* user_data);
-extern b8 se_vfx_3d_emitter_set_uniform_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_uniform_3d_callback callback, void* user_data);
+extern b8 se_vfx_2d_set_particle_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_particle_update_2d_callback callback, void* user_data);
+extern b8 se_vfx_3d_set_particle_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_particle_update_3d_callback callback, void* user_data);
+extern b8 se_vfx_2d_set_uniform_callback(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_uniform_2d_callback callback, void* user_data);
+extern b8 se_vfx_3d_set_uniform_callback(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_uniform_3d_callback callback, void* user_data);
 
-extern b8 se_vfx_2d_emitter_add_builtin_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
-extern b8 se_vfx_2d_emitter_add_builtin_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
-extern b8 se_vfx_2d_emitter_add_builtin_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
-extern b8 se_vfx_2d_emitter_add_builtin_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
-extern b8 se_vfx_3d_emitter_add_builtin_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
-extern b8 se_vfx_3d_emitter_add_builtin_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
-extern b8 se_vfx_3d_emitter_add_builtin_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
-extern b8 se_vfx_3d_emitter_add_builtin_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
+extern b8 se_vfx_2d_add_builtin_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
+extern b8 se_vfx_2d_add_builtin_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
+extern b8 se_vfx_2d_add_builtin_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
+extern b8 se_vfx_2d_add_builtin_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
+extern b8 se_vfx_3d_add_builtin_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, f32 value);
+extern b8 se_vfx_3d_add_builtin_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec2* value);
+extern b8 se_vfx_3d_add_builtin_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec3* value);
+extern b8 se_vfx_3d_add_builtin_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target, se_curve_mode mode, f32 t, const s_vec4* value);
 
-extern b8 se_vfx_2d_emitter_add_uniform_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
-extern b8 se_vfx_2d_emitter_add_uniform_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
-extern b8 se_vfx_2d_emitter_add_uniform_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
-extern b8 se_vfx_2d_emitter_add_uniform_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
-extern b8 se_vfx_3d_emitter_add_uniform_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
-extern b8 se_vfx_3d_emitter_add_uniform_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
-extern b8 se_vfx_3d_emitter_add_uniform_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
-extern b8 se_vfx_3d_emitter_add_uniform_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
+extern b8 se_vfx_2d_add_uniform_float_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
+extern b8 se_vfx_2d_add_uniform_vec2_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
+extern b8 se_vfx_2d_add_uniform_vec3_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
+extern b8 se_vfx_2d_add_uniform_vec4_key(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
+extern b8 se_vfx_3d_add_uniform_float_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, f32 value);
+extern b8 se_vfx_3d_add_uniform_vec2_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec2* value);
+extern b8 se_vfx_3d_add_uniform_vec3_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec3* value);
+extern b8 se_vfx_3d_add_uniform_vec4_key(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name, se_curve_mode mode, f32 t, const s_vec4* value);
 
-extern b8 se_vfx_2d_emitter_clear_builtin_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target);
-extern b8 se_vfx_3d_emitter_clear_builtin_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target);
-extern b8 se_vfx_2d_emitter_clear_uniform_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name);
-extern b8 se_vfx_3d_emitter_clear_uniform_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name);
-extern b8 se_vfx_2d_emitter_clear_tracks(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter);
-extern b8 se_vfx_3d_emitter_clear_tracks(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter);
+extern b8 se_vfx_2d_clear_builtin_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, se_vfx_builtin_target target);
+extern b8 se_vfx_3d_clear_builtin_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, se_vfx_builtin_target target);
+extern b8 se_vfx_2d_clear_uniform_track(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter, const c8* uniform_name);
+extern b8 se_vfx_3d_clear_uniform_track(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter, const c8* uniform_name);
+extern b8 se_vfx_2d_clear_tracks(se_vfx_2d_handle vfx, se_vfx_emitter_2d_handle emitter);
+extern b8 se_vfx_3d_clear_tracks(se_vfx_3d_handle vfx, se_vfx_emitter_3d_handle emitter);
 
 extern b8 se_vfx_2d_tick(se_vfx_2d_handle vfx, f32 dt);
 extern b8 se_vfx_3d_tick(se_vfx_3d_handle vfx, f32 dt);

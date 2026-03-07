@@ -13,7 +13,7 @@ extern u64 se_render_get_generation(void);
 extern void se_render_set_blending(const b8 active);
 extern void se_render_unbind_framebuffer(void); // window framebuffer
 extern void se_render_clear(void);
-extern void se_render_set_background_color(const s_vec4 color);
+extern void se_render_set_background(const s_vec4 color);
 
 // Utility functions
 extern void se_render_print_mat4(const s_mat4 *mat);

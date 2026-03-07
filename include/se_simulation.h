@@ -100,8 +100,8 @@ extern b8 se_simulation_json_load_file(se_simulation_handle sim, const c8* path)
 
 extern b8 se_simulation_snapshot_save_file(se_simulation_handle sim, const c8* path);
 extern b8 se_simulation_snapshot_load_file(se_simulation_handle sim, const c8* path);
-extern b8 se_simulation_snapshot_save_memory(se_simulation_handle sim, u8** out_data, sz* out_size);
-extern b8 se_simulation_snapshot_load_memory(se_simulation_handle sim, const u8* data, sz size);
+extern b8 se_simulation_snapshot_save_bytes(se_simulation_handle sim, u8** out_data, sz* out_size);
+extern b8 se_simulation_snapshot_load_bytes(se_simulation_handle sim, const u8* data, sz size);
 extern void se_simulation_snapshot_free(void* data);
 
 #endif // SE_SIMULATION_H

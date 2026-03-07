@@ -46,7 +46,7 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.03f, 0.04f, 0.06f, 1.0f));
+	se_render_set_background(s_vec4(0.03f, 0.04f, 0.06f, 1.0f));
 
 	se_sdf_scene_handle source_scene = se_sdf_scene_create(NULL);
 	se_sdf_node_group_desc root_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
@@ -101,7 +101,7 @@ int main(void) {
 		se_context_destroy(context);
 		return 1;
 	}
-	se_scene_2d_set_auto_resize(scene_2d, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(scene_2d, window, &s_vec2(1.0f, 1.0f));
 
 	se_object_2d_handle sdf_object = se_sdf_scene_to_object_2d(loaded_scene);
 	if (sdf_object == S_HANDLE_NULL) {

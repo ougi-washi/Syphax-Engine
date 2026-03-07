@@ -53,7 +53,7 @@ extern b8 se_camera_is_target_mode(const se_camera_handle camera);
 extern void se_camera_set_perspective(const se_camera_handle camera, const f32 fov_degrees, const f32 near_plane, const f32 far_plane);
 extern void se_camera_set_orthographic(const se_camera_handle camera, const f32 ortho_height, const f32 near_plane, const f32 far_plane);
 extern void se_camera_set_aspect(const se_camera_handle camera, const f32 width, const f32 height);
-extern void se_camera_set_aspect_from_window(const se_camera_handle camera, const se_window_handle window);
+extern void se_camera_set_window_aspect(const se_camera_handle camera, const se_window_handle window);
 extern b8 se_camera_world_to_ndc(const se_camera_handle camera, const s_vec3 *world, s_vec3 *out_ndc);
 extern b8 se_camera_world_to_screen(const se_camera_handle camera, const s_vec3 *world, const f32 viewport_width, const f32 viewport_height, s_vec2 *out_screen);
 extern b8 se_camera_screen_to_ray(const se_camera_handle camera, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, s_vec3 *out_origin, s_vec3 *out_direction);

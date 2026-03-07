@@ -44,8 +44,8 @@ extern b8 se_navigation_grid_is_blocked(const se_navigation_grid* grid, const se
 extern b8 se_navigation_grid_set_blocked(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked);
 extern void se_navigation_grid_set_blocked_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked);
 extern void se_navigation_grid_set_blocked_circle(se_navigation_grid* grid, const se_navigation_cell center, const i32 radius_cells, const b8 blocked);
-extern void se_navigation_grid_set_dynamic_obstacle(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked);
-extern void se_navigation_grid_set_dynamic_obstacle_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked);
+extern void se_navigation_grid_set_dynamic_cell(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked);
+extern void se_navigation_grid_set_dynamic_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked);
 
 extern b8 se_navigation_world_to_cell(const se_navigation_grid* grid, const s_vec2* world, se_navigation_cell* out_cell);
 extern b8 se_navigation_cell_to_world(const se_navigation_grid* grid, const se_navigation_cell cell, s_vec2* out_world_center);

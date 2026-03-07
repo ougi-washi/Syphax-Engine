@@ -147,12 +147,12 @@ extern i32 se_object_2d_get_instance_index(const se_object_2d_handle object, con
 
 No inline description found in header comments.
 
-### `se_object_2d_get_instance_metadata`
+### `se_object_2d_get_metadata_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_2d_get_instance_metadata(const se_object_2d_handle object, const se_instance_id instance_id, s_mat4* out_metadata);
+extern b8 se_object_2d_get_metadata_by_id(const se_object_2d_handle object, const se_instance_id instance_id, s_mat4* out_metadata);
 ```
 
 </div>
@@ -207,12 +207,12 @@ extern s_mat3 se_object_2d_get_transform(const se_object_2d_handle object);
 
 No inline description found in header comments.
 
-### `se_object_2d_is_instance_active`
+### `se_object_2d_is_active_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_2d_is_instance_active(const se_object_2d_handle object, const se_instance_id instance_id);
+extern b8 se_object_2d_is_active_by_id(const se_object_2d_handle object, const se_instance_id instance_id);
 ```
 
 </div>
@@ -231,48 +231,36 @@ extern b8 se_object_2d_remove_instance(const se_object_2d_handle object, const s
 
 No inline description found in header comments.
 
-### `se_object_2d_set_instance_active`
+### `se_object_2d_set_active_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_2d_set_instance_active(const se_object_2d_handle object, const se_instance_id instance_id, const b8 active);
+extern b8 se_object_2d_set_active_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const b8 active);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_object_2d_set_instance_buffer`
+### `se_object_2d_set_buffer_by_id`
 
 <div class="api-signature">
 
 ```c
-extern void se_object_2d_set_instance_buffer(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4 *buffer);
+extern void se_object_2d_set_buffer_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4 *buffer);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_object_2d_set_instance_metadata`
+### `se_object_2d_set_buffers_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_2d_set_instance_metadata(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4* metadata);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_object_2d_set_instance_transform`
-
-<div class="api-signature">
-
-```c
-extern void se_object_2d_set_instance_transform(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat3 *transform);
+extern void se_object_2d_set_buffers_by_id(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count);
 ```
 
 </div>
@@ -285,18 +273,6 @@ No inline description found in header comments.
 
 ```c
 extern void se_object_2d_set_instances_buffers(const se_object_2d_handle object, const se_buffers *buffers);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_object_2d_set_instances_buffers_bulk`
-
-<div class="api-signature">
-
-```c
-extern void se_object_2d_set_instances_buffers_bulk(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count);
 ```
 
 </div>
@@ -327,12 +303,12 @@ extern void se_object_2d_set_instances_transforms(const se_object_2d_handle obje
 
 No inline description found in header comments.
 
-### `se_object_2d_set_instances_transforms_bulk`
+### `se_object_2d_set_metadata_by_id`
 
 <div class="api-signature">
 
 ```c
-extern void se_object_2d_set_instances_transforms_bulk(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat3* transforms, const sz count);
+extern b8 se_object_2d_set_metadata_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4* metadata);
 ```
 
 </div>
@@ -381,6 +357,30 @@ No inline description found in header comments.
 
 ```c
 extern void se_object_2d_set_transform(const se_object_2d_handle object, const s_mat3 *transform);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_2d_set_transform_by_id`
+
+<div class="api-signature">
+
+```c
+extern void se_object_2d_set_transform_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat3 *transform);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_2d_set_transforms_by_id`
+
+<div class="api-signature">
+
+```c
+extern void se_object_2d_set_transforms_by_id(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat3* transforms, const sz count);
 ```
 
 </div>
@@ -543,12 +543,12 @@ extern i32 se_object_3d_get_instance_index(const se_object_3d_handle object, con
 
 No inline description found in header comments.
 
-### `se_object_3d_get_instance_metadata`
+### `se_object_3d_get_metadata_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_3d_get_instance_metadata(const se_object_3d_handle object, const se_instance_id instance_id, s_mat4* out_metadata);
+extern b8 se_object_3d_get_metadata_by_id(const se_object_3d_handle object, const se_instance_id instance_id, s_mat4* out_metadata);
 ```
 
 </div>
@@ -567,12 +567,12 @@ extern s_mat4 se_object_3d_get_transform(const se_object_3d_handle object);
 
 No inline description found in header comments.
 
-### `se_object_3d_is_instance_active`
+### `se_object_3d_is_active_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_3d_is_instance_active(const se_object_3d_handle object, const se_instance_id instance_id);
+extern b8 se_object_3d_is_active_by_id(const se_object_3d_handle object, const se_instance_id instance_id);
 ```
 
 </div>
@@ -591,60 +591,36 @@ extern b8 se_object_3d_remove_instance(const se_object_3d_handle object, const s
 
 No inline description found in header comments.
 
-### `se_object_3d_set_instance_active`
+### `se_object_3d_set_active_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_3d_set_instance_active(const se_object_3d_handle object, const se_instance_id instance_id, const b8 active);
+extern b8 se_object_3d_set_active_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const b8 active);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_object_3d_set_instance_buffer`
+### `se_object_3d_set_buffer_by_id`
 
 <div class="api-signature">
 
 ```c
-extern void se_object_3d_set_instance_buffer(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *buffer);
+extern void se_object_3d_set_buffer_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *buffer);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_object_3d_set_instance_metadata`
+### `se_object_3d_set_buffers_by_id`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_object_3d_set_instance_metadata(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4* metadata);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_object_3d_set_instance_transform`
-
-<div class="api-signature">
-
-```c
-extern void se_object_3d_set_instance_transform(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *transform);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_object_3d_set_instances_buffers_bulk`
-
-<div class="api-signature">
-
-```c
-extern void se_object_3d_set_instances_buffers_bulk(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count);
+extern void se_object_3d_set_buffers_by_id(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count);
 ```
 
 </div>
@@ -663,24 +639,24 @@ extern void se_object_3d_set_instances_dirty(const se_object_3d_handle object, c
 
 No inline description found in header comments.
 
-### `se_object_3d_set_instances_transforms_bulk`
-
-<div class="api-signature">
-
-```c
-extern void se_object_3d_set_instances_transforms_bulk(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* transforms, const sz count);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_object_3d_set_location`
 
 <div class="api-signature">
 
 ```c
 extern void se_object_3d_set_location(const se_object_3d_handle object, const s_vec3 *location);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_set_metadata_by_id`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_3d_set_metadata_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4* metadata);
 ```
 
 </div>
@@ -717,6 +693,30 @@ No inline description found in header comments.
 
 ```c
 extern void se_object_3d_set_transform(const se_object_3d_handle object, const s_mat4 *transform);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_set_transform_by_id`
+
+<div class="api-signature">
+
+```c
+extern void se_object_3d_set_transform_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *transform);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_object_3d_set_transforms_by_id`
+
+<div class="api-signature">
+
+```c
+extern void se_object_3d_set_transforms_by_id(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* transforms, const sz count);
 ```
 
 </div>
@@ -903,12 +903,12 @@ extern void se_scene_2d_render_to_screen(const se_scene_2d_handle scene, const s
 
 No inline description found in header comments.
 
-### `se_scene_2d_set_auto_resize`
+### `se_scene_2d_set_fit_to_window`
 
 <div class="api-signature">
 
 ```c
-extern void se_scene_2d_set_auto_resize(const se_scene_2d_handle scene, const se_window_handle window, const s_vec2 *ratio);
+extern void se_scene_2d_set_fit_to_window(const se_scene_2d_handle scene, const se_window_handle window, const s_vec2 *ratio);
 ```
 
 </div>
@@ -1143,18 +1143,6 @@ extern void se_scene_3d_render_to_screen(const se_scene_3d_handle scene, const s
 
 No inline description found in header comments.
 
-### `se_scene_3d_set_auto_resize`
-
-<div class="api-signature">
-
-```c
-extern void se_scene_3d_set_auto_resize(const se_scene_3d_handle scene, const se_window_handle window, const s_vec2 *ratio);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_scene_3d_set_camera`
 
 <div class="api-signature">
@@ -1173,6 +1161,18 @@ No inline description found in header comments.
 
 ```c
 extern void se_scene_3d_set_culling(const se_scene_3d_handle scene, const b8 enabled);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_scene_3d_set_fit_to_window`
+
+<div class="api-signature">
+
+```c
+extern void se_scene_3d_set_fit_to_window(const se_scene_3d_handle scene, const se_window_handle window, const s_vec2 *ratio);
 ```
 
 </div>

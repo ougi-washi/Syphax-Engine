@@ -434,7 +434,7 @@ void se_input_tick(se_input_handle* input_handle) {
 	s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
 	s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
 	se_window_get_mouse_delta(input_handle->window, &mouse_delta);
-	se_window_get_scroll_delta(input_handle->window, &scroll_delta);
+	se_window_get_scroll(input_handle->window, &scroll_delta);
 
 	for (sz i = 0; i < s_array_get_size(&input_handle->bindings); i++) {
 		se_input_binding* binding = s_array_get(&input_handle->bindings, s_array_handle(&input_handle->bindings, (u32)i));

@@ -231,12 +231,12 @@ extern void se_window_get_mouse_delta_normalized(const se_window_handle window, 
 
 No inline description found in header comments.
 
-### `se_window_get_mouse_position_normalized`
+### `se_window_get_mouse_normalized`
 
 <div class="api-signature">
 
 ```c
-extern void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position);
+extern void se_window_get_mouse_normalized(const se_window_handle window, s_vec2* out_mouse_position);
 ```
 
 </div>
@@ -267,12 +267,12 @@ extern f32 se_window_get_mouse_position_y(const se_window_handle window);
 
 No inline description found in header comments.
 
-### `se_window_get_scroll_delta`
+### `se_window_get_scroll`
 
 <div class="api-signature">
 
 ```c
-extern void se_window_get_scroll_delta(const se_window_handle window, s_vec2* out_scroll_delta);
+extern void se_window_get_scroll(const se_window_handle window, s_vec2* out_scroll_delta);
 ```
 
 </div>
@@ -423,24 +423,24 @@ extern b8 se_window_is_mouse_released(const se_window_handle window, se_mouse_bu
 
 No inline description found in header comments.
 
-### `se_window_is_raw_mouse_motion_enabled`
+### `se_window_is_raw_mouse_enabled`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_window_is_raw_mouse_motion_enabled(const se_window_handle window);
+extern b8 se_window_is_raw_mouse_enabled(const se_window_handle window);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_window_is_raw_mouse_motion_supported`
+### `se_window_is_raw_mouse_supported`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_window_is_raw_mouse_motion_supported(const se_window_handle window);
+extern b8 se_window_is_raw_mouse_supported(const se_window_handle window);
 ```
 
 </div>
@@ -627,12 +627,12 @@ extern void se_window_set_exit_keys(const se_window_handle window, se_key_combo*
 
 No inline description found in header comments.
 
-### `se_window_set_raw_mouse_motion`
+### `se_window_set_raw_mouse`
 
 <div class="api-signature">
 
 ```c
-extern void se_window_set_raw_mouse_motion(const se_window_handle window, const b8 enabled);
+extern void se_window_set_raw_mouse(const se_window_handle window, const b8 enabled);
 ```
 
 </div>

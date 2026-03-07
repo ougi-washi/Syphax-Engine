@@ -319,7 +319,7 @@ static b8 se_mesh_finalize(se_mesh *mesh,
 	return true;
 }
 
-se_model_handle se_model_load_obj_ex(const char *path, const se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags) {
+se_model_handle se_model_load_obj_with_flags(const char *path, const se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags) {
 	se_context *ctx = se_current_context();
 	if (!ctx || !path || !se_mesh_data_flags_are_valid(mesh_data_flags)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
@@ -541,10 +541,10 @@ se_model_handle se_model_load_obj_ex(const char *path, const se_shaders_ptr *sha
 }
 
 se_model_handle se_model_load_obj(const char *path, const se_shaders_ptr *shaders) {
-	return se_model_load_obj_ex(path, shaders, SE_MESH_DATA_GPU);
+	return se_model_load_obj_with_flags(path, shaders, SE_MESH_DATA_GPU);
 }
 
-se_model_handle se_model_load_obj_simple_ex(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags) {
+se_model_handle se_model_load_obj_simple_with_flags(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags) {
 	se_context *ctx = se_current_context();
 	if (!ctx || !obj_path || !vertex_shader_path || !fragment_shader_path) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
@@ -565,7 +565,7 @@ se_model_handle se_model_load_obj_simple_ex(const char *obj_path, const char *ve
 		*shader_slot = shader;
 	}
 
-	se_model_handle model = se_model_load_obj_ex(obj_path, &shaders, mesh_data_flags);
+	se_model_handle model = se_model_load_obj_with_flags(obj_path, &shaders, mesh_data_flags);
 	s_array_clear(&shaders);
 	if (model == S_HANDLE_NULL) {
 		se_shader_destroy(shader);
@@ -573,12 +573,12 @@ se_model_handle se_model_load_obj_simple_ex(const char *obj_path, const char *ve
 	}
 
 	se_set_last_error(SE_RESULT_OK);
-	se_log("se_model_load_obj_simple_ex :: loaded model: %s", obj_path);
+	se_log("se_model_load_obj_simple_with_flags :: loaded model: %s", obj_path);
 	return model;
 }
 
 se_model_handle se_model_load_obj_simple(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path) {
-	return se_model_load_obj_simple_ex(obj_path, vertex_shader_path, fragment_shader_path, SE_MESH_DATA_GPU);
+	return se_model_load_obj_simple_with_flags(obj_path, vertex_shader_path, fragment_shader_path, SE_MESH_DATA_GPU);
 }
 
 void se_model_destroy(const se_model_handle model) {

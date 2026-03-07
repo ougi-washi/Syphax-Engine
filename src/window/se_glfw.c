@@ -1646,7 +1646,7 @@ void se_window_present_frame(const se_window_handle window, const s_vec4* clear_
 		return;
 	}
 	if (clear_color) {
-		se_render_set_background_color(*clear_color);
+		se_render_set_background(*clear_color);
 	}
 	se_render_clear();
 	se_window_render_screen(window);
@@ -1704,7 +1704,7 @@ void se_window_poll_events(){
 			continue;
 		}
 		s_vec2 mouse_position = {0};
-		se_window_get_mouse_position_normalized(entry->window, &mouse_position);
+		se_window_get_mouse_normalized(entry->window, &mouse_position);
 		se_input_event* out_event = NULL;
 		i32 out_depth = INT_MIN;
 		b8 interacted = false;
@@ -2024,11 +2024,11 @@ void se_window_reset_diagnostics(const se_window_handle window) {
 	memset(&window_ptr->diagnostics, 0, sizeof(window_ptr->diagnostics));
 }
 
-void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position) {
+void se_window_get_mouse_normalized(const se_window_handle window, s_vec2* out_mouse_position) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_get_mouse_position_normalized :: window is null");
-	s_assertf(out_mouse_position, "se_window_get_mouse_position_normalized :: out_mouse_position is null");
+	s_assertf(window_ptr, "se_window_get_mouse_normalized :: window is null");
+	s_assertf(out_mouse_position, "se_window_get_mouse_normalized :: out_mouse_position is null");
 	if (!se_window_pixel_to_normalized(window, (f32)window_ptr->mouse_x, (f32)window_ptr->mouse_y, out_mouse_position)) {
 		*out_mouse_position = s_vec2(0.0f, 0.0f);
 	}
@@ -2050,11 +2050,11 @@ void se_window_get_mouse_delta_normalized(const se_window_handle window, s_vec2*
 	*out_mouse_delta = s_vec2((window_ptr->mouse_dx / window_ptr->width), (window_ptr->mouse_dy / window_ptr->height));
 }
 
-void se_window_get_scroll_delta(const se_window_handle window, s_vec2* out_scroll_delta) {
+void se_window_get_scroll(const se_window_handle window, s_vec2* out_scroll_delta) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_get_scroll_delta :: window is null");
-	s_assertf(out_scroll_delta, "se_window_get_scroll_delta :: out_scroll_delta is null");
+	s_assertf(window_ptr, "se_window_get_scroll :: window is null");
+	s_assertf(out_scroll_delta, "se_window_get_scroll :: out_scroll_delta is null");
 	*out_scroll_delta = s_vec2(window_ptr->scroll_dx, window_ptr->scroll_dy);
 }
 
@@ -2080,17 +2080,17 @@ se_window_cursor_mode se_window_get_cursor_mode(const se_window_handle window) {
 	return window_ptr->cursor_mode;
 }
 
-b8 se_window_is_raw_mouse_motion_supported(const se_window_handle window) {
+b8 se_window_is_raw_mouse_supported(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_is_raw_mouse_motion_supported :: window is null");
+	s_assertf(window_ptr, "se_window_is_raw_mouse_supported :: window is null");
 	return window_ptr->raw_mouse_motion_supported;
 }
 
-void se_window_set_raw_mouse_motion(const se_window_handle window, const b8 enabled) {
+void se_window_set_raw_mouse(const se_window_handle window, const b8 enabled) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_set_raw_mouse_motion :: window is null");
+	s_assertf(window_ptr, "se_window_set_raw_mouse :: window is null");
 	if (!window_ptr->raw_mouse_motion_supported) {
 		window_ptr->raw_mouse_motion_enabled = false;
 		return;
@@ -2100,10 +2100,10 @@ void se_window_set_raw_mouse_motion(const se_window_handle window, const b8 enab
 	window_ptr->raw_mouse_motion_enabled = enabled;
 }
 
-b8 se_window_is_raw_mouse_motion_enabled(const se_window_handle window) {
+b8 se_window_is_raw_mouse_enabled(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
-	s_assertf(window_ptr, "se_window_is_raw_mouse_motion_enabled :: window is null");
+	s_assertf(window_ptr, "se_window_is_raw_mouse_enabled :: window is null");
 	return window_ptr->raw_mouse_motion_enabled;
 }
 

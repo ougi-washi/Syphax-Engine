@@ -830,7 +830,7 @@ static b8 se_gltf_add_mesh_objects_fallback(se_gltf_scene_build_context *ctx) {
 	return true;
 }
 
-se_model_handle se_gltf_model_load_ex(const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags) {
+se_model_handle se_gltf_model_load_with_flags(const se_gltf_asset *asset, const i32 mesh_index, const se_mesh_data_flags mesh_data_flags) {
 	se_context *ctx = se_current_context();
 	if (ctx == NULL || asset == NULL || !se_loader_mesh_data_flags_are_valid(mesh_data_flags)) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
@@ -1080,7 +1080,7 @@ fail:
 }
 
 se_model_handle se_gltf_model_load(const se_gltf_asset *asset, const i32 mesh_index) {
-	return se_gltf_model_load_ex(asset, mesh_index, SE_MESH_DATA_GPU);
+	return se_gltf_model_load_with_flags(asset, mesh_index, SE_MESH_DATA_GPU);
 }
 
 se_texture_handle se_gltf_image_load(const se_gltf_asset *asset, const i32 image_index, const se_texture_wrap wrap) {

@@ -27,10 +27,10 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.05f, 0.06f, 0.08f, 1.0f));
+	se_render_set_background(s_vec4(0.05f, 0.06f, 0.08f, 1.0f));
 
 	se_scene_2d_handle scene = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), BODY_COUNT + 1);
-	se_scene_2d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(scene, window, &s_vec2(1.0f, 1.0f));
 
 	se_physics_world_params_2d world_params = SE_PHYSICS_WORLD_PARAMS_2D_DEFAULTS;
 	world_params.gravity = s_vec2(0.0f, -2.0f);

@@ -544,7 +544,7 @@ void se_camera_set_aspect(const se_camera_handle camera, const f32 width, const 
 	se_camera_mark_projection_dirty(camera_ptr);
 }
 
-void se_camera_set_aspect_from_window(const se_camera_handle camera, const se_window_handle window) {
+void se_camera_set_window_aspect(const se_camera_handle camera, const se_window_handle window) {
 	se_camera* camera_ptr = se_camera_require(camera);
 	if (!camera_ptr || window == S_HANDLE_NULL) {
 		return;

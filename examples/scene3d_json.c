@@ -60,10 +60,10 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.05f, 0.06f, 0.09f, 1.0f));
+	se_render_set_background(s_vec4(0.05f, 0.06f, 0.09f, 1.0f));
 
 	se_scene_3d_handle source_scene = se_scene_3d_create_for_window(window, 16);
-	se_model_handle model = se_model_load_obj_simple_ex(
+	se_model_handle model = se_model_load_obj_simple_with_flags(
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"),
@@ -135,7 +135,7 @@ int main(void) {
 	se_scene_3d_destroy_full(source_scene, true, false);
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
-		se_camera_set_aspect_from_window(camera, window);
+		se_camera_set_window_aspect(camera, window);
 		se_render_clear();
 		se_scene_3d_draw(loaded_scene, window);
 		se_window_end_frame(window);

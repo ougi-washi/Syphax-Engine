@@ -22,17 +22,17 @@ i32 main(void) {
 		se_window_poll_events();
 
 		se_window_set_current_context(window_main);
-		se_render_set_background_color(s_vec4(0.5f, 0.1f, 0.1f, 1.0f));
+		se_render_set_background(s_vec4(0.5f, 0.1f, 0.1f, 1.0f));
 		se_render_clear();
 		se_window_present(window_main);
 
 		se_window_set_current_context(window_1);
-		se_render_set_background_color(s_vec4(0.1f, 0.5f, 0.1f, 1.0f));
+		se_render_set_background(s_vec4(0.1f, 0.5f, 0.1f, 1.0f));
 		se_render_clear();
 		se_window_present(window_1);
 		
 		se_window_set_current_context(window_2);
-		se_render_set_background_color(s_vec4(0.1f, 0.1f, 0.5f, 1.0f));
+		se_render_set_background(s_vec4(0.1f, 0.1f, 0.5f, 1.0f));
 		se_render_clear();
 		se_window_present(window_2);
 	}

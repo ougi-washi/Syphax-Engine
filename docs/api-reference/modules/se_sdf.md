@@ -27,6 +27,18 @@ extern b8 se_sdf_bake_model_texture3d( se_model_handle model, const se_sdf_model
 
 No inline description found in header comments.
 
+### `se_sdf_control_bind_base_color`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_control_bind_base_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_control_bind_fog_color`
 
 <div class="api-signature">
@@ -51,36 +63,36 @@ extern b8 se_sdf_control_bind_fog_density(se_sdf_renderer_handle renderer, se_sd
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_lighting_color`
+### `se_sdf_control_bind_light_color`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_lighting_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_light_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_lighting_direction`
+### `se_sdf_control_bind_light_direction`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_lighting_direction(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_light_direction(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_material_base_color`
+### `se_sdf_control_bind_node_position`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_material_base_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_node_position(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
 ```
 
 </div>
@@ -111,24 +123,12 @@ extern b8 se_sdf_control_bind_node_scale(se_sdf_renderer_handle renderer, se_sdf
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_node_translation`
+### `se_sdf_control_bind_primitive_float`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_node_translation(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_primitive_param_float`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_primitive_param_float(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_primitive_param param, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_primitive_float(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_primitive_param param, se_sdf_control_handle control);
 ```
 
 </div>
@@ -207,120 +207,120 @@ extern b8 se_sdf_control_bind_ptr_vec4(se_sdf_renderer_handle renderer, se_sdf_c
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_back_strength`
+### `se_sdf_control_bind_style_back`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_back_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_back(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_band_levels`
+### `se_sdf_control_bind_style_bands`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_band_levels(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_bands(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_checker_scale`
+### `se_sdf_control_bind_style_checker_scale`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_checker_scale(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_checker_scale(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_checker_strength`
+### `se_sdf_control_bind_style_checker_strength`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_checker_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_checker_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_desaturate`
+### `se_sdf_control_bind_style_desaturate`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_desaturate(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_desaturate(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_fill_strength`
+### `se_sdf_control_bind_style_fill`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_fill_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_fill(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_gamma`
+### `se_sdf_control_bind_style_gamma`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_gamma(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_gamma(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_ground_blend`
+### `se_sdf_control_bind_style_ground_blend`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_ground_blend(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_ground_blend(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_rim_power`
+### `se_sdf_control_bind_style_rim_power`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_rim_power(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_rim_power(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_stylized_rim_strength`
+### `se_sdf_control_bind_style_rim_strength`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_stylized_rim_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_rim_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 ```
 
 </div>
@@ -699,48 +699,36 @@ extern b8 se_sdf_renderer_dump_shader_source(se_sdf_renderer_handle renderer, co
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_get_generated_fragment_source`
+### `se_sdf_renderer_get_build_diagnostics`
 
 <div class="api-signature">
 
 ```c
-extern const char* se_sdf_renderer_get_generated_fragment_source(se_sdf_renderer_handle renderer);
+extern se_sdf_build_diagnostics se_sdf_renderer_get_build_diagnostics(se_sdf_renderer_handle renderer);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_get_generated_fragment_source_size`
+### `se_sdf_renderer_get_shader_source`
 
 <div class="api-signature">
 
 ```c
-extern sz se_sdf_renderer_get_generated_fragment_source_size(se_sdf_renderer_handle renderer);
+extern const char* se_sdf_renderer_get_shader_source(se_sdf_renderer_handle renderer);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_get_last_build_diagnostics`
+### `se_sdf_renderer_get_shader_source_size`
 
 <div class="api-signature">
 
 ```c
-extern se_sdf_build_diagnostics se_sdf_renderer_get_last_build_diagnostics(se_sdf_renderer_handle renderer);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_renderer_get_last_uniform_write_count`
-
-<div class="api-signature">
-
-```c
-extern sz se_sdf_renderer_get_last_uniform_write_count(se_sdf_renderer_handle renderer);
+extern sz se_sdf_renderer_get_shader_source_size(se_sdf_renderer_handle renderer);
 ```
 
 </div>
@@ -759,12 +747,24 @@ extern se_sdf_stylized_desc se_sdf_renderer_get_stylized(se_sdf_renderer_handle 
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_get_total_uniform_write_count`
+### `se_sdf_renderer_get_total_uniform_writes`
 
 <div class="api-signature">
 
 ```c
-extern sz se_sdf_renderer_get_total_uniform_write_count(se_sdf_renderer_handle renderer);
+extern sz se_sdf_renderer_get_total_uniform_writes(se_sdf_renderer_handle renderer);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_renderer_get_uniform_writes`
+
+<div class="api-signature">
+
+```c
+extern sz se_sdf_renderer_get_uniform_writes(se_sdf_renderer_handle renderer);
 ```
 
 </div>

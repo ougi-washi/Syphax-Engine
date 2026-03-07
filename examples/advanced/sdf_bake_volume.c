@@ -95,11 +95,11 @@ static b8 sdf_bake_load_source_model(
 	*out_asset = NULL;
 
 	if (source == SDF_BAKE_SOURCE_CUBE) {
-		*out_model = se_model_load_obj_ex(SE_RESOURCE_PUBLIC("models/cube.obj"), NULL, SE_MESH_DATA_CPU_GPU);
+		*out_model = se_model_load_obj_with_flags(SE_RESOURCE_PUBLIC("models/cube.obj"), NULL, SE_MESH_DATA_CPU_GPU);
 		return *out_model != S_HANDLE_NULL;
 	}
 	if (source == SDF_BAKE_SOURCE_SPHERE) {
-		*out_model = se_model_load_obj_ex(SE_RESOURCE_PUBLIC("models/sphere.obj"), NULL, SE_MESH_DATA_CPU_GPU);
+		*out_model = se_model_load_obj_with_flags(SE_RESOURCE_PUBLIC("models/sphere.obj"), NULL, SE_MESH_DATA_CPU_GPU);
 		return *out_model != S_HANDLE_NULL;
 	}
 
@@ -110,7 +110,7 @@ static b8 sdf_bake_load_source_model(
 		return false;
 	}
 
-	*out_model = se_gltf_model_load_ex(*out_asset, -1, SE_MESH_DATA_CPU_GPU);
+	*out_model = se_gltf_model_load_with_flags(*out_asset, -1, SE_MESH_DATA_CPU_GPU);
 	if (*out_model == S_HANDLE_NULL) {
 		se_gltf_free(*out_asset);
 		*out_asset = NULL;
@@ -305,7 +305,7 @@ int main(int argc, char** argv) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.03f, 0.04f, 0.06f, 1.0f));
+	se_render_set_background(s_vec4(0.03f, 0.04f, 0.06f, 1.0f));
 
 	se_gltf_asset* asset = NULL;
 	se_model_handle source_model = S_HANDLE_NULL;
@@ -387,7 +387,7 @@ int main(int argc, char** argv) {
 	const f32 near_plane = s_max(0.02f, stable_extent * 0.0005f);
 	const f32 far_plane = s_max(120.0f, stable_extent * 16.0f);
 	se_camera_set_perspective(camera, 55.0f, near_plane, far_plane);
-	se_camera_set_aspect_from_window(camera, window);
+	se_camera_set_window_aspect(camera, window);
 	se_camera_set_target(camera, &camera_target);
 
 	f32 camera_yaw = camera_yaw_deg * (PI / 180.0f);
@@ -401,12 +401,12 @@ int main(int argc, char** argv) {
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
-		se_camera_set_aspect_from_window(camera, window);
+		se_camera_set_window_aspect(camera, window);
 
 		s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
 		s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
 		se_window_get_mouse_delta(window, &mouse_delta);
-		se_window_get_scroll_delta(window, &scroll_delta);
+		se_window_get_scroll(window, &scroll_delta);
 
 		if (se_window_is_mouse_down(window, SE_MOUSE_LEFT)) {
 			camera_yaw += mouse_delta.x * 0.01f;

@@ -403,8 +403,8 @@ static void rts_log_perf_summary(const rts_game *game, const c8 *stage) {
 	c8 trace_last_frame[4096] = {0};
 	c8 trace_all_frames[4096] = {0};
 
-	se_debug_dump_last_frame_timing(frame_timing_line, sizeof(frame_timing_line));
-	se_debug_dump_last_frame_timing_lines(frame_timing_lines, sizeof(frame_timing_lines));
+	se_debug_dump_frame_timing(frame_timing_line, sizeof(frame_timing_line));
+	se_debug_dump_frame_timing_lines(frame_timing_lines, sizeof(frame_timing_lines));
 	se_debug_dump_trace_stats(trace_last_frame, sizeof(trace_last_frame), 16u, true);
 	se_debug_dump_trace_stats(trace_all_frames, sizeof(trace_all_frames), 16u, false);
 
@@ -791,7 +791,7 @@ static void rts_hide_minimap_instances(const se_object_2d_handle object, const s
 	const s_mat3 hidden = rts_make_ui_transform(-5.0f, -5.0f, 0.0001f, 0.0001f);
 	for (i32 i = 0; i < count; ++i) {
 		if (instance_ids[i] >= 0) {
-			se_object_2d_set_instance_transform(object, instance_ids[i], &hidden);
+			se_object_2d_set_transform_by_id(object, instance_ids[i], &hidden);
 		}
 	}
 }
@@ -846,7 +846,7 @@ static void rts_set_minimap_instance(const se_object_2d_handle object, const se_
 		return;
 	}
 	const s_mat3 transform = rts_make_ui_transform(x, y, size, size);
-	se_object_2d_set_instance_transform(object, instance_id, &transform);
+	se_object_2d_set_transform_by_id(object, instance_id, &transform);
 }
 
 static b8 rts_init_hud_scene(rts_game *game) {
@@ -865,7 +865,7 @@ static b8 rts_init_hud_scene(rts_game *game) {
 		rts_log("failed to create HUD scene");
 		return false;
 	}
-	se_scene_2d_set_auto_resize(game->hud_scene, game->window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(game->hud_scene, game->window, &s_vec2(1.0f, 1.0f));
 
 	game->hud_minimap_panel_object = se_object_2d_create(SE_RESOURCE_EXAMPLE("99_game/ui_panel.glsl"), &s_mat3_identity, 0);
 	game->hud_minimap_frame_object = se_object_2d_create(SE_RESOURCE_EXAMPLE("99_game/ui_frame.glsl"), &s_mat3_identity, 0);
@@ -1200,7 +1200,7 @@ static b8 rts_init_rendering(rts_game *game) {
 			return false;
 		}
 		const s_mat4 hidden = rts_hidden_transform();
-		se_object_3d_set_instance_transform(game->build_preview_objects[i], game->build_preview_instance_ids[i], &hidden);
+		se_object_3d_set_transform_by_id(game->build_preview_objects[i], game->build_preview_instance_ids[i], &hidden);
 	}
 
 	const s_vec3 selection_color = s_vec3(1.00f, 0.97f, 0.42f);
@@ -1322,8 +1322,8 @@ static rts_unit *rts_spawn_unit(rts_game *game, const rts_unit_kind kind, const 
 		if (slot->instance_id == -1) {
 			slot->instance_id = se_object_3d_add_instance(object, &transform, &s_mat4_identity);
 		} else {
-			se_object_3d_set_instance_transform(object, slot->instance_id, &transform);
-			(void)se_object_3d_set_instance_active(object, slot->instance_id, true);
+			se_object_3d_set_transform_by_id(object, slot->instance_id, &transform);
+			(void)se_object_3d_set_active_by_id(object, slot->instance_id, true);
 		}
 		if (slot->instance_id == -1) {
 			slot->active = false;
@@ -1393,8 +1393,8 @@ static rts_building *rts_spawn_building(rts_game *game, const rts_building_kind 
 		if (slot->instance_id == -1) {
 			slot->instance_id = se_object_3d_add_instance(object, &transform, &s_mat4_identity);
 		} else {
-			se_object_3d_set_instance_transform(object, slot->instance_id, &transform);
-			(void)se_object_3d_set_instance_active(object, slot->instance_id, true);
+			se_object_3d_set_transform_by_id(object, slot->instance_id, &transform);
+			(void)se_object_3d_set_active_by_id(object, slot->instance_id, true);
 		}
 		if (slot->instance_id == -1) {
 			slot->active = false;
@@ -1448,8 +1448,8 @@ static rts_resource_node *rts_spawn_resource(rts_game *game, const s_vec3 *spawn
 		if (slot->instance_id == -1) {
 			slot->instance_id = se_object_3d_add_instance(game->resource_object, &transform, &s_mat4_identity);
 		} else {
-			se_object_3d_set_instance_transform(game->resource_object, slot->instance_id, &transform);
-			(void)se_object_3d_set_instance_active(game->resource_object, slot->instance_id, true);
+			se_object_3d_set_transform_by_id(game->resource_object, slot->instance_id, &transform);
+			(void)se_object_3d_set_active_by_id(game->resource_object, slot->instance_id, true);
 		}
 		if (slot->instance_id == -1) {
 			slot->active = false;
@@ -1594,21 +1594,21 @@ static void rts_hide_unit(rts_game *game, const rts_unit_kind kind, rts_unit *un
 	if (!game || !unit || unit->instance_id == -1) {
 		return;
 	}
-	(void)se_object_3d_set_instance_active(game->unit_objects[kind], unit->instance_id, false);
+	(void)se_object_3d_set_active_by_id(game->unit_objects[kind], unit->instance_id, false);
 }
 
 static void rts_hide_building(rts_game *game, const rts_building_kind kind, rts_building *building) {
 	if (!game || !building || building->instance_id == -1) {
 		return;
 	}
-	(void)se_object_3d_set_instance_active(game->building_objects[kind], building->instance_id, false);
+	(void)se_object_3d_set_active_by_id(game->building_objects[kind], building->instance_id, false);
 }
 
 static void rts_hide_resource(rts_game *game, rts_resource_node *resource) {
 	if (!game || !resource || resource->instance_id == -1) {
 		return;
 	}
-	(void)se_object_3d_set_instance_active(game->resource_object, resource->instance_id, false);
+	(void)se_object_3d_set_active_by_id(game->resource_object, resource->instance_id, false);
 }
 
 static void rts_damage_unit(rts_game *game, const rts_unit_kind kind, const i32 index, const f32 damage) {
@@ -2515,7 +2515,7 @@ static void rts_update_visuals(rts_game *game) {
 			s_vec3 position = unit->position;
 			position.y = scale.y + 0.03f + sinf(game->sim_time * 3.4f + (f32)unit->serial * 0.11f) * 0.03f;
 			const s_mat4 transform = rts_make_transform(&position, &scale, unit->facing_yaw);
-			se_object_3d_set_instance_transform(game->unit_objects[kind], unit->instance_id, &transform);
+			se_object_3d_set_transform_by_id(game->unit_objects[kind], unit->instance_id, &transform);
 
 			if (unit->selected &&
 				selection_marker_index < RTS_MAX_SELECTABLE_UNITS &&
@@ -2526,7 +2526,7 @@ static void rts_update_visuals(rts_game *game) {
 				marker_pos.y = marker_scale.y;
 				const s_mat4 marker_transform = rts_make_transform(&marker_pos, &marker_scale, game->sim_time * 0.5f);
 				const se_instance_id marker_id = game->selection_instance_ids[selection_marker_index];
-				se_object_3d_set_instance_transform(game->selection_object, marker_id, &marker_transform);
+				se_object_3d_set_transform_by_id(game->selection_object, marker_id, &marker_transform);
 				selection_marker_index++;
 			}
 		}
@@ -2535,7 +2535,7 @@ static void rts_update_visuals(rts_game *game) {
 		const s_mat4 hidden = rts_hidden_transform();
 		for (i32 i = selection_marker_index; i < RTS_MAX_SELECTABLE_UNITS; ++i) {
 			if (game->selection_instance_ids[i] != -1) {
-				se_object_3d_set_instance_transform(game->selection_object, game->selection_instance_ids[i], &hidden);
+				se_object_3d_set_transform_by_id(game->selection_object, game->selection_instance_ids[i], &hidden);
 			}
 		}
 	}
@@ -2558,7 +2558,7 @@ static void rts_update_visuals(rts_game *game) {
 			s_vec3 position = building->position;
 			position.y = scale.y;
 			const s_mat4 transform = rts_make_transform(&position, &scale, 0.0f);
-			se_object_3d_set_instance_transform(game->building_objects[kind], building->instance_id, &transform);
+			se_object_3d_set_transform_by_id(game->building_objects[kind], building->instance_id, &transform);
 		}
 	}
 
@@ -2575,7 +2575,7 @@ static void rts_update_visuals(rts_game *game) {
 		s_vec3 position = resource->position;
 		position.y = scale.y;
 		const s_mat4 transform = rts_make_transform(&position, &scale, game->sim_time * 0.35f + (f32)resource->serial * 0.08f);
-		se_object_3d_set_instance_transform(game->resource_object, resource->instance_id, &transform);
+		se_object_3d_set_transform_by_id(game->resource_object, resource->instance_id, &transform);
 	}
 }
 
@@ -2589,7 +2589,7 @@ static void rts_update_build_preview_visual(rts_game *game) {
 	const s_mat4 hidden = rts_hidden_transform();
 	for (i32 i = 0; i < 2; ++i) {
 		if (game->build_preview_objects[i] != S_HANDLE_NULL && game->build_preview_instance_ids[i] != -1) {
-			se_object_3d_set_instance_transform(game->build_preview_objects[i], game->build_preview_instance_ids[i], &hidden);
+			se_object_3d_set_transform_by_id(game->build_preview_objects[i], game->build_preview_instance_ids[i], &hidden);
 		}
 	}
 
@@ -2620,7 +2620,7 @@ static void rts_update_build_preview_visual(rts_game *game) {
 	const s_mat4 transform = rts_make_transform(&pos, &scale, 0.0f);
 	const se_instance_id preview_instance = game->build_preview_instance_ids[preview_idx];
 	if (preview_instance != -1) {
-		se_object_3d_set_instance_transform(game->build_preview_objects[preview_idx], preview_instance, &transform);
+		se_object_3d_set_transform_by_id(game->build_preview_objects[preview_idx], preview_instance, &transform);
 	}
 }
 
@@ -3070,9 +3070,9 @@ static void rts_render_frame(rts_game *game) {
 	if (game->show_minimap_ui && game->hud_scene != S_HANDLE_NULL) {
 		const s_vec4 scene_bg = s_vec4(0.045f, 0.053f, 0.058f, 1.0f);
 		/* Keep HUD framebuffer transparent so it overlays 3D instead of replacing it. */
-		se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
+		se_render_set_background(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
 		se_scene_2d_render_to_buffer(game->hud_scene);
-		se_render_set_background_color(scene_bg);
+		se_render_set_background(scene_bg);
 		se_scene_2d_render_to_screen(game->hud_scene, game->window);
 	}
 }
@@ -3130,7 +3130,7 @@ static void rts_seed_world(rts_game *game) {
 		if (camera_handle != S_HANDLE_NULL) {
 			se_camera_set_perspective(camera_handle, 52.0f, 0.1f, 220.0f);
 			if (game->window != S_HANDLE_NULL) {
-				se_camera_set_aspect_from_window(camera_handle, game->window);
+				se_camera_set_window_aspect(camera_handle, game->window);
 			}
 		}
 	}
@@ -3262,7 +3262,7 @@ int main(int argc, char **argv) {
 	se_window_set_exit_key(game.window, SE_KEY_ESCAPE);
 	se_window_set_vsync(game.window, false);
 	se_window_set_target_fps(game.window, 240);
-	se_render_set_background_color(s_vec4(0.045f, 0.053f, 0.058f, 1.0f));
+	se_render_set_background(s_vec4(0.045f, 0.053f, 0.058f, 1.0f));
 
 	rts_reset_slots(&game);
 	if (!rts_init_rendering(&game)) {
@@ -3306,7 +3306,7 @@ int main(int argc, char **argv) {
 		if (game.track_system_timing && game.sim_time >= game.next_system_timing_log_time) {
 			c8 frame_timing[512] = {0};
 			c8 trace_timing[2048] = {0};
-			se_debug_dump_last_frame_timing(frame_timing, sizeof(frame_timing));
+			se_debug_dump_frame_timing(frame_timing, sizeof(frame_timing));
 			se_debug_dump_trace_stats(trace_timing, sizeof(trace_timing), 6u, true);
 			se_log("%ssystem timing: %s", RTS_LOG_PREFIX, frame_timing);
 			se_log("%ssystem trace top:\n%s", RTS_LOG_PREFIX, trace_timing);

@@ -1176,7 +1176,7 @@ void se_window_reset_diagnostics(const se_window_handle window) {
 	memset(&window_ptr->diagnostics, 0, sizeof(window_ptr->diagnostics));
 }
 
-void se_window_get_mouse_position_normalized(const se_window_handle window, s_vec2* out_mouse_position) {
+void se_window_get_mouse_normalized(const se_window_handle window, s_vec2* out_mouse_position) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr || !out_mouse_position) {
@@ -1205,7 +1205,7 @@ void se_window_get_mouse_delta_normalized(const se_window_handle window, s_vec2*
 	*out_mouse_delta = s_vec2((window_ptr->mouse_dx / window_ptr->width), (window_ptr->mouse_dy / window_ptr->height));
 }
 
-void se_window_get_scroll_delta(const se_window_handle window, s_vec2* out_scroll_delta) {
+void se_window_get_scroll(const se_window_handle window, s_vec2* out_scroll_delta) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr || !out_scroll_delta) {
@@ -1232,7 +1232,7 @@ se_window_cursor_mode se_window_get_cursor_mode(const se_window_handle window) {
 	return window_ptr->cursor_mode;
 }
 
-b8 se_window_is_raw_mouse_motion_supported(const se_window_handle window) {
+b8 se_window_is_raw_mouse_supported(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr) {
@@ -1241,7 +1241,7 @@ b8 se_window_is_raw_mouse_motion_supported(const se_window_handle window) {
 	return window_ptr->raw_mouse_motion_supported;
 }
 
-void se_window_set_raw_mouse_motion(const se_window_handle window, const b8 enabled) {
+void se_window_set_raw_mouse(const se_window_handle window, const b8 enabled) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr) {
@@ -1254,7 +1254,7 @@ void se_window_set_raw_mouse_motion(const se_window_handle window, const b8 enab
 	window_ptr->raw_mouse_motion_enabled = enabled;
 }
 
-b8 se_window_is_raw_mouse_motion_enabled(const se_window_handle window) {
+b8 se_window_is_raw_mouse_enabled(const se_window_handle window) {
 	se_context* context = se_current_context();
 	se_window* window_ptr = se_window_from_handle(context, window);
 	if (!window_ptr) {

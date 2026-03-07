@@ -231,18 +231,6 @@ extern void se_camera_set_aspect(const se_camera_handle camera, const f32 width,
 
 No inline description found in header comments.
 
-### `se_camera_set_aspect_from_window`
-
-<div class="api-signature">
-
-```c
-extern void se_camera_set_aspect_from_window(const se_camera_handle camera, const se_window_handle window);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_camera_set_location`
 
 <div class="api-signature">
@@ -309,6 +297,18 @@ No inline description found in header comments.
 
 ```c
 extern void se_camera_set_target_mode(const se_camera_handle camera, const b8 enabled);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_camera_set_window_aspect`
+
+<div class="api-signature">
+
+```c
+extern void se_camera_set_window_aspect(const se_camera_handle camera, const se_window_handle window);
 ```
 
 </div>

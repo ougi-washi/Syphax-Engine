@@ -975,24 +975,24 @@ extern s_vec2 se_physics_world_2d_get_gravity(se_physics_world_2d_handle world);
 
 No inline description found in header comments.
 
-### `se_physics_world_2d_get_shapes_per_body`
+### `se_physics_world_2d_get_iterations`
 
 <div class="api-signature">
 
 ```c
-extern u32 se_physics_world_2d_get_shapes_per_body(se_physics_world_2d_handle world);
+extern u32 se_physics_world_2d_get_iterations(se_physics_world_2d_handle world);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_physics_world_2d_get_solver_iterations`
+### `se_physics_world_2d_get_shape_limit`
 
 <div class="api-signature">
 
 ```c
-extern u32 se_physics_world_2d_get_solver_iterations(se_physics_world_2d_handle world);
+extern u32 se_physics_world_2d_get_shape_limit(se_physics_world_2d_handle world);
 ```
 
 </div>
@@ -1023,24 +1023,24 @@ extern void se_physics_world_2d_set_gravity(se_physics_world_2d_handle world, co
 
 No inline description found in header comments.
 
-### `se_physics_world_2d_set_shapes_per_body`
+### `se_physics_world_2d_set_iterations`
 
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_2d_set_shapes_per_body(se_physics_world_2d_handle world, const u32 count);
+extern void se_physics_world_2d_set_iterations(se_physics_world_2d_handle world, const u32 iterations);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_physics_world_2d_set_solver_iterations`
+### `se_physics_world_2d_set_shape_limit`
 
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_2d_set_solver_iterations(se_physics_world_2d_handle world, const u32 iterations);
+extern void se_physics_world_2d_set_shape_limit(se_physics_world_2d_handle world, const u32 count);
 ```
 
 </div>
@@ -1131,24 +1131,24 @@ extern s_vec3 se_physics_world_3d_get_gravity(se_physics_world_3d_handle world);
 
 No inline description found in header comments.
 
-### `se_physics_world_3d_get_shapes_per_body`
+### `se_physics_world_3d_get_iterations`
 
 <div class="api-signature">
 
 ```c
-extern u32 se_physics_world_3d_get_shapes_per_body(se_physics_world_3d_handle world);
+extern u32 se_physics_world_3d_get_iterations(se_physics_world_3d_handle world);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_physics_world_3d_get_solver_iterations`
+### `se_physics_world_3d_get_shape_limit`
 
 <div class="api-signature">
 
 ```c
-extern u32 se_physics_world_3d_get_solver_iterations(se_physics_world_3d_handle world);
+extern u32 se_physics_world_3d_get_shape_limit(se_physics_world_3d_handle world);
 ```
 
 </div>
@@ -1179,24 +1179,24 @@ extern void se_physics_world_3d_set_gravity(se_physics_world_3d_handle world, co
 
 No inline description found in header comments.
 
-### `se_physics_world_3d_set_shapes_per_body`
+### `se_physics_world_3d_set_iterations`
 
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_3d_set_shapes_per_body(se_physics_world_3d_handle world, const u32 count);
+extern void se_physics_world_3d_set_iterations(se_physics_world_3d_handle world, const u32 iterations);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_physics_world_3d_set_solver_iterations`
+### `se_physics_world_3d_set_shape_limit`
 
 <div class="api-signature">
 
 ```c
-extern void se_physics_world_3d_set_solver_iterations(se_physics_world_3d_handle world, const u32 iterations);
+extern void se_physics_world_3d_set_shape_limit(se_physics_world_3d_handle world, const u32 count);
 ```
 
 </div>

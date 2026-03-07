@@ -159,24 +159,24 @@ extern void se_navigation_grid_set_blocked_rect(se_navigation_grid* grid, const 
 
 No inline description found in header comments.
 
-### `se_navigation_grid_set_dynamic_obstacle`
+### `se_navigation_grid_set_dynamic_cell`
 
 <div class="api-signature">
 
 ```c
-extern void se_navigation_grid_set_dynamic_obstacle(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked);
+extern void se_navigation_grid_set_dynamic_cell(se_navigation_grid* grid, const se_navigation_cell cell, const b8 blocked);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_navigation_grid_set_dynamic_obstacle_rect`
+### `se_navigation_grid_set_dynamic_rect`
 
 <div class="api-signature">
 
 ```c
-extern void se_navigation_grid_set_dynamic_obstacle_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked);
+extern void se_navigation_grid_set_dynamic_rect(se_navigation_grid* grid, const se_navigation_cell min_cell, const se_navigation_cell max_cell, const b8 blocked);
 ```
 
 </div>

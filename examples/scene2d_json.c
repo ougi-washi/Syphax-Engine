@@ -59,10 +59,10 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.08f, 0.10f, 0.12f, 1.0f));
+	se_render_set_background(s_vec4(0.08f, 0.10f, 0.12f, 1.0f));
 
 	se_scene_2d_handle source_scene = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), 4);
-	se_scene_2d_set_auto_resize(source_scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(source_scene, window, &s_vec2(1.0f, 1.0f));
 
 	se_object_2d_handle panel = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
 	se_object_2d_set_scale(panel, &s_vec2(0.62f, 0.45f));
@@ -81,8 +81,8 @@ int main(void) {
 	if (second_id >= 0) {
 		s_mat4 metadata = s_mat4_identity;
 		metadata.m[0][3] = 7.0f;
-		se_object_2d_set_instance_metadata(button, second_id, &metadata);
-		se_object_2d_set_instance_active(button, second_id, false);
+		se_object_2d_set_metadata_by_id(button, second_id, &metadata);
+		se_object_2d_set_active_by_id(button, second_id, false);
 	}
 	if (!se_object_2d_to_json_file(button, object_json_path) ||
 		!se_object_2d_from_json_file(button, object_json_path)) {
@@ -100,7 +100,7 @@ int main(void) {
 	}
 
 	se_scene_2d_handle loaded_scene = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), 4);
-	se_scene_2d_set_auto_resize(loaded_scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(loaded_scene, window, &s_vec2(1.0f, 1.0f));
 	if (!scene_json_load(loaded_scene, json_path)) {
 		printf("scene2d_json :: load failed (%s)\n", se_result_str(se_get_last_error()));
 		se_scene_2d_destroy_full(loaded_scene, true);

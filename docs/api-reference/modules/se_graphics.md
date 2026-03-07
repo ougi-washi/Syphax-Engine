@@ -75,12 +75,12 @@ extern void se_render_print_mat4(const s_mat4 *mat);
 
 Utility functions
 
-### `se_render_set_background_color`
+### `se_render_set_background`
 
 <div class="api-signature">
 
 ```c
-extern void se_render_set_background_color(const s_vec4 color);
+extern void se_render_set_background(const s_vec4 color);
 ```
 
 </div>

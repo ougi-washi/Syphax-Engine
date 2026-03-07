@@ -20,7 +20,7 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.05f, 0.06f, 0.09f, 1.0f));
+	se_render_set_background(s_vec4(0.05f, 0.06f, 0.09f, 1.0f));
 
 	se_scene_3d_handle scene = se_scene_3d_create_for_window(window, 16);
 	se_model_handle model = se_model_load_obj_simple(
@@ -54,7 +54,7 @@ int main(void) {
 		s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
 		s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
 		se_window_get_mouse_delta(window, &mouse_delta);
-		se_window_get_scroll_delta(window, &scroll_delta);
+		se_window_get_scroll(window, &scroll_delta);
 
 		if (se_window_is_mouse_down(window, SE_MOUSE_LEFT)) {
 			camera_yaw += mouse_delta.x * 0.01f;

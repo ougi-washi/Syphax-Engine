@@ -1488,7 +1488,7 @@ static b8 se_editor_collect_debug_properties(se_editor* editor) {
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_TRACE_CPU_MS_LAST_FRAME, trace_summary.cpu_ms_last_frame, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_TRACE_GPU_MS_LAST_FRAME, trace_summary.gpu_ms_last_frame, false);
 	}
-	if (se_debug_get_last_frame_timing(&timing)) {
+	if (se_debug_get_frame_timing(&timing)) {
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_FRAME_MS, timing.frame_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_WINDOW_UPDATE_MS, timing.window_update_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_INPUT_MS, timing.input_ms, false);
@@ -1520,9 +1520,9 @@ static b8 se_editor_collect_window_properties(se_editor* editor, const se_editor
 	se_window_get_diagnostics(window_handle, &diagnostics);
 	se_window_get_framebuffer_size(window_handle, &framebuffer_width, &framebuffer_height);
 	se_window_get_content_scale(window_handle, &content_scale_x, &content_scale_y);
-	se_window_get_mouse_position_normalized(window_handle, &mouse_ndc);
+	se_window_get_mouse_normalized(window_handle, &mouse_ndc);
 	se_window_get_mouse_delta_normalized(window_handle, &mouse_delta_ndc);
-	se_window_get_scroll_delta(window_handle, &scroll_delta);
+	se_window_get_scroll(window_handle, &scroll_delta);
 	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_WIDTH, window->width, false);
 	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_HEIGHT, window->height, false);
 	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_FRAMEBUFFER_WIDTH, framebuffer_width, false);
@@ -1531,8 +1531,8 @@ static b8 se_editor_collect_window_properties(se_editor* editor, const se_editor
 	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_VSYNC, se_window_is_vsync_enabled(window_handle), true);
 	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_SHOULD_CLOSE, se_window_should_close(window_handle), true);
 	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_CURSOR_MODE, (i32)se_window_get_cursor_mode(window_handle), true);
-	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_RAW_MOUSE_MOTION_SUPPORTED, se_window_is_raw_mouse_motion_supported(window_handle), false);
-	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_RAW_MOUSE_MOTION_ENABLED, se_window_is_raw_mouse_motion_enabled(window_handle), true);
+	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_RAW_MOUSE_MOTION_SUPPORTED, se_window_is_raw_mouse_supported(window_handle), false);
+	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_RAW_MOUSE_MOTION_ENABLED, se_window_is_raw_mouse_enabled(window_handle), true);
 	se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_DELTA_TIME, se_window_get_delta_time(window_handle), false);
 	se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_FPS, se_window_get_fps(window_handle), false);
 	se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_TIME, se_window_get_time(window_handle), false);
@@ -2034,8 +2034,8 @@ static b8 se_editor_collect_physics_2d_properties(se_editor* editor) {
 		return false;
 	}
 	se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_GRAVITY, se_physics_world_2d_get_gravity(editor->physics_2d), true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, se_physics_world_2d_get_solver_iterations(editor->physics_2d), true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, se_physics_world_2d_get_shapes_per_body(editor->physics_2d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, se_physics_world_2d_get_iterations(editor->physics_2d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, se_physics_world_2d_get_shape_limit(editor->physics_2d), true);
 	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_BODY_COUNT, (u64)se_physics_world_2d_get_body_count(editor->physics_2d), false);
 	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_CONTACT_COUNT, (u64)se_physics_world_2d_get_contact_count(editor->physics_2d), false);
 	return true;
@@ -2071,8 +2071,8 @@ static b8 se_editor_collect_physics_3d_properties(se_editor* editor) {
 		return false;
 	}
 	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_GRAVITY, se_physics_world_3d_get_gravity(editor->physics_3d), true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, se_physics_world_3d_get_solver_iterations(editor->physics_3d), true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, se_physics_world_3d_get_shapes_per_body(editor->physics_3d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SOLVER_ITERATIONS, se_physics_world_3d_get_iterations(editor->physics_3d), true);
+	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_SHAPES_PER_BODY, se_physics_world_3d_get_shape_limit(editor->physics_3d), true);
 	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_BODY_COUNT, (u64)se_physics_world_3d_get_body_count(editor->physics_3d), false);
 	se_editor_add_property_u64(&editor->properties, SE_EDITOR_NAME_CONTACT_COUNT, (u64)se_physics_world_3d_get_contact_count(editor->physics_3d), false);
 	return true;
@@ -2114,7 +2114,7 @@ static b8 se_editor_apply_backend_command(se_editor* editor, const se_editor_com
 		if (!se_editor_value_as_vec4(&command->value, &vec4_value)) {
 			return false;
 		}
-		se_render_set_background_color(vec4_value);
+		se_render_set_background(vec4_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_RENDER_SET_BLENDING) == 0) {
@@ -2239,10 +2239,10 @@ static b8 se_editor_apply_window_command(se_editor* editor, const se_editor_comm
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_RAW_MOUSE_MOTION) == 0 || strcmp(command->name, SE_EDITOR_NAME_RAW_MOUSE_MOTION_ENABLED) == 0) {
-		if (!se_editor_command_read_bool(command, se_window_is_raw_mouse_motion_enabled(window_handle), &bool_value)) {
+		if (!se_editor_command_read_bool(command, se_window_is_raw_mouse_enabled(window_handle), &bool_value)) {
 			return false;
 		}
-		se_window_set_raw_mouse_motion(window_handle, bool_value);
+		se_window_set_raw_mouse(window_handle, bool_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_BEGIN_FRAME) == 0) {
@@ -2534,7 +2534,7 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (window_handle == S_HANDLE_NULL) {
 			return false;
 		}
-		se_camera_set_aspect_from_window(camera_handle, window_handle);
+		se_camera_set_window_aspect(camera_handle, window_handle);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_ORBIT) == 0) {
@@ -2675,7 +2675,7 @@ static b8 se_editor_apply_scene_2d_command(se_editor* editor, const se_editor_co
 		if (handle_value == S_HANDLE_NULL) {
 			return false;
 		}
-		se_scene_2d_set_auto_resize(scene_handle, (se_window_handle)handle_value, &vec2_value);
+		se_scene_2d_set_fit_to_window(scene_handle, (se_window_handle)handle_value, &vec2_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_BIND) == 0) {
@@ -2813,20 +2813,20 @@ static b8 se_editor_apply_object_2d_command(se_editor* editor, const se_editor_c
 		if (!se_editor_value_as_i32(&command->value, &instance_id) || !se_editor_value_as_bool(&command->aux_value, &bool_value)) {
 			return false;
 		}
-		return se_object_2d_set_instance_active(object_handle, instance_id, bool_value);
+		return se_object_2d_set_active_by_id(object_handle, instance_id, bool_value);
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_INSTANCE_SET_TRANSFORM) == 0) {
 		if (!se_editor_value_as_i32(&command->value, &instance_id) || !se_editor_value_as_mat3(&command->aux_value, &mat3_value)) {
 			return false;
 		}
-		se_object_2d_set_instance_transform(object_handle, instance_id, &mat3_value);
+		se_object_2d_set_transform_by_id(object_handle, instance_id, &mat3_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_INSTANCE_SET_BUFFER) == 0) {
 		if (!se_editor_value_as_i32(&command->value, &instance_id) || !se_editor_value_as_mat4(&command->aux_value, &mat4_value)) {
 			return false;
 		}
-		se_object_2d_set_instance_buffer(object_handle, instance_id, &mat4_value);
+		se_object_2d_set_buffer_by_id(object_handle, instance_id, &mat4_value);
 		return true;
 	}
 	return false;
@@ -2907,7 +2907,7 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 		if (handle_value == S_HANDLE_NULL) {
 			return false;
 		}
-		se_scene_3d_set_auto_resize(scene_handle, (se_window_handle)handle_value, &vec2_value);
+		se_scene_3d_set_fit_to_window(scene_handle, (se_window_handle)handle_value, &vec2_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_RENDER_TO_BUFFER) == 0) {
@@ -3072,20 +3072,20 @@ static b8 se_editor_apply_object_3d_command(se_editor* editor, const se_editor_c
 		if (!se_editor_value_as_i32(&command->value, &instance_id) || !se_editor_value_as_bool(&command->aux_value, &bool_value)) {
 			return false;
 		}
-		return se_object_3d_set_instance_active(object_handle, instance_id, bool_value);
+		return se_object_3d_set_active_by_id(object_handle, instance_id, bool_value);
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_INSTANCE_SET_TRANSFORM) == 0) {
 		if (!se_editor_value_as_i32(&command->value, &instance_id) || !se_editor_value_as_mat4(&command->aux_value, &mat4_value)) {
 			return false;
 		}
-		se_object_3d_set_instance_transform(object_handle, instance_id, &mat4_value);
+		se_object_3d_set_transform_by_id(object_handle, instance_id, &mat4_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_INSTANCE_SET_BUFFER) == 0) {
 		if (!se_editor_value_as_i32(&command->value, &instance_id) || !se_editor_value_as_mat4(&command->aux_value, &mat4_value)) {
 			return false;
 		}
-		se_object_3d_set_instance_buffer(object_handle, instance_id, &mat4_value);
+		se_object_3d_set_buffer_by_id(object_handle, instance_id, &mat4_value);
 		return true;
 	}
 	return false;
@@ -3512,7 +3512,7 @@ static b8 se_editor_apply_vfx_2d_command(se_editor* editor, const se_editor_comm
 		return se_vfx_2d_emitter_set_shader(vfx, (se_vfx_emitter_2d_handle)emitter, vs_path, fs_path);
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_EMITTER_CLEAR_TRACKS) == 0) {
-		return se_vfx_2d_emitter_clear_tracks(vfx, (se_vfx_emitter_2d_handle)emitter);
+		return se_vfx_2d_clear_tracks(vfx, (se_vfx_emitter_2d_handle)emitter);
 	}
 	return false;
 }
@@ -3656,7 +3656,7 @@ static b8 se_editor_apply_vfx_3d_command(se_editor* editor, const se_editor_comm
 		return se_vfx_3d_emitter_set_shader(vfx, (se_vfx_emitter_3d_handle)emitter, vs_path, fs_path);
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_EMITTER_CLEAR_TRACKS) == 0) {
-		return se_vfx_3d_emitter_clear_tracks(vfx, (se_vfx_emitter_3d_handle)emitter);
+		return se_vfx_3d_clear_tracks(vfx, (se_vfx_emitter_3d_handle)emitter);
 	}
 	return false;
 }
@@ -4255,7 +4255,7 @@ static b8 se_editor_apply_navigation_command(se_editor* editor, const se_editor_
 		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
 			return false;
 		}
-		se_navigation_grid_set_dynamic_obstacle(editor->navigation, (se_navigation_cell){ (i32)vec3_value.x, (i32)vec3_value.y }, vec3_value.z > 0.5f);
+		se_navigation_grid_set_dynamic_cell(editor->navigation, (se_navigation_cell){ (i32)vec3_value.x, (i32)vec3_value.y }, vec3_value.z > 0.5f);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_SET_RECT_BLOCKED) == 0) {
@@ -4289,7 +4289,7 @@ static b8 se_editor_apply_navigation_command(se_editor* editor, const se_editor_
 		if (!se_editor_value_as_bool(&command->aux_value, &bool_value)) {
 			bool_value = true;
 		}
-		se_navigation_grid_set_dynamic_obstacle_rect(
+		se_navigation_grid_set_dynamic_rect(
 			editor->navigation,
 			(se_navigation_cell){ (i32)vec4_value.x, (i32)vec4_value.y },
 			(se_navigation_cell){ (i32)vec4_value.z, (i32)vec4_value.w },
@@ -4317,14 +4317,14 @@ static b8 se_editor_apply_physics_2d_command(se_editor* editor, const se_editor_
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		se_physics_world_2d_set_solver_iterations(editor->physics_2d, u32_value);
+		se_physics_world_2d_set_iterations(editor->physics_2d, u32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_SHAPES_PER_BODY) == 0) {
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		se_physics_world_2d_set_shapes_per_body(editor->physics_2d, u32_value);
+		se_physics_world_2d_set_shape_limit(editor->physics_2d, u32_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_STEP) == 0) {
@@ -4467,14 +4467,14 @@ static b8 se_editor_apply_physics_3d_command(se_editor* editor, const se_editor_
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		se_physics_world_3d_set_solver_iterations(editor->physics_3d, u32_value);
+		se_physics_world_3d_set_iterations(editor->physics_3d, u32_value);
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_SHAPES_PER_BODY) == 0) {
 		if (!se_editor_value_as_u32(&command->value, &u32_value)) {
 			return false;
 		}
-		se_physics_world_3d_set_shapes_per_body(editor->physics_3d, u32_value);
+		se_physics_world_3d_set_shape_limit(editor->physics_3d, u32_value);
 		return true;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_STEP) == 0) {
@@ -5883,7 +5883,7 @@ b8 se_editor_collect_diagnostics(se_editor* editor, se_editor_diagnostics* out_d
 		out_diagnostics->trace_gpu_ms_last_frame = trace_summary.gpu_ms_last_frame;
 		out_diagnostics->has_trace_stats = true;
 	}
-	out_diagnostics->has_frame_timing = se_debug_get_last_frame_timing(&out_diagnostics->frame_timing);
+	out_diagnostics->has_frame_timing = se_debug_get_frame_timing(&out_diagnostics->frame_timing);
 	if (editor->window != S_HANDLE_NULL) {
 		se_window_get_diagnostics(editor->window, &out_diagnostics->window_diagnostics);
 		out_diagnostics->has_window_diagnostics = true;

@@ -157,7 +157,7 @@ i32 main() {
 
     se_window_loop(window, 
         se_render_clear();
-	    se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
+	    se_render_set_background(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
         render_world(&world, window);
 		render_ui(window);
         se_debug_render_overlay(window, NULL);

@@ -250,7 +250,7 @@ static se_model_handle editor_create_colored_gizmo_model(const s_vec3* color) {
 			*slot = shader;
 		}
 	}
-	model = se_model_load_obj_ex(SE_RESOURCE_PUBLIC("models/cube.obj"), &shaders, SE_MESH_DATA_GPU);
+	model = se_model_load_obj_with_flags(SE_RESOURCE_PUBLIC("models/cube.obj"), &shaders, SE_MESH_DATA_GPU);
 	s_array_clear(&shaders);
 	if (model == S_HANDLE_NULL) {
 		se_shader_destroy(shader);
@@ -775,7 +775,7 @@ static se_object_2d_handle editor_pick_scene_object_2d(editor_showcase_app* app)
 	if (!app || app->scene_2d == S_HANDLE_NULL) {
 		return S_HANDLE_NULL;
 	}
-	se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+	se_window_get_mouse_normalized(app->window, &mouse_ndc);
 	if (se_scene_2d_pick_object(app->scene_2d, &mouse_ndc, editor_pick_filter_scene_2d, app, &picked)) {
 		return picked;
 	}
@@ -937,7 +937,7 @@ static void editor_begin_drag_2d(editor_showcase_app* app, const editor_gizmo_ax
 	}
 	app->active_axis = axis;
 	app->dragging = true;
-	se_window_get_mouse_position_normalized(app->window, &app->drag_start_mouse_ndc);
+	se_window_get_mouse_normalized(app->window, &app->drag_start_mouse_ndc);
 	app->drag_start_pos_2d = se_object_2d_get_position(app->selected_2d);
 }
 
@@ -948,7 +948,7 @@ static void editor_update_drag_2d(editor_showcase_app* app) {
 	if (!app || !app->dragging || app->selected_2d == S_HANDLE_NULL) {
 		return;
 	}
-	se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+	se_window_get_mouse_normalized(app->window, &mouse_ndc);
 	delta = s_vec2_sub(&mouse_ndc, &app->drag_start_mouse_ndc);
 	new_position = s_vec2_add(&app->drag_start_pos_2d, &delta);
 	if (app->active_axis == EDITOR_GIZMO_AXIS_X) {
@@ -1592,7 +1592,7 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 		editor_log_error("create scene_2d");
 		return false;
 	}
-	se_scene_2d_set_auto_resize(app->scene_2d, app->window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(app->scene_2d, app->window, &s_vec2(1.0f, 1.0f));
 
 	app->scene_3d = se_scene_3d_create_for_window(app->window, 128);
 	if (app->scene_3d == S_HANDLE_NULL) {
@@ -1609,7 +1609,7 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	app->camera_pitch_3d = 0.32f;
 	app->camera_distance_3d = 7.5f;
 	se_camera_set_target_mode(app->camera_3d, true);
-	se_camera_set_aspect_from_window(app->camera_3d, app->window);
+	se_camera_set_window_aspect(app->camera_3d, app->window);
 	se_camera_set_perspective(app->camera_3d, 52.0f, 0.05f, 220.0f);
 	app->camera_target_sdf = s_vec3(0.0f, 0.0f, 0.0f);
 	app->camera_yaw_sdf = 0.70f;
@@ -1647,7 +1647,7 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 		return false;
 	}
 	se_camera_set_target_mode(app->sdf_camera, true);
-	se_camera_set_aspect_from_window(app->sdf_camera, app->window);
+	se_camera_set_window_aspect(app->sdf_camera, app->window);
 	se_camera_set_perspective(app->sdf_camera, 52.0f, 0.05f, 200.0f);
 
 	app->sdf_scene = se_sdf_scene_create(NULL);
@@ -1781,7 +1781,7 @@ static void editor_add_object_from_cursor(editor_showcase_app* app) {
 	}
 	if (app->target == EDITOR_TARGET_SCENE_2D) {
 		s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
-		se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+		se_window_get_mouse_normalized(app->window, &mouse_ndc);
 		app->selected_2d = editor_spawn_object_2d(app, &mouse_ndc);
 		return;
 	}
@@ -1824,7 +1824,7 @@ static void editor_apply_camera_pose_3d(editor_showcase_app* app) {
 	const s_vec3 position = s_vec3_sub(&app->camera_target_3d, &s_vec3_muls(&forward, app->camera_distance_3d));
 	se_camera_set_location(app->camera_3d, &position);
 	se_camera_set_target(app->camera_3d, &app->camera_target_3d);
-	se_camera_set_aspect_from_window(app->camera_3d, app->window);
+	se_camera_set_window_aspect(app->camera_3d, app->window);
 }
 
 static void editor_apply_camera_pose_sdf(editor_showcase_app* app) {
@@ -1837,7 +1837,7 @@ static void editor_apply_camera_pose_sdf(editor_showcase_app* app) {
 	const s_vec3 position = s_vec3_sub(&app->camera_target_sdf, &s_vec3_muls(&forward, app->camera_distance_sdf));
 	se_camera_set_location(app->sdf_camera, &position);
 	se_camera_set_target(app->sdf_camera, &app->camera_target_sdf);
-	se_camera_set_aspect_from_window(app->sdf_camera, app->window);
+	se_camera_set_window_aspect(app->sdf_camera, app->window);
 }
 
 static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt) {
@@ -1849,7 +1849,7 @@ static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt) {
 
 	const b8 alt = editor_is_alt_down(app);
 	se_window_get_mouse_delta(app->window, &mouse_delta);
-	se_window_get_scroll_delta(app->window, &scroll_delta);
+	se_window_get_scroll(app->window, &scroll_delta);
 
 	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
 		app->camera_yaw_3d += mouse_delta.x * 0.007f;
@@ -1900,7 +1900,7 @@ static void editor_update_camera_sdf(editor_showcase_app* app, const f32 dt) {
 	}
 	const b8 alt = editor_is_alt_down(app);
 	se_window_get_mouse_delta(app->window, &mouse_delta);
-	se_window_get_scroll_delta(app->window, &scroll_delta);
+	se_window_get_scroll(app->window, &scroll_delta);
 
 	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
 		app->camera_yaw_sdf += mouse_delta.x * 0.007f;
@@ -1951,7 +1951,7 @@ static void editor_update_scene_2d_interaction(editor_showcase_app* app) {
 	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT)) {
 		editor_gizmo_axis axis = EDITOR_GIZMO_AXIS_NONE;
 		se_object_2d_handle picked = S_HANDLE_NULL;
-		se_window_get_mouse_position_normalized(app->window, &mouse_ndc);
+		se_window_get_mouse_normalized(app->window, &mouse_ndc);
 		axis = editor_pick_2d_gizmo_axis(app, &mouse_ndc);
 		if (axis != EDITOR_GIZMO_AXIS_NONE) {
 			editor_begin_drag_2d(app, axis);
@@ -2070,7 +2070,7 @@ int main(void) {
 	}
 	se_window_set_exit_key(app.window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(app.window, 60);
-	se_render_set_background_color(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
+	se_render_set_background(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
 
 	if (!editor_setup_ui(&app)) {
 		printf("editor_showcase :: ui setup failed (%s)\n", se_result_str(se_get_last_error()));
@@ -2155,9 +2155,9 @@ int main(void) {
 			}
 		}
 		if (app.ui != S_HANDLE_NULL) {
-			se_render_set_background_color(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
+			se_render_set_background(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
 			se_ui_draw(app.ui);
-			se_render_set_background_color(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
+			se_render_set_background(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
 		}
 		se_window_end_frame(app.window);
 	}

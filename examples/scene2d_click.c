@@ -20,10 +20,10 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.07f, 0.08f, 0.10f, 1.0f));
+	se_render_set_background(s_vec4(0.07f, 0.08f, 0.10f, 1.0f));
 
 	se_scene_2d_handle scene = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), 4);
-	se_scene_2d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(scene, window, &s_vec2(1.0f, 1.0f));
 
 	se_object_2d_handle panel = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
 	se_object_2d_set_scale(panel, &s_vec2(0.60f, 0.44f));
@@ -45,7 +45,7 @@ int main(void) {
 
 		if (se_window_is_mouse_pressed(window, SE_MOUSE_LEFT)) {
 			s_vec2 pointer = s_vec2(0.0f, 0.0f);
-			se_window_get_mouse_position_normalized(window, &pointer);
+			se_window_get_mouse_normalized(window, &pointer);
 			se_object_2d_handle picked = S_HANDLE_NULL;
 			if (se_scene_2d_pick_object(scene, &pointer, NULL, NULL, &picked) && picked == button) {
 				active_color = !active_color;

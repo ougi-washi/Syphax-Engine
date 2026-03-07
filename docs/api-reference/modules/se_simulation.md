@@ -315,6 +315,18 @@ extern void se_simulation_snapshot_free(void* data);
 
 No inline description found in header comments.
 
+### `se_simulation_snapshot_load_bytes`
+
+<div class="api-signature">
+
+```c
+extern b8 se_simulation_snapshot_load_bytes(se_simulation_handle sim, const u8* data, sz size);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_simulation_snapshot_load_file`
 
 <div class="api-signature">
@@ -327,12 +339,12 @@ extern b8 se_simulation_snapshot_load_file(se_simulation_handle sim, const c8* p
 
 No inline description found in header comments.
 
-### `se_simulation_snapshot_load_memory`
+### `se_simulation_snapshot_save_bytes`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_simulation_snapshot_load_memory(se_simulation_handle sim, const u8* data, sz size);
+extern b8 se_simulation_snapshot_save_bytes(se_simulation_handle sim, u8** out_data, sz* out_size);
 ```
 
 </div>
@@ -345,18 +357,6 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_simulation_snapshot_save_file(se_simulation_handle sim, const c8* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_simulation_snapshot_save_memory`
-
-<div class="api-signature">
-
-```c
-extern b8 se_simulation_snapshot_save_memory(se_simulation_handle sim, u8** out_data, sz* out_size);
 ```
 
 </div>

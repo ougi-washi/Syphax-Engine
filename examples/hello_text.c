@@ -33,9 +33,9 @@ int main(void) {
 			warm_palette = !warm_palette;
 		}
 		if (warm_palette) {
-			se_render_set_background_color(s_vec4(0.10f, 0.11f, 0.14f, 1.0f));
+			se_render_set_background(s_vec4(0.10f, 0.11f, 0.14f, 1.0f));
 		} else {
-			se_render_set_background_color(s_vec4(0.04f, 0.12f, 0.11f, 1.0f));
+			se_render_set_background(s_vec4(0.04f, 0.12f, 0.11f, 1.0f));
 		}
 
 		se_render_clear();

@@ -1305,11 +1305,11 @@ i32 se_object_2d_get_instance_index(const se_object_2d_handle object, const se_i
 	return -1;
 }
 
-void se_object_2d_set_instance_transform(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat3 *transform) {
+void se_object_2d_set_transform_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat3 *transform) {
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_set_instance_transform :: object is null");
-	s_assertf(transform, "se_object_2d_set_instance_transform :: transform is null");
+	s_assertf(object_ptr, "se_object_2d_set_transform_by_id :: object is null");
+	s_assertf(transform, "se_object_2d_set_transform_by_id :: transform is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index >= 0) {
 		s_mat3 *current_transform = s_array_get(&object_ptr->instances.transforms, s_array_handle(&object_ptr->instances.transforms, (u32)index));
@@ -1321,11 +1321,11 @@ void se_object_2d_set_instance_transform(const se_object_2d_handle object, const
 	}
 }
 
-void se_object_2d_set_instance_buffer(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4 *buffer) {
+void se_object_2d_set_buffer_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4 *buffer) {
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_set_instance_buffer :: object is null");
-	s_assertf(buffer, "se_object_2d_set_instance_buffer :: buffer is null");
+	s_assertf(object_ptr, "se_object_2d_set_buffer_by_id :: object is null");
+	s_assertf(buffer, "se_object_2d_set_buffer_by_id :: buffer is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index >= 0) {
 		s_mat4 *current_buffer = s_array_get(&object_ptr->instances.buffers, s_array_handle(&object_ptr->instances.buffers, (u32)index));
@@ -1393,13 +1393,13 @@ void se_object_2d_set_instances_buffers(const se_object_2d_handle object, const 
 	se_object_2d_set_instances_dirty(object, true);
 }
 
-void se_object_2d_set_instances_transforms_bulk(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat3* transforms, const sz count) {
+void se_object_2d_set_transforms_by_id(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat3* transforms, const sz count) {
 	if (!instance_ids || !transforms) {
 		return;
 	}
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_set_instances_transforms_bulk :: object is null");
+	s_assertf(object_ptr, "se_object_2d_set_transforms_by_id :: object is null");
 	for (sz i = 0; i < count; ++i) {
 		const i32 index = se_object_2d_get_instance_index(object, instance_ids[i]);
 		if (index < 0) {
@@ -1413,13 +1413,13 @@ void se_object_2d_set_instances_transforms_bulk(const se_object_2d_handle object
 	se_object_2d_set_instances_dirty(object, true);
 }
 
-void se_object_2d_set_instances_buffers_bulk(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count) {
+void se_object_2d_set_buffers_by_id(const se_object_2d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count) {
 	if (!instance_ids || !buffers) {
 		return;
 	}
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_set_instances_buffers_bulk :: object is null");
+	s_assertf(object_ptr, "se_object_2d_set_buffers_by_id :: object is null");
 	for (sz i = 0; i < count; ++i) {
 		const i32 index = se_object_2d_get_instance_index(object, instance_ids[i]);
 		if (index < 0) {
@@ -1433,10 +1433,10 @@ void se_object_2d_set_instances_buffers_bulk(const se_object_2d_handle object, c
 	se_object_2d_set_instances_dirty(object, true);
 }
 
-b8 se_object_2d_set_instance_active(const se_object_2d_handle object, const se_instance_id instance_id, const b8 active) {
+b8 se_object_2d_set_active_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const b8 active) {
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_set_instance_active :: object is null");
+	s_assertf(object_ptr, "se_object_2d_set_active_by_id :: object is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -1458,10 +1458,10 @@ b8 se_object_2d_set_instance_active(const se_object_2d_handle object, const se_i
 	return true;
 }
 
-b8 se_object_2d_is_instance_active(const se_object_2d_handle object, const se_instance_id instance_id) {
+b8 se_object_2d_is_active_by_id(const se_object_2d_handle object, const se_instance_id instance_id) {
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_is_instance_active :: object is null");
+	s_assertf(object_ptr, "se_object_2d_is_active_by_id :: object is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		return false;
@@ -1477,14 +1477,14 @@ sz se_object_2d_get_inactive_slot_count(const se_object_2d_handle object) {
 	return s_array_get_size(&object_ptr->instances.free_indices);
 }
 
-b8 se_object_2d_set_instance_metadata(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4* metadata) {
+b8 se_object_2d_set_metadata_by_id(const se_object_2d_handle object, const se_instance_id instance_id, const s_mat4* metadata) {
 	if (!metadata) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_set_instance_metadata :: object is null");
+	s_assertf(object_ptr, "se_object_2d_set_metadata_by_id :: object is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -1500,14 +1500,14 @@ b8 se_object_2d_set_instance_metadata(const se_object_2d_handle object, const se
 	return true;
 }
 
-b8 se_object_2d_get_instance_metadata(const se_object_2d_handle object, const se_instance_id instance_id, s_mat4* out_metadata) {
+b8 se_object_2d_get_metadata_by_id(const se_object_2d_handle object, const se_instance_id instance_id, s_mat4* out_metadata) {
 	if (!out_metadata) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	se_context *ctx = se_current_context();
 	se_object_2d *object_ptr = se_object_2d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_2d_get_instance_metadata :: object is null");
+	s_assertf(object_ptr, "se_object_2d_get_metadata_by_id :: object is null");
 	const i32 index = se_object_2d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -1878,14 +1878,14 @@ static void se_scene_2d_resize_callback(const se_window_handle window, void *sce
 	se_scene_2d_render_to_buffer(scene);
 }
 
-void se_scene_2d_set_auto_resize(const se_scene_2d_handle scene, const se_window_handle window, const s_vec2 *ratio) {
+void se_scene_2d_set_fit_to_window(const se_scene_2d_handle scene, const se_window_handle window, const s_vec2 *ratio) {
 	se_context *ctx = se_current_context();
 	se_scene_2d *scene_ptr = se_scene_2d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_2d_set_auto_resize :: scene is null");
-	s_assertf(ratio, "se_scene_2d_set_auto_resize :: ratio is null");
+	s_assertf(scene_ptr, "se_scene_2d_set_fit_to_window :: scene is null");
+	s_assertf(ratio, "se_scene_2d_set_fit_to_window :: ratio is null");
 
 	s_assertf(ratio->x == 1.0 && ratio->y == 1.0,
-				"se_scene_2d_set_auto_resize :: ratio can only be 1 for now, "
+				"se_scene_2d_set_fit_to_window :: ratio can only be 1 for now, "
 				"please wait for the next update");
 	se_framebuffer *framebuffer_ptr = s_array_get(&ctx->framebuffers, scene_ptr->output);
 	framebuffer_ptr->auto_resize = true;
@@ -2593,7 +2593,7 @@ b8 se_scene_3d_from_json(const se_scene_3d_handle scene, const s_json* root) {
 			s_array_add(&shader_handles, shader_handle);
 		}
 
-		const se_model_handle model_handle = se_model_load_obj_ex(source_path, &shader_handles, SE_MESH_DATA_CPU_GPU);
+		const se_model_handle model_handle = se_model_load_obj_with_flags(source_path, &shader_handles, SE_MESH_DATA_CPU_GPU);
 		s_array_clear(&shader_handles);
 		if (model_handle == S_HANDLE_NULL) {
 			goto fail;
@@ -2751,7 +2751,7 @@ se_scene_3d_handle se_scene_3d_create_for_window(const se_window_handle window, 
 	}
 
 	const s_vec2 ratio = s_vec2(1.0f, 1.0f);
-	se_scene_3d_set_auto_resize(scene, window, &ratio);
+	se_scene_3d_set_fit_to_window(scene, window, &ratio);
 	se_set_last_error(SE_RESULT_OK);
 	return scene;
 }
@@ -2779,14 +2779,14 @@ static void se_scene_3d_resize_callback(const se_window_handle window, void *sce
 	se_scene_3d_render_to_buffer(scene);
 }
 
-void se_scene_3d_set_auto_resize(const se_scene_3d_handle scene, const se_window_handle window, const s_vec2 *ratio) {
+void se_scene_3d_set_fit_to_window(const se_scene_3d_handle scene, const se_window_handle window, const s_vec2 *ratio) {
 	se_context *ctx = se_current_context();
 	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_set_auto_resize :: scene is null");
-	s_assertf(ratio, "se_scene_3d_set_auto_resize :: ratio is null");
+	s_assertf(scene_ptr, "se_scene_3d_set_fit_to_window :: scene is null");
+	s_assertf(ratio, "se_scene_3d_set_fit_to_window :: ratio is null");
 
 	s_assertf(ratio->x == 1.0 && ratio->y == 1.0,
-			"se_scene_3d_set_auto_resize :: ratio can only be 1 for now, "
+			"se_scene_3d_set_fit_to_window :: ratio can only be 1 for now, "
 			"please wait for the next update");
 	se_framebuffer *framebuffer_ptr = s_array_get(&ctx->framebuffers, scene_ptr->output);
 	framebuffer_ptr->auto_resize = true;
@@ -3532,11 +3532,11 @@ i32 se_object_3d_get_instance_index(const se_object_3d_handle object, const se_i
 	return -1;
 }
 
-void se_object_3d_set_instance_transform(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *transform) {
+void se_object_3d_set_transform_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *transform) {
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_set_instance_transform :: object is null");
-	s_assertf(transform, "se_object_3d_set_instance_transform :: transform is null");
+	s_assertf(object_ptr, "se_object_3d_set_transform_by_id :: object is null");
+	s_assertf(transform, "se_object_3d_set_transform_by_id :: transform is null");
 	const i32 index = se_object_3d_get_instance_index(object, instance_id);
 	if (index >= 0) {
 		s_mat4 *current_transform = s_array_get(&object_ptr->instances.transforms, s_array_handle(&object_ptr->instances.transforms, (u32)index));
@@ -3548,11 +3548,11 @@ void se_object_3d_set_instance_transform(const se_object_3d_handle object, const
 	}
 }
 
-void se_object_3d_set_instance_buffer(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *buffer) {
+void se_object_3d_set_buffer_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4 *buffer) {
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_set_instance_buffer :: object is null");
-	s_assertf(buffer, "se_object_3d_set_instance_buffer :: buffer is null");
+	s_assertf(object_ptr, "se_object_3d_set_buffer_by_id :: object is null");
+	s_assertf(buffer, "se_object_3d_set_buffer_by_id :: buffer is null");
 	const i32 index = se_object_3d_get_instance_index(object, instance_id);
 	if (index >= 0) {
 		s_mat4 *current_buffer = s_array_get(&object_ptr->instances.buffers, s_array_handle(&object_ptr->instances.buffers, (u32)index));
@@ -3564,13 +3564,13 @@ void se_object_3d_set_instance_buffer(const se_object_3d_handle object, const se
 	}
 }
 
-void se_object_3d_set_instances_transforms_bulk(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* transforms, const sz count) {
+void se_object_3d_set_transforms_by_id(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* transforms, const sz count) {
 	if (!instance_ids || !transforms) {
 		return;
 	}
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_set_instances_transforms_bulk :: object is null");
+	s_assertf(object_ptr, "se_object_3d_set_transforms_by_id :: object is null");
 	for (sz i = 0; i < count; ++i) {
 		const i32 index = se_object_3d_get_instance_index(object, instance_ids[i]);
 		if (index < 0) {
@@ -3584,13 +3584,13 @@ void se_object_3d_set_instances_transforms_bulk(const se_object_3d_handle object
 	se_object_3d_set_instances_dirty(object, true);
 }
 
-void se_object_3d_set_instances_buffers_bulk(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count) {
+void se_object_3d_set_buffers_by_id(const se_object_3d_handle object, const se_instance_id* instance_ids, const s_mat4* buffers, const sz count) {
 	if (!instance_ids || !buffers) {
 		return;
 	}
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_set_instances_buffers_bulk :: object is null");
+	s_assertf(object_ptr, "se_object_3d_set_buffers_by_id :: object is null");
 	for (sz i = 0; i < count; ++i) {
 		const i32 index = se_object_3d_get_instance_index(object, instance_ids[i]);
 		if (index < 0) {
@@ -3604,10 +3604,10 @@ void se_object_3d_set_instances_buffers_bulk(const se_object_3d_handle object, c
 	se_object_3d_set_instances_dirty(object, true);
 }
 
-b8 se_object_3d_set_instance_active(const se_object_3d_handle object, const se_instance_id instance_id, const b8 active) {
+b8 se_object_3d_set_active_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const b8 active) {
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_set_instance_active :: object is null");
+	s_assertf(object_ptr, "se_object_3d_set_active_by_id :: object is null");
 	const i32 index = se_object_3d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -3629,10 +3629,10 @@ b8 se_object_3d_set_instance_active(const se_object_3d_handle object, const se_i
 	return true;
 }
 
-b8 se_object_3d_is_instance_active(const se_object_3d_handle object, const se_instance_id instance_id) {
+b8 se_object_3d_is_active_by_id(const se_object_3d_handle object, const se_instance_id instance_id) {
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_is_instance_active :: object is null");
+	s_assertf(object_ptr, "se_object_3d_is_active_by_id :: object is null");
 	const i32 index = se_object_3d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		return false;
@@ -3648,14 +3648,14 @@ sz se_object_3d_get_inactive_slot_count(const se_object_3d_handle object) {
 	return s_array_get_size(&object_ptr->instances.free_indices);
 }
 
-b8 se_object_3d_set_instance_metadata(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4* metadata) {
+b8 se_object_3d_set_metadata_by_id(const se_object_3d_handle object, const se_instance_id instance_id, const s_mat4* metadata) {
 	if (!metadata) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_set_instance_metadata :: object is null");
+	s_assertf(object_ptr, "se_object_3d_set_metadata_by_id :: object is null");
 	const i32 index = se_object_3d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
@@ -3671,14 +3671,14 @@ b8 se_object_3d_set_instance_metadata(const se_object_3d_handle object, const se
 	return true;
 }
 
-b8 se_object_3d_get_instance_metadata(const se_object_3d_handle object, const se_instance_id instance_id, s_mat4* out_metadata) {
+b8 se_object_3d_get_metadata_by_id(const se_object_3d_handle object, const se_instance_id instance_id, s_mat4* out_metadata) {
 	if (!out_metadata) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
-	s_assertf(object_ptr, "se_object_3d_get_instance_metadata :: object is null");
+	s_assertf(object_ptr, "se_object_3d_get_metadata_by_id :: object is null");
 	const i32 index = se_object_3d_get_instance_index(object, instance_id);
 	if (index < 0) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);

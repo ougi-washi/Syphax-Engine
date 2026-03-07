@@ -19,8 +19,8 @@ int main(void) {
 
 	se_navigation_grid_set_blocked_rect(&grid, (se_navigation_cell){10, 8}, (se_navigation_cell){18, 22}, true);
 	se_navigation_grid_set_blocked_circle(&grid, (se_navigation_cell){22, 10}, 3, true);
-	se_navigation_grid_set_dynamic_obstacle(&grid, (se_navigation_cell){9, 9}, true);
-	se_navigation_grid_set_dynamic_obstacle_rect(&grid, (se_navigation_cell){4, 14}, (se_navigation_cell){6, 18}, true);
+	se_navigation_grid_set_dynamic_cell(&grid, (se_navigation_cell){9, 9}, true);
+	se_navigation_grid_set_dynamic_rect(&grid, (se_navigation_cell){4, 14}, (se_navigation_cell){6, 18}, true);
 
 	const se_navigation_cell start = {2, 2};
 	const se_navigation_cell goal = {29, 28};

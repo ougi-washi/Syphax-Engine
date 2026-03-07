@@ -3999,7 +3999,7 @@ se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 
 	const s_vec3 reference_local = s_vec3_sub(reference_position, &body_cfg.position);
 	const se_sdf_physics_detail_tier detail_tier = se_sdf_physics_pick_tier(&bounds, &reference_local);
-	const u32 world_shape_budget = s_max((u32)1u, se_physics_world_3d_get_shapes_per_body(world));
+	const u32 world_shape_budget = s_max((u32)1u, se_physics_world_3d_get_shape_limit(world));
 
 	if (se_sdf_physics_try_add_simple_shape(world, body, root, is_trigger)) {
 		return body;
@@ -4859,7 +4859,7 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 	return 1;
 }
 
-const char* se_sdf_renderer_get_generated_fragment_source(const se_sdf_renderer_handle renderer) {
+const char* se_sdf_renderer_get_shader_source(const se_sdf_renderer_handle renderer) {
 	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return NULL;
@@ -4867,7 +4867,7 @@ const char* se_sdf_renderer_get_generated_fragment_source(const se_sdf_renderer_
 	return renderer_ptr->generated_fragment_source.data;
 }
 
-sz se_sdf_renderer_get_generated_fragment_source_size(const se_sdf_renderer_handle renderer) {
+sz se_sdf_renderer_get_shader_source_size(const se_sdf_renderer_handle renderer) {
 	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
@@ -4893,7 +4893,7 @@ b8 se_sdf_renderer_dump_shader_source(const se_sdf_renderer_handle renderer, con
 	return written == renderer_ptr->generated_fragment_source.size;
 }
 
-sz se_sdf_renderer_get_last_uniform_write_count(const se_sdf_renderer_handle renderer) {
+sz se_sdf_renderer_get_uniform_writes(const se_sdf_renderer_handle renderer) {
 	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
@@ -4901,7 +4901,7 @@ sz se_sdf_renderer_get_last_uniform_write_count(const se_sdf_renderer_handle ren
 	return renderer_ptr->last_uniform_write_count;
 }
 
-sz se_sdf_renderer_get_total_uniform_write_count(const se_sdf_renderer_handle renderer) {
+sz se_sdf_renderer_get_total_uniform_writes(const se_sdf_renderer_handle renderer) {
 	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
 		return 0;
@@ -4924,7 +4924,7 @@ const char* se_sdf_control_get_uniform_name(
 	return control_ptr->uniform_name;
 }
 
-se_sdf_build_diagnostics se_sdf_renderer_get_last_build_diagnostics(const se_sdf_renderer_handle renderer) {
+se_sdf_build_diagnostics se_sdf_renderer_get_build_diagnostics(const se_sdf_renderer_handle renderer) {
 	se_sdf_build_diagnostics diagnostics = {0};
 	se_sdf_renderer* renderer_ptr = se_sdf_renderer_from_handle(renderer);
 	if (!renderer_ptr) {
@@ -5958,7 +5958,7 @@ b8 se_sdf_control_bind_ptr_mat4(
 	return 1;
 }
 
-b8 se_sdf_control_bind_node_translation(
+b8 se_sdf_control_bind_node_position(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node,
@@ -6044,7 +6044,7 @@ static b8 se_sdf_bind_primitive_param_float(
 	return 1;
 }
 
-b8 se_sdf_control_bind_primitive_param_float(
+b8 se_sdf_control_bind_primitive_float(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_scene_handle scene,
 	const se_sdf_node_handle node,
@@ -6073,7 +6073,7 @@ static b8 se_sdf_bind_renderer_float_control(
 	return 1;
 }
 
-b8 se_sdf_control_bind_material_base_color(
+b8 se_sdf_control_bind_base_color(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6085,7 +6085,7 @@ b8 se_sdf_control_bind_material_base_color(
 	return 1;
 }
 
-b8 se_sdf_control_bind_lighting_direction(
+b8 se_sdf_control_bind_light_direction(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6097,7 +6097,7 @@ b8 se_sdf_control_bind_lighting_direction(
 	return 1;
 }
 
-b8 se_sdf_control_bind_lighting_color(
+b8 se_sdf_control_bind_light_color(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6129,7 +6129,7 @@ b8 se_sdf_control_bind_fog_density(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->fog_density_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_band_levels(
+b8 se_sdf_control_bind_style_bands(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6137,7 +6137,7 @@ b8 se_sdf_control_bind_stylized_band_levels(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_band_levels_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_rim_power(
+b8 se_sdf_control_bind_style_rim_power(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6145,7 +6145,7 @@ b8 se_sdf_control_bind_stylized_rim_power(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_rim_power_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_rim_strength(
+b8 se_sdf_control_bind_style_rim_strength(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6153,7 +6153,7 @@ b8 se_sdf_control_bind_stylized_rim_strength(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_rim_strength_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_fill_strength(
+b8 se_sdf_control_bind_style_fill(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6161,7 +6161,7 @@ b8 se_sdf_control_bind_stylized_fill_strength(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_fill_strength_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_back_strength(
+b8 se_sdf_control_bind_style_back(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6169,7 +6169,7 @@ b8 se_sdf_control_bind_stylized_back_strength(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_back_strength_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_checker_scale(
+b8 se_sdf_control_bind_style_checker_scale(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6177,7 +6177,7 @@ b8 se_sdf_control_bind_stylized_checker_scale(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_checker_scale_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_checker_strength(
+b8 se_sdf_control_bind_style_checker_strength(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6185,7 +6185,7 @@ b8 se_sdf_control_bind_stylized_checker_strength(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_checker_strength_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_ground_blend(
+b8 se_sdf_control_bind_style_ground_blend(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6193,7 +6193,7 @@ b8 se_sdf_control_bind_stylized_ground_blend(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_ground_blend_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_desaturate(
+b8 se_sdf_control_bind_style_desaturate(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {
@@ -6201,7 +6201,7 @@ b8 se_sdf_control_bind_stylized_desaturate(
 	return se_sdf_bind_renderer_float_control(renderer_ptr, &renderer_ptr->stylized_desaturate_control, control);
 }
 
-b8 se_sdf_control_bind_stylized_gamma(
+b8 se_sdf_control_bind_style_gamma(
 	const se_sdf_renderer_handle renderer,
 	const se_sdf_control_handle control
 ) {

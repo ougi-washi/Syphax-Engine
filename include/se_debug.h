@@ -108,9 +108,9 @@ extern void se_debug_dump_trace_stats(c8* out_buffer, sz out_buffer_size, u32 ma
 extern void se_debug_clear_trace_events(void);
 extern void se_debug_frame_begin(void);
 extern void se_debug_frame_end(void);
-extern b8 se_debug_get_last_frame_timing(se_debug_frame_timing* out_timing);
-extern void se_debug_dump_last_frame_timing(c8* out_buffer, const sz out_buffer_size);
-extern void se_debug_dump_last_frame_timing_lines(c8* out_buffer, const sz out_buffer_size);
+extern b8 se_debug_get_frame_timing(se_debug_frame_timing* out_timing);
+extern void se_debug_dump_frame_timing(c8* out_buffer, const sz out_buffer_size);
+extern void se_debug_dump_frame_timing_lines(c8* out_buffer, const sz out_buffer_size);
 
 extern b8 se_debug_collect_stats(const se_window_handle window, se_input_handle* input, se_debug_system_stats* out_stats);
 extern void se_debug_set_overlay_enabled(const b8 enabled);

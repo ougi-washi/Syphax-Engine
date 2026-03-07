@@ -39,24 +39,24 @@ extern b8 se_debug_collect_stats(const se_window_handle window, se_input_handle*
 
 No inline description found in header comments.
 
-### `se_debug_dump_last_frame_timing`
+### `se_debug_dump_frame_timing`
 
 <div class="api-signature">
 
 ```c
-extern void se_debug_dump_last_frame_timing(c8* out_buffer, const sz out_buffer_size);
+extern void se_debug_dump_frame_timing(c8* out_buffer, const sz out_buffer_size);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_debug_dump_last_frame_timing_lines`
+### `se_debug_dump_frame_timing_lines`
 
 <div class="api-signature">
 
 ```c
-extern void se_debug_dump_last_frame_timing_lines(c8* out_buffer, const sz out_buffer_size);
+extern void se_debug_dump_frame_timing_lines(c8* out_buffer, const sz out_buffer_size);
 ```
 
 </div>
@@ -111,12 +111,12 @@ extern u32 se_debug_get_category_mask(void);
 
 No inline description found in header comments.
 
-### `se_debug_get_last_frame_timing`
+### `se_debug_get_frame_timing`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_debug_get_last_frame_timing(se_debug_frame_timing* out_timing);
+extern b8 se_debug_get_frame_timing(se_debug_frame_timing* out_timing);
 ```
 
 </div>

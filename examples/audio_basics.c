@@ -19,7 +19,7 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.04f, 0.05f, 0.08f, 1.0f));
+	se_render_set_background(s_vec4(0.04f, 0.05f, 0.08f, 1.0f));
 
 	se_audio_engine* audio = se_audio_init(NULL);
 	se_audio_clip* chime = se_audio_clip_load(audio, SE_RESOURCE_PUBLIC("audio/chime.wav"));

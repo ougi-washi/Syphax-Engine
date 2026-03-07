@@ -970,7 +970,7 @@ i32 main(void) {
 		return 0;
 	}
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-	se_render_set_background_color(s_vec4(0.07f, 0.08f, 0.10f, 1.0f));
+	se_render_set_background(s_vec4(0.07f, 0.08f, 0.10f, 1.0f));
 
 	se_ui_handle ui = se_ui_create(window, 512);
 	if (ui == S_HANDLE_NULL) {
@@ -1375,7 +1375,7 @@ i32 main(void) {
 		const f32 mouse_x = se_window_get_mouse_position_x(window);
 		const f32 mouse_y = se_window_get_mouse_position_y(window);
 		if (!se_window_pixel_to_normalized(window, mouse_x, mouse_y, &pointer_ndc)) {
-			se_window_get_mouse_position_normalized(window, &pointer_ndc);
+			se_window_get_mouse_normalized(window, &pointer_ndc);
 		}
 		ui_update_card_drag(&state, &pointer_ndc);
 

@@ -21,10 +21,10 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.05f, 0.07f, 0.10f, 1.0f));
+	se_render_set_background(s_vec4(0.05f, 0.07f, 0.10f, 1.0f));
 
 	se_scene_2d_handle scene = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), 2);
-	se_scene_2d_set_auto_resize(scene, window, &s_vec2(1.0f, 1.0f));
+	se_scene_2d_set_fit_to_window(scene, window, &s_vec2(1.0f, 1.0f));
 	se_object_2d_handle dots = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d_inst/instance.glsl"), &s_mat3_identity, INSTANCE_COUNT);
 	se_scene_2d_add_object(scene, dots);
 
@@ -58,7 +58,7 @@ int main(void) {
 			const f32 y = wave_enabled ? sinf(time * 2.2f + (f32)i * 0.45f) * 0.24f : 0.0f;
 			s_mat3 transform = s_mat3_identity;
 			s_mat3_set_translation(&transform, &s_vec2(x, y));
-			se_object_2d_set_instance_transform(dots, *id, &transform);
+			se_object_2d_set_transform_by_id(dots, *id, &transform);
 		}
 
 		se_render_clear();

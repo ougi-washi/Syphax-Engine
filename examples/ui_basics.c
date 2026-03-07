@@ -47,7 +47,7 @@ int main(void) {
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(window, 60);
-	se_render_set_background_color(s_vec4(0.08f, 0.10f, 0.12f, 1.0f));
+	se_render_set_background(s_vec4(0.08f, 0.10f, 0.12f, 1.0f));
 
 	se_ui_handle ui = se_ui_create(window, 64);
 	se_ui_widget_handle root = se_ui_create_root(ui);

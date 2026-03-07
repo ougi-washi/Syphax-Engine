@@ -2732,46 +2732,46 @@ s_vec3 se_physics_world_3d_get_gravity(const se_physics_world_3d_handle world_ha
 	return world ? world->gravity : s_vec3(0.0f, 0.0f, 0.0f);
 }
 
-void se_physics_world_2d_set_solver_iterations(const se_physics_world_2d_handle world_handle, const u32 iterations) {
+void se_physics_world_2d_set_iterations(const se_physics_world_2d_handle world_handle, const u32 iterations) {
 	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
 	if (!world) return;
 	world->solver_iterations = iterations;
 }
 
-u32 se_physics_world_2d_get_solver_iterations(const se_physics_world_2d_handle world_handle) {
+u32 se_physics_world_2d_get_iterations(const se_physics_world_2d_handle world_handle) {
 	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
 	return world ? world->solver_iterations : 0u;
 }
 
-void se_physics_world_3d_set_solver_iterations(const se_physics_world_3d_handle world_handle, const u32 iterations) {
+void se_physics_world_3d_set_iterations(const se_physics_world_3d_handle world_handle, const u32 iterations) {
 	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
 	if (!world) return;
 	world->solver_iterations = iterations;
 }
 
-u32 se_physics_world_3d_get_solver_iterations(const se_physics_world_3d_handle world_handle) {
+u32 se_physics_world_3d_get_iterations(const se_physics_world_3d_handle world_handle) {
 	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
 	return world ? world->solver_iterations : 0u;
 }
 
-void se_physics_world_2d_set_shapes_per_body(const se_physics_world_2d_handle world_handle, const u32 count) {
+void se_physics_world_2d_set_shape_limit(const se_physics_world_2d_handle world_handle, const u32 count) {
 	se_physics_world_2d *world = se_physics_world_2d_from_handle_mut(world_handle);
 	if (!world) return;
 	world->shapes_per_body = count;
 }
 
-u32 se_physics_world_2d_get_shapes_per_body(const se_physics_world_2d_handle world_handle) {
+u32 se_physics_world_2d_get_shape_limit(const se_physics_world_2d_handle world_handle) {
 	const se_physics_world_2d *world = se_physics_world_2d_from_handle_const(world_handle);
 	return world ? world->shapes_per_body : 0u;
 }
 
-void se_physics_world_3d_set_shapes_per_body(const se_physics_world_3d_handle world_handle, const u32 count) {
+void se_physics_world_3d_set_shape_limit(const se_physics_world_3d_handle world_handle, const u32 count) {
 	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
 	if (!world) return;
 	world->shapes_per_body = count;
 }
 
-u32 se_physics_world_3d_get_shapes_per_body(const se_physics_world_3d_handle world_handle) {
+u32 se_physics_world_3d_get_shape_limit(const se_physics_world_3d_handle world_handle) {
 	const se_physics_world_3d *world = se_physics_world_3d_from_handle_const(world_handle);
 	return world ? world->shapes_per_body : 0u;
 }

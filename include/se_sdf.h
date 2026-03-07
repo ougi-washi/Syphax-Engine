@@ -626,13 +626,13 @@ extern b8 se_sdf_renderer_set_light_rig(
 extern b8 se_sdf_renderer_build(se_sdf_renderer_handle renderer);
 extern b8 se_sdf_renderer_rebuild_if_dirty(se_sdf_renderer_handle renderer);
 extern b8 se_sdf_renderer_render(se_sdf_renderer_handle renderer, const se_sdf_frame_desc* frame);
-extern const char* se_sdf_renderer_get_generated_fragment_source(se_sdf_renderer_handle renderer);
-extern sz se_sdf_renderer_get_generated_fragment_source_size(se_sdf_renderer_handle renderer);
+extern const char* se_sdf_renderer_get_shader_source(se_sdf_renderer_handle renderer);
+extern sz se_sdf_renderer_get_shader_source_size(se_sdf_renderer_handle renderer);
 extern b8 se_sdf_renderer_dump_shader_source(se_sdf_renderer_handle renderer, const char* path);
-extern sz se_sdf_renderer_get_last_uniform_write_count(se_sdf_renderer_handle renderer);
-extern sz se_sdf_renderer_get_total_uniform_write_count(se_sdf_renderer_handle renderer);
+extern sz se_sdf_renderer_get_uniform_writes(se_sdf_renderer_handle renderer);
+extern sz se_sdf_renderer_get_total_uniform_writes(se_sdf_renderer_handle renderer);
 extern const char* se_sdf_control_get_uniform_name(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern se_sdf_build_diagnostics se_sdf_renderer_get_last_build_diagnostics(se_sdf_renderer_handle renderer);
+extern se_sdf_build_diagnostics se_sdf_renderer_get_build_diagnostics(se_sdf_renderer_handle renderer);
 
 extern se_sdf_control_handle se_sdf_control_define_float(se_sdf_renderer_handle renderer, const char* name, f32 default_value);
 extern se_sdf_control_handle se_sdf_control_define_vec2(se_sdf_renderer_handle renderer, const char* name, const s_vec2* default_value);
@@ -652,25 +652,25 @@ extern b8 se_sdf_control_bind_ptr_vec3(se_sdf_renderer_handle renderer, se_sdf_c
 extern b8 se_sdf_control_bind_ptr_vec4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec4* value_ptr);
 extern b8 se_sdf_control_bind_ptr_int(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const i32* value_ptr);
 extern b8 se_sdf_control_bind_ptr_mat4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_mat4* value_ptr);
-extern b8 se_sdf_control_bind_node_translation(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_node_position(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
 extern b8 se_sdf_control_bind_node_rotation(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
 extern b8 se_sdf_control_bind_node_scale(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_primitive_param_float(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_primitive_param param, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_material_base_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_lighting_direction(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_lighting_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_primitive_float(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_primitive_param param, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_base_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_light_direction(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_light_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 extern b8 se_sdf_control_bind_fog_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 extern b8 se_sdf_control_bind_fog_density(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_band_levels(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_rim_power(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_rim_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_fill_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_back_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_checker_scale(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_checker_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_ground_blend(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_desaturate(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_stylized_gamma(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_bands(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_rim_power(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_rim_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_fill(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_back(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_checker_scale(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_checker_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_ground_blend(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_desaturate(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_control_bind_style_gamma(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
 
 // ============================================================================
 // Shader String Generation

@@ -195,18 +195,6 @@ extern se_model_handle se_model_load_obj(const char *path, const se_shaders_ptr 
 
 No inline description found in header comments.
 
-### `se_model_load_obj_ex`
-
-<div class="api-signature">
-
-```c
-extern se_model_handle se_model_load_obj_ex(const char *path, const se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_model_load_obj_simple`
 
 <div class="api-signature">
@@ -219,12 +207,24 @@ extern se_model_handle se_model_load_obj_simple(const char *obj_path, const char
 
 No inline description found in header comments.
 
-### `se_model_load_obj_simple_ex`
+### `se_model_load_obj_simple_with_flags`
 
 <div class="api-signature">
 
 ```c
-extern se_model_handle se_model_load_obj_simple_ex(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags);
+extern se_model_handle se_model_load_obj_simple_with_flags(const char *obj_path, const char *vertex_shader_path, const char *fragment_shader_path, const se_mesh_data_flags mesh_data_flags);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_model_load_obj_with_flags`
+
+<div class="api-signature">
+
+```c
+extern se_model_handle se_model_load_obj_with_flags(const char *path, const se_shaders_ptr *shaders, const se_mesh_data_flags mesh_data_flags);
 ```
 
 </div>
