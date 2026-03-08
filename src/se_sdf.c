@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <stdint.h>
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -42,6 +43,9 @@ typedef struct {
 	s_mat4 transform;
 	se_sdf_operation operation;
 	f32 operation_amount;
+	se_sdf_noise noise;
+	s_vec3 color;
+	b8 has_color;
 	se_sdf_primitive_desc primitive;
 	se_sdf_node_handle parent;
 	b8 is_group;
@@ -58,8 +62,18 @@ typedef struct se_sdf_scene {
 	se_sdf_node_handle root;
 	se_sdf_renderer_handle implicit_renderer;
 	se_camera_handle implicit_camera;
+	u64 generation;
 } se_sdf_scene;
 typedef s_array(se_sdf_scene, se_sdf_scenes);
+
+typedef struct se_sdf_physics {
+	se_sdf_scene_handle scene;
+	se_sdf_object root_snapshot;
+	se_sdf_scene_bounds bounds;
+	u64 built_generation;
+	b8 has_snapshot;
+} se_sdf_physics;
+typedef s_array(se_sdf_physics, se_sdf_physicses);
 
 typedef struct {
 	se_sdf_scene_handle scene;
@@ -158,6 +172,7 @@ typedef struct se_sdf_renderer {
 	se_sdf_control_handle stylized_gamma_control;
 	se_sdf_build_diagnostics diagnostics;
 	u64 render_generation;
+	u64 scene_generation_built;
 	b8 built;
 } se_sdf_renderer;
 typedef s_array(se_sdf_renderer, se_sdf_renderers);
@@ -197,6 +212,35 @@ static void se_sdf_renderer_release_shader(se_sdf_renderer* renderer);
 static void se_sdf_renderer_release_quad(se_sdf_renderer* renderer);
 static void se_sdf_renderer_invalidate_gpu_state(se_sdf_renderer* renderer);
 static void se_sdf_renderer_refresh_context_state(se_sdf_renderer* renderer);
+static void se_sdf_free_legacy_object(se_sdf_object* obj);
+static b8 se_sdf_scene_build_legacy_root(
+	se_sdf_scene_handle scene,
+	se_sdf_scene** out_scene_ptr,
+	se_sdf_object* out_root
+);
+static void se_sdf_generate_color_function(se_sdf_string* out, se_sdf_object* root, const char* func_name);
+static void se_sdf_physics_collect_object_bounds_recursive(
+	se_sdf_object* object,
+	const s_mat4* parent_transform,
+	se_sdf_scene_bounds* bounds,
+	sz depth,
+	sz max_depth
+);
+static void se_sdf_physics_finalize_bounds(se_sdf_scene_bounds* bounds);
+static f32 se_sdf_physics_eval_object_distance_recursive(
+	se_sdf_object* object,
+	const s_vec3* world_point,
+	const s_mat4* parent_transform,
+	sz depth,
+	sz max_depth
+);
+static b8 se_sdf_estimate_surface_normal(
+	se_sdf_object* root,
+	const s_vec3* point,
+	s_vec3* out_normal
+);
+static void se_sdf_scene_touch(se_sdf_scene* scene_ptr);
+static u64 se_sdf_scene_generation(const se_sdf_scene* scene_ptr);
 static s_vec3 se_sdf_mul_mat4_point(const s_mat4* mat, const s_vec3* point);
 static void se_sdf_scene_bounds_expand_point(se_sdf_scene_bounds* bounds, const s_vec3* point);
 static void se_sdf_scene_bounds_expand_transformed_aabb(
@@ -204,6 +248,11 @@ static void se_sdf_scene_bounds_expand_transformed_aabb(
 	const s_mat4* transform,
 	const s_vec3* local_min,
 	const s_vec3* local_max
+);
+static void se_sdf_expand_local_bounds_by_noise(
+	const se_sdf_noise* noise,
+	s_vec3* local_min,
+	s_vec3* local_max
 );
 static b8 se_sdf_get_primitive_local_bounds(
 	const se_sdf_primitive_desc* primitive,
@@ -220,17 +269,6 @@ static void se_sdf_collect_scene_bounds_recursive(
 	sz depth,
 	sz max_depth
 );
-static s_mat4 se_sdf_transform_trs(
-	f32 tx,
-	f32 ty,
-	f32 tz,
-	f32 rx,
-	f32 ry,
-	f32 rz,
-	f32 sx,
-	f32 sy,
-	f32 sz
-);
 static s_mat4 se_sdf_transform_grid_cell(
 	i32 index,
 	i32 columns,
@@ -241,6 +279,11 @@ static s_mat4 se_sdf_transform_grid_cell(
 	f32 sx,
 	f32 sy,
 	f32 sz
+);
+static f32 se_sdf_noise_apply_distance(
+	const se_sdf_noise* noise,
+	const s_vec3* local_point,
+	f32 distance
 );
 
 typedef s_array(se_sdf_node_handle, se_sdf_node_handles);
@@ -366,6 +409,18 @@ static b8 se_sdf_json_add_mat4(s_json* parent, const c8* name, const s_mat4* val
 	return 1;
 }
 
+static b8 se_sdf_json_add_noise(s_json* parent, const c8* name, const se_sdf_noise* noise) {
+	if (!parent || !noise) {
+		return 0;
+	}
+	s_json* noise_json = se_sdf_json_add_object(parent, name);
+	return noise_json &&
+		se_sdf_json_add_bool(noise_json, "active", noise->active) &&
+		se_sdf_json_add_f32(noise_json, "scale", noise->scale) &&
+		se_sdf_json_add_f32(noise_json, "offset", noise->offset) &&
+		se_sdf_json_add_f32(noise_json, "frequency", noise->frequency);
+}
+
 static b8 se_sdf_json_number_to_u32(const s_json* node, u32* out_value) {
 	if (!node || node->type != S_JSON_NUMBER || !out_value) {
 		return 0;
@@ -448,6 +503,30 @@ static b8 se_sdf_json_get_string(const s_json* object, const c8* key, const c8**
 		return 0;
 	}
 	*out_value = node->as.string;
+	return 1;
+}
+
+static b8 se_sdf_json_read_noise(const s_json* object, const c8* key, se_sdf_noise* out_noise) {
+	if (!out_noise) {
+		return 0;
+	}
+	*out_noise = SE_SDF_NOISE_DEFAULTS;
+	if (!object || object->type != S_JSON_OBJECT || !key) {
+		return 0;
+	}
+	const s_json* noise_json = s_json_get(object, key);
+	if (!noise_json) {
+		return 1;
+	}
+	if (noise_json->type != S_JSON_OBJECT) {
+		return 0;
+	}
+	if (!se_sdf_json_get_bool(noise_json, "active", &out_noise->active) ||
+		!se_sdf_json_get_f32(noise_json, "scale", &out_noise->scale) ||
+		!se_sdf_json_get_f32(noise_json, "offset", &out_noise->offset) ||
+		!se_sdf_json_get_f32(noise_json, "frequency", &out_noise->frequency)) {
+		return 0;
+	}
 	return 1;
 }
 
@@ -826,6 +905,9 @@ static b8 se_sdf_get_context(se_context** out_context) {
 	if (s_array_get_capacity(&ctx->sdf_scenes) == 0) {
 		s_array_init(&ctx->sdf_scenes);
 	}
+	if (s_array_get_capacity(&ctx->sdf_physicses) == 0) {
+		s_array_init(&ctx->sdf_physicses);
+	}
 	if (s_array_get_capacity(&ctx->sdf_renderers) == 0) {
 		s_array_init(&ctx->sdf_renderers);
 	}
@@ -948,6 +1030,31 @@ static se_sdf_scene* se_sdf_scene_from_handle(const se_sdf_scene_handle scene) {
 		return NULL;
 	}
 	return s_array_get(&ctx->sdf_scenes, scene);
+}
+
+static se_sdf_physics* se_sdf_physics_from_handle(const se_sdf_physics_handle physics) {
+	if (physics == SE_SDF_PHYSICS_NULL) {
+		return NULL;
+	}
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return NULL;
+	}
+	return s_array_get(&ctx->sdf_physicses, physics);
+}
+
+static void se_sdf_scene_touch(se_sdf_scene* scene_ptr) {
+	if (!scene_ptr) {
+		return;
+	}
+	scene_ptr->generation++;
+	if (scene_ptr->generation == 0u) {
+		scene_ptr->generation = 1u;
+	}
+}
+
+static u64 se_sdf_scene_generation(const se_sdf_scene* scene_ptr) {
+	return scene_ptr ? scene_ptr->generation : 0u;
 }
 
 static void se_sdf_scene_release_implicit_resources(se_sdf_scene* scene_ptr) {
@@ -1345,6 +1452,7 @@ se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc) {
 	scene->root = SE_SDF_NODE_NULL;
 	scene->implicit_renderer = SE_SDF_RENDERER_NULL;
 	scene->implicit_camera = S_HANDLE_NULL;
+	scene->generation = 1u;
 
 	if (scene_desc.initial_node_capacity > 0) {
 		s_array_reserve(&scene->nodes, scene_desc.initial_node_capacity);
@@ -1442,6 +1550,13 @@ void se_sdf_scene_destroy(const se_sdf_scene_handle scene) {
 	if (!se_sdf_get_context(&ctx)) {
 		return;
 	}
+	for (sz i = s_array_get_size(&ctx->sdf_physicses); i > 0; --i) {
+		const se_sdf_physics_handle physics_handle = s_array_handle(&ctx->sdf_physicses, (u32)(i - 1u));
+		se_sdf_physics* physics_ptr = s_array_get(&ctx->sdf_physicses, physics_handle);
+		if (physics_ptr && physics_ptr->scene == scene) {
+			se_sdf_physics_destroy(physics_handle);
+		}
+	}
 	se_sdf_scene_release_implicit_resources(scene_ptr);
 	se_sdf_scene_release_nodes(scene_ptr);
 	s_array_remove(&ctx->sdf_scenes, scene);
@@ -1453,6 +1568,7 @@ void se_sdf_scene_clear(const se_sdf_scene_handle scene) {
 		return;
 	}
 	se_sdf_scene_release_nodes(scene_ptr);
+	se_sdf_scene_touch(scene_ptr);
 }
 
 b8 se_sdf_scene_set_root(const se_sdf_scene_handle scene, const se_sdf_node_handle node) {
@@ -1462,6 +1578,7 @@ b8 se_sdf_scene_set_root(const se_sdf_scene_handle scene, const se_sdf_node_hand
 	}
 	if (node == SE_SDF_NODE_NULL) {
 		scene_ptr->root = SE_SDF_NODE_NULL;
+		se_sdf_scene_touch(scene_ptr);
 		return 1;
 	}
 	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
@@ -1469,6 +1586,7 @@ b8 se_sdf_scene_set_root(const se_sdf_scene_handle scene, const se_sdf_node_hand
 		return 0;
 	}
 	scene_ptr->root = node;
+	se_sdf_scene_touch(scene_ptr);
 	return 1;
 }
 
@@ -1478,6 +1596,167 @@ se_sdf_node_handle se_sdf_scene_get_root(const se_sdf_scene_handle scene) {
 		return SE_SDF_NODE_NULL;
 	}
 	return scene_ptr->root;
+}
+
+u64 se_sdf_scene_get_generation(const se_sdf_scene_handle scene) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		return 0u;
+	}
+	return scene_ptr->generation;
+}
+
+static b8 se_sdf_physics_build_snapshot(se_sdf_physics* physics) {
+	if (!physics) {
+		return 0;
+	}
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(physics->scene);
+	if (!scene_ptr) {
+		return 0;
+	}
+
+	se_sdf_object snapshot = {0};
+	se_sdf_scene* built_scene_ptr = NULL;
+	if (!se_sdf_scene_build_legacy_root(physics->scene, &built_scene_ptr, &snapshot)) {
+		return 0;
+	}
+
+	se_sdf_scene_bounds bounds = SE_SDF_SCENE_BOUNDS_DEFAULTS;
+	const s_mat4 identity = s_mat4_identity;
+	se_sdf_physics_collect_object_bounds_recursive(&snapshot, &identity, &bounds, 0, 128);
+	if (!bounds.valid) {
+		se_sdf_free_legacy_object(&snapshot);
+		return 0;
+	}
+	se_sdf_physics_finalize_bounds(&bounds);
+	if (bounds.has_unbounded_primitives) {
+		s_vec3 half = s_vec3(
+			bounds.max.x - bounds.min.x,
+			bounds.max.y - bounds.min.y,
+			bounds.max.z - bounds.min.z
+		);
+		half = s_vec3_muls(&half, 0.5f);
+		half.x = fmaxf(half.x, 64.0f);
+		half.y = fmaxf(half.y, 64.0f);
+		half.z = fmaxf(half.z, 64.0f);
+		bounds.min = s_vec3_sub(&bounds.center, &half);
+		bounds.max = s_vec3_add(&bounds.center, &half);
+		se_sdf_physics_finalize_bounds(&bounds);
+	}
+
+	if (physics->has_snapshot) {
+		se_sdf_free_legacy_object(&physics->root_snapshot);
+	}
+	physics->root_snapshot = snapshot;
+	physics->bounds = bounds;
+	physics->built_generation = built_scene_ptr ? built_scene_ptr->generation : scene_ptr->generation;
+	physics->has_snapshot = 1;
+	return 1;
+}
+
+static b8 se_sdf_physics_ensure_current(se_sdf_physics* physics) {
+	if (!physics) {
+		return 0;
+	}
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(physics->scene);
+	if (!scene_ptr) {
+		return 0;
+	}
+	if (physics->has_snapshot && physics->built_generation == scene_ptr->generation) {
+		return 1;
+	}
+	return se_sdf_physics_build_snapshot(physics);
+}
+
+static b8 se_sdf_physics_sample_callback_3d(void* user_data, const s_vec3* local_point, f32* out_distance, s_vec3* out_normal) {
+	const se_sdf_physics_handle handle = (se_sdf_physics_handle)(uintptr_t)user_data;
+	se_sdf_physics* physics = se_sdf_physics_from_handle(handle);
+	if (!physics || !local_point || !out_distance || !se_sdf_physics_ensure_current(physics)) {
+		return 0;
+	}
+	const s_mat4 identity = s_mat4_identity;
+	*out_distance = se_sdf_physics_eval_object_distance_recursive(
+		&physics->root_snapshot,
+		local_point,
+		&identity,
+		0,
+		128
+	);
+	if (out_normal) {
+		if (!se_sdf_estimate_surface_normal(&physics->root_snapshot, local_point, out_normal)) {
+			*out_normal = s_vec3(0.0f, 1.0f, 0.0f);
+		}
+	}
+	return 1;
+}
+
+se_sdf_physics_handle se_sdf_physics_create(const se_sdf_scene_handle scene) {
+	if (scene == SE_SDF_SCENE_NULL) {
+		return SE_SDF_PHYSICS_NULL;
+	}
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return SE_SDF_PHYSICS_NULL;
+	}
+	if (!se_sdf_scene_from_handle(scene)) {
+		return SE_SDF_PHYSICS_NULL;
+	}
+	const se_sdf_physics_handle handle = s_array_increment(&ctx->sdf_physicses);
+	se_sdf_physics* physics = s_array_get(&ctx->sdf_physicses, handle);
+	memset(physics, 0, sizeof(*physics));
+	physics->scene = scene;
+	if (!se_sdf_physics_build_snapshot(physics)) {
+		s_array_remove(&ctx->sdf_physicses, handle);
+		return SE_SDF_PHYSICS_NULL;
+	}
+	return handle;
+}
+
+void se_sdf_physics_destroy(const se_sdf_physics_handle physics) {
+	if (physics == SE_SDF_PHYSICS_NULL) {
+		return;
+	}
+	se_context* ctx = NULL;
+	if (!se_sdf_get_context(&ctx)) {
+		return;
+	}
+	se_sdf_physics* physics_ptr = s_array_get(&ctx->sdf_physicses, physics);
+	if (!physics_ptr) {
+		return;
+	}
+	if (physics_ptr->has_snapshot) {
+		se_sdf_free_legacy_object(&physics_ptr->root_snapshot);
+		physics_ptr->has_snapshot = 0;
+	}
+	s_array_remove(&ctx->sdf_physicses, physics);
+}
+
+b8 se_sdf_physics_refresh(const se_sdf_physics_handle physics) {
+	se_sdf_physics* physics_ptr = se_sdf_physics_from_handle(physics);
+	return physics_ptr ? se_sdf_physics_build_snapshot(physics_ptr) : 0;
+}
+
+se_physics_shape_3d_handle se_sdf_physics_add_shape_3d(
+	const se_sdf_physics_handle physics,
+	const se_physics_world_3d_handle world,
+	const se_physics_body_3d_handle body,
+	const s_vec3* offset,
+	const s_vec3* rotation,
+	const b8 is_trigger
+) {
+	se_sdf_physics* physics_ptr = se_sdf_physics_from_handle(physics);
+	if (!physics_ptr || !offset || !rotation || !se_sdf_physics_ensure_current(physics_ptr)) {
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+	}
+	se_physics_sdf_3d sdf = {
+		.user_data = (void*)(uintptr_t)physics,
+		.local_bounds = {
+			.min = physics_ptr->bounds.min,
+			.max = physics_ptr->bounds.max
+		},
+		.sample = se_sdf_physics_sample_callback_3d
+	};
+	return se_physics_body_3d_add_sdf(world, body, &sdf, offset, rotation, is_trigger);
 }
 
 static void se_sdf_write_scene_error(
@@ -1701,6 +1980,9 @@ s_json* se_sdf_to_json(const se_sdf_scene_handle scene) {
 			!se_sdf_json_add_mat4(node_json, "transform", &node->transform) ||
 			!se_sdf_json_add_i32(node_json, "operation", (i32)node->operation) ||
 			!se_sdf_json_add_f32(node_json, "operation_amount", node->operation_amount) ||
+			!se_sdf_json_add_noise(node_json, "noise", &node->noise) ||
+			!se_sdf_json_add_vec3(node_json, "color", &node->color) ||
+			!se_sdf_json_add_bool(node_json, "has_color", node->has_color) ||
 			!se_sdf_json_add_vec3(node_json, "control_translation", &node->control_translation) ||
 			!se_sdf_json_add_vec3(node_json, "control_rotation", &node->control_rotation) ||
 			!se_sdf_json_add_vec3(node_json, "control_scale", &node->control_scale) ||
@@ -1801,10 +2083,13 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 		i32 operation_i32 = 0;
 		f32 operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT;
 		s_mat4 transform = s_mat4_identity;
+		se_sdf_noise noise = SE_SDF_NOISE_DEFAULTS;
 		s_vec3 control_translation = s_vec3(0.0f, 0.0f, 0.0f);
 		s_vec3 control_rotation = s_vec3(0.0f, 0.0f, 0.0f);
 		s_vec3 control_scale = s_vec3(1.0f, 1.0f, 1.0f);
+		s_vec3 color = s_vec3(0.0f, 0.0f, 0.0f);
 		b8 control_trs_initialized = 0;
+		b8 has_color = 0;
 		if (!se_sdf_json_get_bool(node_json, "is_group", &is_group) ||
 			!se_sdf_json_get_i32(node_json, "operation", &operation_i32) ||
 			!se_sdf_json_get_f32(node_json, "operation_amount", &operation_amount) ||
@@ -1840,6 +2125,23 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 			}
 			control_trs_initialized = control_initialized_json->as.boolean;
 		}
+		const s_json* color_json = s_json_get(node_json, "color");
+		const s_json* has_color_json = s_json_get(node_json, "has_color");
+		if (color_json && !se_sdf_json_read_vec3_node(color_json, &color)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		if (has_color_json) {
+			if (has_color_json->type != S_JSON_BOOL) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				goto fail;
+			}
+			has_color = has_color_json->as.boolean;
+		}
+		if (!se_sdf_json_read_noise(node_json, "noise", &noise)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
 
 		se_sdf_node_handle node_handle = SE_SDF_NODE_NULL;
 		if (is_group) {
@@ -1861,10 +2163,15 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 			primitive_desc.operation = (se_sdf_operation)operation_i32;
 			primitive_desc.operation_amount = operation_amount;
 			primitive_desc.primitive = primitive;
+			primitive_desc.noise = noise;
 			node_handle = se_sdf_node_create_primitive(temp_scene, &primitive_desc);
 		}
 
 		if (node_handle == SE_SDF_NODE_NULL) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+		if (has_color && !se_sdf_node_set_color(temp_scene, node_handle, &color)) {
 			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 			goto fail;
 		}
@@ -1879,6 +2186,7 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 		node_ptr->control_rotation = control_rotation;
 		node_ptr->control_scale = control_scale;
 		node_ptr->control_trs_initialized = control_trs_initialized;
+		node_ptr->noise = noise;
 	}
 
 	for (sz i = 0; i < nodes_json->as.children.count; ++i) {
@@ -1953,6 +2261,7 @@ b8 se_sdf_from_json(const se_sdf_scene_handle scene, const s_json* root) {
 	temp_scene_ptr->root = SE_SDF_NODE_NULL;
 	se_sdf_scene_destroy(temp_scene);
 	s_array_clear(&created_handles);
+	se_sdf_scene_touch(scene_ptr);
 	se_set_last_error(SE_RESULT_OK);
 	return 1;
 
@@ -1968,10 +2277,17 @@ b8 se_sdf_from_json_file(const se_sdf_scene_handle scene, const c8* path) {
 		return 0;
 	}
 
+	c8 resolved_path[SE_MAX_PATH_LENGTH] = {0};
+	const c8* read_path = path;
 	c8* text = NULL;
-	if (!s_file_read(path, &text, NULL)) {
-		se_set_last_error(SE_RESULT_IO);
-		return 0;
+	if (!s_file_read(read_path, &text, NULL)) {
+		if (se_paths_resolve_resource_path(resolved_path, sizeof(resolved_path), path)) {
+			read_path = resolved_path;
+		}
+		if (!s_file_read(read_path, &text, NULL)) {
+			se_set_last_error(SE_RESULT_IO);
+			return 0;
+		}
 	}
 
 	s_json* root = s_json_parse(text);
@@ -2005,6 +2321,9 @@ se_sdf_node_handle se_sdf_node_create_primitive(
 	node->transform = desc->transform;
 	node->operation = desc->operation;
 	node->operation_amount = se_sdf_sanitize_operation_amount(desc->operation, desc->operation_amount);
+	node->noise = desc->noise;
+	node->color = s_vec3(0.0f, 0.0f, 0.0f);
+	node->has_color = 0;
 	node->primitive = desc->primitive;
 	node->parent = SE_SDF_NODE_NULL;
 	node->is_group = 0;
@@ -2013,6 +2332,7 @@ se_sdf_node_handle se_sdf_node_create_primitive(
 	node->control_scale = s_vec3(1.0f, 1.0f, 1.0f);
 	node->control_trs_initialized = 0;
 	s_array_init(&node->children);
+	se_sdf_scene_touch(scene_ptr);
 	return node_handle;
 }
 
@@ -2040,6 +2360,9 @@ se_sdf_node_handle se_sdf_node_create_group(
 	node->transform = group_desc.transform;
 	node->operation = group_desc.operation;
 	node->operation_amount = se_sdf_sanitize_operation_amount(group_desc.operation, group_desc.operation_amount);
+	node->noise = SE_SDF_NOISE_DEFAULTS;
+	node->color = s_vec3(0.0f, 0.0f, 0.0f);
+	node->has_color = 0;
 	node->parent = SE_SDF_NODE_NULL;
 	node->is_group = 1;
 	node->control_translation = s_vec3(0.0f, 0.0f, 0.0f);
@@ -2047,6 +2370,7 @@ se_sdf_node_handle se_sdf_node_create_group(
 	node->control_scale = s_vec3(1.0f, 1.0f, 1.0f);
 	node->control_trs_initialized = 0;
 	s_array_init(&node->children);
+	se_sdf_scene_touch(scene_ptr);
 	return node_handle;
 }
 
@@ -2059,6 +2383,7 @@ void se_sdf_node_destroy(const se_sdf_scene_handle scene, const se_sdf_node_hand
 		return;
 	}
 	se_sdf_destroy_node_recursive(scene_ptr, scene, node);
+	se_sdf_scene_touch(scene_ptr);
 }
 
 b8 se_sdf_node_add_child(
@@ -2095,6 +2420,7 @@ b8 se_sdf_node_add_child(
 		s_array_add(&parent_node->children, child);
 	}
 	child_node->parent = parent;
+	se_sdf_scene_touch(scene_ptr);
 	return 1;
 }
 
@@ -2121,6 +2447,7 @@ b8 se_sdf_node_remove_child(
 	if (child_node && child_node->parent == parent) {
 		child_node->parent = SE_SDF_NODE_NULL;
 	}
+	se_sdf_scene_touch(scene_ptr);
 	return 1;
 }
 
@@ -2142,6 +2469,7 @@ b8 se_sdf_node_set_operation(
 	}
 	node_ptr->operation = operation;
 	node_ptr->operation_amount = se_sdf_sanitize_operation_amount(operation, node_ptr->operation_amount);
+	se_sdf_scene_touch(scene_ptr);
 	return 1;
 }
 
@@ -2163,6 +2491,7 @@ b8 se_sdf_node_set_transform(
 	}
 	node_ptr->transform = *transform;
 	node_ptr->control_trs_initialized = 0;
+	se_sdf_scene_touch(scene_ptr);
 	return 1;
 }
 
@@ -2178,25 +2507,88 @@ s_mat4 se_sdf_node_get_transform(const se_sdf_scene_handle scene, const se_sdf_n
 	return node_ptr->transform;
 }
 
-static s_mat4 se_sdf_transform_trs(
-	const f32 tx,
-	const f32 ty,
-	const f32 tz,
-	const f32 rx,
-	const f32 ry,
-	const f32 rz,
-	const f32 sx,
-	const f32 sy,
-	const f32 sz
+b8 se_sdf_node_set_noise(
+	const se_sdf_scene_handle scene,
+	const se_sdf_node_handle node,
+	const se_sdf_noise* noise
 ) {
+	if (!noise) {
+		return 0;
+	}
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		return 0;
+	}
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
+	if (!node_ptr || node_ptr->is_group) {
+		return 0;
+	}
+	node_ptr->noise = *noise;
+	se_sdf_scene_touch(scene_ptr);
+	return 1;
+}
+
+se_sdf_noise se_sdf_node_get_noise(const se_sdf_scene_handle scene, const se_sdf_node_handle node) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		return SE_SDF_NOISE_DEFAULTS;
+	}
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
+	if (!node_ptr) {
+		return SE_SDF_NOISE_DEFAULTS;
+	}
+	return node_ptr->noise;
+}
+
+b8 se_sdf_node_set_color(
+	const se_sdf_scene_handle scene,
+	const se_sdf_node_handle node,
+	const s_vec3* color
+) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr) {
+		return 0;
+	}
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
+	if (!node_ptr || node_ptr->is_group) {
+		return 0;
+	}
+	if (!color) {
+		node_ptr->color = s_vec3(0.0f, 0.0f, 0.0f);
+		node_ptr->has_color = 0;
+		se_sdf_scene_touch(scene_ptr);
+		return 1;
+	}
+	node_ptr->color = *color;
+	node_ptr->has_color = 1;
+	se_sdf_scene_touch(scene_ptr);
+	return 1;
+}
+
+b8 se_sdf_node_get_color(
+	const se_sdf_scene_handle scene,
+	const se_sdf_node_handle node,
+	s_vec3* out_color
+) {
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr || !out_color) {
+		return 0;
+	}
+	se_sdf_node* node_ptr = se_sdf_node_from_handle(scene_ptr, scene, node);
+	if (!node_ptr || node_ptr->is_group || !node_ptr->has_color) {
+		return 0;
+	}
+	*out_color = node_ptr->color;
+	return 1;
+}
+
+s_mat4 se_sdf_transform(const s_vec3 translation, const s_vec3 rotation, const s_vec3 scale) {
 	s_mat4 transform = s_mat4_identity;
-	const s_vec3 translation = s_vec3(tx, ty, tz);
-	const s_vec3 scale = s_vec3(sx, sy, sz);
 
 	transform = s_mat4_translate(&transform, &translation);
-	if (rx != 0.0f) transform = s_mat4_rotate_x(&transform, rx);
-	if (ry != 0.0f) transform = s_mat4_rotate_y(&transform, ry);
-	if (rz != 0.0f) transform = s_mat4_rotate_z(&transform, rz);
+	if (rotation.x != 0.0f) transform = s_mat4_rotate_x(&transform, rotation.x);
+	if (rotation.y != 0.0f) transform = s_mat4_rotate_y(&transform, rotation.y);
+	if (rotation.z != 0.0f) transform = s_mat4_rotate_z(&transform, rotation.z);
 	transform = s_mat4_scale(&transform, &scale);
 	return transform;
 }
@@ -2221,7 +2613,7 @@ static s_mat4 se_sdf_transform_grid_cell(
 	const i32 col = index % safe_columns;
 	const f32 x = ((f32)col - half_width) * spacing;
 	const f32 z = ((f32)row - half_depth) * spacing;
-	return se_sdf_transform_trs(x, y, z, 0.0f, yaw, 0.0f, sx, sy, sz);
+	return se_sdf_transform(s_vec3(x, y, z), s_vec3(0.0f, yaw, 0.0f), s_vec3(sx, sy, sz));
 }
 
 static se_sdf_primitive_desc se_sdf_default_sphere_primitive(void) {
@@ -2499,8 +2891,10 @@ b8 se_sdf_scene_build_orbit_showcase_preset(
 		const f32 x = cosf(t) * orbit_radius;
 		const f32 z = sinf(t) * orbit_radius;
 		const f32 yaw = -t;
-		const s_mat4 orbit_transform = se_sdf_transform_trs(
-			x, 0.35f, z, 0.0f, yaw, 0.0f, 0.72f, 0.72f, 0.72f
+		const s_mat4 orbit_transform = se_sdf_transform(
+			s_vec3(x, 0.35f, z),
+			s_vec3(0.0f, yaw, 0.0f),
+			s_vec3(0.72f, 0.72f, 0.72f)
 		);
 		se_sdf_node_handle orbit_node = se_sdf_node_spawn_primitive(scene, root, orbit, &orbit_transform, SE_SDF_OP_UNION);
 		if (orbit_node == SE_SDF_NODE_NULL) {
@@ -2568,6 +2962,38 @@ static void se_sdf_scene_bounds_expand_transformed_aabb(
 			}
 		}
 	}
+}
+
+static void se_sdf_expand_local_bounds_by_noise(
+	const se_sdf_noise* noise,
+	s_vec3* local_min,
+	s_vec3* local_max
+) {
+	if (!noise || !noise->active || !local_min || !local_max) {
+		return;
+	}
+	const f32 pad = fabsf(noise->offset) + fabsf(noise->scale);
+	local_min->x -= pad;
+	local_min->y -= pad;
+	local_min->z -= pad;
+	local_max->x += pad;
+	local_max->y += pad;
+	local_max->z += pad;
+}
+
+static f32 se_sdf_noise_apply_distance(
+	const se_sdf_noise* noise,
+	const s_vec3* local_point,
+	const f32 distance
+) {
+	if (!noise || !noise->active || !local_point) {
+		return distance;
+	}
+	const f32 frequency = fmaxf(fabsf(noise->frequency), 0.0001f);
+	const f32 n = sinf(local_point->x * frequency)
+		* sinf(local_point->y * frequency)
+		* sinf(local_point->z * frequency);
+	return distance + noise->offset + noise->scale * n;
 }
 
 static void se_sdf_bounds_from_points(
@@ -2857,6 +3283,7 @@ static void se_sdf_collect_scene_bounds_recursive(
 		s_vec3 local_max = s_vec3(0.0f, 0.0f, 0.0f);
 		b8 is_unbounded = 0;
 		if (se_sdf_get_primitive_local_bounds(&node->primitive, &local_min, &local_max, &is_unbounded)) {
+			se_sdf_expand_local_bounds_by_noise(&node->noise, &local_min, &local_max);
 			se_sdf_scene_bounds_expand_transformed_aabb(bounds, &world_transform, &local_min, &local_max);
 		}
 		if (is_unbounded) {
@@ -3479,14 +3906,7 @@ static f32 se_sdf_physics_apply_noise(
 	const s_vec3* local_point,
 	const f32 distance
 ) {
-	if (!noise || !noise->active || !local_point) {
-		return distance;
-	}
-	const f32 frequency = fmaxf(fabsf(noise->frequency), 0.0001f);
-	const f32 n = sinf(local_point->x * frequency)
-		* sinf(local_point->y * frequency)
-		* sinf(local_point->z * frequency);
-	return distance + noise->offset + noise->scale * n;
+	return se_sdf_noise_apply_distance(noise, local_point, distance);
 }
 
 static f32 se_sdf_physics_eval_object_distance_recursive(
@@ -4256,7 +4676,9 @@ static b8 se_sdf_build_legacy_object_recursive(
 	out->source_node = node_handle;
 	out->operation = runtime_node->operation;
 	out->operation_amount = runtime_node->operation_amount;
-	out->noise = (se_sdf_noise){0};
+	out->noise = runtime_node->noise;
+	out->color = runtime_node->color;
+	out->has_color = runtime_node->has_color;
 
 	if (runtime_node->is_group) {
 		out->type = SE_SDF_NONE;
@@ -4282,6 +4704,235 @@ static b8 se_sdf_build_legacy_object_recursive(
 	}
 
 	return 1;
+}
+
+typedef struct {
+	f32 distance;
+	se_sdf_node_handle node;
+} se_sdf_query_distance_result;
+
+static se_sdf_query_distance_result se_sdf_query_distance_recursive(
+	se_sdf_object* object,
+	const s_vec3* world_point,
+	const s_mat4* parent_transform,
+	const sz depth,
+	const sz max_depth
+) {
+	se_sdf_query_distance_result result = {
+		.distance = 1e9f,
+		.node = SE_SDF_NODE_NULL
+	};
+	if (!object || !world_point || !parent_transform || depth > max_depth) {
+		return result;
+	}
+
+	const s_mat4 world_transform = s_mat4_mul(parent_transform, &object->transform);
+	const s_mat4 inverse_transform = s_mat4_inverse(&world_transform);
+	const s_vec3 local_point = se_sdf_mul_mat4_point(&inverse_transform, world_point);
+	if (!se_sdf_physics_vec3_is_finite(&local_point)) {
+		return result;
+	}
+
+	const sz child_count = s_array_get_size(&object->children);
+	if (child_count > 0) {
+		se_sdf_object* first = s_array_get(&object->children, s_array_handle(&object->children, 0u));
+		result = se_sdf_query_distance_recursive(first, world_point, &world_transform, depth + 1u, max_depth);
+		for (sz i = 1; i < child_count; ++i) {
+			se_sdf_object* child = s_array_get(&object->children, s_array_handle(&object->children, (u32)i));
+			const se_sdf_query_distance_result rhs = se_sdf_query_distance_recursive(
+				child,
+				world_point,
+				&world_transform,
+				depth + 1u,
+				max_depth
+			);
+			switch (object->operation) {
+				case SE_SDF_OP_UNION:
+				case SE_SDF_OP_SMOOTH_UNION:
+					if (rhs.distance < result.distance) {
+						result = rhs;
+					}
+					break;
+				case SE_SDF_OP_INTERSECTION:
+				case SE_SDF_OP_SMOOTH_INTERSECTION:
+					if (rhs.distance > result.distance) {
+						result = rhs;
+					}
+					break;
+				case SE_SDF_OP_SUBTRACTION:
+				case SE_SDF_OP_SMOOTH_SUBTRACTION: {
+					const f32 lhs_distance = result.distance;
+					const f32 rhs_distance = rhs.distance;
+					const f32 combined = fmaxf(lhs_distance, -rhs_distance);
+					if (-rhs_distance > lhs_distance) {
+						result = rhs;
+					}
+					result.distance = combined;
+					break;
+				}
+				case SE_SDF_OP_NONE:
+				default:
+					break;
+			}
+		}
+		return result;
+	}
+
+	result.distance = se_sdf_physics_eval_primitive_distance_local(object, &local_point);
+	result.distance = se_sdf_noise_apply_distance(&object->noise, &local_point, result.distance);
+	result.node = object->source_node;
+	if (!isfinite(result.distance)) {
+		result.distance = 1e9f;
+	}
+	return result;
+}
+
+static b8 se_sdf_estimate_surface_normal(
+	se_sdf_object* root,
+	const s_vec3* point,
+	s_vec3* out_normal
+) {
+	if (!root || !point || !out_normal) {
+		return 0;
+	}
+	const f32 epsilon = 0.01f;
+	const s_vec3 dx = s_vec3(epsilon, 0.0f, 0.0f);
+	const s_vec3 dy = s_vec3(0.0f, epsilon, 0.0f);
+	const s_vec3 dz = s_vec3(0.0f, 0.0f, epsilon);
+	const sz max_depth = 256u;
+	const f32 sx = se_sdf_query_distance_recursive(root, &s_vec3_add(point, &dx), &s_mat4_identity, 0u, max_depth).distance -
+		se_sdf_query_distance_recursive(root, &s_vec3_sub(point, &dx), &s_mat4_identity, 0u, max_depth).distance;
+	const f32 sy = se_sdf_query_distance_recursive(root, &s_vec3_add(point, &dy), &s_mat4_identity, 0u, max_depth).distance -
+		se_sdf_query_distance_recursive(root, &s_vec3_sub(point, &dy), &s_mat4_identity, 0u, max_depth).distance;
+	const f32 sz = se_sdf_query_distance_recursive(root, &s_vec3_add(point, &dz), &s_mat4_identity, 0u, max_depth).distance -
+		se_sdf_query_distance_recursive(root, &s_vec3_sub(point, &dz), &s_mat4_identity, 0u, max_depth).distance;
+	s_vec3 normal = s_vec3(sx, sy, sz);
+	if (s_vec3_length(&normal) <= 0.000001f) {
+		normal = s_vec3(0.0f, 1.0f, 0.0f);
+	}
+	*out_normal = s_vec3_normalize(&normal);
+	return 1;
+}
+
+static b8 se_sdf_scene_build_legacy_root(
+	const se_sdf_scene_handle scene,
+	se_sdf_scene** out_scene_ptr,
+	se_sdf_object* out_root
+) {
+	if (!out_scene_ptr || !out_root) {
+		return 0;
+	}
+	*out_scene_ptr = NULL;
+	memset(out_root, 0, sizeof(*out_root));
+	se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(scene);
+	if (!scene_ptr || scene_ptr->root == SE_SDF_NODE_NULL) {
+		return 0;
+	}
+	if (!se_sdf_build_legacy_object_recursive(scene_ptr, scene, scene_ptr->root, out_root)) {
+		return 0;
+	}
+	*out_scene_ptr = scene_ptr;
+	return 1;
+}
+
+b8 se_sdf_scene_sample_distance(const se_sdf_scene_handle scene, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node) {
+	if (!point || !out_distance) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+	se_sdf_scene* scene_ptr = NULL;
+	se_sdf_object legacy_root = {0};
+	if (!se_sdf_scene_build_legacy_root(scene, &scene_ptr, &legacy_root)) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return 0;
+	}
+	const sz max_depth = s_array_get_size(&scene_ptr->nodes) + 1u;
+	const se_sdf_query_distance_result result = se_sdf_query_distance_recursive(
+		&legacy_root,
+		point,
+		&s_mat4_identity,
+		0u,
+		max_depth
+	);
+	se_sdf_free_legacy_object(&legacy_root);
+	*out_distance = result.distance;
+	if (out_node) {
+		*out_node = result.node;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return 1;
+}
+
+b8 se_sdf_scene_raycast(const se_sdf_scene_handle scene, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit) {
+	if (!origin || !direction || !out_hit || max_distance <= 0.0f) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+	memset(out_hit, 0, sizeof(*out_hit));
+	out_hit->scene = scene;
+	out_hit->node = SE_SDF_NODE_NULL;
+	const f32 direction_length = s_vec3_length(direction);
+	if (direction_length <= 0.000001f) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+	const s_vec3 ray_direction = s_vec3_normalize(direction);
+
+	se_sdf_scene* scene_ptr = NULL;
+	se_sdf_object legacy_root = {0};
+	if (!se_sdf_scene_build_legacy_root(scene, &scene_ptr, &legacy_root)) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return 0;
+	}
+
+	const sz max_depth = s_array_get_size(&scene_ptr->nodes) + 1u;
+	const f32 hit_epsilon = 0.0015f;
+	const u32 max_steps = 192u;
+	f32 travel = 0.0f;
+	for (u32 step = 0u; step < max_steps && travel <= max_distance; ++step) {
+		const s_vec3 point = s_vec3_add(origin, &s_vec3_muls(&ray_direction, travel));
+		const se_sdf_query_distance_result sample = se_sdf_query_distance_recursive(
+			&legacy_root,
+			&point,
+			&s_mat4_identity,
+			0u,
+			max_depth
+		);
+		const f32 signed_distance = sample.distance;
+		if (fabsf(signed_distance) <= hit_epsilon) {
+			out_hit->position = point;
+			out_hit->distance = travel;
+			out_hit->node = sample.node;
+			out_hit->hit = 1;
+			(void)se_sdf_estimate_surface_normal(&legacy_root, &point, &out_hit->normal);
+			se_sdf_free_legacy_object(&legacy_root);
+			se_set_last_error(SE_RESULT_OK);
+			return 1;
+		}
+		const f32 step_distance = fmaxf(fabsf(signed_distance), hit_epsilon * 0.5f);
+		if (!isfinite(step_distance)) {
+			break;
+		}
+		travel += step_distance;
+	}
+
+	se_sdf_free_legacy_object(&legacy_root);
+	se_set_last_error(SE_RESULT_NOT_FOUND);
+	return 0;
+}
+
+b8 se_sdf_scene_project_point(const se_sdf_scene_handle scene, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit) {
+	return se_sdf_scene_raycast(scene, point, direction, max_distance, out_hit);
+}
+
+b8 se_sdf_scene_sample_height(const se_sdf_scene_handle scene, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit) {
+	if (!out_hit) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0;
+	}
+	const s_vec3 origin = s_vec3(x, start_y, z);
+	const s_vec3 direction = s_vec3(0.0f, -1.0f, 0.0f);
+	return se_sdf_scene_raycast(scene, &origin, &direction, max_distance, out_hit);
 }
 
 se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) {
@@ -4342,6 +4993,7 @@ se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc) 
 	renderer->stylized_desaturate_control = SE_SDF_CONTROL_NULL;
 	renderer->stylized_gamma_control = SE_SDF_CONTROL_NULL;
 	renderer->render_generation = se_render_get_generation();
+	renderer->scene_generation_built = 0u;
 	se_sdf_set_diagnostics(renderer, 1, "init", "renderer created");
 	return handle;
 }
@@ -4377,6 +5029,14 @@ void se_sdf_shutdown(void) {
 		se_sdf_renderer_destroy(renderer_handle);
 	}
 
+	while (s_array_get_size(&ctx->sdf_physicses) > 0) {
+		se_sdf_physics_handle physics_handle = s_array_handle(
+			&ctx->sdf_physicses,
+			(u32)(s_array_get_size(&ctx->sdf_physicses) - 1)
+		);
+		se_sdf_physics_destroy(physics_handle);
+	}
+
 	while (s_array_get_size(&ctx->sdf_scenes) > 0) {
 		se_sdf_scene_handle scene_handle = s_array_handle(
 			&ctx->sdf_scenes,
@@ -4385,6 +5045,7 @@ void se_sdf_shutdown(void) {
 		se_sdf_scene_destroy(scene_handle);
 	}
 
+	s_array_clear(&ctx->sdf_physicses);
 	s_array_clear(&ctx->sdf_renderers);
 	s_array_clear(&ctx->sdf_scenes);
 }
@@ -4399,6 +5060,7 @@ b8 se_sdf_renderer_set_scene(const se_sdf_renderer_handle renderer, const se_sdf
 	}
 	renderer_ptr->scene = scene;
 	renderer_ptr->built = 0;
+	renderer_ptr->scene_generation_built = 0u;
 	return 1;
 }
 
@@ -4560,6 +5222,7 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 			}
 			se_sdf_codegen_active_renderer = renderer_ptr;
 			se_sdf_generate_distance_function(&renderer_ptr->generated_fragment_source, &legacy_root, map_name);
+			se_sdf_generate_color_function(&renderer_ptr->generated_fragment_source, &legacy_root, "map_color");
 			se_sdf_codegen_active_renderer = NULL;
 			se_sdf_free_legacy_object(&legacy_root);
 			emitted_map = 1;
@@ -4628,6 +5291,12 @@ b8 se_sdf_renderer_build(const se_sdf_renderer_handle renderer) {
 
 	renderer_ptr->built = 1;
 	renderer_ptr->render_generation = se_render_get_generation();
+	if (renderer_ptr->scene != SE_SDF_SCENE_NULL) {
+		se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(renderer_ptr->scene);
+		renderer_ptr->scene_generation_built = se_sdf_scene_generation(scene_ptr);
+	} else {
+		renderer_ptr->scene_generation_built = 0u;
+	}
 	renderer_ptr->last_uniform_write_count = 0;
 	se_sdf_set_diagnostics(
 		renderer_ptr,
@@ -4645,7 +5314,15 @@ b8 se_sdf_renderer_rebuild_if_dirty(const se_sdf_renderer_handle renderer) {
 	if (!renderer_ptr) {
 		return 0;
 	}
-	if (!renderer_ptr->built) {
+	b8 needs_rebuild = !renderer_ptr->built;
+	if (!needs_rebuild &&
+		renderer_ptr->desc.auto_rebuild_on_scene_change &&
+		renderer_ptr->scene != SE_SDF_SCENE_NULL) {
+		se_sdf_scene* scene_ptr = se_sdf_scene_from_handle(renderer_ptr->scene);
+		const u64 current_generation = se_sdf_scene_generation(scene_ptr);
+		needs_rebuild = current_generation != renderer_ptr->scene_generation_built;
+	}
+	if (needs_rebuild) {
 		return se_sdf_renderer_build(renderer);
 	}
 	return 1;
@@ -4686,7 +5363,10 @@ b8 se_sdf_renderer_render(const se_sdf_renderer_handle renderer, const se_sdf_fr
 		return 0;
 	}
 	se_sdf_renderer_refresh_context_state(renderer_ptr);
-	if (!renderer_ptr->built) {
+	if (!renderer_ptr->built ||
+		(renderer_ptr->desc.auto_rebuild_on_scene_change &&
+		 renderer_ptr->scene != SE_SDF_SCENE_NULL &&
+		 renderer_ptr->scene_generation_built != se_sdf_scene_generation(se_sdf_scene_from_handle(renderer_ptr->scene)))) {
 		if (!se_sdf_renderer_build(renderer)) {
 			return 0;
 		}
@@ -6420,6 +7100,9 @@ b8 se_sdf_codegen_emit_map_stub(se_sdf_string* out, const char* map_func_name) {
 	se_sdf_string_append(out,
 		"float %s(vec3 p) {\n"
 		"	return length(p) + 1e10;\n"
+		"}\n\n"
+		"vec3 map_color(vec3 p) {\n"
+		"	return u_material_base_color;\n"
 		"}\n\n", name);
 	return !out->oom;
 }
@@ -6465,7 +7148,7 @@ b8 se_sdf_codegen_emit_shading_stub(se_sdf_string* out) {
 		"	float checker = 0.5 + 0.5 * sign(sin(checker_freq * p.x) * sin(checker_freq * p.z));\n"
 		"	float checker_mix = clamp(u_stylized_checker_strength, 0.0, 1.0);\n"
 		"	vec3 checker_tint = mix(vec3(0.88), vec3(1.16), checker);\n"
-		"	vec3 base = u_material_base_color * mix(vec3(1.0), checker_tint, checker_mix);\n"
+		"	vec3 base = map_color(p) * mix(vec3(1.0), checker_tint, checker_mix);\n"
 		"	vec3 tone0 = base * 0.24;\n"
 		"	vec3 tone1 = base * 0.45 + vec3(0.03);\n"
 		"	vec3 tone2 = base * 0.70 + vec3(0.05);\n"
@@ -7523,11 +8206,260 @@ static void se_sdf_emit_operation(
     }
 }
 
+static void se_sdf_emit_color_literal(se_sdf_string* out, const se_sdf_object* obj) {
+	if (!out || !obj) {
+		return;
+	}
+	if (obj->has_color) {
+		se_sdf_string_append(out, "vec3(%.6f, %.6f, %.6f)", obj->color.x, obj->color.y, obj->color.z);
+		return;
+	}
+	se_sdf_string_append(out, "u_material_base_color");
+}
+
+static void se_sdf_emit_color_operation(
+	se_sdf_string* out,
+	se_sdf_operation op,
+	f32 operation_amount,
+	const char* d1,
+	const char* d2,
+	u32 indent
+) {
+	const f32 smooth_amount = se_sdf_sanitize_operation_amount(op, operation_amount);
+	se_sdf_emit_indent(out, indent);
+	switch (op) {
+		case SE_SDF_OP_UNION:
+			se_sdf_string_append(out, "if ((%s).w < (%s).w) %s = %s;\n", d2, d1, d1, d2);
+			break;
+		case SE_SDF_OP_INTERSECTION:
+			se_sdf_string_append(out, "if ((%s).w > (%s).w) %s = %s;\n", d2, d1, d1, d2);
+			break;
+		case SE_SDF_OP_SUBTRACTION:
+			se_sdf_string_append(
+				out,
+				"{ float lhs = (%s).w; float rhs = (%s).w; float combined = max(lhs, -rhs); if (-rhs > lhs) { (%s).xyz = (%s).xyz; } (%s).w = combined; }\n",
+				d1,
+				d2,
+				d1,
+				d2,
+				d1
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_UNION:
+			se_sdf_string_append(
+				out,
+				"{ const float k = %.6f; float h = clamp(0.5 + 0.5 * (((%s).w) - ((%s).w)) / k, 0.0, 1.0); %s = vec4(mix((%s).xyz, (%s).xyz, h), mix((%s).w, (%s).w, h) - k * h * (1.0 - h)); }\n",
+				smooth_amount,
+				d2,
+				d1,
+				d1,
+				d2,
+				d1,
+				d2,
+				d1
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_INTERSECTION:
+			se_sdf_string_append(
+				out,
+				"{ const float k = %.6f; float h = clamp(0.5 - 0.5 * (((%s).w) - ((%s).w)) / k, 0.0, 1.0); %s = vec4(mix((%s).xyz, (%s).xyz, h), mix((%s).w, (%s).w, h) + k * h * (1.0 - h)); }\n",
+				smooth_amount,
+				d2,
+				d1,
+				d1,
+				d2,
+				d1,
+				d2,
+				d1
+			);
+			break;
+		case SE_SDF_OP_SMOOTH_SUBTRACTION:
+			se_sdf_string_append(
+				out,
+				"{ const float k = %.6f; float h = clamp(0.5 - 0.5 * (((%s).w) + ((%s).w)) / k, 0.0, 1.0); %s = vec4(mix((%s).xyz, (%s).xyz, h), mix((%s).w, -(%s).w, h) + k * h * (1.0 - h)); }\n",
+				smooth_amount,
+				d2,
+				d1,
+				d1,
+				d2,
+				d1,
+				d1,
+				d2
+			);
+			break;
+		case SE_SDF_OP_NONE:
+		default:
+			break;
+	}
+}
+
+static void se_sdf_emit_object_color_eval(
+	se_sdf_string* out,
+	se_sdf_object* obj,
+	const char* p_var,
+	const char* result_var,
+	u32* temp_counter,
+	u32 indent
+) {
+	const char* local_p = p_var;
+	const char* sample_p = p_var;
+	char transformed_p[32];
+	const char* translation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_TRANSLATION);
+	const char* rotation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_ROTATION);
+	const char* scale_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_SCALE);
+	const b8 has_dynamic_trs = (translation_uniform != NULL) || (rotation_uniform != NULL) || (scale_uniform != NULL);
+
+	if (has_dynamic_trs) {
+		const s_vec3 base_translation = s_vec3(
+			obj->transform.m[3][0],
+			obj->transform.m[3][1],
+			obj->transform.m[3][2]
+		);
+		const s_vec3 base_rotation = s_vec3(0.0f, 0.0f, 0.0f);
+		const s_vec3 base_scale = s_vec3(
+			se_sdf_abs_or_one(obj->transform.m[0][0]),
+			se_sdf_abs_or_one(obj->transform.m[1][1]),
+			se_sdf_abs_or_one(obj->transform.m[2][2])
+		);
+		const b8 has_non_identity_scale =
+			(fabsf(base_scale.x - 1.0f) > 0.000001f) ||
+			(fabsf(base_scale.y - 1.0f) > 0.000001f) ||
+			(fabsf(base_scale.z - 1.0f) > 0.000001f);
+		const b8 has_rotation =
+			(rotation_uniform != NULL) ||
+			(fabsf(base_rotation.x) > 0.000001f) ||
+			(fabsf(base_rotation.y) > 0.000001f) ||
+			(fabsf(base_rotation.z) > 0.000001f);
+
+		snprintf(transformed_p, sizeof(transformed_p), "_cp%u", (*temp_counter)++);
+		se_sdf_emit_indent(out, indent);
+		se_sdf_string_append(out, "vec3 %s = %s;\n", transformed_p, p_var);
+		se_sdf_emit_indent(out, indent);
+		if (translation_uniform) {
+			se_sdf_string_append(out, "%s -= %s;\n", transformed_p, translation_uniform);
+		} else {
+			se_sdf_string_append(
+				out,
+				"%s -= vec3(%.6f, %.6f, %.6f);\n",
+				transformed_p,
+				base_translation.x,
+				base_translation.y,
+				base_translation.z
+			);
+		}
+		if (scale_uniform || has_non_identity_scale) {
+			se_sdf_emit_indent(out, indent);
+			if (scale_uniform) {
+				se_sdf_string_append(out, "%s /= max(abs(%s), vec3(0.00001));\n", transformed_p, scale_uniform);
+			} else {
+				se_sdf_string_append(
+					out,
+					"%s /= max(abs(vec3(%.6f, %.6f, %.6f)), vec3(0.00001));\n",
+					transformed_p,
+					base_scale.x,
+					base_scale.y,
+					base_scale.z
+				);
+			}
+		}
+		if (has_rotation) {
+			char rot_var[32];
+			char c_var[32];
+			char s_var[32];
+			snprintf(rot_var, sizeof(rot_var), "_cr%u", (*temp_counter)++);
+			snprintf(c_var, sizeof(c_var), "_cc%u", (*temp_counter)++);
+			snprintf(s_var, sizeof(s_var), "_cs%u", (*temp_counter)++);
+			se_sdf_emit_indent(out, indent);
+			if (rotation_uniform) {
+				se_sdf_string_append(out, "vec3 %s = -%s;\n", rot_var, rotation_uniform);
+			} else {
+				se_sdf_string_append(out, "vec3 %s = vec3(%.6f, %.6f, %.6f);\n",
+					rot_var,
+					-base_rotation.x,
+					-base_rotation.y,
+					-base_rotation.z
+				);
+			}
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "float %s = cos(%s.z);\n", c_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "float %s = sin(%s.z);\n", s_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s.xy = mat2(%s, -%s, %s, %s) * %s.xy;\n", transformed_p, c_var, s_var, s_var, c_var, transformed_p);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = cos(%s.y);\n", c_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = sin(%s.y);\n", s_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s.xz = mat2(%s, -%s, %s, %s) * %s.xz;\n", transformed_p, c_var, s_var, s_var, c_var, transformed_p);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = cos(%s.x);\n", c_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s = sin(%s.x);\n", s_var, rot_var);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(out, "%s.yz = mat2(%s, -%s, %s, %s) * %s.yz;\n", transformed_p, c_var, s_var, s_var, c_var, transformed_p);
+		}
+		local_p = transformed_p;
+	} else if (!se_sdf_is_identity(&obj->transform)) {
+		snprintf(transformed_p, sizeof(transformed_p), "_cp%u", (*temp_counter)++);
+		se_sdf_emit_indent(out, indent);
+		se_sdf_gen_transform(out, p_var, obj->transform, transformed_p);
+		se_sdf_string_append(out, "\n");
+		local_p = transformed_p;
+	}
+	sample_p = local_p;
+
+	sz child_count = se_sdf_count_children(obj);
+	if (child_count == 0) {
+		char distance_var[32];
+		snprintf(distance_var, sizeof(distance_var), "_cd%u", (*temp_counter)++);
+		se_sdf_emit_leaf_eval(out, obj, sample_p, distance_var, indent);
+		if (obj->noise.active) {
+			const f32 frequency = fmaxf(fabsf(obj->noise.frequency), 0.0001f);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(
+				out,
+				"%s += %.6f + %.6f * sin(%s.x * %.6f) * sin(%s.y * %.6f) * sin(%s.z * %.6f);\n",
+				distance_var,
+				obj->noise.offset,
+				obj->noise.scale,
+				local_p,
+				frequency,
+				local_p,
+				frequency,
+				local_p,
+				frequency
+			);
+		}
+		se_sdf_emit_indent(out, indent);
+		se_sdf_string_append(out, "vec4 %s = vec4(", result_var);
+		se_sdf_emit_color_literal(out, obj);
+		se_sdf_string_append(out, ", %s);\n", distance_var);
+		return;
+	}
+
+	char child_result[32];
+	snprintf(child_result, sizeof(child_result), "_cv%u", (*temp_counter)++);
+	se_sdf_object* child0 = se_sdf_get_child(obj, 0);
+	se_sdf_emit_object_color_eval(out, child0, local_p, child_result, temp_counter, indent);
+	se_sdf_emit_indent(out, indent);
+	se_sdf_string_append(out, "vec4 %s = %s;\n", result_var, child_result);
+
+	for (sz i = 1; i < child_count; ++i) {
+		char rhs_result[32];
+		snprintf(rhs_result, sizeof(rhs_result), "_cv%u", (*temp_counter)++);
+		se_sdf_object* child = se_sdf_get_child(obj, i);
+		se_sdf_emit_object_color_eval(out, child, local_p, rhs_result, temp_counter, indent);
+		se_sdf_emit_color_operation(out, obj->operation, obj->operation_amount, result_var, rhs_result, indent);
+	}
+}
+
 static void se_sdf_emit_object_eval(
     se_sdf_string* out, se_sdf_object* obj, const char* p_var,
     const char* result_var, u32* temp_counter, u32 indent
 ) {
     const char* local_p = p_var;
+	const char* sample_p = p_var;
     char transformed_p[32];
 	const char* translation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_TRANSLATION);
 	const char* rotation_uniform = se_sdf_codegen_get_node_bind_uniform(obj, SE_SDF_NODE_BIND_ROTATION);
@@ -7632,10 +8564,28 @@ static void se_sdf_emit_object_eval(
         se_sdf_string_append(out, "\n");
         local_p = transformed_p;
     }
+	sample_p = local_p;
 
     sz child_count = se_sdf_count_children(obj);
     if (child_count == 0) {
-        se_sdf_emit_leaf_eval(out, obj, local_p, result_var, indent);
+        se_sdf_emit_leaf_eval(out, obj, sample_p, result_var, indent);
+		if (obj->noise.active) {
+			const f32 frequency = fmaxf(fabsf(obj->noise.frequency), 0.0001f);
+			se_sdf_emit_indent(out, indent);
+			se_sdf_string_append(
+				out,
+				"%s += %.6f + %.6f * sin(%s.x * %.6f) * sin(%s.y * %.6f) * sin(%s.z * %.6f);\n",
+				result_var,
+				obj->noise.offset,
+				obj->noise.scale,
+				local_p,
+				frequency,
+				local_p,
+				frequency,
+				local_p,
+				frequency
+			);
+		}
         return;
     }
 
@@ -7669,6 +8619,21 @@ void se_sdf_generate_distance_function(se_sdf_string* out, se_sdf_object* root, 
     se_sdf_string_append(out, "float %s(vec3 p) {\n", func_name);
     se_sdf_object_to_string(out, root, "p");
     se_sdf_string_append(out, "}\n");
+}
+
+static void se_sdf_generate_color_function(se_sdf_string* out, se_sdf_object* root, const char* func_name) {
+	const char* name = (func_name && func_name[0] != '\0') ? func_name : "map_color";
+	if (!out || !root) {
+		return;
+	}
+	se_sdf_string_append(out, "vec3 %s(vec3 p) {\n", name);
+	u32 temp_counter = 0u;
+	char root_result[32];
+	snprintf(root_result, sizeof(root_result), "_cv%u", temp_counter++);
+	se_sdf_emit_object_color_eval(out, root, "p", root_result, &temp_counter, 1u);
+	se_sdf_emit_indent(out, 1u);
+	se_sdf_string_append(out, "return %s.xyz;\n", root_result);
+	se_sdf_string_append(out, "}\n");
 }
 
 typedef struct {

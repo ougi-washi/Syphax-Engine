@@ -44,6 +44,7 @@ struct se_physics_shape_3d {
 			b8 is_aabb;
 		} box;
 		se_physics_mesh_3d mesh;
+		se_physics_sdf_3d sdf;
 	};
 	se_box_3d local_bounds;
 	se_physics_bvh_nodes_3d bvh_nodes;
@@ -516,6 +517,36 @@ se_box_3d se_physics_shape_3d_world_aabb(const se_physics_body_3d *body, const s
 		box.max = max_v;
 		return box;
 	}
+	if (shape->type == SE_PHYSICS_SHAPE_3D_SDF) {
+		s_vec3 min_v = s_vec3(FLT_MAX, FLT_MAX, FLT_MAX);
+		s_vec3 max_v = s_vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+		s_vec3 corners[8] = {
+			shape->local_bounds.min,
+			s_vec3(shape->local_bounds.max.x, shape->local_bounds.min.y, shape->local_bounds.min.z),
+			s_vec3(shape->local_bounds.max.x, shape->local_bounds.max.y, shape->local_bounds.min.z),
+			s_vec3(shape->local_bounds.min.x, shape->local_bounds.max.y, shape->local_bounds.min.z),
+			s_vec3(shape->local_bounds.min.x, shape->local_bounds.min.y, shape->local_bounds.max.z),
+			s_vec3(shape->local_bounds.max.x, shape->local_bounds.min.y, shape->local_bounds.max.z),
+			s_vec3(shape->local_bounds.max.x, shape->local_bounds.max.y, shape->local_bounds.max.z),
+			shape->local_bounds.max
+		};
+		s_vec3 rot = s_vec3(body->rotation.x + shape->rotation.x, body->rotation.y + shape->rotation.y, body->rotation.z + shape->rotation.z);
+		for (u32 i = 0; i < 8; i++) {
+			s_vec3 w = se_physics_rotate_vec3(&corners[i], &rot);
+			w.x += center.x;
+			w.y += center.y;
+			w.z += center.z;
+			min_v.x = s_min(min_v.x, w.x);
+			min_v.y = s_min(min_v.y, w.y);
+			min_v.z = s_min(min_v.z, w.z);
+			max_v.x = s_max(max_v.x, w.x);
+			max_v.y = s_max(max_v.y, w.y);
+			max_v.z = s_max(max_v.z, w.z);
+		}
+		box.min = min_v;
+		box.max = max_v;
+		return box;
+	}
 	return box;
 }
 
@@ -542,6 +573,14 @@ f32 se_physics_shape_3d_volume(const se_physics_shape_3d *shape) {
 		case SE_PHYSICS_SHAPE_3D_BOX: {
 			s_vec3 he = shape->box.half_extents;
 			return (he.x * 2.0f) * (he.y * 2.0f) * (he.z * 2.0f);
+		}
+		case SE_PHYSICS_SHAPE_3D_SDF: {
+			s_vec3 size = s_vec3(
+				shape->local_bounds.max.x - shape->local_bounds.min.x,
+				shape->local_bounds.max.y - shape->local_bounds.min.y,
+				shape->local_bounds.max.z - shape->local_bounds.min.z
+			);
+			return fmaxf(size.x, 0.0f) * fmaxf(size.y, 0.0f) * fmaxf(size.z, 0.0f);
 		}
 		case SE_PHYSICS_SHAPE_3D_MESH:
 		default:
@@ -1472,6 +1511,344 @@ b8 se_physics_mesh_box_3d(const se_physics_mesh_3d *mesh, const s_vec3 *mesh_pos
 	return false;
 }
 
+typedef struct {
+	const se_physics_shape_3d *shape;
+	s_vec3 center;
+	s_vec3 rotation;
+} se_physics_sdf_world_shape;
+
+static b8 se_physics_sdf_sample_local(
+	const se_physics_shape_3d *shape,
+	const s_vec3 *local_point,
+	f32 *out_distance,
+	s_vec3 *out_normal
+) {
+	if (!shape || shape->type != SE_PHYSICS_SHAPE_3D_SDF || !shape->sdf.sample || !local_point || !out_distance) {
+		return false;
+	}
+	s_vec3 local_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	if (!shape->sdf.sample(shape->sdf.user_data, local_point, out_distance, &local_normal)) {
+		return false;
+	}
+	if (out_normal) {
+		const f32 length_sq = se_physics_vec3_length_sq(&local_normal);
+		*out_normal = length_sq > SE_PHYSICS_EPSILON
+			? s_vec3_divs(&local_normal, sqrtf(length_sq))
+			: s_vec3(0.0f, 1.0f, 0.0f);
+	}
+	return true;
+}
+
+static b8 se_physics_sdf_shape_world(
+	const se_physics_body_3d *body,
+	const se_physics_shape_3d *shape,
+	se_physics_sdf_world_shape *out_sdf
+) {
+	if (!body || !shape || !out_sdf || shape->type != SE_PHYSICS_SHAPE_3D_SDF || !shape->sdf.sample) {
+		return false;
+	}
+	const s_vec3 offset = se_physics_rotate_vec3(&shape->offset, &body->rotation);
+	out_sdf->shape = shape;
+	out_sdf->center = s_vec3(
+		body->position.x + offset.x,
+		body->position.y + offset.y,
+		body->position.z + offset.z
+	);
+	out_sdf->rotation = s_vec3(
+		body->rotation.x + shape->rotation.x,
+		body->rotation.y + shape->rotation.y,
+		body->rotation.z + shape->rotation.z
+	);
+	return true;
+}
+
+static b8 se_physics_sdf_sample_world(
+	const se_physics_sdf_world_shape *sdf,
+	const s_vec3 *world_point,
+	f32 *out_distance,
+	s_vec3 *out_normal_world
+) {
+	if (!sdf || !world_point || !out_distance) {
+		return false;
+	}
+	const s_vec3 local_point = se_physics_box3d_local_point(world_point, &sdf->center, &sdf->rotation);
+	s_vec3 local_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	if (!se_physics_sdf_sample_local(sdf->shape, &local_point, out_distance, &local_normal)) {
+		return false;
+	}
+	if (out_normal_world) {
+		s_vec3 normal_world = se_physics_rotate_vec3(&local_normal, &sdf->rotation);
+		const f32 length_sq = se_physics_vec3_length_sq(&normal_world);
+		*out_normal_world = length_sq > SE_PHYSICS_EPSILON
+			? s_vec3_divs(&normal_world, sqrtf(length_sq))
+			: s_vec3(0.0f, 1.0f, 0.0f);
+	}
+	return true;
+}
+
+static void se_physics_sdf_seed_points(const se_box_3d *bounds, s_vec3 *out_points, u32 *out_count) {
+	if (!bounds || !out_points || !out_count) {
+		return;
+	}
+	const s_vec3 center = s_vec3(
+		(bounds->min.x + bounds->max.x) * 0.5f,
+		(bounds->min.y + bounds->max.y) * 0.5f,
+		(bounds->min.z + bounds->max.z) * 0.5f
+	);
+	u32 count = 0u;
+	for (u32 ix = 0u; ix < 2u; ++ix) {
+		for (u32 iy = 0u; iy < 2u; ++iy) {
+			for (u32 iz = 0u; iz < 2u; ++iz) {
+				out_points[count++] = s_vec3(
+					ix == 0u ? bounds->min.x : bounds->max.x,
+					iy == 0u ? bounds->min.y : bounds->max.y,
+					iz == 0u ? bounds->min.z : bounds->max.z
+				);
+			}
+		}
+	}
+	out_points[count++] = s_vec3(bounds->min.x, center.y, center.z);
+	out_points[count++] = s_vec3(bounds->max.x, center.y, center.z);
+	out_points[count++] = s_vec3(center.x, bounds->min.y, center.z);
+	out_points[count++] = s_vec3(center.x, bounds->max.y, center.z);
+	out_points[count++] = s_vec3(center.x, center.y, bounds->min.z);
+	out_points[count++] = s_vec3(center.x, center.y, bounds->max.z);
+	*out_count = count;
+}
+
+static void se_physics_box_surface_points_world(
+	const s_vec3 *center,
+	const s_vec3 *half,
+	const s_vec3 *rotation,
+	s_vec3 *out_points,
+	u32 *out_count
+) {
+	if (!center || !half || !rotation || !out_points || !out_count) {
+		return;
+	}
+	const s_vec3 local_points[14] = {
+		s_vec3(-half->x, -half->y, -half->z),
+		s_vec3(half->x, -half->y, -half->z),
+		s_vec3(half->x, half->y, -half->z),
+		s_vec3(-half->x, half->y, -half->z),
+		s_vec3(-half->x, -half->y, half->z),
+		s_vec3(half->x, -half->y, half->z),
+		s_vec3(half->x, half->y, half->z),
+		s_vec3(-half->x, half->y, half->z),
+		s_vec3(-half->x, 0.0f, 0.0f),
+		s_vec3(half->x, 0.0f, 0.0f),
+		s_vec3(0.0f, -half->y, 0.0f),
+		s_vec3(0.0f, half->y, 0.0f),
+		s_vec3(0.0f, 0.0f, -half->z),
+		s_vec3(0.0f, 0.0f, half->z)
+	};
+	for (u32 i = 0u; i < 14u; ++i) {
+		s_vec3 point = se_physics_rotate_vec3(&local_points[i], rotation);
+		out_points[i] = s_vec3(point.x + center->x, point.y + center->y, point.z + center->z);
+	}
+	*out_count = 14u;
+}
+
+static b8 se_physics_sdf_project_local(
+	const se_physics_sdf_world_shape *sdf,
+	const s_vec3 *seed,
+	s_vec3 *out_local_point,
+	s_vec3 *out_local_normal
+) {
+	if (!sdf || !seed || !out_local_point) {
+		return false;
+	}
+	s_vec3 point = se_physics_vec3_clamp(seed, &sdf->shape->local_bounds.min, &sdf->shape->local_bounds.max);
+	for (u32 i = 0u; i < 18u; ++i) {
+		f32 distance = 0.0f;
+		s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
+		if (!se_physics_sdf_sample_local(sdf->shape, &point, &distance, &normal)) {
+			return false;
+		}
+		if (fabsf(distance) <= 0.0025f) {
+			*out_local_point = point;
+			if (out_local_normal) {
+				*out_local_normal = normal;
+			}
+			return true;
+		}
+		point = s_vec3(
+			point.x - normal.x * distance,
+			point.y - normal.y * distance,
+			point.z - normal.z * distance
+		);
+		point = se_physics_vec3_clamp(&point, &sdf->shape->local_bounds.min, &sdf->shape->local_bounds.max);
+	}
+	f32 distance = 0.0f;
+	s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
+	if (!se_physics_sdf_sample_local(sdf->shape, &point, &distance, &normal) || fabsf(distance) > 0.05f) {
+		return false;
+	}
+	*out_local_point = point;
+	if (out_local_normal) {
+		*out_local_normal = normal;
+	}
+	return true;
+}
+
+static b8 se_physics_sdf_sphere_3d(
+	const se_physics_sdf_world_shape *sdf,
+	const s_vec3 *sphere_pos,
+	const f32 radius,
+	const b8 sdf_is_a,
+	se_physics_contact_3d *out
+) {
+	if (!sdf || !sphere_pos || radius <= 0.0f || !out) {
+		return false;
+	}
+	f32 distance = 0.0f;
+	s_vec3 sdf_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	if (!se_physics_sdf_sample_world(sdf, sphere_pos, &distance, &sdf_normal) || distance > radius) {
+		return false;
+	}
+	out->penetration = radius - distance;
+	if (sdf_is_a) {
+		out->normal = sdf_normal;
+		out->contact_point = s_vec3(
+			sphere_pos->x - sdf_normal.x * distance,
+			sphere_pos->y - sdf_normal.y * distance,
+			sphere_pos->z - sdf_normal.z * distance
+		);
+	} else {
+		out->normal = s_vec3(-sdf_normal.x, -sdf_normal.y, -sdf_normal.z);
+		out->contact_point = s_vec3(
+			sphere_pos->x + out->normal.x * radius,
+			sphere_pos->y + out->normal.y * radius,
+			sphere_pos->z + out->normal.z * radius
+		);
+	}
+	return true;
+}
+
+static b8 se_physics_sdf_box_3d(
+	const se_physics_sdf_world_shape *sdf,
+	const s_vec3 *box_center,
+	const s_vec3 *half,
+	const s_vec3 *box_rotation,
+	const b8 sdf_is_a,
+	se_physics_contact_3d *out
+) {
+	if (!sdf || !box_center || !half || !box_rotation || !out) {
+		return false;
+	}
+	s_vec3 points[14];
+	u32 point_count = 0u;
+	se_physics_box_surface_points_world(box_center, half, box_rotation, points, &point_count);
+
+	f32 best_distance = FLT_MAX;
+	s_vec3 best_point = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 best_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	for (u32 i = 0u; i < point_count; ++i) {
+		f32 distance = 0.0f;
+		s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
+		if (!se_physics_sdf_sample_world(sdf, &points[i], &distance, &normal) || distance > 0.0f) {
+			continue;
+		}
+		if (distance < best_distance) {
+			best_distance = distance;
+			best_point = points[i];
+			best_normal = normal;
+		}
+	}
+	if (best_distance > 0.0f) {
+		return false;
+	}
+	out->penetration = -best_distance;
+	if (sdf_is_a) {
+		out->normal = best_normal;
+		out->contact_point = s_vec3(
+			best_point.x + best_normal.x * out->penetration,
+			best_point.y + best_normal.y * out->penetration,
+			best_point.z + best_normal.z * out->penetration
+		);
+	} else {
+		out->normal = s_vec3(-best_normal.x, -best_normal.y, -best_normal.z);
+		out->contact_point = best_point;
+	}
+	return true;
+}
+
+static b8 se_physics_sdf_sdf_3d(
+	const se_physics_sdf_world_shape *a_sdf,
+	const se_physics_sdf_world_shape *b_sdf,
+	se_physics_contact_3d *out
+) {
+	if (!a_sdf || !b_sdf || !out) {
+		return false;
+	}
+
+	f32 best_penetration = 0.0f;
+	s_vec3 best_normal = s_vec3(0.0f, 1.0f, 0.0f);
+	s_vec3 best_point = s_vec3(0.0f, 0.0f, 0.0f);
+
+	s_vec3 seeds[14];
+	u32 seed_count = 0u;
+	se_physics_sdf_seed_points(&a_sdf->shape->local_bounds, seeds, &seed_count);
+	for (u32 i = 0u; i < seed_count; ++i) {
+		s_vec3 local_point = s_vec3(0.0f, 0.0f, 0.0f);
+		if (!se_physics_sdf_project_local(a_sdf, &seeds[i], &local_point, NULL)) {
+			continue;
+		}
+		s_vec3 world_point = se_physics_rotate_vec3(&local_point, &a_sdf->rotation);
+		world_point.x += a_sdf->center.x;
+		world_point.y += a_sdf->center.y;
+		world_point.z += a_sdf->center.z;
+
+		f32 distance = 0.0f;
+		s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
+		if (!se_physics_sdf_sample_world(b_sdf, &world_point, &distance, &normal) || distance > 0.0f) {
+			continue;
+		}
+		const f32 penetration = -distance;
+		if (penetration > best_penetration) {
+			best_penetration = penetration;
+			best_normal = s_vec3(-normal.x, -normal.y, -normal.z);
+			best_point = world_point;
+		}
+	}
+
+	se_physics_sdf_seed_points(&b_sdf->shape->local_bounds, seeds, &seed_count);
+	for (u32 i = 0u; i < seed_count; ++i) {
+		s_vec3 local_point = s_vec3(0.0f, 0.0f, 0.0f);
+		if (!se_physics_sdf_project_local(b_sdf, &seeds[i], &local_point, NULL)) {
+			continue;
+		}
+		s_vec3 world_point = se_physics_rotate_vec3(&local_point, &b_sdf->rotation);
+		world_point.x += b_sdf->center.x;
+		world_point.y += b_sdf->center.y;
+		world_point.z += b_sdf->center.z;
+
+		f32 distance = 0.0f;
+		s_vec3 normal = s_vec3(0.0f, 1.0f, 0.0f);
+		if (!se_physics_sdf_sample_world(a_sdf, &world_point, &distance, &normal) || distance > 0.0f) {
+			continue;
+		}
+		const f32 penetration = -distance;
+		if (penetration > best_penetration) {
+			best_penetration = penetration;
+			best_normal = normal;
+			best_point = s_vec3(
+				world_point.x + normal.x * penetration,
+				world_point.y + normal.y * penetration,
+				world_point.z + normal.z * penetration
+			);
+		}
+	}
+
+	if (best_penetration <= 0.0f) {
+		return false;
+	}
+	out->normal = best_normal;
+	out->penetration = best_penetration;
+	out->contact_point = best_point;
+	return true;
+}
+
 b8 se_physics_ray_circle_2d(const s_vec2 *origin, const s_vec2 *dir, f32 max_distance, const s_vec2 *center, f32 radius, f32 *out_t, s_vec2 *out_normal) {
 	s_vec2 m = s_vec2(origin->x - center->x, origin->y - center->y);
 	f32 a = s_vec2_dot(dir, dir);
@@ -1852,6 +2229,39 @@ b8 se_physics_shapes_collide_3d(se_physics_body_3d *a, se_physics_shape_3d *shap
 			out->normal.z = -out->normal.z;
 		}
 		return hit;
+	}
+	if (shape_a->type == SE_PHYSICS_SHAPE_3D_SDF && shape_b->type == SE_PHYSICS_SHAPE_3D_SPHERE) {
+		se_physics_sdf_world_shape sdf = {0};
+		return se_physics_sdf_shape_world(a, shape_a, &sdf) &&
+			se_physics_sdf_sphere_3d(&sdf, &b_center, shape_b->sphere.radius, true, out);
+	}
+	if (shape_b->type == SE_PHYSICS_SHAPE_3D_SDF && shape_a->type == SE_PHYSICS_SHAPE_3D_SPHERE) {
+		se_physics_sdf_world_shape sdf = {0};
+		return se_physics_sdf_shape_world(b, shape_b, &sdf) &&
+			se_physics_sdf_sphere_3d(&sdf, &a_center, shape_a->sphere.radius, false, out);
+	}
+	if (shape_a->type == SE_PHYSICS_SHAPE_3D_SDF && (shape_b->type == SE_PHYSICS_SHAPE_3D_BOX || shape_b->type == SE_PHYSICS_SHAPE_3D_AABB)) {
+		se_physics_sdf_world_shape sdf = {0};
+		s_vec3 rot_b = shape_b->type == SE_PHYSICS_SHAPE_3D_AABB || shape_b->box.is_aabb
+			? s_vec3(0.0f, 0.0f, 0.0f)
+			: s_vec3(b->rotation.x + shape_b->rotation.x, b->rotation.y + shape_b->rotation.y, b->rotation.z + shape_b->rotation.z);
+		return se_physics_sdf_shape_world(a, shape_a, &sdf) &&
+			se_physics_sdf_box_3d(&sdf, &b_center, &shape_b->box.half_extents, &rot_b, true, out);
+	}
+	if (shape_b->type == SE_PHYSICS_SHAPE_3D_SDF && (shape_a->type == SE_PHYSICS_SHAPE_3D_BOX || shape_a->type == SE_PHYSICS_SHAPE_3D_AABB)) {
+		se_physics_sdf_world_shape sdf = {0};
+		s_vec3 rot_a = shape_a->type == SE_PHYSICS_SHAPE_3D_AABB || shape_a->box.is_aabb
+			? s_vec3(0.0f, 0.0f, 0.0f)
+			: s_vec3(a->rotation.x + shape_a->rotation.x, a->rotation.y + shape_a->rotation.y, a->rotation.z + shape_a->rotation.z);
+		return se_physics_sdf_shape_world(b, shape_b, &sdf) &&
+			se_physics_sdf_box_3d(&sdf, &a_center, &shape_a->box.half_extents, &rot_a, false, out);
+	}
+	if (shape_a->type == SE_PHYSICS_SHAPE_3D_SDF && shape_b->type == SE_PHYSICS_SHAPE_3D_SDF) {
+		se_physics_sdf_world_shape sdf_a = {0};
+		se_physics_sdf_world_shape sdf_b = {0};
+		return se_physics_sdf_shape_world(a, shape_a, &sdf_a) &&
+			se_physics_sdf_shape_world(b, shape_b, &sdf_b) &&
+			se_physics_sdf_sdf_3d(&sdf_a, &sdf_b, out);
 	}
 
 	return false;
@@ -2310,6 +2720,44 @@ se_physics_shape_3d_handle se_physics_body_3d_add_mesh(const se_physics_world_3d
 			shape->bvh_built = true;
 		}
 	}
+	se_physics_body_3d_update_mass(body);
+	se_set_last_error(SE_RESULT_OK);
+	return shape_handle;
+}
+
+se_physics_shape_3d_handle se_physics_body_3d_add_sdf(
+	const se_physics_world_3d_handle world_handle,
+	const se_physics_body_3d_handle body_handle,
+	const se_physics_sdf_3d *sdf,
+	const s_vec3 *offset,
+	const s_vec3 *rotation,
+	const b8 is_trigger
+) {
+	se_physics_world_3d *world = se_physics_world_3d_from_handle_mut(world_handle);
+	se_physics_body_3d *body = se_physics_body_3d_from_world_mut(world, body_handle);
+	if (!world || !body || !sdf || !sdf->sample || !offset || !rotation) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+	}
+	if (s_array_get_size(&body->shapes) >= s_array_get_capacity(&body->shapes)) {
+		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+	}
+	if (sdf->local_bounds.max.x <= sdf->local_bounds.min.x ||
+		sdf->local_bounds.max.y <= sdf->local_bounds.min.y ||
+		sdf->local_bounds.max.z <= sdf->local_bounds.min.z) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return SE_PHYSICS_SHAPE_3D_HANDLE_NULL;
+	}
+	se_physics_shape_3d_handle shape_handle = s_array_increment(&body->shapes);
+	se_physics_shape_3d *shape = s_array_get(&body->shapes, shape_handle);
+	memset(shape, 0, sizeof(*shape));
+	shape->type = SE_PHYSICS_SHAPE_3D_SDF;
+	shape->offset = *offset;
+	shape->rotation = *rotation;
+	shape->sdf = *sdf;
+	shape->local_bounds = sdf->local_bounds;
+	shape->is_trigger = is_trigger;
 	se_physics_body_3d_update_mass(body);
 	se_set_last_error(SE_RESULT_OK);
 	return shape_handle;

@@ -28,6 +28,42 @@ typedef struct {
 	se_navigation_occupancy occupancy;
 } se_navigation_grid;
 
+typedef struct {
+	s_vec3 world;
+	f32 height;
+	s_vec3 normal;
+	f32 cost;
+	b8 walkable;
+} se_navigation_sample;
+
+typedef s_array(se_navigation_sample, se_navigation_samples);
+
+typedef struct {
+	i32 width;
+	i32 height;
+	f32 cell_size;
+	s_vec3 origin;
+	f32 min_cost;
+	se_navigation_samples samples;
+} se_navigation_field;
+
+typedef b8 (*se_navigation_sampler)(
+	const se_navigation_field* field,
+	const se_navigation_cell cell,
+	se_navigation_sample* in_out_sample,
+	void* user_data);
+
+typedef struct {
+	se_navigation_cell cell;
+	f32 cost;
+} se_navigation_area_cell;
+
+typedef s_array(se_navigation_area_cell, se_navigation_area_cells);
+
+typedef struct {
+	se_navigation_area_cells cells;
+} se_navigation_area;
+
 typedef void (*se_navigation_debug_hook)(
 	const se_navigation_grid* grid,
 	const se_navigation_cell* open_cells,
@@ -53,6 +89,21 @@ extern b8 se_navigation_cell_to_world(const se_navigation_grid* grid, const se_n
 extern b8 se_navigation_path_init(se_navigation_path* path, const sz reserve_count);
 extern void se_navigation_path_clear(se_navigation_path* path);
 extern void se_navigation_path_reset(se_navigation_path* path);
+
+extern b8 se_navigation_field_create(se_navigation_field* out_field, const i32 width, const i32 height, const f32 cell_size, const s_vec3* origin);
+extern void se_navigation_field_destroy(se_navigation_field* field);
+extern b8 se_navigation_field_build(se_navigation_field* field, se_navigation_sampler sampler, void* user_data);
+extern b8 se_navigation_field_is_valid_cell(const se_navigation_field* field, const se_navigation_cell cell);
+extern b8 se_navigation_field_get_sample(const se_navigation_field* field, const se_navigation_cell cell, se_navigation_sample* out_sample);
+extern b8 se_navigation_field_set_sample(se_navigation_field* field, const se_navigation_cell cell, const se_navigation_sample* sample);
+extern b8 se_navigation_field_world_to_cell(const se_navigation_field* field, const s_vec3* world, se_navigation_cell* out_cell);
+extern b8 se_navigation_field_cell_to_world(const se_navigation_field* field, const se_navigation_cell cell, s_vec3* out_world);
+extern sz se_navigation_field_get_neighbors(const se_navigation_field* field, const se_navigation_cell cell, const b8 allow_diagonal, se_navigation_cell out_neighbors[8]);
+extern b8 se_navigation_field_find_path(const se_navigation_field* field, const se_navigation_cell start, const se_navigation_cell goal, const b8 allow_diagonal, se_navigation_path* out_path);
+extern b8 se_navigation_area_init(se_navigation_area* area, const sz reserve_count);
+extern void se_navigation_area_clear(se_navigation_area* area);
+extern void se_navigation_area_reset(se_navigation_area* area);
+extern b8 se_navigation_field_find_reachable(const se_navigation_field* field, const se_navigation_cell start, const f32 max_cost, const b8 allow_diagonal, se_navigation_area* out_area);
 
 extern sz se_navigation_get_neighbors(const se_navigation_grid* grid, const se_navigation_cell cell, const b8 allow_diagonal, se_navigation_cell out_neighbors[8]);
 extern b8 se_navigation_raycast_cells(const se_navigation_grid* grid, const se_navigation_cell start, const se_navigation_cell end, se_navigation_path* out_cells);

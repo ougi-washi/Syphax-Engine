@@ -45,7 +45,8 @@ typedef enum {
 	SE_PHYSICS_SHAPE_3D_AABB = 0,
 	SE_PHYSICS_SHAPE_3D_BOX,
 	SE_PHYSICS_SHAPE_3D_SPHERE,
-	SE_PHYSICS_SHAPE_3D_MESH
+	SE_PHYSICS_SHAPE_3D_MESH,
+	SE_PHYSICS_SHAPE_3D_SDF
 } se_physics_shape_type_3d;
 
 typedef struct {
@@ -61,6 +62,14 @@ typedef struct {
 	const u32 *indices;
 	sz index_count;
 } se_physics_mesh_3d;
+
+typedef b8 (*se_physics_sdf_sample_fn_3d)(void *user_data, const s_vec3 *local_point, f32 *out_distance, s_vec3 *out_normal);
+
+typedef struct {
+	void *user_data;
+	se_box_3d local_bounds;
+	se_physics_sdf_sample_fn_3d sample;
+} se_physics_sdf_3d;
 
 typedef struct {
 	se_box_2d bounds;
@@ -199,6 +208,7 @@ extern se_physics_shape_3d_handle se_physics_body_3d_add_sphere(se_physics_world
 extern se_physics_shape_3d_handle se_physics_body_3d_add_aabb(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *offset, const s_vec3 *half_extents, const b8 is_trigger);
 extern se_physics_shape_3d_handle se_physics_body_3d_add_box(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3 *offset, const s_vec3 *half_extents, const s_vec3 *rotation, const b8 is_trigger);
 extern se_physics_shape_3d_handle se_physics_body_3d_add_mesh(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const se_physics_mesh_3d *mesh, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger);
+extern se_physics_shape_3d_handle se_physics_body_3d_add_sdf(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const se_physics_sdf_3d *sdf, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger);
 
 extern void se_physics_body_2d_set_type(se_physics_world_2d_handle world, se_physics_body_2d_handle body, se_physics_body_type type);
 extern se_physics_body_type se_physics_body_2d_get_type(se_physics_world_2d_handle world, se_physics_body_2d_handle body);

@@ -291,6 +291,15 @@ static void se_input_tick_replay(se_input_handle* input_handle) {
 	if (!input_handle || !input_handle->runtime || !input_handle->runtime->replay_enabled) {
 		return;
 	}
+	for (sz i = 0; i < s_array_get_size(&input_handle->runtime->actions); ++i) {
+		se_input_action* action = s_array_get(&input_handle->runtime->actions, s_array_handle(&input_handle->runtime->actions, (u32)i));
+		if (!action || !action->valid) {
+			continue;
+		}
+		action->previous_value = action->value;
+		action->pressed = false;
+		action->released = false;
+	}
 	const f64 dt = se_window_get_delta_time(input_handle->window);
 	input_handle->runtime->replay_time += s_max(dt, 0.0);
 

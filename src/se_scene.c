@@ -80,12 +80,23 @@ static b8 se_scene_json_write_file(const c8* path, s_json* root) {
 static b8 se_scene_json_read_file(const c8* path, s_json** out_root) {
 	c8* text = NULL;
 	s_json* root = NULL;
+	c8 resolved_path[SE_MAX_PATH_LENGTH] = {0};
+	const c8* read_path = path;
 	if (!path || path[0] == '\0' || !out_root) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	*out_root = NULL;
-	if (!s_file_read(path, &text, NULL)) {
+	if (!s_file_read(read_path, &text, NULL)) {
+		if (se_paths_resolve_resource_path(resolved_path, sizeof(resolved_path), path)) {
+			read_path = resolved_path;
+		}
+		if (!s_file_read(read_path, &text, NULL)) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+	}
+	if (!text) {
 		se_set_last_error(SE_RESULT_IO);
 		return false;
 	}
@@ -535,6 +546,73 @@ static void se_mat4_apply_basis_scale(s_mat4 *transform, const s_vec3 *scale) {
 	transform->m[2][2] *= scale->z;
 }
 
+static s_vec3 se_mat4_mul_point(const s_mat4* transform, const s_vec3* point) {
+	if (!transform || !point) {
+		return s_vec3(0.0f, 0.0f, 0.0f);
+	}
+	return s_vec3(
+		(transform->m[0][0] * point->x) + (transform->m[1][0] * point->y) + (transform->m[2][0] * point->z) + transform->m[3][0],
+		(transform->m[0][1] * point->x) + (transform->m[1][1] * point->y) + (transform->m[2][1] * point->z) + transform->m[3][1],
+		(transform->m[0][2] * point->x) + (transform->m[1][2] * point->y) + (transform->m[2][2] * point->z) + transform->m[3][2]
+	);
+}
+
+static f32 se_max3(const f32 a, const f32 b, const f32 c) {
+	return s_max(a, s_max(b, c));
+}
+
+static b8 se_model_estimate_pick_sphere(const se_model* model, s_vec3* out_center, f32* out_radius) {
+	if (!model || !out_center || !out_radius) {
+		return false;
+	}
+
+	b8 found_vertex = false;
+	s_vec3 min_point = s_vec3(FLT_MAX, FLT_MAX, FLT_MAX);
+	s_vec3 max_point = s_vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	for (sz mesh_index = 0; mesh_index < s_array_get_size((se_meshes*)&model->meshes); ++mesh_index) {
+		se_mesh* mesh = s_array_get((se_meshes*)&model->meshes, s_array_handle((se_meshes*)&model->meshes, (u32)mesh_index));
+		if (!mesh || s_array_get_size(&mesh->cpu.vertices) == 0) {
+			continue;
+		}
+		for (sz vertex_index = 0; vertex_index < s_array_get_size(&mesh->cpu.vertices); ++vertex_index) {
+			const se_vertex_3d* vertex = s_array_get(&mesh->cpu.vertices, s_array_handle(&mesh->cpu.vertices, (u32)vertex_index));
+			if (!vertex) {
+				continue;
+			}
+			const s_vec3 local_point = se_mat4_mul_point(&mesh->matrix, &vertex->position);
+			min_point.x = fminf(min_point.x, local_point.x);
+			min_point.y = fminf(min_point.y, local_point.y);
+			min_point.z = fminf(min_point.z, local_point.z);
+			max_point.x = fmaxf(max_point.x, local_point.x);
+			max_point.y = fmaxf(max_point.y, local_point.y);
+			max_point.z = fmaxf(max_point.z, local_point.z);
+			found_vertex = true;
+		}
+	}
+
+	if (!found_vertex) {
+		*out_center = s_vec3(0.0f, 0.0f, 0.0f);
+		*out_radius = 0.8660254f;
+		return false;
+	}
+
+	*out_center = s_vec3(
+		(min_point.x + max_point.x) * 0.5f,
+		(min_point.y + max_point.y) * 0.5f,
+		(min_point.z + max_point.z) * 0.5f
+	);
+	const s_vec3 extent = s_vec3(
+		max_point.x - out_center->x,
+		max_point.y - out_center->y,
+		max_point.z - out_center->z
+	);
+	*out_radius = s_vec3_length(&extent);
+	if (*out_radius <= 0.0001f) {
+		*out_radius = 0.5f;
+	}
+	return true;
+}
+
 static b8 se_object_2d_handle_exists(const se_context* ctx, const se_object_2d_handle handle) {
 	return ctx && handle != S_HANDLE_NULL && s_array_get((se_objects_2d*)&ctx->objects_2d, handle) != NULL;
 }
@@ -951,6 +1029,55 @@ static void se_instances_remove_free_index(se_instance_ids* free_indices, const 
 	}
 }
 
+static void se_object_3d_refresh_mesh_instance_sources(se_object_3d* object_ptr) {
+	if (!object_ptr || object_ptr->is_custom) {
+		return;
+	}
+	const sz instance_capacity = s_array_get_capacity(&object_ptr->render_transforms);
+	for (sz i = 0; i < s_array_get_size(&object_ptr->mesh_instances); ++i) {
+		se_mesh_instance* mesh_instance = s_array_get(&object_ptr->mesh_instances, s_array_handle(&object_ptr->mesh_instances, (u32)i));
+		if (!mesh_instance) {
+			continue;
+		}
+		se_instance_buffer* transform_buffer = s_array_get(&mesh_instance->instance_buffers, s_array_handle(&mesh_instance->instance_buffers, 0u));
+		if (transform_buffer) {
+			transform_buffer->buffer_ptr = s_array_get_data(&object_ptr->render_transforms);
+			transform_buffer->buffer_size = sizeof(s_mat4) * instance_capacity;
+		}
+		se_instance_buffer* buffer_buffer = s_array_get(&mesh_instance->instance_buffers, s_array_handle(&mesh_instance->instance_buffers, 1u));
+		if (buffer_buffer) {
+			buffer_buffer->buffer_ptr = s_array_get_data(&object_ptr->render_buffers);
+			buffer_buffer->buffer_size = sizeof(s_mat4) * instance_capacity;
+		}
+		se_instance_buffer* metadata_buffer = s_array_get(&mesh_instance->instance_buffers, s_array_handle(&mesh_instance->instance_buffers, 2u));
+		if (metadata_buffer) {
+			metadata_buffer->buffer_ptr = s_array_get_data(&object_ptr->render_metadata);
+			metadata_buffer->buffer_size = sizeof(s_mat4) * instance_capacity;
+		}
+		mesh_instance->instance_buffers_dirty = true;
+	}
+}
+
+static b8 se_object_3d_reserve_storage(se_object_3d* object_ptr, const sz instance_capacity) {
+	if (!object_ptr || object_ptr->is_custom) {
+		return false;
+	}
+	if (instance_capacity <= s_array_get_capacity(&object_ptr->instances.ids)) {
+		return true;
+	}
+	s_array_reserve(&object_ptr->instances.ids, instance_capacity);
+	s_array_reserve(&object_ptr->instances.transforms, instance_capacity);
+	s_array_reserve(&object_ptr->instances.buffers, instance_capacity);
+	s_array_reserve(&object_ptr->instances.actives, instance_capacity);
+	s_array_reserve(&object_ptr->instances.free_indices, instance_capacity);
+	s_array_reserve(&object_ptr->instances.metadata, instance_capacity);
+	s_array_reserve(&object_ptr->render_transforms, instance_capacity);
+	s_array_reserve(&object_ptr->render_buffers, instance_capacity);
+	s_array_reserve(&object_ptr->render_metadata, instance_capacity);
+	se_object_3d_refresh_mesh_instance_sources(object_ptr);
+	return true;
+}
+
 static void se_object_2d_sync_render_instances(se_object_2d* object_ptr) {
 	if (!object_ptr || object_ptr->is_custom) {
 		return;
@@ -980,15 +1107,26 @@ static void se_object_3d_sync_render_instances(se_object_3d* object_ptr) {
 		return;
 	}
 	se_transforms_clear_keep_capacity(&object_ptr->render_transforms);
+	se_buffers_clear_keep_capacity(&object_ptr->render_buffers);
+	se_buffers_clear_keep_capacity(&object_ptr->render_metadata);
 	const sz logical_count = s_array_get_size(&object_ptr->instances.transforms);
 	for (sz i = 0; i < logical_count; ++i) {
 		b8* active = s_array_get(&object_ptr->instances.actives, s_array_handle(&object_ptr->instances.actives, (u32)i));
 		if (!active || !*active) {
 			continue;
 		}
+		s_mat4* buffer = s_array_get(&object_ptr->instances.buffers, s_array_handle(&object_ptr->instances.buffers, (u32)i));
+		s_mat4* metadata = s_array_get(&object_ptr->instances.metadata, s_array_handle(&object_ptr->instances.metadata, (u32)i));
 		s_mat4 transform = s_mat4_identity;
+		s_mat4 default_buffer = s_mat4_identity;
+		s_mat4 default_metadata = s_mat4_identity;
+		s_mat4 render_buffer = buffer ? *buffer : default_buffer;
+		s_mat4 render_metadata = metadata ? *metadata : default_metadata;
 		s_array_add(&object_ptr->render_transforms, transform);
+		s_array_add(&object_ptr->render_buffers, render_buffer);
+		s_array_add(&object_ptr->render_metadata, render_metadata);
 	}
+	se_object_3d_refresh_mesh_instance_sources(object_ptr);
 }
 
 se_object_2d_handle se_object_2d_create(const c8 *fragment_shader_path, const s_mat3 *transform, const sz max_instances_count) {
@@ -1496,6 +1634,7 @@ b8 se_object_2d_set_metadata_by_id(const se_object_2d_handle object, const se_in
 		return false;
 	}
 	*entry = *metadata;
+	se_object_3d_set_instances_dirty(object, true);
 	se_set_last_error(SE_RESULT_OK);
 	return true;
 }
@@ -2962,14 +3101,15 @@ void se_scene_3d_render_to_buffer(const se_scene_3d_handle scene) {
 			continue;
 		}
 		const sz active_count = se_instances_active_count(&object->instances.actives);
-		if (active_count != s_array_get_size(&object->render_transforms)) {
+		const b8 object_dirty = se_object_3d_are_instances_dirty(object_handle);
+		if (object_dirty || active_count != s_array_get_size(&object->render_transforms)) {
 			se_object_3d_sync_render_instances(object);
 		}
 		const sz instance_count = s_array_get_size(&object->render_transforms);
 		if (instance_count == 0) {
 			continue;
 		}
-		const b8 object_requires_upload = camera_changed || se_object_3d_are_instances_dirty(object_handle);
+		const b8 object_requires_upload = camera_changed || object_dirty;
 
 		const sz mesh_count = s_array_get_size(&object->mesh_instances);
 		sz mesh_index = 0;
@@ -3086,14 +3226,56 @@ void se_scene_3d_remove_object(const se_scene_3d_handle scene, const se_object_3
 	}
 }
 
-b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_object_3d_handle* out_object, f32* out_distance) {
-	if (!out_object || viewport_width <= 1.0f || viewport_height <= 1.0f) {
+static b8 se_scene_ray_intersects_sphere(
+	const s_vec3* origin,
+	const s_vec3* direction,
+	const s_vec3* center,
+	const f32 radius,
+	f32* out_distance
+) {
+	if (!origin || !direction || !center || radius <= 0.0f) {
+		return false;
+	}
+	const s_vec3 oc = s_vec3_sub(origin, center);
+	const f32 a = s_vec3_dot(direction, direction);
+	const f32 b = 2.0f * s_vec3_dot(&oc, direction);
+	const f32 c = s_vec3_dot(&oc, &oc) - (radius * radius);
+	const f32 discriminant = (b * b) - (4.0f * a * c);
+	if (discriminant < 0.0f || fabsf(a) <= 0.000001f) {
+		return false;
+	}
+	const f32 sqrt_disc = sqrtf(discriminant);
+	const f32 inv_denom = 0.5f / a;
+	const f32 t0 = (-b - sqrt_disc) * inv_denom;
+	const f32 t1 = (-b + sqrt_disc) * inv_denom;
+	f32 distance = FLT_MAX;
+	if (t0 >= 0.0f) {
+		distance = t0;
+	} else if (t1 >= 0.0f) {
+		distance = t1;
+	}
+	if (distance == FLT_MAX) {
+		return false;
+	}
+	if (out_distance) {
+		*out_distance = distance;
+	}
+	return true;
+}
+
+b8 se_scene_3d_pick_instance_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_scene_pick_hit_3d* out_hit) {
+	if (!out_hit || viewport_width <= 1.0f || viewport_height <= 1.0f) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
+	memset(out_hit, 0, sizeof(*out_hit));
+	out_hit->object = S_HANDLE_NULL;
+	out_hit->instance_id = -1;
+	out_hit->distance = FLT_MAX;
+
 	se_context *ctx = se_current_context();
 	se_scene_3d *scene_ptr = se_scene_3d_from_handle(ctx, scene);
-	s_assertf(scene_ptr, "se_scene_3d_pick_object_screen :: scene is null");
+	s_assertf(scene_ptr, "se_scene_3d_pick_instance_screen :: scene is null");
 	if (scene_ptr->camera == S_HANDLE_NULL) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
 		return false;
@@ -3105,9 +3287,7 @@ b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 scre
 		return false;
 	}
 
-	const f32 radius = s_max(pick_radius, 0.0001f);
-	f32 best_distance = FLT_MAX;
-	se_object_3d_handle best_object = S_HANDLE_NULL;
+	const f32 radius_padding = s_max(pick_radius, 0.0001f);
 	for (sz i = 0; i < s_array_get_size(&scene_ptr->objects); ++i) {
 		se_object_3d_handle object_handle = *s_array_get(&scene_ptr->objects, s_array_handle(&scene_ptr->objects, (u32)i));
 		if (object_handle == S_HANDLE_NULL) {
@@ -3117,44 +3297,71 @@ b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 scre
 			continue;
 		}
 		se_object_3d *object = se_object_3d_from_handle(ctx, object_handle);
-		if (!object || !object->is_visible || object->is_custom) {
+		if (!object || !object->is_visible || object->is_custom || object->model == S_HANDLE_NULL) {
 			continue;
 		}
+		se_model *model = se_model_from_handle(ctx, object->model);
+		if (!model) {
+			continue;
+		}
+		s_vec3 local_center = s_vec3(0.0f, 0.0f, 0.0f);
+		f32 local_radius = 0.8660254f;
+		(void)se_model_estimate_pick_sphere(model, &local_center, &local_radius);
 		for (sz j = 0; j < s_array_get_size(&object->instances.transforms); ++j) {
 			b8* active = s_array_get(&object->instances.actives, s_array_handle(&object->instances.actives, (u32)j));
-			if (!active || !*active) {
-				continue;
-			}
+			se_instance_id* instance_id = s_array_get(&object->instances.ids, s_array_handle(&object->instances.ids, (u32)j));
 			s_mat4 *instance_transform = s_array_get(&object->instances.transforms, s_array_handle(&object->instances.transforms, (u32)j));
-			if (!instance_transform) {
+			if (!active || !*active || !instance_id || !instance_transform) {
 				continue;
 			}
 			s_mat4 world_transform = s_mat4_mul(&object->transform, instance_transform);
-			const s_vec3 center = s_mat4_get_translation(&world_transform);
-			const s_vec3 origin_to_center = s_vec3_sub(&center, &ray_origin);
-			const f32 t = s_vec3_dot(&origin_to_center, &ray_direction);
-			if (t < 0.0f) {
+			const s_vec3 world_center = se_mat4_mul_point(&world_transform, &local_center);
+			const s_vec3 scale = se_mat4_extract_basis_scale(&world_transform);
+			const f32 world_radius = (local_radius * se_max3(scale.x, scale.y, scale.z)) + radius_padding;
+			f32 hit_distance = 0.0f;
+			if (!se_scene_ray_intersects_sphere(&ray_origin, &ray_direction, &world_center, world_radius, &hit_distance)) {
 				continue;
 			}
-			const s_vec3 projected = s_vec3_add(&ray_origin, &s_vec3_muls(&ray_direction, t));
-			const s_vec3 delta = s_vec3_sub(&center, &projected);
-			const f32 distance = s_vec3_length(&delta);
-			if (distance <= radius && t < best_distance) {
-				best_distance = t;
-				best_object = object_handle;
+			if (hit_distance >= out_hit->distance) {
+				continue;
 			}
+			out_hit->object = object_handle;
+			out_hit->instance_id = *instance_id;
+			out_hit->distance = hit_distance;
+			out_hit->point = s_vec3_add(&ray_origin, &s_vec3_muls(&ray_direction, hit_distance));
 		}
 	}
-	*out_object = best_object;
-	if (out_distance) {
-		*out_distance = best_distance;
-	}
-	if (best_object == S_HANDLE_NULL) {
+
+	if (out_hit->object == S_HANDLE_NULL) {
 		se_set_last_error(SE_RESULT_NOT_FOUND);
 		return false;
 	}
 	se_set_last_error(SE_RESULT_OK);
 	return true;
+}
+
+b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_object_3d_handle* out_object, f32* out_distance) {
+	if (!out_object) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_scene_pick_hit_3d hit = {0};
+	const b8 ok = se_scene_3d_pick_instance_screen(
+		scene,
+		screen_x,
+		screen_y,
+		viewport_width,
+		viewport_height,
+		pick_radius,
+		filter,
+		user_data,
+		&hit
+	);
+	*out_object = ok ? hit.object : S_HANDLE_NULL;
+	if (out_distance) {
+		*out_distance = ok ? hit.distance : FLT_MAX;
+	}
+	return ok;
 }
 
 void se_scene_3d_set_camera(const se_scene_3d_handle scene, const se_camera_handle camera) {
@@ -3295,13 +3502,9 @@ se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat
 	s_array_init(&new_object->instances.free_indices);
 	s_array_init(&new_object->instances.metadata);
 	s_array_init(&new_object->render_transforms);
-	s_array_reserve(&new_object->instances.ids, instance_capacity);
-	s_array_reserve(&new_object->instances.transforms, instance_capacity);
-	s_array_reserve(&new_object->instances.buffers, instance_capacity);
-	s_array_reserve(&new_object->instances.actives, instance_capacity);
-	s_array_reserve(&new_object->instances.free_indices, instance_capacity);
-	s_array_reserve(&new_object->instances.metadata, instance_capacity);
-	s_array_reserve(&new_object->render_transforms, instance_capacity);
+	s_array_init(&new_object->render_buffers);
+	s_array_init(&new_object->render_metadata);
+	se_object_3d_reserve_storage(new_object, instance_capacity);
 	new_object->instances.next_id = 0;
 
 	se_model *model_ptr = se_model_from_handle(ctx, model);
@@ -3319,6 +3522,8 @@ se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat
 			}
 			se_mesh_instance_create(mesh_instance, mesh, (u32)instance_capacity);
 			se_mesh_instance_add_buffer(mesh_instance, s_array_get_data(&new_object->render_transforms), instance_capacity);
+			se_mesh_instance_add_buffer(mesh_instance, s_array_get_data(&new_object->render_buffers), instance_capacity);
+			se_mesh_instance_add_buffer(mesh_instance, s_array_get_data(&new_object->render_metadata), instance_capacity);
 		}
 	}
 
@@ -3329,19 +3534,26 @@ se_object_3d_handle se_object_3d_create(const se_model_handle model, const s_mat
 		s_handle active_handle = s_array_increment(&new_object->instances.actives);
 		s_handle metadata_handle = s_array_increment(&new_object->instances.metadata);
 		s_handle render_handle = s_array_increment(&new_object->render_transforms);
+		s_handle render_buffer_handle = s_array_increment(&new_object->render_buffers);
+		s_handle render_metadata_handle = s_array_increment(&new_object->render_metadata);
 		se_instance_id *new_instance_id = s_array_get(&new_object->instances.ids, id_handle);
 		s_mat4 *new_transform = s_array_get(&new_object->instances.transforms, transform_handle);
 		s_mat4 *new_buffer = s_array_get(&new_object->instances.buffers, buffer_handle);
 		b8 *new_active = s_array_get(&new_object->instances.actives, active_handle);
 		s_mat4 *new_metadata = s_array_get(&new_object->instances.metadata, metadata_handle);
 		s_mat4 *new_render_transform = s_array_get(&new_object->render_transforms, render_handle);
+		s_mat4 *new_render_buffer = s_array_get(&new_object->render_buffers, render_buffer_handle);
+		s_mat4 *new_render_metadata = s_array_get(&new_object->render_metadata, render_metadata_handle);
 		*new_instance_id = 0;
 		*new_transform = s_mat4_identity;
 		*new_buffer = s_mat4_identity;
 		*new_active = true;
 		*new_metadata = s_mat4_identity;
 		*new_render_transform = s_mat4_identity;
+		*new_render_buffer = s_mat4_identity;
+		*new_render_metadata = s_mat4_identity;
 		new_object->instances.next_id = 1;
+		se_object_3d_refresh_mesh_instance_sources(new_object);
 		se_object_3d_set_instances_dirty(object_handle, true);
 	}
 
@@ -3392,6 +3604,8 @@ void se_object_3d_destroy(const se_object_3d_handle object) {
 	}
 	s_array_clear(&object_ptr->mesh_instances);
 	s_array_clear(&object_ptr->render_transforms);
+	s_array_clear(&object_ptr->render_buffers);
+	s_array_clear(&object_ptr->render_metadata);
 	s_array_clear(&object_ptr->instances.ids);
 	s_array_clear(&object_ptr->instances.transforms);
 	s_array_clear(&object_ptr->instances.buffers);
@@ -3409,6 +3623,15 @@ void se_object_3d_set_transform(const se_object_3d_handle object, const s_mat4 *
 	s_assertf(object_ptr, "se_object_3d_set_transform :: object is null");
 	s_assertf(transform, "se_object_3d_set_transform :: transform is null");
 	object_ptr->transform = *transform;
+	se_object_3d_set_instances_dirty(object, true);
+}
+
+void se_object_3d_set_location(const se_object_3d_handle object, const s_vec3 *location) {
+	se_context *ctx = se_current_context();
+	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
+	s_assertf(object_ptr, "se_object_3d_set_location :: object is null");
+	s_assertf(location, "se_object_3d_set_location :: location is null");
+	s_mat4_set_translation(&object_ptr->transform, location);
 	se_object_3d_set_instances_dirty(object, true);
 }
 
@@ -3451,6 +3674,21 @@ s_mat4 se_object_3d_get_transform(const se_object_3d_handle object) {
 	return object_ptr->transform;
 }
 
+b8 se_object_3d_reserve_instances(const se_object_3d_handle object, const sz instance_capacity) {
+	se_context *ctx = se_current_context();
+	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
+	if (!object_ptr || object_ptr->is_custom || instance_capacity == 0) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_object_3d_reserve_storage(object_ptr, instance_capacity)) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 se_instance_id se_object_3d_add_instance(const se_object_3d_handle object, const s_mat4 *transform, const s_mat4 *buffer) {
 	se_context *ctx = se_current_context();
 	se_object_3d *object_ptr = se_object_3d_from_handle(ctx, object);
@@ -3461,8 +3699,11 @@ se_instance_id se_object_3d_add_instance(const se_object_3d_handle object, const
 	sz reuse_index = 0;
 	const b8 has_free_slot = se_instances_pop_free_index(&object_ptr->instances.free_indices, &reuse_index);
 	if (!has_free_slot && max_capacity > 0 && s_array_get_size(&object_ptr->instances.ids) >= max_capacity) {
-		se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
-		return -1;
+		const sz next_capacity = s_max(max_capacity + 1, max_capacity * 2);
+		if (!se_object_3d_reserve_storage(object_ptr, next_capacity)) {
+			se_set_last_error(SE_RESULT_CAPACITY_EXCEEDED);
+			return -1;
+		}
 	}
 
 	const se_instance_id new_id = object_ptr->instances.next_id++;
@@ -3928,6 +4169,8 @@ b8 se_object_3d_from_json(const se_object_3d_handle object, const s_json* root) 
 	se_instance_ids_clear_keep_capacity(&object_ptr->instances.free_indices);
 	se_buffers_clear_keep_capacity(&object_ptr->instances.metadata);
 	se_transforms_clear_keep_capacity(&object_ptr->render_transforms);
+	se_buffers_clear_keep_capacity(&object_ptr->render_buffers);
+	se_buffers_clear_keep_capacity(&object_ptr->render_metadata);
 
 	for (sz slot_index = 0; slot_index < slot_count; ++slot_index) {
 		const s_json* slot_json = s_json_at(instances_json, slot_index);
@@ -3960,6 +4203,7 @@ b8 se_object_3d_from_json(const se_object_3d_handle object, const s_json* root) 
 	}
 
 	object_ptr->instances.next_id = (se_instance_id)next_instance_id;
+	se_object_3d_refresh_mesh_instance_sources(object_ptr);
 	se_object_3d_set_instances_dirty(object, true);
 	se_set_last_error(SE_RESULT_OK);
 	return true;

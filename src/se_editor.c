@@ -1591,10 +1591,10 @@ static b8 se_editor_collect_camera_properties(se_editor* editor, const se_editor
 	}
 	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_POSITION, camera->position, true);
 	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_TARGET, camera->target, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_UP, camera->up, true);
-	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_RIGHT, camera->right, true);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_UP, camera->up, false);
+	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_RIGHT, camera->right, false);
 	se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_FORWARD, se_camera_get_forward_vector((se_camera_handle)item->handle), false);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FOV, camera->fov, true);
+	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FOV, camera->fov, !camera->use_orthographic);
 	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_NEAR, camera->near, true);
 	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_FAR, camera->far, true);
 	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ASPECT, camera->aspect, true);
@@ -2466,37 +2466,45 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		camera->fov = f32_value;
-		if (camera->use_orthographic) {
-			se_camera_set_orthographic(camera_handle, camera->ortho_height, camera->near, camera->far);
-		} else {
-			se_camera_set_perspective(camera_handle, camera->fov, camera->near, camera->far);
+		if (camera->use_orthographic || f32_value <= 1.0f || f32_value >= 179.0f) {
+			return false;
 		}
-		return true;
+		se_camera_set_perspective(camera_handle, f32_value, camera->near, camera->far);
+		return fabsf(camera->fov - f32_value) <= 0.0001f;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_NEAR) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		camera->near = f32_value;
 		if (camera->use_orthographic) {
-			se_camera_set_orthographic(camera_handle, camera->ortho_height, camera->near, camera->far);
+			if (f32_value <= 0.0f || camera->far <= f32_value || camera->ortho_height <= 0.0f) {
+				return false;
+			}
+			se_camera_set_orthographic(camera_handle, camera->ortho_height, f32_value, camera->far);
 		} else {
-			se_camera_set_perspective(camera_handle, camera->fov, camera->near, camera->far);
+			if (f32_value <= 0.0f || camera->far <= f32_value || camera->fov <= 1.0f || camera->fov >= 179.0f) {
+				return false;
+			}
+			se_camera_set_perspective(camera_handle, camera->fov, f32_value, camera->far);
 		}
-		return true;
+		return fabsf(camera->near - f32_value) <= 0.0001f;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_FAR) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		camera->far = f32_value;
 		if (camera->use_orthographic) {
-			se_camera_set_orthographic(camera_handle, camera->ortho_height, camera->near, camera->far);
+			if (camera->near <= 0.0f || f32_value <= camera->near || camera->ortho_height <= 0.0f) {
+				return false;
+			}
+			se_camera_set_orthographic(camera_handle, camera->ortho_height, camera->near, f32_value);
 		} else {
-			se_camera_set_perspective(camera_handle, camera->fov, camera->near, camera->far);
+			if (camera->near <= 0.0f || f32_value <= camera->near || camera->fov <= 1.0f || camera->fov >= 179.0f) {
+				return false;
+			}
+			se_camera_set_perspective(camera_handle, camera->fov, camera->near, f32_value);
 		}
-		return true;
+		return fabsf(camera->far - f32_value) <= 0.0001f;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_ASPECT) == 0) {
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
@@ -2509,10 +2517,14 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
 			return false;
 		}
-		camera->ortho_height = f32_value;
-		if (camera->use_orthographic) {
-			se_camera_set_orthographic(camera_handle, camera->ortho_height, camera->near, camera->far);
+		if (f32_value <= 0.0f) {
+			return false;
 		}
+		if (camera->use_orthographic) {
+			se_camera_set_orthographic(camera_handle, f32_value, camera->near, camera->far);
+			return fabsf(camera->ortho_height - f32_value) <= 0.0001f;
+		}
+		camera->ortho_height = f32_value;
 		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_USE_ORTHOGRAPHIC) == 0) {
@@ -2524,7 +2536,7 @@ static b8 se_editor_apply_camera_command(se_editor* editor, const se_editor_comm
 		} else {
 			se_camera_set_perspective(camera_handle, camera->fov, camera->near, camera->far);
 		}
-		return true;
+		return camera->use_orthographic == bool_value;
 	}
 	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_SET_ASPECT_FROM_WINDOW) == 0) {
 		if (!se_editor_value_as_handle(&command->value, &handle_value)) {

@@ -749,6 +749,7 @@ void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffe
 
 	s_handle buffer_handle = s_array_increment(&instance->instance_buffers);
 	se_instance_buffer *new_buffer = s_array_get(&instance->instance_buffers, buffer_handle);
+	const u32 buffer_index = (u32)(s_array_get_size(&instance->instance_buffers) - 1);
 	new_buffer->vbo = 0;
 	new_buffer->buffer_ptr = buffer;
 	new_buffer->buffer_size = sizeof(s_mat4) * instance_count;
@@ -757,7 +758,7 @@ void se_mesh_instance_add_buffer(se_mesh_instance *instance, const s_mat4 *buffe
 	glBufferData(GL_ARRAY_BUFFER, new_buffer->buffer_size, new_buffer->buffer_ptr, GL_DYNAMIC_DRAW);
 
 	for (u32 i = 0; i < 4; i++) {
-		const u32 attrib = 3 + i;
+		const u32 attrib = 3 + (buffer_index * 4u) + i;
 		glEnableVertexAttribArray(attrib);
 		glVertexAttribPointer(attrib, 4, GL_FLOAT, GL_FALSE, sizeof(s_mat4), (void *)(sizeof(s_vec4) * i));
 		glVertexAttribDivisor(attrib, 1);
@@ -780,7 +781,7 @@ void se_mesh_instance_update(se_mesh_instance *instance) {
 	se_instance_buffer *current_buffer = NULL;
 	s_foreach(&instance->instance_buffers, current_buffer) {
 		glBindBuffer(GL_ARRAY_BUFFER, current_buffer->vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, current_buffer->buffer_size, current_buffer->buffer_ptr);
+		glBufferData(GL_ARRAY_BUFFER, current_buffer->buffer_size, current_buffer->buffer_ptr, GL_DYNAMIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 	instance->instance_buffers_dirty = false;

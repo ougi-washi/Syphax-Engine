@@ -30,6 +30,13 @@ typedef s_handle se_scene_3d_custom_render_handle;
 typedef void (*se_scene_3d_custom_render_callback)(se_scene_3d_handle scene, void* user_data);
 
 typedef struct {
+	se_object_3d_handle object;
+	se_instance_id instance_id;
+	s_vec3 point;
+	f32 distance;
+} se_scene_pick_hit_3d;
+
+typedef struct {
 	se_instance_ids ids;
 	se_transforms transforms;
 	se_buffers buffers;
@@ -88,6 +95,8 @@ typedef struct se_object_3d {
 			se_instances instances;
 			se_mesh_instances mesh_instances;
 			se_transforms render_transforms;
+			se_buffers render_buffers;
+			se_buffers render_metadata;
 		};
 		se_object_custom custom;
 	};
@@ -200,6 +209,7 @@ extern void se_scene_3d_draw(const se_scene_3d_handle scene, const se_window_han
 extern void se_scene_3d_add_object(const se_scene_3d_handle scene, const se_object_3d_handle object);
 extern se_object_3d_handle se_scene_3d_add_model(const se_scene_3d_handle scene, const se_model_handle model, const s_mat4 *transform);
 extern void se_scene_3d_remove_object(const se_scene_3d_handle scene, const se_object_3d_handle object);
+extern b8 se_scene_3d_pick_instance_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_scene_pick_hit_3d* out_hit);
 extern b8 se_scene_3d_pick_object_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_object_3d_handle* out_object, f32* out_distance);
 extern void se_scene_3d_set_camera(const se_scene_3d_handle scene, const se_camera_handle camera);
 extern se_camera_handle se_scene_3d_get_camera(const se_scene_3d_handle scene);
@@ -221,6 +231,7 @@ extern void se_object_3d_set_location(const se_object_3d_handle object, const s_
 extern void se_object_3d_set_rotation(const se_object_3d_handle object, const s_vec3 *rotation);
 extern void se_object_3d_set_scale(const se_object_3d_handle object, const s_vec3 *scale);
 extern s_mat4 se_object_3d_get_transform(const se_object_3d_handle object);
+extern b8 se_object_3d_reserve_instances(const se_object_3d_handle object, const sz instance_capacity);
 extern se_instance_id se_object_3d_add_instance(const se_object_3d_handle object, const s_mat4 *transform, const s_mat4 *buffer);
 extern b8 se_object_3d_remove_instance(const se_object_3d_handle object, const se_instance_id instance_id);
 extern i32 se_object_3d_get_instance_index(const se_object_3d_handle object, const se_instance_id instance_id);

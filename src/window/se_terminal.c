@@ -37,6 +37,7 @@ typedef struct {
 	u32 rows;
 	s_array(se_window_terminal_cell, cells);
 	b8 present_initialized;
+	u32 blank_frame_count;
 } se_window_terminal_surface;
 
 typedef struct {
@@ -281,6 +282,7 @@ static void se_window_terminal_surface_resize(se_window* window_ptr, const u32 c
 		s_array_add(&surface->cells, default_cell);
 	}
 	surface->present_initialized = false;
+	surface->blank_frame_count = 0u;
 }
 
 static void se_window_terminal_sync_size(se_window* window_ptr) {
@@ -319,10 +321,91 @@ static void se_window_terminal_clear(se_window* window_ptr, const s_vec4* bg_col
 	}
 }
 
+static b8 se_window_terminal_surface_is_blank(const se_window_terminal_surface* surface) {
+	if (!surface) {
+		return true;
+	}
+	se_window_terminal_surface* mutable_surface = (se_window_terminal_surface*)surface;
+	for (u32 i = 0; i < surface->columns * surface->rows; ++i) {
+		const se_window_terminal_cell* cell = s_array_get(&mutable_surface->cells, s_array_handle(&mutable_surface->cells, i));
+		if (!cell) {
+			continue;
+		}
+		if (cell->glyph != '\0' && cell->glyph != ' ') {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void se_window_terminal_surface_write_text(
+	se_window_terminal_surface* surface,
+	const i32 row,
+	const i32 column,
+	const c8* text,
+	const s_vec4* fg_color,
+	const s_vec4* bg_color
+) {
+	if (!surface || !text || row < 0 || column < 0) {
+		return;
+	}
+	const i32 max_rows = (i32)surface->rows;
+	const i32 max_columns = (i32)surface->columns;
+	if (row >= max_rows || column >= max_columns) {
+		return;
+	}
+	const sz len = strlen(text);
+	for (sz i = 0; i < len; ++i) {
+		const i32 x = column + (i32)i;
+		if (x < 0 || x >= max_columns) {
+			continue;
+		}
+		const u32 index = (u32)row * surface->columns + (u32)x;
+		se_window_terminal_cell* cell = s_array_get(&surface->cells, s_array_handle(&surface->cells, index));
+		if (!cell) {
+			continue;
+		}
+		cell->glyph = text[i];
+		if (fg_color) {
+			cell->fg_color = *fg_color;
+		}
+		if (bg_color) {
+			cell->bg_color = *bg_color;
+		}
+	}
+}
+
+static void se_window_terminal_overlay_blank_surface_hint(se_window_terminal_surface* surface) {
+	static const c8* lines[] = {
+		"Terminal backend is experimental and does not rasterize scenes yet.",
+		"Use desktop_glfw with SE_TERMINAL_RENDER=1 for terminal output."
+	};
+	if (!surface || surface->rows == 0 || surface->columns == 0) {
+		return;
+	}
+	const s_vec4 fg = s_vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	const s_vec4 bg = s_vec4(0.14f, 0.07f, 0.07f, 1.0f);
+	const i32 line_count = (i32)(sizeof(lines) / sizeof(lines[0]));
+	const i32 start_row = s_max(0, ((i32)surface->rows - line_count) / 2);
+	for (i32 i = 0; i < line_count; ++i) {
+		const sz len = strlen(lines[i]);
+		const i32 start_column = s_max(0, ((i32)surface->columns - (i32)len) / 2);
+		se_window_terminal_surface_write_text(surface, start_row + i, start_column, lines[i], &fg, &bg);
+	}
+}
+
 static void se_window_terminal_present(se_window* window_ptr) {
 	se_window_terminal_surface* surface = se_window_terminal_surface_get_or_create(window_ptr);
 	if (!surface) {
 		return;
+	}
+	if (se_window_terminal_surface_is_blank(surface)) {
+		surface->blank_frame_count++;
+		if (surface->blank_frame_count >= 2u) {
+			se_window_terminal_overlay_blank_surface_hint(surface);
+		}
+	} else {
+		surface->blank_frame_count = 0u;
 	}
 	if (!surface->present_initialized) {
 		fputs("\033[2J", stdout);

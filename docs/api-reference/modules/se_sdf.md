@@ -579,6 +579,30 @@ extern void se_sdf_node_destroy(se_sdf_scene_handle scene, se_sdf_node_handle no
 
 No inline description found in header comments.
 
+### `se_sdf_node_get_color`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_get_color(se_sdf_scene_handle scene, se_sdf_node_handle node, s_vec3* out_color);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_noise`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_noise se_sdf_node_get_noise(se_sdf_scene_handle scene, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_node_get_transform`
 
 <div class="api-signature">
@@ -597,6 +621,30 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_sdf_node_remove_child(se_sdf_scene_handle scene, se_sdf_node_handle parent, se_sdf_node_handle child);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_set_color`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_set_color(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_vec3* color);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_set_noise`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_set_noise(se_sdf_scene_handle scene, se_sdf_node_handle node, const se_sdf_noise* noise);
 ```
 
 </div>
@@ -645,6 +693,54 @@ No inline description found in header comments.
 
 ```c
 extern se_physics_body_3d_handle se_sdf_object_create_physics_body_3d( se_physics_world_3d_handle world, const se_sdf_object* object, const se_physics_body_params_3d* body_params, const s_vec3* reference_position, b8 is_trigger );
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_physics_add_shape_3d`
+
+<div class="api-signature">
+
+```c
+extern se_physics_shape_3d_handle se_sdf_physics_add_shape_3d( se_sdf_physics_handle physics, se_physics_world_3d_handle world, se_physics_body_3d_handle body, const s_vec3* offset, const s_vec3* rotation, b8 is_trigger );
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_physics_create`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_physics_handle se_sdf_physics_create(se_sdf_scene_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_physics_destroy`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_physics_destroy(se_sdf_physics_handle physics);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_physics_refresh`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_physics_refresh(se_sdf_physics_handle physics);
 ```
 
 </div>
@@ -987,12 +1083,72 @@ extern void se_sdf_scene_destroy(se_sdf_scene_handle scene);
 
 No inline description found in header comments.
 
+### `se_sdf_scene_get_generation`
+
+<div class="api-signature">
+
+```c
+extern u64 se_sdf_scene_get_generation(se_sdf_scene_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_scene_get_root`
 
 <div class="api-signature">
 
 ```c
 extern se_sdf_node_handle se_sdf_scene_get_root(se_sdf_scene_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_scene_project_point`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_scene_project_point(se_sdf_scene_handle scene, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_scene_raycast`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_scene_raycast(se_sdf_scene_handle scene, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_scene_sample_distance`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_scene_sample_distance(se_sdf_scene_handle scene, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_scene_sample_height`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_scene_sample_height(se_sdf_scene_handle scene, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit);
 ```
 
 </div>
@@ -1065,6 +1221,18 @@ No inline description found in header comments.
 
 ```c
 extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_transform`
+
+<div class="api-signature">
+
+```c
+extern s_mat4 se_sdf_transform(s_vec3 translation, s_vec3 rotation, s_vec3 scale);
 ```
 
 </div>
@@ -1476,7 +1644,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { s_mat4 transform; se_sdf_operation operation; f32 operation_amount; se_sdf_primitive_desc primitive; } se_sdf_node_primitive_desc;
+typedef struct { s_mat4 transform; se_sdf_operation operation; f32 operation_amount; se_sdf_primitive_desc primitive; se_sdf_noise noise; } se_sdf_node_primitive_desc;
 ```
 
 </div>
@@ -1500,7 +1668,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf_object { s_mat4 transform; se_sdf_scene_handle source_scene; se_sdf_node_handle source_node; se_sdf_object_type type; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; struct { s_vec3 size; f32 roundness; } round_box; struct { s_vec3 size; f32 thickness; } box_frame; struct { s_vec2 radii; } torus; struct { s_vec2 axis_sin_cos; f32 major_radius; f32 minor_radius; } capped_torus; struct { f32 half_length; f32 outer_radius; f32 inner_radius; } link; struct { s_vec3 axis_and_radius; } cylinder; struct { s_vec2 angle_sin_cos; f32 height; } cone; struct { s_vec2 angle_sin_cos; } cone_infinite; struct { s_vec3 normal; f32 offset; } plane; struct { s_vec2 half_size; } hex_prism; struct { s_vec3 a; s_vec3 b; f32 radius; } capsule; struct { f32 height; f32 radius; } vertical_capsule; struct { f32 radius; f32 half_height; } capped_cylinder; struct { s_vec3 a; s_vec3 b; f32 radius; } capped_cylinder_arbitrary; struct { f32 outer_radius; f32 corner_radius; f32 half_height; } rounded_cylinder; struct { f32 height; f32 radius_base; f32 radius_top; } capped_cone; struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } capped_cone_arbitrary; struct { s_vec2 angle_sin_cos; f32 radius; } solid_angle; struct { f32 radius; f32 cut_height; } cut_sphere; struct { f32 radius; f32 cut_height; f32 thickness; } cut_hollow_sphere; struct { f32 radius_a; f32 radius_b; f32 separation; } death_star; struct { f32 radius_base; f32 radius_top; f32 height; } round_cone; struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } round_cone_arbitrary; struct { s_vec3 a; s_vec3 b; f32 width; } vesica_segment; struct { f32 length_a; f32 length_b; f32 height; f32 corner_radius; } rhombus; struct { f32 size; } octahedron; struct { f32 size; } octahedron_bound; struct { f32 height; } pyramid; struct { s_vec3 a; s_vec3 b; s_vec3 c; } triangle; struct { s_vec3 a; s_vec3 b; s_vec3 c; s_vec3 d; } quad; }; se_sdf_operation operation; f32 operation_amount; se_sdf_noise noise; s_array(struct se_sdf_object, children); } se_sdf_object;
+typedef struct se_sdf_object { s_mat4 transform; se_sdf_scene_handle source_scene; se_sdf_node_handle source_node; se_sdf_object_type type; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; struct { s_vec3 size; f32 roundness; } round_box; struct { s_vec3 size; f32 thickness; } box_frame; struct { s_vec2 radii; } torus; struct { s_vec2 axis_sin_cos; f32 major_radius; f32 minor_radius; } capped_torus; struct { f32 half_length; f32 outer_radius; f32 inner_radius; } link; struct { s_vec3 axis_and_radius; } cylinder; struct { s_vec2 angle_sin_cos; f32 height; } cone; struct { s_vec2 angle_sin_cos; } cone_infinite; struct { s_vec3 normal; f32 offset; } plane; struct { s_vec2 half_size; } hex_prism; struct { s_vec3 a; s_vec3 b; f32 radius; } capsule; struct { f32 height; f32 radius; } vertical_capsule; struct { f32 radius; f32 half_height; } capped_cylinder; struct { s_vec3 a; s_vec3 b; f32 radius; } capped_cylinder_arbitrary; struct { f32 outer_radius; f32 corner_radius; f32 half_height; } rounded_cylinder; struct { f32 height; f32 radius_base; f32 radius_top; } capped_cone; struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } capped_cone_arbitrary; struct { s_vec2 angle_sin_cos; f32 radius; } solid_angle; struct { f32 radius; f32 cut_height; } cut_sphere; struct { f32 radius; f32 cut_height; f32 thickness; } cut_hollow_sphere; struct { f32 radius_a; f32 radius_b; f32 separation; } death_star; struct { f32 radius_base; f32 radius_top; f32 height; } round_cone; struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } round_cone_arbitrary; struct { s_vec3 a; s_vec3 b; f32 width; } vesica_segment; struct { f32 length_a; f32 length_b; f32 height; f32 corner_radius; } rhombus; struct { f32 size; } octahedron; struct { f32 size; } octahedron_bound; struct { f32 height; } pyramid; struct { s_vec3 a; s_vec3 b; s_vec3 c; } triangle; struct { s_vec3 a; s_vec3 b; s_vec3 c; s_vec3 d; } quad; }; se_sdf_operation operation; f32 operation_amount; se_sdf_noise noise; s_vec3 color; b8 has_color; s_array(struct se_sdf_object, children); } se_sdf_object;
 ```
 
 </div>
@@ -1525,6 +1693,18 @@ No inline description found in header comments.
 
 ```c
 typedef struct { f32 size; } se_sdf_octahedron_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_physics_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_sdf_physics_handle;
 ```
 
 </div>
@@ -1753,6 +1933,18 @@ No inline description found in header comments.
 
 ```c
 typedef struct { f32 band_levels; f32 rim_power; f32 rim_strength; f32 fill_strength; f32 back_strength; f32 checker_scale; f32 checker_strength; f32 ground_blend; f32 desaturate; f32 gamma; } se_sdf_stylized_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_surface_hit`
+
+<div class="api-signature">
+
+```c
+typedef struct { s_vec3 position; s_vec3 normal; f32 distance; se_sdf_scene_handle scene; se_sdf_node_handle node; b8 hit; } se_sdf_surface_hit;
 ```
 
 </div>

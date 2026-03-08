@@ -477,6 +477,30 @@ static void se_sim_event_queue_clear(se_sim_event_records* queue) {
 	s_array_init(queue);
 }
 
+static void se_simulation_event_queue_prune_target(se_sim_event_records* queue, const se_entity_id target, u32* in_out_payload_bytes) {
+	if (!queue || target == SE_SIM_ENTITY_ID_INVALID) {
+		return;
+	}
+	for (sz i = 0; i < s_array_get_size(queue);) {
+		s_handle handle = s_array_handle(queue, (u32)i);
+		se_sim_event_record* event_record = s_array_get(queue, handle);
+		if (!event_record || event_record->target != target) {
+			i++;
+			continue;
+		}
+		const u32 payload_size = (u32)s_array_get_size(&event_record->payload);
+		if (in_out_payload_bytes) {
+			if (*in_out_payload_bytes >= payload_size) {
+				*in_out_payload_bytes -= payload_size;
+			} else {
+				*in_out_payload_bytes = 0u;
+			}
+		}
+		se_sim_event_record_clear(event_record);
+		s_array_remove_ordered(queue, handle);
+	}
+}
+
 static void se_simulation_entities_clear(se_simulation* sim) {
 	if (!sim) {
 		return;
@@ -1399,6 +1423,8 @@ static b8 se_simulation_entity_destroy_internal(se_simulation* sim, const se_ent
 	if (slot->generation == 0u) {
 		slot->generation = 1u;
 	}
+	se_simulation_event_queue_prune_target(&sim->pending_events, entity, &sim->used_event_payload_bytes);
+	se_simulation_event_queue_prune_target(&sim->ready_events, entity, &sim->used_event_payload_bytes);
 	s_array_add(&sim->free_slots, slot_index);
 	if (sim->alive_entities > 0u) {
 		sim->alive_entities--;
@@ -1696,13 +1722,26 @@ static b8 se_simulation_event_poll_internal(
 		return false;
 	}
 
-	for (sz i = 0; i < s_array_get_size(&sim->ready_events); ++i) {
+	for (sz i = 0; i < s_array_get_size(&sim->ready_events);) {
 		s_handle handle = s_array_handle(&sim->ready_events, (u32)i);
 		se_sim_event_record* event_record = s_array_get(&sim->ready_events, handle);
 		if (!event_record) {
+			i++;
+			continue;
+		}
+		if (!se_simulation_entity_slot_from_id_const(sim, event_record->target, NULL)) {
+			const u32 payload_size = (u32)s_array_get_size(&event_record->payload);
+			if (sim->used_event_payload_bytes >= payload_size) {
+				sim->used_event_payload_bytes -= payload_size;
+			} else {
+				sim->used_event_payload_bytes = 0u;
+			}
+			se_sim_event_record_clear(event_record);
+			s_array_remove_ordered(&sim->ready_events, handle);
 			continue;
 		}
 		if (event_record->target != target || event_record->type != type) {
+			i++;
 			continue;
 		}
 		const u32 payload_size = (u32)s_array_get_size(&event_record->payload);

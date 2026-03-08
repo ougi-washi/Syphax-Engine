@@ -14,12 +14,14 @@ typedef struct s_json s_json;
 
 typedef s_handle se_sdf_scene_handle;
 typedef s_handle se_sdf_node_handle;
+typedef s_handle se_sdf_physics_handle;
 typedef s_handle se_sdf_material_handle;
 typedef s_handle se_sdf_renderer_handle;
 typedef s_handle se_sdf_control_handle;
 
 #define SE_SDF_SCENE_NULL ((se_sdf_scene_handle)S_HANDLE_NULL)
 #define SE_SDF_NODE_NULL ((se_sdf_node_handle)S_HANDLE_NULL)
+#define SE_SDF_PHYSICS_NULL ((se_sdf_physics_handle)S_HANDLE_NULL)
 #define SE_SDF_MATERIAL_NULL ((se_sdf_material_handle)S_HANDLE_NULL)
 #define SE_SDF_RENDERER_NULL ((se_sdf_renderer_handle)S_HANDLE_NULL)
 #define SE_SDF_CONTROL_NULL ((se_sdf_control_handle)S_HANDLE_NULL)
@@ -66,6 +68,13 @@ typedef struct {
 	f32 offset;
 	f32 frequency;
 } se_sdf_noise;
+
+#define SE_SDF_NOISE_DEFAULTS ((se_sdf_noise){ \
+	.active = 0, \
+	.scale = 0.0f, \
+	.offset = 0.0f, \
+	.frequency = 1.0f \
+})
 
 typedef enum {
 	SE_SDF_OP_NONE,
@@ -227,6 +236,8 @@ typedef struct se_sdf_object {
 	se_sdf_operation operation;
 	f32 operation_amount;
 	se_sdf_noise noise;
+	s_vec3 color;
+	b8 has_color;
 	s_array(struct se_sdf_object, children);
 } se_sdf_object;
 
@@ -302,6 +313,15 @@ typedef struct {
 } se_sdf_scene_desc;
 
 typedef struct {
+	s_vec3 position;
+	s_vec3 normal;
+	f32 distance;
+	se_sdf_scene_handle scene;
+	se_sdf_node_handle node;
+	b8 hit;
+} se_sdf_surface_hit;
+
+typedef struct {
 	s_mat4 transform;
 	se_sdf_operation operation;
 	f32 operation_amount;
@@ -312,11 +332,13 @@ typedef struct {
 	se_sdf_operation operation;
 	f32 operation_amount;
 	se_sdf_primitive_desc primitive;
+	se_sdf_noise noise;
 } se_sdf_node_primitive_desc;
 
 #define SE_SDF_SCENE_DESC_DEFAULTS ((se_sdf_scene_desc){ .initial_node_capacity = 0 })
 #define SE_SDF_NODE_GROUP_DESC_DEFAULTS ((se_sdf_node_group_desc){ .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION, .operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT })
 
+extern s_mat4 se_sdf_transform(s_vec3 translation, s_vec3 rotation, s_vec3 scale);
 extern se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc);
 extern se_object_2d_handle se_sdf_scene_to_object_2d(se_sdf_scene_handle scene);
 extern se_object_3d_handle se_sdf_scene_to_object_3d(se_sdf_scene_handle scene);
@@ -324,7 +346,12 @@ extern void se_sdf_scene_destroy(se_sdf_scene_handle scene);
 extern void se_sdf_scene_clear(se_sdf_scene_handle scene);
 extern b8 se_sdf_scene_set_root(se_sdf_scene_handle scene, se_sdf_node_handle node);
 extern se_sdf_node_handle se_sdf_scene_get_root(se_sdf_scene_handle scene);
+extern u64 se_sdf_scene_get_generation(se_sdf_scene_handle scene);
 extern b8 se_sdf_scene_validate(se_sdf_scene_handle scene, char* error_message, sz error_message_size);
+extern b8 se_sdf_scene_sample_distance(se_sdf_scene_handle scene, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node);
+extern b8 se_sdf_scene_project_point(se_sdf_scene_handle scene, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+extern b8 se_sdf_scene_raycast(se_sdf_scene_handle scene, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+extern b8 se_sdf_scene_sample_height(se_sdf_scene_handle scene, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit);
 extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
 extern b8 se_sdf_from_json(se_sdf_scene_handle scene, const s_json* root);
 extern b8 se_sdf_from_json_file(se_sdf_scene_handle scene, const c8* path);
@@ -337,6 +364,10 @@ extern b8 se_sdf_node_remove_child(se_sdf_scene_handle scene, se_sdf_node_handle
 extern b8 se_sdf_node_set_operation(se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_operation operation);
 extern b8 se_sdf_node_set_transform(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_mat4* transform);
 extern s_mat4 se_sdf_node_get_transform(se_sdf_scene_handle scene, se_sdf_node_handle node);
+extern b8 se_sdf_node_set_noise(se_sdf_scene_handle scene, se_sdf_node_handle node, const se_sdf_noise* noise);
+extern se_sdf_noise se_sdf_node_get_noise(se_sdf_scene_handle scene, se_sdf_node_handle node);
+extern b8 se_sdf_node_set_color(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_vec3* color);
+extern b8 se_sdf_node_get_color(se_sdf_scene_handle scene, se_sdf_node_handle node, s_vec3* out_color);
 extern se_sdf_node_handle se_sdf_node_spawn_primitive(
 	se_sdf_scene_handle scene,
 	se_sdf_node_handle parent,
@@ -423,6 +454,17 @@ extern b8 se_sdf_scene_align_camera(
 	se_camera_handle camera,
 	const se_sdf_camera_align_desc* desc,
 	se_sdf_scene_bounds* out_bounds
+);
+extern se_sdf_physics_handle se_sdf_physics_create(se_sdf_scene_handle scene);
+extern void se_sdf_physics_destroy(se_sdf_physics_handle physics);
+extern b8 se_sdf_physics_refresh(se_sdf_physics_handle physics);
+extern se_physics_shape_3d_handle se_sdf_physics_add_shape_3d(
+	se_sdf_physics_handle physics,
+	se_physics_world_3d_handle world,
+	se_physics_body_3d_handle body,
+	const s_vec3* offset,
+	const s_vec3* rotation,
+	b8 is_trigger
 );
 extern se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
 	se_physics_world_3d_handle world,

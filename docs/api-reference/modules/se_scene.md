@@ -591,6 +591,18 @@ extern b8 se_object_3d_remove_instance(const se_object_3d_handle object, const s
 
 No inline description found in header comments.
 
+### `se_object_3d_reserve_instances`
+
+<div class="api-signature">
+
+```c
+extern b8 se_object_3d_reserve_instances(const se_object_3d_handle object, const sz instance_capacity);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_object_3d_set_active_by_id`
 
 <div class="api-signature">
@@ -1071,6 +1083,18 @@ extern b8 se_scene_3d_get_output_depth_texture(const se_scene_3d_handle scene, u
 
 No inline description found in header comments.
 
+### `se_scene_3d_pick_instance_screen`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_3d_pick_instance_screen(const se_scene_3d_handle scene, const f32 screen_x, const f32 screen_y, const f32 viewport_width, const f32 viewport_height, const f32 pick_radius, se_scene_pick_filter_3d filter, void* user_data, se_scene_pick_hit_3d* out_hit);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_scene_3d_pick_object_screen`
 
 <div class="api-signature">
@@ -1286,7 +1310,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_object_3d { s_mat4 transform; union { struct { se_model_handle model; se_instances instances; se_mesh_instances mesh_instances; se_transforms render_transforms; }; se_object_custom custom; }; b8 is_custom : 1; b8 is_visible : 1; } se_object_3d;
+typedef struct se_object_3d { s_mat4 transform; union { struct { se_model_handle model; se_instances instances; se_mesh_instances mesh_instances; se_transforms render_transforms; se_buffers render_buffers; se_buffers render_metadata; }; se_object_custom custom; }; b8 is_custom : 1; b8 is_visible : 1; } se_object_3d;
 ```
 
 </div>
@@ -1431,6 +1455,18 @@ No inline description found in header comments.
 
 ```c
 typedef b8 (*se_scene_pick_filter_3d)(se_object_3d_handle object, void* user_data);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_scene_pick_hit_3d`
+
+<div class="api-signature">
+
+```c
+typedef struct { se_object_3d_handle object; se_instance_id instance_id; s_vec3 point; f32 distance; } se_scene_pick_hit_3d;
 ```
 
 </div>

@@ -483,6 +483,18 @@ extern se_physics_shape_3d_handle se_physics_body_3d_add_mesh(se_physics_world_3
 
 No inline description found in header comments.
 
+### `se_physics_body_3d_add_sdf`
+
+<div class="api-signature">
+
+```c
+extern se_physics_shape_3d_handle se_physics_body_3d_add_sdf(se_physics_world_3d_handle world, se_physics_body_3d_handle body, const se_physics_sdf_3d *sdf, const s_vec3 *offset, const s_vec3 *rotation, const b8 is_trigger);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_physics_body_3d_add_sphere`
 
 <div class="api-signature">
@@ -1246,7 +1258,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef enum { SE_PHYSICS_SHAPE_3D_AABB = 0, SE_PHYSICS_SHAPE_3D_BOX, SE_PHYSICS_SHAPE_3D_SPHERE, SE_PHYSICS_SHAPE_3D_MESH } se_physics_shape_type_3d;
+typedef enum { SE_PHYSICS_SHAPE_3D_AABB = 0, SE_PHYSICS_SHAPE_3D_BOX, SE_PHYSICS_SHAPE_3D_SPHERE, SE_PHYSICS_SHAPE_3D_MESH, SE_PHYSICS_SHAPE_3D_SDF } se_physics_shape_type_3d;
 ```
 
 </div>
@@ -1441,6 +1453,30 @@ No inline description found in header comments.
 
 ```c
 typedef struct { se_physics_body_3d_handle body; se_physics_shape_3d_handle shape; s_vec3 point; s_vec3 normal; f32 distance; } se_physics_raycast_hit_3d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_sdf_3d`
+
+<div class="api-signature">
+
+```c
+typedef struct { void *user_data; se_box_3d local_bounds; se_physics_sdf_sample_fn_3d sample; } se_physics_sdf_3d;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_physics_sdf_sample_fn_3d`
+
+<div class="api-signature">
+
+```c
+typedef b8 (*se_physics_sdf_sample_fn_3d)(void *user_data, const s_vec3 *local_point, f32 *out_distance, s_vec3 *out_normal);
 ```
 
 </div>
