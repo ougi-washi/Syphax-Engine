@@ -1,0 +1,63 @@
+{
+  "format": "se_sdf_json",
+  "version": 1,
+  "root_index": 0,
+  "nodes": [
+    {
+      "is_group": true,
+      "transform": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+      ],
+      "operation": 1,
+      "operation_amount": 0.5,
+      "control_translation": [0, 0, 0],
+      "control_rotation": [0, 0, 0],
+      "control_scale": [1, 1, 1],
+      "control_trs_initialized": false,
+      "children": [1, 2]
+    },
+    {
+      "is_group": false,
+      "transform": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, -1, 0, 1
+      ],
+      "operation": 1,
+      "operation_amount": 0.5,
+      "control_translation": [0, 0, 0],
+      "control_rotation": [0, 0, 0],
+      "control_scale": [1, 1, 1],
+      "control_trs_initialized": false,
+      "primitive": {
+        "type": 2,
+        "size": [24, 1, 24]
+      },
+      "children": []
+    },
+    {
+      "is_group": false,
+      "transform": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        4, 1, 3, 1
+      ],
+      "operation": 4,
+      "operation_amount": 1.0,
+      "control_translation": [0, 0, 0],
+      "control_rotation": [0, 0, 0],
+      "control_scale": [1, 1, 1],
+      "control_trs_initialized": false,
+      "primitive": {
+        "type": 1,
+        "radius": 4
+      },
+      "children": []
+    }
+  ]
+}

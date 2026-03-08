@@ -1,0 +1,52 @@
+{
+  "format": "se_object_3d_json",
+  "version": 1,
+  "source_path": "public/models/cube.obj",
+  "shaders": [
+    {
+      "vertex_path": "public/shaders/scene_3d_vertex.glsl",
+      "fragment_path": "public/shaders/scene_3d_fragment.glsl"
+    }
+  ],
+  "mesh_matrices": [
+    [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ]
+  ],
+  "transform": [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    -4, 0, 0, 1
+  ],
+  "visible": true,
+  "instance_capacity": 1,
+  "next_instance_id": 1,
+  "instances": [
+    {
+      "id": 0,
+      "active": true,
+      "transform": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+      ],
+      "buffer": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+      ],
+      "metadata": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+      ]
+    }
+  ]
+}
