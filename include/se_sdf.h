@@ -3,8 +3,8 @@
 #ifndef SE_SDF_H
 #define SE_SDF_H
 
-#include "syphax/s_types.h"
 #include "syphax/s_array.h"
+#include "syphax/s_types.h"
 #include "se_camera.h"
 #include "se_physics.h"
 
@@ -12,55 +12,52 @@ typedef struct s_json s_json;
 
 #define SE_SDF_MAX_STRING_LENGTH 4096
 
-typedef s_handle se_sdf_scene_handle;
+typedef s_handle se_sdf_handle;
 typedef s_handle se_sdf_node_handle;
 typedef s_handle se_sdf_physics_handle;
 typedef s_handle se_sdf_material_handle;
 typedef s_handle se_sdf_renderer_handle;
-typedef s_handle se_sdf_control_handle;
 
-#define SE_SDF_SCENE_NULL ((se_sdf_scene_handle)S_HANDLE_NULL)
+#define SE_SDF_NULL ((se_sdf_handle)S_HANDLE_NULL)
 #define SE_SDF_NODE_NULL ((se_sdf_node_handle)S_HANDLE_NULL)
 #define SE_SDF_PHYSICS_NULL ((se_sdf_physics_handle)S_HANDLE_NULL)
 #define SE_SDF_MATERIAL_NULL ((se_sdf_material_handle)S_HANDLE_NULL)
 #define SE_SDF_RENDERER_NULL ((se_sdf_renderer_handle)S_HANDLE_NULL)
-#define SE_SDF_CONTROL_NULL ((se_sdf_control_handle)S_HANDLE_NULL)
 
 typedef enum {
-	SE_SDF_NONE,  // Container/group node with no shape
-	SE_SDF_SPHERE,
-	SE_SDF_BOX,
-	SE_SDF_ROUND_BOX,
-	SE_SDF_BOX_FRAME,
-	SE_SDF_TORUS,
-	SE_SDF_CAPPED_TORUS,
-	SE_SDF_LINK,
-	SE_SDF_CYLINDER,
-	SE_SDF_CONE,
-	SE_SDF_CONE_INFINITE,
-	SE_SDF_PLANE,
-	SE_SDF_HEX_PRISM,
-	SE_SDF_CAPSULE,
-	SE_SDF_VERTICAL_CAPSULE,
-	SE_SDF_CAPPED_CYLINDER,
-	SE_SDF_CAPPED_CYLINDER_ARBITRARY,
-	SE_SDF_ROUNDED_CYLINDER,
-	SE_SDF_CAPPED_CONE,
-	SE_SDF_CAPPED_CONE_ARBITRARY,
-	SE_SDF_SOLID_ANGLE,
-	SE_SDF_CUT_SPHERE,
-	SE_SDF_CUT_HOLLOW_SPHERE,
-	SE_SDF_DEATH_STAR,
-	SE_SDF_ROUND_CONE,
-	SE_SDF_ROUND_CONE_ARBITRARY,
-	SE_SDF_VESICA_SEGMENT,
-	SE_SDF_RHOMBUS,
-	SE_SDF_OCTAHEDRON,
-	SE_SDF_OCTAHEDRON_BOUND,
-	SE_SDF_PYRAMID,
-	SE_SDF_TRIANGLE,
-	SE_SDF_QUAD
-} se_sdf_object_type;
+	SE_SDF_PRIMITIVE_SPHERE = 1,
+	SE_SDF_PRIMITIVE_BOX = 2,
+	SE_SDF_PRIMITIVE_ROUND_BOX = 3,
+	SE_SDF_PRIMITIVE_BOX_FRAME = 4,
+	SE_SDF_PRIMITIVE_TORUS = 5,
+	SE_SDF_PRIMITIVE_CAPPED_TORUS = 6,
+	SE_SDF_PRIMITIVE_LINK = 7,
+	SE_SDF_PRIMITIVE_CYLINDER = 8,
+	SE_SDF_PRIMITIVE_CONE = 9,
+	SE_SDF_PRIMITIVE_CONE_INFINITE = 10,
+	SE_SDF_PRIMITIVE_PLANE = 11,
+	SE_SDF_PRIMITIVE_HEX_PRISM = 12,
+	SE_SDF_PRIMITIVE_CAPSULE = 13,
+	SE_SDF_PRIMITIVE_VERTICAL_CAPSULE = 14,
+	SE_SDF_PRIMITIVE_CAPPED_CYLINDER = 15,
+	SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY = 16,
+	SE_SDF_PRIMITIVE_ROUNDED_CYLINDER = 17,
+	SE_SDF_PRIMITIVE_CAPPED_CONE = 18,
+	SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY = 19,
+	SE_SDF_PRIMITIVE_SOLID_ANGLE = 20,
+	SE_SDF_PRIMITIVE_CUT_SPHERE = 21,
+	SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE = 22,
+	SE_SDF_PRIMITIVE_DEATH_STAR = 23,
+	SE_SDF_PRIMITIVE_ROUND_CONE = 24,
+	SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY = 25,
+	SE_SDF_PRIMITIVE_VESICA_SEGMENT = 26,
+	SE_SDF_PRIMITIVE_RHOMBUS = 27,
+	SE_SDF_PRIMITIVE_OCTAHEDRON = 28,
+	SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND = 29,
+	SE_SDF_PRIMITIVE_PYRAMID = 30,
+	SE_SDF_PRIMITIVE_TRIANGLE = 31,
+	SE_SDF_PRIMITIVE_QUAD = 32
+} se_sdf_primitive_type;
 
 typedef struct {
 	b8 active;
@@ -89,39 +86,10 @@ typedef enum {
 #define SE_SDF_OPERATION_AMOUNT_DEFAULT 0.5f
 
 typedef enum {
-	SE_SDF_PRIMITIVE_SPHERE = SE_SDF_SPHERE,
-	SE_SDF_PRIMITIVE_BOX = SE_SDF_BOX,
-	SE_SDF_PRIMITIVE_ROUND_BOX = SE_SDF_ROUND_BOX,
-	SE_SDF_PRIMITIVE_BOX_FRAME = SE_SDF_BOX_FRAME,
-	SE_SDF_PRIMITIVE_TORUS = SE_SDF_TORUS,
-	SE_SDF_PRIMITIVE_CAPPED_TORUS = SE_SDF_CAPPED_TORUS,
-	SE_SDF_PRIMITIVE_LINK = SE_SDF_LINK,
-	SE_SDF_PRIMITIVE_CYLINDER = SE_SDF_CYLINDER,
-	SE_SDF_PRIMITIVE_CONE = SE_SDF_CONE,
-	SE_SDF_PRIMITIVE_CONE_INFINITE = SE_SDF_CONE_INFINITE,
-	SE_SDF_PRIMITIVE_PLANE = SE_SDF_PLANE,
-	SE_SDF_PRIMITIVE_HEX_PRISM = SE_SDF_HEX_PRISM,
-	SE_SDF_PRIMITIVE_CAPSULE = SE_SDF_CAPSULE,
-	SE_SDF_PRIMITIVE_VERTICAL_CAPSULE = SE_SDF_VERTICAL_CAPSULE,
-	SE_SDF_PRIMITIVE_CAPPED_CYLINDER = SE_SDF_CAPPED_CYLINDER,
-	SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY = SE_SDF_CAPPED_CYLINDER_ARBITRARY,
-	SE_SDF_PRIMITIVE_ROUNDED_CYLINDER = SE_SDF_ROUNDED_CYLINDER,
-	SE_SDF_PRIMITIVE_CAPPED_CONE = SE_SDF_CAPPED_CONE,
-	SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY = SE_SDF_CAPPED_CONE_ARBITRARY,
-	SE_SDF_PRIMITIVE_SOLID_ANGLE = SE_SDF_SOLID_ANGLE,
-	SE_SDF_PRIMITIVE_CUT_SPHERE = SE_SDF_CUT_SPHERE,
-	SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE = SE_SDF_CUT_HOLLOW_SPHERE,
-	SE_SDF_PRIMITIVE_DEATH_STAR = SE_SDF_DEATH_STAR,
-	SE_SDF_PRIMITIVE_ROUND_CONE = SE_SDF_ROUND_CONE,
-	SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY = SE_SDF_ROUND_CONE_ARBITRARY,
-	SE_SDF_PRIMITIVE_VESICA_SEGMENT = SE_SDF_VESICA_SEGMENT,
-	SE_SDF_PRIMITIVE_RHOMBUS = SE_SDF_RHOMBUS,
-	SE_SDF_PRIMITIVE_OCTAHEDRON = SE_SDF_OCTAHEDRON,
-	SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND = SE_SDF_OCTAHEDRON_BOUND,
-	SE_SDF_PRIMITIVE_PYRAMID = SE_SDF_PYRAMID,
-	SE_SDF_PRIMITIVE_TRIANGLE = SE_SDF_TRIANGLE,
-	SE_SDF_PRIMITIVE_QUAD = SE_SDF_QUAD
-} se_sdf_primitive_type;
+	SE_SDF_NODE_GROUP,
+	SE_SDF_NODE_PRIMITIVE,
+	SE_SDF_NODE_REF
+} se_sdf_node_type;
 
 typedef struct { f32 radius; } se_sdf_sphere_desc;
 typedef struct { s_vec3 size; } se_sdf_box_desc;
@@ -194,129 +162,15 @@ typedef struct {
 	};
 } se_sdf_primitive_desc;
 
-typedef struct se_sdf_object {
-	s_mat4 transform;
-	se_sdf_scene_handle source_scene;
-	se_sdf_node_handle source_node;
-	se_sdf_object_type type;
-	union {
-		struct { f32 radius; } sphere;
-		struct { s_vec3 size; } box;
-		struct { s_vec3 size; f32 roundness; } round_box;
-		struct { s_vec3 size; f32 thickness; } box_frame;
-		struct { s_vec2 radii; } torus;
-		struct { s_vec2 axis_sin_cos; f32 major_radius; f32 minor_radius; } capped_torus;
-		struct { f32 half_length; f32 outer_radius; f32 inner_radius; } link;
-		struct { s_vec3 axis_and_radius; } cylinder;
-		struct { s_vec2 angle_sin_cos; f32 height; } cone;
-		struct { s_vec2 angle_sin_cos; } cone_infinite;
-		struct { s_vec3 normal; f32 offset; } plane;
-		struct { s_vec2 half_size; } hex_prism;
-		struct { s_vec3 a; s_vec3 b; f32 radius; } capsule;
-		struct { f32 height; f32 radius; } vertical_capsule;
-		struct { f32 radius; f32 half_height; } capped_cylinder;
-		struct { s_vec3 a; s_vec3 b; f32 radius; } capped_cylinder_arbitrary;
-		struct { f32 outer_radius; f32 corner_radius; f32 half_height; } rounded_cylinder;
-		struct { f32 height; f32 radius_base; f32 radius_top; } capped_cone;
-		struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } capped_cone_arbitrary;
-		struct { s_vec2 angle_sin_cos; f32 radius; } solid_angle;
-		struct { f32 radius; f32 cut_height; } cut_sphere;
-		struct { f32 radius; f32 cut_height; f32 thickness; } cut_hollow_sphere;
-		struct { f32 radius_a; f32 radius_b; f32 separation; } death_star;
-		struct { f32 radius_base; f32 radius_top; f32 height; } round_cone;
-		struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } round_cone_arbitrary;
-		struct { s_vec3 a; s_vec3 b; f32 width; } vesica_segment;
-		struct { f32 length_a; f32 length_b; f32 height; f32 corner_radius; } rhombus;
-		struct { f32 size; } octahedron;
-		struct { f32 size; } octahedron_bound;
-		struct { f32 height; } pyramid;
-		struct { s_vec3 a; s_vec3 b; s_vec3 c; } triangle;
-		struct { s_vec3 a; s_vec3 b; s_vec3 c; s_vec3 d; } quad;
-	};			
-	se_sdf_operation operation;
-	f32 operation_amount;
-	se_sdf_noise noise;
-	s_vec3 color;
-	b8 has_color;
-	s_array(struct se_sdf_object, children);
-} se_sdf_object;
-
-static inline void se_sdf_add_children(se_sdf_object* parent, sz count, se_sdf_object* children) {
-	for (sz i = 0; i < count; ++i) s_array_add(&parent->children, children[i]);
-}
-
-static inline se_sdf_object se_sdf_make(se_sdf_object obj) {
-	s_array_init(&obj.children);
-	return obj;
-}
-
-// Shape macros: se_sdf_sphere(transform, .radius = value, ...)
-#define se_sdf_sphere(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_SPHERE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_box(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_BOX, .transform = (xform), __VA_ARGS__})
-#define se_sdf_round_box(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_ROUND_BOX, .transform = (xform), __VA_ARGS__})
-#define se_sdf_box_frame(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_BOX_FRAME, .transform = (xform), __VA_ARGS__})
-#define se_sdf_torus(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_TORUS, .transform = (xform), __VA_ARGS__})
-#define se_sdf_capped_torus(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CAPPED_TORUS, .transform = (xform), __VA_ARGS__})
-#define se_sdf_link(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_LINK, .transform = (xform), __VA_ARGS__})
-#define se_sdf_cylinder(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CYLINDER, .transform = (xform), __VA_ARGS__})
-#define se_sdf_cone(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CONE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_cone_inf(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CONE_INFINITE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_plane(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_PLANE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_hex_prism(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_HEX_PRISM, .transform = (xform), __VA_ARGS__})
-#define se_sdf_capsule(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CAPSULE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_vert_capsule(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_VERTICAL_CAPSULE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_capped_cyl(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CAPPED_CYLINDER, .transform = (xform), __VA_ARGS__})
-#define se_sdf_capped_cyl_arb(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CAPPED_CYLINDER_ARBITRARY, .transform = (xform), __VA_ARGS__})
-#define se_sdf_rounded_cyl(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_ROUNDED_CYLINDER, .transform = (xform), __VA_ARGS__})
-#define se_sdf_capped_cone(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CAPPED_CONE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_capped_cone_arb(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CAPPED_CONE_ARBITRARY, .transform = (xform), __VA_ARGS__})
-#define se_sdf_solid_angle(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_SOLID_ANGLE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_cut_sphere(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CUT_SPHERE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_cut_hollow_sphere(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_CUT_HOLLOW_SPHERE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_death_star(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_DEATH_STAR, .transform = (xform), __VA_ARGS__})
-#define se_sdf_round_cone(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_ROUND_CONE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_round_cone_arb(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_ROUND_CONE_ARBITRARY, .transform = (xform), __VA_ARGS__})
-#define se_sdf_vesica(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_VESICA_SEGMENT, .transform = (xform), __VA_ARGS__})
-#define se_sdf_rhombus(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_RHOMBUS, .transform = (xform), __VA_ARGS__})
-#define se_sdf_octa(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_OCTAHEDRON, .transform = (xform), __VA_ARGS__})
-#define se_sdf_octa_bound(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_OCTAHEDRON_BOUND, .transform = (xform), __VA_ARGS__})
-#define se_sdf_pyramid(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_PYRAMID, .transform = (xform), __VA_ARGS__})
-#define se_sdf_tri(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_TRIANGLE, .transform = (xform), __VA_ARGS__})
-#define se_sdf_quad(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_QUAD, .transform = (xform), __VA_ARGS__})
-
-// Container/group node (no shape, just holds children with operation)
-#define se_sdf_group(xform, ...) se_sdf_make((se_sdf_object){.type = SE_SDF_NONE, .transform = (xform), __VA_ARGS__})
-
-// Add nodes with operation: se_sdf_nodes(parent, SE_SDF_OP_UNION, child1, child2)
-// Alternative names considered: subshapes, operands, elements, branches
-// 'nodes' is used as it fits scene graph terminology
-#define se_sdf_nodes(parent, op, ...) do { \
-	se_sdf_object _n[] = { __VA_ARGS__ }; \
-	(parent).operation = (op); \
-	se_sdf_add_children(&(parent), sizeof(_n)/sizeof(_n[0]), _n); \
-} while(0)
-
-// Convenience constants
-#define se_sdf_union SE_SDF_OP_UNION
-#define se_sdf_intersection SE_SDF_OP_INTERSECTION
-#define se_sdf_subtraction SE_SDF_OP_SUBTRACTION
-#define se_sdf_smooth_union SE_SDF_OP_SMOOTH_UNION
-#define se_sdf_smooth_intersection SE_SDF_OP_SMOOTH_INTERSECTION
-#define se_sdf_smooth_subtraction SE_SDF_OP_SMOOTH_SUBTRACTION
-#define se_sdf_noop SE_SDF_OP_NONE
-
-// Default transform (identity)
-#define se_sdf_default s_mat4_identity
-
 typedef struct {
 	sz initial_node_capacity;
-} se_sdf_scene_desc;
+} se_sdf_desc;
 
 typedef struct {
 	s_vec3 position;
 	s_vec3 normal;
 	f32 distance;
-	se_sdf_scene_handle scene;
+	se_sdf_handle sdf;
 	se_sdf_node_handle node;
 	b8 hit;
 } se_sdf_surface_hit;
@@ -335,79 +189,13 @@ typedef struct {
 	se_sdf_noise noise;
 } se_sdf_node_primitive_desc;
 
-#define SE_SDF_SCENE_DESC_DEFAULTS ((se_sdf_scene_desc){ .initial_node_capacity = 0 })
-#define SE_SDF_NODE_GROUP_DESC_DEFAULTS ((se_sdf_node_group_desc){ .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION, .operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT })
+typedef struct {
+	se_sdf_handle source;
+	s_mat4 transform;
+	se_sdf_operation operation;
+	f32 operation_amount;
+} se_sdf_node_ref_desc;
 
-extern s_mat4 se_sdf_transform(s_vec3 translation, s_vec3 rotation, s_vec3 scale);
-extern se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc);
-extern se_object_2d_handle se_sdf_scene_to_object_2d(se_sdf_scene_handle scene);
-extern se_object_3d_handle se_sdf_scene_to_object_3d(se_sdf_scene_handle scene);
-extern void se_sdf_scene_destroy(se_sdf_scene_handle scene);
-extern void se_sdf_scene_clear(se_sdf_scene_handle scene);
-extern b8 se_sdf_scene_set_root(se_sdf_scene_handle scene, se_sdf_node_handle node);
-extern se_sdf_node_handle se_sdf_scene_get_root(se_sdf_scene_handle scene);
-extern u64 se_sdf_scene_get_generation(se_sdf_scene_handle scene);
-extern b8 se_sdf_scene_validate(se_sdf_scene_handle scene, char* error_message, sz error_message_size);
-extern b8 se_sdf_scene_sample_distance(se_sdf_scene_handle scene, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node);
-extern b8 se_sdf_scene_project_point(se_sdf_scene_handle scene, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
-extern b8 se_sdf_scene_raycast(se_sdf_scene_handle scene, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
-extern b8 se_sdf_scene_sample_height(se_sdf_scene_handle scene, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit);
-extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
-extern b8 se_sdf_from_json(se_sdf_scene_handle scene, const s_json* root);
-extern b8 se_sdf_from_json_file(se_sdf_scene_handle scene, const c8* path);
-
-extern se_sdf_node_handle se_sdf_node_create_primitive(se_sdf_scene_handle scene, const se_sdf_node_primitive_desc* desc);
-extern se_sdf_node_handle se_sdf_node_create_group(se_sdf_scene_handle scene, const se_sdf_node_group_desc* desc);
-extern void se_sdf_node_destroy(se_sdf_scene_handle scene, se_sdf_node_handle node);
-extern b8 se_sdf_node_add_child(se_sdf_scene_handle scene, se_sdf_node_handle parent, se_sdf_node_handle child);
-extern b8 se_sdf_node_remove_child(se_sdf_scene_handle scene, se_sdf_node_handle parent, se_sdf_node_handle child);
-extern b8 se_sdf_node_set_operation(se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_operation operation);
-extern b8 se_sdf_node_set_transform(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_mat4* transform);
-extern s_mat4 se_sdf_node_get_transform(se_sdf_scene_handle scene, se_sdf_node_handle node);
-extern b8 se_sdf_node_set_noise(se_sdf_scene_handle scene, se_sdf_node_handle node, const se_sdf_noise* noise);
-extern se_sdf_noise se_sdf_node_get_noise(se_sdf_scene_handle scene, se_sdf_node_handle node);
-extern b8 se_sdf_node_set_color(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_vec3* color);
-extern b8 se_sdf_node_get_color(se_sdf_scene_handle scene, se_sdf_node_handle node, s_vec3* out_color);
-extern se_sdf_node_handle se_sdf_node_spawn_primitive(
-	se_sdf_scene_handle scene,
-	se_sdf_node_handle parent,
-	const se_sdf_primitive_desc* primitive,
-	const s_mat4* transform,
-	se_sdf_operation operation
-);
-extern b8 se_sdf_scene_build_single_object_preset(
-	se_sdf_scene_handle scene,
-	const se_sdf_primitive_desc* primitive,
-	const s_mat4* transform,
-	se_sdf_node_handle* out_root,
-	se_sdf_node_handle* out_object
-);
-extern b8 se_sdf_scene_build_grid_preset(
-	se_sdf_scene_handle scene,
-	const se_sdf_primitive_desc* primitive,
-	i32 columns,
-	i32 rows,
-	f32 spacing,
-	se_sdf_node_handle* out_root,
-	se_sdf_node_handle* out_first
-);
-extern b8 se_sdf_scene_build_primitive_gallery_preset(
-	se_sdf_scene_handle scene,
-	i32 columns,
-	i32 rows,
-	f32 spacing,
-	se_sdf_node_handle* out_root,
-	se_sdf_node_handle* out_focus
-);
-extern b8 se_sdf_scene_build_orbit_showcase_preset(
-	se_sdf_scene_handle scene,
-	const se_sdf_primitive_desc* center_primitive,
-	const se_sdf_primitive_desc* orbit_primitive,
-	i32 orbit_count,
-	f32 orbit_radius,
-	se_sdf_node_handle* out_root,
-	se_sdf_node_handle* out_center
-);
 typedef struct {
 	s_vec3 min;
 	s_vec3 max;
@@ -415,7 +203,7 @@ typedef struct {
 	f32 radius;
 	b8 valid;
 	b8 has_unbounded_primitives;
-} se_sdf_scene_bounds;
+} se_sdf_bounds;
 
 typedef struct {
 	s_vec3 view_direction;
@@ -428,7 +216,45 @@ typedef struct {
 	b8 update_clip_planes;
 } se_sdf_camera_align_desc;
 
-#define SE_SDF_SCENE_BOUNDS_DEFAULTS ((se_sdf_scene_bounds){ \
+typedef struct {
+	u32 lod_count;
+	u32 lod_resolutions[4];
+	u32 brick_size;
+	u32 brick_border;
+	f32 max_distance_scale;
+	b8 force_rebuild;
+} se_sdf_prepare_desc;
+
+typedef struct {
+	u32 resolution;
+	se_texture_handle texture;
+	s_vec3 voxel_size;
+	f32 max_distance;
+	b8 valid;
+} se_sdf_lod_volume;
+
+typedef struct {
+	b8 pending;
+	b8 applied;
+	b8 failed;
+	b8 ready;
+	se_result result;
+} se_sdf_prepare_status;
+
+typedef struct {
+	se_sdf_bounds bounds;
+	u32 lod_count;
+	se_sdf_lod_volume lods[4];
+} se_sdf_bake_result;
+
+typedef struct {
+	se_sdf_prepare_desc prepare;
+} se_sdf_bake_desc;
+
+#define SE_SDF_DESC_DEFAULTS ((se_sdf_desc){ .initial_node_capacity = 0 })
+#define SE_SDF_NODE_GROUP_DESC_DEFAULTS ((se_sdf_node_group_desc){ .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION, .operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT })
+#define SE_SDF_NODE_REF_DESC_DEFAULTS ((se_sdf_node_ref_desc){ .source = SE_SDF_NULL, .transform = s_mat4_identity, .operation = SE_SDF_OP_UNION, .operation_amount = SE_SDF_OPERATION_AMOUNT_DEFAULT })
+#define SE_SDF_BOUNDS_DEFAULTS ((se_sdf_bounds){ \
 	.min = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
 	.max = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
 	.center = (s_vec3){ .x = 0.0f, .y = 0.0f, .z = 0.0f }, \
@@ -436,7 +262,6 @@ typedef struct {
 	.valid = 0, \
 	.has_unbounded_primitives = 0 \
 })
-
 #define SE_SDF_CAMERA_ALIGN_DESC_DEFAULTS ((se_sdf_camera_align_desc){ \
 	.view_direction = (s_vec3){ .x = 1.35f, .y = 0.75f, .z = 1.35f }, \
 	.up = (s_vec3){ .x = 0.0f, .y = 1.0f, .z = 0.0f }, \
@@ -447,15 +272,112 @@ typedef struct {
 	.far_margin = 8.00f, \
 	.update_clip_planes = 1 \
 })
+#define SE_SDF_PREPARE_DESC_DEFAULTS ((se_sdf_prepare_desc){ \
+	.lod_count = 4u, \
+	.lod_resolutions = { 128u, 64u, 32u, 16u }, \
+	.brick_size = 32u, \
+	.brick_border = 1u, \
+	.max_distance_scale = 1.0f, \
+	.force_rebuild = 0 \
+})
 
-extern b8 se_sdf_scene_calculate_bounds(se_sdf_scene_handle scene, se_sdf_scene_bounds* out_bounds);
-extern b8 se_sdf_scene_align_camera(
-	se_sdf_scene_handle scene,
+extern s_mat4 se_sdf_transform(s_vec3 translation, s_vec3 rotation, s_vec3 scale);
+extern se_sdf_handle se_sdf_create(const se_sdf_desc* desc);
+extern se_object_2d_handle se_sdf_to_object_2d(se_sdf_handle sdf);
+extern se_object_3d_handle se_sdf_to_object_3d(se_sdf_handle sdf);
+extern void se_sdf_destroy(se_sdf_handle sdf);
+extern void se_sdf_clear(se_sdf_handle sdf);
+extern b8 se_sdf_set_root(se_sdf_handle sdf, se_sdf_node_handle node);
+extern se_sdf_node_handle se_sdf_get_root(se_sdf_handle sdf);
+extern u64 se_sdf_get_generation(se_sdf_handle sdf);
+extern b8 se_sdf_validate(se_sdf_handle sdf, char* error_message, sz error_message_size);
+extern b8 se_sdf_prepare(se_sdf_handle sdf, const se_sdf_prepare_desc* desc);
+extern b8 se_sdf_prepare_async(se_sdf_handle sdf, const se_sdf_prepare_desc* desc);
+extern b8 se_sdf_prepare_poll(se_sdf_handle sdf, se_sdf_prepare_status* out_status);
+extern b8 se_sdf_bake(se_sdf_handle sdf, const se_sdf_bake_desc* desc, se_sdf_bake_result* out_result);
+extern b8 se_sdf_sample_distance(se_sdf_handle sdf, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node);
+extern b8 se_sdf_project_point(se_sdf_handle sdf, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+extern b8 se_sdf_raycast(se_sdf_handle sdf, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+extern b8 se_sdf_sample_height(se_sdf_handle sdf, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit);
+extern b8 se_sdf_calculate_bounds(se_sdf_handle sdf, se_sdf_bounds* out_bounds);
+extern b8 se_sdf_align_camera(
+	se_sdf_handle sdf,
 	se_camera_handle camera,
 	const se_sdf_camera_align_desc* desc,
-	se_sdf_scene_bounds* out_bounds
+	se_sdf_bounds* out_bounds
 );
-extern se_sdf_physics_handle se_sdf_physics_create(se_sdf_scene_handle scene);
+extern s_json* se_sdf_to_json(se_sdf_handle sdf);
+extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
+extern b8 se_sdf_from_json_file(se_sdf_handle sdf, const c8* path);
+
+extern se_sdf_node_handle se_sdf_node_create_primitive(se_sdf_handle sdf, const se_sdf_node_primitive_desc* desc);
+extern se_sdf_node_handle se_sdf_node_create_group(se_sdf_handle sdf, const se_sdf_node_group_desc* desc);
+extern se_sdf_node_handle se_sdf_node_create_ref(se_sdf_handle sdf, const se_sdf_node_ref_desc* desc);
+extern u32 se_sdf_get_node_count(se_sdf_handle sdf);
+extern se_sdf_node_handle se_sdf_get_node(se_sdf_handle sdf, u32 index);
+extern se_sdf_node_type se_sdf_node_get_type(se_sdf_handle sdf, se_sdf_node_handle node);
+extern se_sdf_node_handle se_sdf_node_get_parent(se_sdf_handle sdf, se_sdf_node_handle node);
+extern u32 se_sdf_node_get_child_count(se_sdf_handle sdf, se_sdf_node_handle node);
+extern se_sdf_node_handle se_sdf_node_get_child(se_sdf_handle sdf, se_sdf_node_handle node, u32 index);
+extern se_sdf_operation se_sdf_node_get_operation(se_sdf_handle sdf, se_sdf_node_handle node);
+extern b8 se_sdf_node_set_operation_amount(se_sdf_handle sdf, se_sdf_node_handle node, f32 operation_amount);
+extern f32 se_sdf_node_get_operation_amount(se_sdf_handle sdf, se_sdf_node_handle node);
+extern se_sdf_handle se_sdf_node_get_ref_source(se_sdf_handle sdf, se_sdf_node_handle node);
+extern b8 se_sdf_node_set_primitive(se_sdf_handle sdf, se_sdf_node_handle node, const se_sdf_primitive_desc* primitive);
+extern b8 se_sdf_node_get_primitive(se_sdf_handle sdf, se_sdf_node_handle node, se_sdf_primitive_desc* out_primitive);
+extern b8 se_sdf_node_has_color(se_sdf_handle sdf, se_sdf_node_handle node);
+extern void se_sdf_node_destroy(se_sdf_handle sdf, se_sdf_node_handle node);
+extern b8 se_sdf_node_add_child(se_sdf_handle sdf, se_sdf_node_handle parent, se_sdf_node_handle child);
+extern b8 se_sdf_node_remove_child(se_sdf_handle sdf, se_sdf_node_handle parent, se_sdf_node_handle child);
+extern b8 se_sdf_node_set_operation(se_sdf_handle sdf, se_sdf_node_handle node, se_sdf_operation operation);
+extern b8 se_sdf_node_set_transform(se_sdf_handle sdf, se_sdf_node_handle node, const s_mat4* transform);
+extern s_mat4 se_sdf_node_get_transform(se_sdf_handle sdf, se_sdf_node_handle node);
+extern b8 se_sdf_node_set_noise(se_sdf_handle sdf, se_sdf_node_handle node, const se_sdf_noise* noise);
+extern se_sdf_noise se_sdf_node_get_noise(se_sdf_handle sdf, se_sdf_node_handle node);
+extern b8 se_sdf_node_set_color(se_sdf_handle sdf, se_sdf_node_handle node, const s_vec3* color);
+extern b8 se_sdf_node_get_color(se_sdf_handle sdf, se_sdf_node_handle node, s_vec3* out_color);
+extern se_sdf_node_handle se_sdf_node_spawn_primitive(
+	se_sdf_handle sdf,
+	se_sdf_node_handle parent,
+	const se_sdf_primitive_desc* primitive,
+	const s_mat4* transform,
+	se_sdf_operation operation
+);
+extern b8 se_sdf_build_single_object_preset(
+	se_sdf_handle sdf,
+	const se_sdf_primitive_desc* primitive,
+	const s_mat4* transform,
+	se_sdf_node_handle* out_root,
+	se_sdf_node_handle* out_object
+);
+extern b8 se_sdf_build_grid_preset(
+	se_sdf_handle sdf,
+	const se_sdf_primitive_desc* primitive,
+	i32 columns,
+	i32 rows,
+	f32 spacing,
+	se_sdf_node_handle* out_root,
+	se_sdf_node_handle* out_first
+);
+extern b8 se_sdf_build_primitive_gallery_preset(
+	se_sdf_handle sdf,
+	i32 columns,
+	i32 rows,
+	f32 spacing,
+	se_sdf_node_handle* out_root,
+	se_sdf_node_handle* out_focus
+);
+extern b8 se_sdf_build_orbit_showcase_preset(
+	se_sdf_handle sdf,
+	const se_sdf_primitive_desc* center_primitive,
+	const se_sdf_primitive_desc* orbit_primitive,
+	i32 orbit_count,
+	f32 orbit_radius,
+	se_sdf_node_handle* out_root,
+	se_sdf_node_handle* out_center
+);
+
+extern se_sdf_physics_handle se_sdf_physics_create(se_sdf_handle sdf);
 extern void se_sdf_physics_destroy(se_sdf_physics_handle physics);
 extern b8 se_sdf_physics_refresh(se_sdf_physics_handle physics);
 extern se_physics_shape_3d_handle se_sdf_physics_add_shape_3d(
@@ -464,13 +386,6 @@ extern se_physics_shape_3d_handle se_sdf_physics_add_shape_3d(
 	se_physics_body_3d_handle body,
 	const s_vec3* offset,
 	const s_vec3* rotation,
-	b8 is_trigger
-);
-extern se_physics_body_3d_handle se_sdf_object_create_physics_body_3d(
-	se_physics_world_3d_handle world,
-	const se_sdf_object* object,
-	const se_physics_body_params_3d* body_params,
-	const s_vec3* reference_position,
 	b8 is_trigger
 );
 
@@ -509,9 +424,12 @@ extern b8 se_sdf_bake_model_texture3d(
 );
 
 typedef struct {
-	sz shader_source_capacity;
-	b8 auto_rebuild_on_scene_change;
-	b8 enable_shader_debug_output;
+	u32 brick_budget;
+	u32 brick_upload_budget;
+	u32 max_visible_instances;
+	f32 lod_fade_ratio;
+	b8 use_compute_if_available;
+	b8 front_to_back_sort;
 } se_sdf_renderer_desc;
 
 typedef struct {
@@ -537,6 +455,14 @@ typedef struct {
 } se_sdf_renderer_debug;
 
 typedef struct {
+	u32 visible_refs;
+	u32 resident_bricks;
+	u32 page_misses;
+	f32 average_march_steps;
+	u32 selected_lod_counts[4];
+} se_sdf_renderer_stats;
+
+typedef struct {
 	s_vec2 resolution;
 	f32 time_seconds;
 	s_vec2 mouse_normalized;
@@ -544,6 +470,7 @@ typedef struct {
 	b8 has_scene_depth_texture;
 	u32 scene_depth_texture;
 } se_sdf_frame_desc;
+
 extern b8 se_sdf_frame_set_camera(se_sdf_frame_desc* frame, se_camera_handle camera);
 extern b8 se_sdf_frame_set_scene_depth_texture(se_sdf_frame_desc* frame, u32 depth_texture);
 
@@ -575,26 +502,6 @@ typedef struct {
 	f32 gamma;
 } se_sdf_stylized_desc;
 
-typedef enum {
-	SE_SDF_CONTROL_FLOAT,
-	SE_SDF_CONTROL_VEC2,
-	SE_SDF_CONTROL_VEC3,
-	SE_SDF_CONTROL_VEC4,
-	SE_SDF_CONTROL_INT,
-	SE_SDF_CONTROL_MAT4
-} se_sdf_control_type;
-
-typedef enum {
-	SE_SDF_PRIMITIVE_PARAM_RADIUS,
-	SE_SDF_PRIMITIVE_PARAM_RADIUS_A,
-	SE_SDF_PRIMITIVE_PARAM_RADIUS_B,
-	SE_SDF_PRIMITIVE_PARAM_HEIGHT,
-	SE_SDF_PRIMITIVE_PARAM_THICKNESS,
-	SE_SDF_PRIMITIVE_PARAM_SIZE_X,
-	SE_SDF_PRIMITIVE_PARAM_SIZE_Y,
-	SE_SDF_PRIMITIVE_PARAM_SIZE_Z
-} se_sdf_primitive_param;
-
 #define SE_SDF_RAYMARCH_QUALITY_DEFAULTS ((se_sdf_raymarch_quality){ \
 	.max_steps = 96, \
 	.hit_epsilon = 0.0015f, \
@@ -603,20 +510,20 @@ typedef enum {
 	.shadow_steps = 32, \
 	.shadow_strength = 0.65f \
 })
-
 #define SE_SDF_RENDERER_DEBUG_DEFAULTS ((se_sdf_renderer_debug){ \
 	.show_normals = 0, \
 	.show_distance = 0, \
 	.show_steps = 0, \
 	.freeze_time = 0 \
 })
-
 #define SE_SDF_RENDERER_DESC_DEFAULTS ((se_sdf_renderer_desc){ \
-	.shader_source_capacity = (256u * 1024u), \
-	.auto_rebuild_on_scene_change = 1, \
-	.enable_shader_debug_output = 0 \
+	.brick_budget = 512u, \
+	.brick_upload_budget = 32u, \
+	.max_visible_instances = 2048u, \
+	.lod_fade_ratio = 0.15f, \
+	.use_compute_if_available = 1, \
+	.front_to_back_sort = 1 \
 })
-
 #define SE_SDF_FRAME_DESC_DEFAULTS ((se_sdf_frame_desc){ \
 	.resolution = (s_vec2){ .x = 1.0f, .y = 1.0f }, \
 	.time_seconds = 0.0f, \
@@ -625,7 +532,6 @@ typedef enum {
 	.has_scene_depth_texture = 0, \
 	.scene_depth_texture = 0u \
 })
-
 #define SE_SDF_MATERIAL_DESC_DEFAULTS ((se_sdf_material_desc){ \
 	.model = SE_SDF_SHADING_STYLIZED, \
 	.base_color = (s_vec3){ .x = 0.70f, .y = 0.72f, .z = 0.75f }, \
@@ -634,7 +540,6 @@ typedef enum {
 	.metalness = 0.0f, \
 	.opacity = 1.0f \
 })
-
 #define SE_SDF_STYLIZED_DESC_DEFAULTS ((se_sdf_stylized_desc){ \
 	.band_levels = 4.0f, \
 	.rim_power = 2.2f, \
@@ -651,7 +556,7 @@ typedef enum {
 extern se_sdf_renderer_handle se_sdf_renderer_create(const se_sdf_renderer_desc* desc);
 extern void se_sdf_renderer_destroy(se_sdf_renderer_handle renderer);
 extern void se_sdf_shutdown(void);
-extern b8 se_sdf_renderer_set_scene(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene);
+extern b8 se_sdf_renderer_set_sdf(se_sdf_renderer_handle renderer, se_sdf_handle sdf);
 extern b8 se_sdf_renderer_set_quality(se_sdf_renderer_handle renderer, const se_sdf_raymarch_quality* quality);
 extern b8 se_sdf_renderer_set_debug(se_sdf_renderer_handle renderer, const se_sdf_renderer_debug* debug);
 extern b8 se_sdf_renderer_set_material(se_sdf_renderer_handle renderer, const se_sdf_material_desc* material);
@@ -665,132 +570,8 @@ extern b8 se_sdf_renderer_set_light_rig(
 	const s_vec3* fog_color,
 	f32 fog_density
 );
-extern b8 se_sdf_renderer_build(se_sdf_renderer_handle renderer);
-extern b8 se_sdf_renderer_rebuild_if_dirty(se_sdf_renderer_handle renderer);
 extern b8 se_sdf_renderer_render(se_sdf_renderer_handle renderer, const se_sdf_frame_desc* frame);
-extern const char* se_sdf_renderer_get_shader_source(se_sdf_renderer_handle renderer);
-extern sz se_sdf_renderer_get_shader_source_size(se_sdf_renderer_handle renderer);
-extern b8 se_sdf_renderer_dump_shader_source(se_sdf_renderer_handle renderer, const char* path);
-extern sz se_sdf_renderer_get_uniform_writes(se_sdf_renderer_handle renderer);
-extern sz se_sdf_renderer_get_total_uniform_writes(se_sdf_renderer_handle renderer);
-extern const char* se_sdf_control_get_uniform_name(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern se_sdf_renderer_stats se_sdf_renderer_get_stats(se_sdf_renderer_handle renderer);
 extern se_sdf_build_diagnostics se_sdf_renderer_get_build_diagnostics(se_sdf_renderer_handle renderer);
-
-extern se_sdf_control_handle se_sdf_control_define_float(se_sdf_renderer_handle renderer, const char* name, f32 default_value);
-extern se_sdf_control_handle se_sdf_control_define_vec2(se_sdf_renderer_handle renderer, const char* name, const s_vec2* default_value);
-extern se_sdf_control_handle se_sdf_control_define_vec3(se_sdf_renderer_handle renderer, const char* name, const s_vec3* default_value);
-extern se_sdf_control_handle se_sdf_control_define_vec4(se_sdf_renderer_handle renderer, const char* name, const s_vec4* default_value);
-extern se_sdf_control_handle se_sdf_control_define_int(se_sdf_renderer_handle renderer, const char* name, i32 default_value);
-extern se_sdf_control_handle se_sdf_control_define_mat4(se_sdf_renderer_handle renderer, const char* name, const s_mat4* default_value);
-extern b8 se_sdf_control_set_float(se_sdf_renderer_handle renderer, se_sdf_control_handle control, f32 value);
-extern b8 se_sdf_control_set_vec2(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec2* value);
-extern b8 se_sdf_control_set_vec3(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec3* value);
-extern b8 se_sdf_control_set_vec4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec4* value);
-extern b8 se_sdf_control_set_int(se_sdf_renderer_handle renderer, se_sdf_control_handle control, i32 value);
-extern b8 se_sdf_control_set_mat4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_mat4* value);
-extern b8 se_sdf_control_bind_ptr_float(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const f32* value_ptr);
-extern b8 se_sdf_control_bind_ptr_vec2(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec2* value_ptr);
-extern b8 se_sdf_control_bind_ptr_vec3(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec3* value_ptr);
-extern b8 se_sdf_control_bind_ptr_vec4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec4* value_ptr);
-extern b8 se_sdf_control_bind_ptr_int(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const i32* value_ptr);
-extern b8 se_sdf_control_bind_ptr_mat4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_mat4* value_ptr);
-extern b8 se_sdf_control_bind_node_position(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_node_rotation(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_node_scale(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_primitive_float(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_primitive_param param, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_base_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_light_direction(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_light_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_fog_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_fog_density(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_bands(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_rim_power(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_rim_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_fill(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_back(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_checker_scale(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_checker_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_ground_blend(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_desaturate(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-extern b8 se_sdf_control_bind_style_gamma(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-
-// ============================================================================
-// Shader String Generation
-// ============================================================================
-
-typedef struct {
-	char* data;
-	sz capacity;
-	sz size;
-	b8 oom;
-} se_sdf_string;
-
-void se_sdf_string_init(se_sdf_string* str, sz capacity);
-void se_sdf_string_free(se_sdf_string* str);
-void se_sdf_string_append(se_sdf_string* str, const char* fmt, ...);
-void se_sdf_string_append_vec2(se_sdf_string* str, s_vec2 v);
-void se_sdf_string_append_vec3(se_sdf_string* str, s_vec3 v);
-
-typedef struct {
-	u32 next_id;
-} se_sdf_symbol_allocator;
-
-void se_sdf_symbol_allocator_init(se_sdf_symbol_allocator* allocator);
-void se_sdf_symbol_allocator_reset(se_sdf_symbol_allocator* allocator);
-u32 se_sdf_symbol_allocator_next(se_sdf_symbol_allocator* allocator);
-void se_sdf_symbol_allocator_make_name(se_sdf_symbol_allocator* allocator, const char* prefix, char* out_name, sz out_name_size);
-
-b8 se_sdf_codegen_emit_fragment_prelude(se_sdf_string* out);
-b8 se_sdf_codegen_emit_uniform_block(se_sdf_string* out);
-b8 se_sdf_codegen_emit_map_stub(se_sdf_string* out, const char* map_func_name);
-b8 se_sdf_codegen_emit_shading_stub(se_sdf_string* out);
-b8 se_sdf_codegen_emit_fragment_main(se_sdf_string* out, const char* map_func_name);
-b8 se_sdf_codegen_emit_fragment_scaffold(se_sdf_string* out, const char* map_func_name);
-
-// Shape generators - each returns GLSL distance function code
-void se_sdf_gen_sphere(se_sdf_string* out, const char* p, f32 radius);
-void se_sdf_gen_box(se_sdf_string* out, const char* p, s_vec3 size);
-void se_sdf_gen_round_box(se_sdf_string* out, const char* p, s_vec3 size, f32 roundness);
-void se_sdf_gen_box_frame(se_sdf_string* out, const char* p, s_vec3 size, f32 thickness);
-void se_sdf_gen_torus(se_sdf_string* out, const char* p, f32 major_r, f32 minor_r);
-void se_sdf_gen_capped_torus(se_sdf_string* out, const char* p, s_vec2 sc, f32 ra, f32 rb);
-void se_sdf_gen_link(se_sdf_string* out, const char* p, f32 le, f32 r1, f32 r2);
-void se_sdf_gen_cylinder(se_sdf_string* out, const char* p, s_vec3 c);
-void se_sdf_gen_cone(se_sdf_string* out, const char* p, s_vec2 sc, f32 h);
-void se_sdf_gen_cone_inf(se_sdf_string* out, const char* p, s_vec2 sc);
-void se_sdf_gen_plane(se_sdf_string* out, const char* p, s_vec3 n, f32 h);
-void se_sdf_gen_hex_prism(se_sdf_string* out, const char* p, s_vec2 h);
-void se_sdf_gen_capsule(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, f32 r);
-void se_sdf_gen_vert_capsule(se_sdf_string* out, const char* p, f32 h, f32 r);
-void se_sdf_gen_capped_cyl(se_sdf_string* out, const char* p, f32 r, f32 hh);
-void se_sdf_gen_capped_cyl_arb(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, f32 r);
-void se_sdf_gen_rounded_cyl(se_sdf_string* out, const char* p, f32 ra, f32 rb, f32 hh);
-void se_sdf_gen_capped_cone(se_sdf_string* out, const char* p, f32 h, f32 r1, f32 r2);
-void se_sdf_gen_capped_cone_arb(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, f32 ra, f32 rb);
-void se_sdf_gen_solid_angle(se_sdf_string* out, const char* p, s_vec2 sc, f32 r);
-void se_sdf_gen_cut_sphere(se_sdf_string* out, const char* p, f32 r, f32 ch);
-void se_sdf_gen_cut_hollow_sphere(se_sdf_string* out, const char* p, f32 r, f32 ch, f32 t);
-void se_sdf_gen_death_star(se_sdf_string* out, const char* p, f32 ra, f32 rb, f32 d);
-void se_sdf_gen_round_cone(se_sdf_string* out, const char* p, f32 r1, f32 r2, f32 h);
-void se_sdf_gen_round_cone_arb(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, f32 r1, f32 r2);
-void se_sdf_gen_vesica(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, f32 w);
-void se_sdf_gen_rhombus(se_sdf_string* out, const char* p, f32 la, f32 lb, f32 h, f32 r);
-void se_sdf_gen_octa(se_sdf_string* out, const char* p, f32 s);
-void se_sdf_gen_octa_bound(se_sdf_string* out, const char* p, f32 s);
-void se_sdf_gen_pyramid(se_sdf_string* out, const char* p, f32 h);
-void se_sdf_gen_tri(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, s_vec3 c);
-void se_sdf_gen_quad(se_sdf_string* out, const char* p, s_vec3 a, s_vec3 b, s_vec3 c, s_vec3 d);
-
-// Generate transform application: (inverse(mat) * vec4(p, 1.0)).xyz
-void se_sdf_gen_transform(se_sdf_string* out, const char* p_var, s_mat4 transform, const char* result_var);
-
-// Generate operation combining two distances
-void se_sdf_gen_operation(se_sdf_string* out, se_sdf_operation op, const char* d1, const char* d2);
-
-// Main recursive generator (emits GLSL function-body statements ending with return)
-void se_sdf_object_to_string(se_sdf_string* out, se_sdf_object* obj, const char* p_var);
-
-// Helper to generate full distance function
-void se_sdf_generate_distance_function(se_sdf_string* out, se_sdf_object* root, const char* func_name);
 
 #endif // SE_SDF_H

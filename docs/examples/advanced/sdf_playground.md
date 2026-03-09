@@ -14,7 +14,7 @@ prerequisites:
 
 ## Goal
 
-Build SDF scene graph primitives and render with stylized shading.
+Build nested SDF primitives and render with stylized shading.
 
 
 ## Learning path
@@ -40,7 +40,7 @@ Build SDF scene graph primitives and render with stylized shading.
 
 ## Internal flow
 
-- SDF primitives are assembled into a scene graph and attached to one SDF renderer.
+- SDF primitives are assembled into one `se_sdf` graph and attached to one SDF renderer.
 - Camera + frame descriptors (resolution, time, mouse) are refreshed every loop iteration.
 - `se_sdf_renderer_render` evaluates the signed-distance shading pass before present.
 

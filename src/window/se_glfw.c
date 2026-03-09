@@ -59,6 +59,7 @@ typedef struct {
 	b8 configured;
 	b8 enabled;
 	b8 hide_window;
+	b8 sync_updates_enabled;
 	b8 interactive_stdout;
 	b8 ansi_initialized;
 	b8 emitted_header;
@@ -80,6 +81,12 @@ typedef struct {
 	struct termios input_original_termios;
 	u8* pixel_buffer;
 	sz pixel_buffer_capacity;
+	c8* frame_buffer;
+	sz frame_buffer_capacity;
+	u32 sample_width;
+	u32 sample_height;
+	u32 sample_framebuffer;
+	u32 sample_texture;
 } se_window_terminal_mirror_state;
 
 typedef struct {
@@ -102,6 +109,22 @@ static i32 se_window_terminal_mirror_output_fd(void) {
 
 static FILE* se_window_terminal_mirror_output_stream(void) {
 	return g_terminal_mirror.output_stream ? g_terminal_mirror.output_stream : stdout;
+}
+
+static void se_window_terminal_mirror_write_all(const void* bytes, const sz byte_count) {
+	if (!bytes || byte_count == 0) {
+		return;
+	}
+	const u8* cursor = (const u8*)bytes;
+	sz remaining = byte_count;
+	while (remaining > 0) {
+		const ssize_t written = write(se_window_terminal_mirror_output_fd(), cursor, remaining);
+		if (written <= 0) {
+			break;
+		}
+		cursor += (sz)written;
+		remaining -= (sz)written;
+	}
 }
 
 typedef struct {
@@ -676,8 +699,13 @@ static void se_window_terminal_mirror_write_restore_sequence(void) {
 		return;
 	}
 	g_terminal_restore_emitted = 1;
-	static const c8 restore_sequence[] = "\033[?1000l\033[?1002l\033[?1006l\033[0m\033[?25h\033[?1049l";
-	(void)write(se_window_terminal_mirror_output_fd(), restore_sequence, sizeof(restore_sequence) - 1);
+	static const c8 restore_sequence[] = "\033[?1000l\033[?1002l\033[?1006l\033[?7h\033[0m\033[?25h\033[?1049l";
+	static const c8 restore_sequence_sync[] = "\033[?1000l\033[?1002l\033[?1006l\033[?2026l\033[?7h\033[0m\033[?25h\033[?1049l";
+	if (g_terminal_mirror.sync_updates_enabled) {
+		se_window_terminal_mirror_write_all(restore_sequence_sync, sizeof(restore_sequence_sync) - 1);
+	} else {
+		se_window_terminal_mirror_write_all(restore_sequence, sizeof(restore_sequence) - 1);
+	}
 }
 
 static void se_window_terminal_mirror_restore_on_exit(void) {
@@ -814,7 +842,13 @@ static void se_window_docs_capture_present(se_window* window_ptr) {
 	i32 fb_height = 0;
 	glfwGetFramebufferSize((GLFWwindow*)window_ptr->handle, &fb_width, &fb_height);
 	if (fb_width <= 0 || fb_height <= 0) {
-		return;
+		GLint viewport[4] = {0, 0, 0, 0};
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		fb_width = viewport[2];
+		fb_height = viewport[3];
+		if (fb_width <= 0 || fb_height <= 0) {
+			return;
+		}
 	}
 
 	const sz row_stride = (sz)fb_width * 3;
@@ -835,7 +869,7 @@ static void se_window_docs_capture_present(se_window* window_ptr) {
 	}
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	glReadBuffer(GL_BACK);
+	glReadBuffer(GL_FRONT);
 	glReadPixels(0, 0, fb_width, fb_height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
 
 	u8* row_swap = malloc(row_stride);
@@ -897,13 +931,14 @@ static void se_window_terminal_mirror_configure(void) {
 		return;
 	}
 	g_terminal_mirror.hide_window = se_window_env_flag_enabled("SE_TERMINAL_HIDE_WINDOW");
+	g_terminal_mirror.sync_updates_enabled = se_window_env_flag_value("SE_TERMINAL_SYNC_UPDATES", false);
 	if (g_terminal_mirror.hide_window) {
 		fprintf(
 			stderr,
 			"se_window :: terminal hide mode enabled (SE_TERMINAL_HIDE_WINDOW=1), desktop window will be hidden. "
 			"Unset SE_TERMINAL_HIDE_WINDOW to show a normal window.\n");
 	}
-	g_terminal_mirror.target_fps = se_window_env_u32("SE_TERMINAL_FPS", 12, 1, 60);
+	g_terminal_mirror.target_fps = se_window_env_u32("SE_TERMINAL_FPS", 30, 1, 120);
 	g_terminal_mirror.frame_interval = 1.0 / (f64)g_terminal_mirror.target_fps;
 	g_terminal_mirror.forced_columns = se_window_env_u32("SE_TERMINAL_COLS", 0, 0, 240);
 	g_terminal_mirror.forced_rows = se_window_env_u32("SE_TERMINAL_ROWS", 0, 0, 120);
@@ -979,7 +1014,7 @@ static void se_window_terminal_mirror_begin_frame(void) {
 	}
 	if (!g_terminal_mirror.ansi_initialized) {
 		FILE* out = se_window_terminal_mirror_output_stream();
-		fputs("\033[?1049h\033[2J\033[H\033[?25l", out);
+		fputs("\033[?1049h\033[?7l\033[2J\033[H\033[?25l", out);
 		fflush(out);
 		g_terminal_mirror.ansi_initialized = true;
 	}
@@ -1050,17 +1085,21 @@ static void se_window_terminal_mirror_present(se_window* window_ptr) {
 	}
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	glReadBuffer(GL_BACK);
+	glReadBuffer(GL_FRONT);
 	glReadPixels(0, 0, fb_width, fb_height, GL_RGB, GL_UNSIGNED_BYTE, g_terminal_mirror.pixel_buffer);
 
-	static const c8 block_glyph[] = "\xE2\x96\x88";
+	static const c8 full_block_glyph[] = "\xE2\x96\x88";
 	FILE* out = se_window_terminal_mirror_output_stream();
-	fputs("\033[H", out);
 
 	u8 current_fg[3] = {255, 255, 255};
 	b8 has_color = false;
 
 	for (u32 row = 0; row < g_terminal_mirror.rows; ++row) {
+		c8 row_ansi[32] = {0};
+		const i32 row_ansi_len = snprintf(row_ansi, sizeof(row_ansi), "\033[%u;1H", (unsigned)(row + 1u));
+		if (row_ansi_len > 0) {
+			fputs(row_ansi, out);
+		}
 		for (u32 column = 0; column < g_terminal_mirror.columns; ++column) {
 			const u32 src_x = s_min(
 				(u32)(((column * (u64)fb_width) + (g_terminal_mirror.columns / 2u)) / g_terminal_mirror.columns),
@@ -1090,10 +1129,7 @@ static void se_window_terminal_mirror_present(se_window* window_ptr) {
 				current_fg[2] = b;
 				has_color = true;
 			}
-			fputs(block_glyph, out);
-		}
-		if (row + 1 < g_terminal_mirror.rows) {
-			fputc('\n', out);
+			fputs(full_block_glyph, out);
 		}
 	}
 	// Return cursor to home so periodic logs do not cause terminal scroll/jitter.
@@ -1126,6 +1162,15 @@ static void se_window_terminal_mirror_shutdown(void) {
 		(void)close(g_terminal_mirror.stdout_original_fd);
 		g_terminal_mirror.stdout_original_fd = -1;
 	}
+	if (glfwGetCurrentContext() != NULL) {
+		if (g_terminal_mirror.sample_texture != 0u) {
+			glDeleteTextures(1, &g_terminal_mirror.sample_texture);
+		}
+		if (g_terminal_mirror.sample_framebuffer != 0u) {
+			glDeleteFramebuffers(1, &g_terminal_mirror.sample_framebuffer);
+		}
+	}
+	free(g_terminal_mirror.frame_buffer);
 	free(g_terminal_mirror.pixel_buffer);
 	memset(&g_terminal_mirror, 0, sizeof(g_terminal_mirror));
 }
@@ -1543,11 +1588,11 @@ static void se_window_render_screen_internal(const se_window_handle window, se_w
 		}
 	}
 	se_debug_render_overlay(window, NULL);
-	se_window_docs_capture_present(window_ptr);
-	se_window_terminal_mirror_present(window_ptr);
 	se_debug_trace_begin_channel("window_present_gpu", SE_DEBUG_TRACE_CHANNEL_GPU);
 	glfwSwapBuffers((GLFWwindow*)window_ptr->handle);
 	se_debug_trace_end_channel("window_present_gpu", SE_DEBUG_TRACE_CHANNEL_GPU);
+	se_window_docs_capture_present(window_ptr);
+	se_window_terminal_mirror_present(window_ptr);
 	window_ptr->diagnostics.frames_presented++;
 	window_ptr->diagnostics.last_present_duration = glfwGetTime() - present_begin;
 	se_debug_trace_end("window_present");
@@ -1669,6 +1714,12 @@ void se_window_begin_frame(const se_window_handle window) {
 		return;
 	}
 	se_window_set_current_context(window);
+	u32 framebuffer_width = 0u;
+	u32 framebuffer_height = 0u;
+	se_window_get_framebuffer_size(window, &framebuffer_width, &framebuffer_height);
+	if (framebuffer_width > 0u && framebuffer_height > 0u) {
+		glViewport(0, 0, (GLsizei)framebuffer_width, (GLsizei)framebuffer_height);
+	}
 	se_set_last_error(SE_RESULT_OK);
 }
 
@@ -1898,7 +1949,13 @@ void se_window_get_framebuffer_size(const se_window_handle window, u32* out_widt
 	i32 width = (i32)window_ptr->width;
 	i32 height = (i32)window_ptr->height;
 	if (window_ptr->handle) {
-		glfwGetFramebufferSize((GLFWwindow*)window_ptr->handle, &width, &height);
+		i32 queried_width = 0;
+		i32 queried_height = 0;
+		glfwGetFramebufferSize((GLFWwindow*)window_ptr->handle, &queried_width, &queried_height);
+		if (queried_width > 0 && queried_height > 0) {
+			width = queried_width;
+			height = queried_height;
+		}
 	}
 
 	if (out_width) {

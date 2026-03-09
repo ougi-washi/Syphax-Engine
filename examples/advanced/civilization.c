@@ -50,7 +50,7 @@ typedef struct unit_t {
 typedef struct world_t {
     se_scene_3d_handle scene;
 
-    se_sdf_scene_handle landscape;
+    se_sdf_handle landscape;
     se_object_3d_handle buildings;
     se_object_3d_handle units;
 
@@ -120,8 +120,9 @@ void init_world(world_t *world, se_window_handle window) {
 		se_log("civilization :: failed to load");
 		return;
 	}
+	(void)se_sdf_prepare(world->landscape, NULL);
 
-	se_object_3d_handle landscape_object_3d = se_sdf_scene_to_object_3d(world->landscape);
+	se_object_3d_handle landscape_object_3d = se_sdf_to_object_3d(world->landscape);
 	se_scene_3d_add_object(world->scene, landscape_object_3d);
 	se_scene_3d_add_object(world->scene, world->buildings);
 	se_scene_3d_add_object(world->scene, world->units);

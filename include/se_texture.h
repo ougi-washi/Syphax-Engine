@@ -27,6 +27,7 @@ typedef s_array(se_texture_handle, se_textures_ptr);
 
 extern se_texture_handle se_texture_load(const char *path, const se_texture_wrap wrap);
 extern se_texture_handle se_texture_load_from_memory(const u8 *data, const sz size, const se_texture_wrap wrap);
+extern se_texture_handle se_texture_create_3d_r16f(const f32 *data, const u32 width, const u32 height, const u32 depth, const se_texture_wrap wrap);
 extern se_texture_handle se_texture_create_3d_rgba16f(const f32 *data, const u32 width, const u32 height, const u32 depth, const se_texture_wrap wrap);
 extern se_texture_handle se_texture_find_by_id(const u32 texture_id);
 extern b8 se_texture_sample_rgb(const se_texture_handle texture, const s_vec2 *uv, s_vec3 *out_color);

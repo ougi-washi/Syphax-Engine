@@ -146,7 +146,7 @@ typedef struct {
 	se_vfx_3d_handle focused_vfx_3d;
 	se_scene_2d_handle focused_scene_2d;
 	se_scene_3d_handle focused_scene_3d;
-	se_sdf_scene_handle focused_sdf;
+	se_sdf_handle focused_sdf;
 	se_camera_handle focused_sdf_camera;
 	const c8* scene_2d_json_path;
 	const c8* scene_3d_json_path;
@@ -166,7 +166,7 @@ typedef struct {
 	.focused_vfx_3d = S_HANDLE_NULL, \
 	.focused_scene_2d = S_HANDLE_NULL, \
 	.focused_scene_3d = S_HANDLE_NULL, \
-	.focused_sdf = SE_SDF_SCENE_NULL, \
+	.focused_sdf = SE_SDF_NULL, \
 	.focused_sdf_camera = S_HANDLE_NULL, \
 	.scene_2d_json_path = NULL, \
 	.scene_3d_json_path = NULL, \
@@ -181,7 +181,7 @@ typedef struct {
 	u32 objects_2d;
 	u32 scenes_3d;
 	u32 objects_3d;
-	u32 sdf_scenes;
+	u32 sdfs;
 	u32 uis;
 	u32 ui_widgets;
 	u32 vfx_2d;
@@ -294,8 +294,8 @@ extern void se_editor_set_focused_scene_2d(se_editor* editor, se_scene_2d_handle
 extern se_scene_2d_handle se_editor_get_focused_scene_2d(const se_editor* editor);
 extern void se_editor_set_focused_scene_3d(se_editor* editor, se_scene_3d_handle scene);
 extern se_scene_3d_handle se_editor_get_focused_scene_3d(const se_editor* editor);
-extern void se_editor_set_focused_sdf(se_editor* editor, se_sdf_scene_handle scene);
-extern se_sdf_scene_handle se_editor_get_focused_sdf(const se_editor* editor);
+extern void se_editor_set_focused_sdf(se_editor* editor, se_sdf_handle sdf);
+extern se_sdf_handle se_editor_get_focused_sdf(const se_editor* editor);
 extern void se_editor_set_focused_sdf_camera(se_editor* editor, se_camera_handle camera);
 extern se_camera_handle se_editor_get_focused_sdf_camera(const se_editor* editor);
 
@@ -310,8 +310,8 @@ extern b8 se_editor_scene_2d_json_save(se_editor* editor, se_scene_2d_handle sce
 extern b8 se_editor_scene_2d_json_load(se_editor* editor, se_scene_2d_handle scene, const c8* path);
 extern b8 se_editor_scene_3d_json_save(se_editor* editor, se_scene_3d_handle scene, const c8* path);
 extern b8 se_editor_scene_3d_json_load(se_editor* editor, se_scene_3d_handle scene, const c8* path);
-extern b8 se_editor_sdf_json_save(se_editor* editor, se_sdf_scene_handle scene, const c8* path);
-extern b8 se_editor_sdf_json_load(se_editor* editor, se_sdf_scene_handle scene, const c8* path);
+extern b8 se_editor_sdf_json_save(se_editor* editor, se_sdf_handle sdf, const c8* path);
+extern b8 se_editor_sdf_json_load(se_editor* editor, se_sdf_handle sdf, const c8* path);
 extern b8 se_editor_scene_kit_json_save(
 	se_editor* editor,
 	const c8* scene_2d_path,

@@ -15,6 +15,18 @@ This page is generated from `include/se_texture.h` and is deterministic.
 
 ## Functions
 
+### `se_texture_create_3d_r16f`
+
+<div class="api-signature">
+
+```c
+extern se_texture_handle se_texture_create_3d_r16f(const f32 *data, const u32 width, const u32 height, const u32 depth, const se_texture_wrap wrap);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_texture_create_3d_rgba16f`
 
 <div class="api-signature">

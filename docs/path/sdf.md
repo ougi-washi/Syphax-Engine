@@ -1,8 +1,8 @@
 ---
 title: SDF
-summary: SDF scene graph flow from scene creation to validated transform updates.
+summary: SDF graph flow from creation to explicit prepare, validation, and rendering.
 prerequisites:
-  - SDF concepts and scene graph basics understood.
+  - SDF concepts and nested graph basics understood.
   - Runtime target with camera controls.
 ---
 
@@ -10,13 +10,13 @@ prerequisites:
 
 ## When to use this
 
-Use this when signed-distance content should be assembled with reusable scene nodes and validated structure.
+Use this when signed-distance content should be assembled with reusable `se_sdf` nodes, prepared explicitly, and reused as nested chunks or objects.
 
 ## Quick start
 
 ```c
-se_sdf_scene_create(...);
-se_sdf_scene_clear(...);
+se_sdf_create(...);
+se_sdf_clear(...);
 ```
 
 Use this tiny call path first, then continue with the four progressive snippets below.
@@ -31,8 +31,8 @@ Build the smallest compileable setup that touches `se_sdf` with explicit handles
 
 Key API calls:
 
-- `se_sdf_scene_create`
-- `se_sdf_scene_clear`
+- `se_sdf_create`
+- `se_sdf_clear`
 
 ## Step 2: Add Core Feature
 
@@ -46,10 +46,10 @@ What changed from previous step: this step layers one additional capability with
 
 Key API calls:
 
-- `se_sdf_scene_create`
-- `se_sdf_scene_clear`
+- `se_sdf_create`
+- `se_sdf_clear`
 - `se_sdf_node_create_group`
-- `se_sdf_scene_set_root`
+- `se_sdf_set_root`
 
 ## Step 3: Interactive / Tunable
 
@@ -63,10 +63,10 @@ What changed from previous step: this step layers one additional capability with
 
 Key API calls:
 
-- `se_sdf_scene_create`
-- `se_sdf_scene_clear`
+- `se_sdf_create`
+- `se_sdf_clear`
 - `se_sdf_node_create_group`
-- `se_sdf_scene_set_root`
+- `se_sdf_set_root`
 - `s_mat4_identity`
 - `se_sdf_node_set_transform`
 
@@ -82,10 +82,11 @@ What changed from previous step: this step layers one additional capability with
 
 Key API calls:
 
-- `se_sdf_scene_create`
-- `se_sdf_scene_clear`
+- `se_sdf_create`
+- `se_sdf_clear`
 - `se_sdf_node_create_group`
-- `se_sdf_scene_set_root`
+- `se_sdf_set_root`
+- `se_sdf_prepare`
 - `s_mat4_identity`
 - `se_sdf_node_set_transform`
 

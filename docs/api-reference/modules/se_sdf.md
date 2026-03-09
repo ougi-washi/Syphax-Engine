@@ -15,6 +15,30 @@ This page is generated from `include/se_sdf.h` and is deterministic.
 
 ## Functions
 
+### `se_sdf_align_camera`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_align_camera( se_sdf_handle sdf, se_camera_handle camera, const se_sdf_camera_align_desc* desc, se_sdf_bounds* out_bounds );
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_bake`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_bake(se_sdf_handle sdf, const se_sdf_bake_desc* desc, se_sdf_bake_result* out_result);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_bake_model_texture3d`
 
 <div class="api-signature">
@@ -27,456 +51,96 @@ extern b8 se_sdf_bake_model_texture3d( se_model_handle model, const se_sdf_model
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_base_color`
+### `se_sdf_build_grid_preset`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_base_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_build_grid_preset( se_sdf_handle sdf, const se_sdf_primitive_desc* primitive, i32 columns, i32 rows, f32 spacing, se_sdf_node_handle* out_root, se_sdf_node_handle* out_first );
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_fog_color`
+### `se_sdf_build_orbit_showcase_preset`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_fog_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_build_orbit_showcase_preset( se_sdf_handle sdf, const se_sdf_primitive_desc* center_primitive, const se_sdf_primitive_desc* orbit_primitive, i32 orbit_count, f32 orbit_radius, se_sdf_node_handle* out_root, se_sdf_node_handle* out_center );
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_fog_density`
+### `se_sdf_build_primitive_gallery_preset`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_fog_density(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_build_primitive_gallery_preset( se_sdf_handle sdf, i32 columns, i32 rows, f32 spacing, se_sdf_node_handle* out_root, se_sdf_node_handle* out_focus );
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_light_color`
+### `se_sdf_build_single_object_preset`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_light_color(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_build_single_object_preset( se_sdf_handle sdf, const se_sdf_primitive_desc* primitive, const s_mat4* transform, se_sdf_node_handle* out_root, se_sdf_node_handle* out_object );
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_light_direction`
+### `se_sdf_calculate_bounds`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_light_direction(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
+extern b8 se_sdf_calculate_bounds(se_sdf_handle sdf, se_sdf_bounds* out_bounds);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_node_position`
+### `se_sdf_clear`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_node_position(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
+extern void se_sdf_clear(se_sdf_handle sdf);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_node_rotation`
+### `se_sdf_create`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_node_rotation(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
+extern se_sdf_handle se_sdf_create(const se_sdf_desc* desc);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_control_bind_node_scale`
+### `se_sdf_destroy`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_control_bind_node_scale(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_primitive_float`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_primitive_float(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_primitive_param param, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_ptr_float`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_ptr_float(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const f32* value_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_ptr_int`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_ptr_int(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const i32* value_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_ptr_mat4`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_ptr_mat4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_mat4* value_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_ptr_vec2`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_ptr_vec2(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec2* value_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_ptr_vec3`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_ptr_vec3(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec3* value_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_ptr_vec4`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_ptr_vec4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec4* value_ptr);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_back`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_back(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_bands`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_bands(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_checker_scale`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_checker_scale(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_checker_strength`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_checker_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_desaturate`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_desaturate(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_fill`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_fill(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_gamma`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_gamma(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_ground_blend`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_ground_blend(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_rim_power`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_rim_power(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_bind_style_rim_strength`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_bind_style_rim_strength(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_define_float`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_control_handle se_sdf_control_define_float(se_sdf_renderer_handle renderer, const char* name, f32 default_value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_define_int`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_control_handle se_sdf_control_define_int(se_sdf_renderer_handle renderer, const char* name, i32 default_value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_define_mat4`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_control_handle se_sdf_control_define_mat4(se_sdf_renderer_handle renderer, const char* name, const s_mat4* default_value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_define_vec2`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_control_handle se_sdf_control_define_vec2(se_sdf_renderer_handle renderer, const char* name, const s_vec2* default_value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_define_vec3`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_control_handle se_sdf_control_define_vec3(se_sdf_renderer_handle renderer, const char* name, const s_vec3* default_value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_define_vec4`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_control_handle se_sdf_control_define_vec4(se_sdf_renderer_handle renderer, const char* name, const s_vec4* default_value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_get_uniform_name`
-
-<div class="api-signature">
-
-```c
-extern const char* se_sdf_control_get_uniform_name(se_sdf_renderer_handle renderer, se_sdf_control_handle control);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_set_float`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_set_float(se_sdf_renderer_handle renderer, se_sdf_control_handle control, f32 value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_set_int`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_set_int(se_sdf_renderer_handle renderer, se_sdf_control_handle control, i32 value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_set_mat4`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_set_mat4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_mat4* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_set_vec2`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_set_vec2(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec2* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_set_vec3`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_set_vec3(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec3* value);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_control_set_vec4`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_control_set_vec4(se_sdf_renderer_handle renderer, se_sdf_control_handle control, const s_vec4* value);
+extern void se_sdf_destroy(se_sdf_handle sdf);
 ```
 
 </div>
@@ -512,7 +176,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_from_json(se_sdf_scene_handle scene, const s_json* root);
+extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
 ```
 
 </div>
@@ -524,7 +188,55 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_from_json_file(se_sdf_scene_handle scene, const c8* path);
+extern b8 se_sdf_from_json_file(se_sdf_handle sdf, const c8* path);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_generation`
+
+<div class="api-signature">
+
+```c
+extern u64 se_sdf_get_generation(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_node`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_node_handle se_sdf_get_node(se_sdf_handle sdf, u32 index);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_node_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_sdf_get_node_count(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_root`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_node_handle se_sdf_get_root(se_sdf_handle sdf);
 ```
 
 </div>
@@ -536,7 +248,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_add_child(se_sdf_scene_handle scene, se_sdf_node_handle parent, se_sdf_node_handle child);
+extern b8 se_sdf_node_add_child(se_sdf_handle sdf, se_sdf_node_handle parent, se_sdf_node_handle child);
 ```
 
 </div>
@@ -548,7 +260,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_sdf_node_handle se_sdf_node_create_group(se_sdf_scene_handle scene, const se_sdf_node_group_desc* desc);
+extern se_sdf_node_handle se_sdf_node_create_group(se_sdf_handle sdf, const se_sdf_node_group_desc* desc);
 ```
 
 </div>
@@ -560,7 +272,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_sdf_node_handle se_sdf_node_create_primitive(se_sdf_scene_handle scene, const se_sdf_node_primitive_desc* desc);
+extern se_sdf_node_handle se_sdf_node_create_primitive(se_sdf_handle sdf, const se_sdf_node_primitive_desc* desc);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_create_ref`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_node_handle se_sdf_node_create_ref(se_sdf_handle sdf, const se_sdf_node_ref_desc* desc);
 ```
 
 </div>
@@ -572,7 +296,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern void se_sdf_node_destroy(se_sdf_scene_handle scene, se_sdf_node_handle node);
+extern void se_sdf_node_destroy(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_child`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_node_handle se_sdf_node_get_child(se_sdf_handle sdf, se_sdf_node_handle node, u32 index);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_child_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_sdf_node_get_child_count(se_sdf_handle sdf, se_sdf_node_handle node);
 ```
 
 </div>
@@ -584,7 +332,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_get_color(se_sdf_scene_handle scene, se_sdf_node_handle node, s_vec3* out_color);
+extern b8 se_sdf_node_get_color(se_sdf_handle sdf, se_sdf_node_handle node, s_vec3* out_color);
 ```
 
 </div>
@@ -596,7 +344,67 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_sdf_noise se_sdf_node_get_noise(se_sdf_scene_handle scene, se_sdf_node_handle node);
+extern se_sdf_noise se_sdf_node_get_noise(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_operation`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_operation se_sdf_node_get_operation(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_operation_amount`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_node_get_operation_amount(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_parent`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_node_handle se_sdf_node_get_parent(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_primitive`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_get_primitive(se_sdf_handle sdf, se_sdf_node_handle node, se_sdf_primitive_desc* out_primitive);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_ref_source`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_handle se_sdf_node_get_ref_source(se_sdf_handle sdf, se_sdf_node_handle node);
 ```
 
 </div>
@@ -608,7 +416,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern s_mat4 se_sdf_node_get_transform(se_sdf_scene_handle scene, se_sdf_node_handle node);
+extern s_mat4 se_sdf_node_get_transform(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_get_type`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_node_type se_sdf_node_get_type(se_sdf_handle sdf, se_sdf_node_handle node);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_has_color`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_has_color(se_sdf_handle sdf, se_sdf_node_handle node);
 ```
 
 </div>
@@ -620,7 +452,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_remove_child(se_sdf_scene_handle scene, se_sdf_node_handle parent, se_sdf_node_handle child);
+extern b8 se_sdf_node_remove_child(se_sdf_handle sdf, se_sdf_node_handle parent, se_sdf_node_handle child);
 ```
 
 </div>
@@ -632,7 +464,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_set_color(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_vec3* color);
+extern b8 se_sdf_node_set_color(se_sdf_handle sdf, se_sdf_node_handle node, const s_vec3* color);
 ```
 
 </div>
@@ -644,7 +476,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_set_noise(se_sdf_scene_handle scene, se_sdf_node_handle node, const se_sdf_noise* noise);
+extern b8 se_sdf_node_set_noise(se_sdf_handle sdf, se_sdf_node_handle node, const se_sdf_noise* noise);
 ```
 
 </div>
@@ -656,7 +488,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_set_operation(se_sdf_scene_handle scene, se_sdf_node_handle node, se_sdf_operation operation);
+extern b8 se_sdf_node_set_operation(se_sdf_handle sdf, se_sdf_node_handle node, se_sdf_operation operation);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_set_operation_amount`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_set_operation_amount(se_sdf_handle sdf, se_sdf_node_handle node, f32 operation_amount);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_node_set_primitive`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_node_set_primitive(se_sdf_handle sdf, se_sdf_node_handle node, const se_sdf_primitive_desc* primitive);
 ```
 
 </div>
@@ -668,7 +524,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_node_set_transform(se_sdf_scene_handle scene, se_sdf_node_handle node, const s_mat4* transform);
+extern b8 se_sdf_node_set_transform(se_sdf_handle sdf, se_sdf_node_handle node, const s_mat4* transform);
 ```
 
 </div>
@@ -680,19 +536,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_sdf_node_handle se_sdf_node_spawn_primitive( se_sdf_scene_handle scene, se_sdf_node_handle parent, const se_sdf_primitive_desc* primitive, const s_mat4* transform, se_sdf_operation operation );
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_object_create_physics_body_3d`
-
-<div class="api-signature">
-
-```c
-extern se_physics_body_3d_handle se_sdf_object_create_physics_body_3d( se_physics_world_3d_handle world, const se_sdf_object* object, const se_physics_body_params_3d* body_params, const s_vec3* reference_position, b8 is_trigger );
+extern se_sdf_node_handle se_sdf_node_spawn_primitive( se_sdf_handle sdf, se_sdf_node_handle parent, const se_sdf_primitive_desc* primitive, const s_mat4* transform, se_sdf_operation operation );
 ```
 
 </div>
@@ -716,7 +560,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern se_sdf_physics_handle se_sdf_physics_create(se_sdf_scene_handle scene);
+extern se_sdf_physics_handle se_sdf_physics_create(se_sdf_handle sdf);
 ```
 
 </div>
@@ -747,12 +591,60 @@ extern b8 se_sdf_physics_refresh(se_sdf_physics_handle physics);
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_build`
+### `se_sdf_prepare`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_renderer_build(se_sdf_renderer_handle renderer);
+extern b8 se_sdf_prepare(se_sdf_handle sdf, const se_sdf_prepare_desc* desc);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_prepare_async`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_prepare_async(se_sdf_handle sdf, const se_sdf_prepare_desc* desc);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_prepare_poll`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_prepare_poll(se_sdf_handle sdf, se_sdf_prepare_status* out_status);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_project_point`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_project_point(se_sdf_handle sdf, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_raycast`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_raycast(se_sdf_handle sdf, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
 ```
 
 </div>
@@ -783,18 +675,6 @@ extern void se_sdf_renderer_destroy(se_sdf_renderer_handle renderer);
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_dump_shader_source`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_renderer_dump_shader_source(se_sdf_renderer_handle renderer, const char* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_renderer_get_build_diagnostics`
 
 <div class="api-signature">
@@ -807,24 +687,12 @@ extern se_sdf_build_diagnostics se_sdf_renderer_get_build_diagnostics(se_sdf_ren
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_get_shader_source`
+### `se_sdf_renderer_get_stats`
 
 <div class="api-signature">
 
 ```c
-extern const char* se_sdf_renderer_get_shader_source(se_sdf_renderer_handle renderer);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_renderer_get_shader_source_size`
-
-<div class="api-signature">
-
-```c
-extern sz se_sdf_renderer_get_shader_source_size(se_sdf_renderer_handle renderer);
+extern se_sdf_renderer_stats se_sdf_renderer_get_stats(se_sdf_renderer_handle renderer);
 ```
 
 </div>
@@ -837,42 +705,6 @@ No inline description found in header comments.
 
 ```c
 extern se_sdf_stylized_desc se_sdf_renderer_get_stylized(se_sdf_renderer_handle renderer);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_renderer_get_total_uniform_writes`
-
-<div class="api-signature">
-
-```c
-extern sz se_sdf_renderer_get_total_uniform_writes(se_sdf_renderer_handle renderer);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_renderer_get_uniform_writes`
-
-<div class="api-signature">
-
-```c
-extern sz se_sdf_renderer_get_uniform_writes(se_sdf_renderer_handle renderer);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_renderer_rebuild_if_dirty`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_renderer_rebuild_if_dirty(se_sdf_renderer_handle renderer);
 ```
 
 </div>
@@ -951,12 +783,12 @@ extern b8 se_sdf_renderer_set_quality(se_sdf_renderer_handle renderer, const se_
 
 No inline description found in header comments.
 
-### `se_sdf_renderer_set_scene`
+### `se_sdf_renderer_set_sdf`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_renderer_set_scene(se_sdf_renderer_handle renderer, se_sdf_scene_handle scene);
+extern b8 se_sdf_renderer_set_sdf(se_sdf_renderer_handle renderer, se_sdf_handle sdf);
 ```
 
 </div>
@@ -975,228 +807,36 @@ extern b8 se_sdf_renderer_set_stylized(se_sdf_renderer_handle renderer, const se
 
 No inline description found in header comments.
 
-### `se_sdf_scene_align_camera`
+### `se_sdf_sample_distance`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_scene_align_camera( se_sdf_scene_handle scene, se_camera_handle camera, const se_sdf_camera_align_desc* desc, se_sdf_scene_bounds* out_bounds );
+extern b8 se_sdf_sample_distance(se_sdf_handle sdf, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_scene_build_grid_preset`
+### `se_sdf_sample_height`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_scene_build_grid_preset( se_sdf_scene_handle scene, const se_sdf_primitive_desc* primitive, i32 columns, i32 rows, f32 spacing, se_sdf_node_handle* out_root, se_sdf_node_handle* out_first );
+extern b8 se_sdf_sample_height(se_sdf_handle sdf, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_scene_build_orbit_showcase_preset`
+### `se_sdf_set_root`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_sdf_scene_build_orbit_showcase_preset( se_sdf_scene_handle scene, const se_sdf_primitive_desc* center_primitive, const se_sdf_primitive_desc* orbit_primitive, i32 orbit_count, f32 orbit_radius, se_sdf_node_handle* out_root, se_sdf_node_handle* out_center );
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_build_primitive_gallery_preset`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_build_primitive_gallery_preset( se_sdf_scene_handle scene, i32 columns, i32 rows, f32 spacing, se_sdf_node_handle* out_root, se_sdf_node_handle* out_focus );
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_build_single_object_preset`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_build_single_object_preset( se_sdf_scene_handle scene, const se_sdf_primitive_desc* primitive, const s_mat4* transform, se_sdf_node_handle* out_root, se_sdf_node_handle* out_object );
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_calculate_bounds`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_calculate_bounds(se_sdf_scene_handle scene, se_sdf_scene_bounds* out_bounds);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_clear`
-
-<div class="api-signature">
-
-```c
-extern void se_sdf_scene_clear(se_sdf_scene_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_create`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_scene_handle se_sdf_scene_create(const se_sdf_scene_desc* desc);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_destroy`
-
-<div class="api-signature">
-
-```c
-extern void se_sdf_scene_destroy(se_sdf_scene_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_get_generation`
-
-<div class="api-signature">
-
-```c
-extern u64 se_sdf_scene_get_generation(se_sdf_scene_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_get_root`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_node_handle se_sdf_scene_get_root(se_sdf_scene_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_project_point`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_project_point(se_sdf_scene_handle scene, const s_vec3* point, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_raycast`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_raycast(se_sdf_scene_handle scene, const s_vec3* origin, const s_vec3* direction, f32 max_distance, se_sdf_surface_hit* out_hit);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_sample_distance`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_sample_distance(se_sdf_scene_handle scene, const s_vec3* point, f32* out_distance, se_sdf_node_handle* out_node);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_sample_height`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_sample_height(se_sdf_scene_handle scene, f32 x, f32 z, f32 start_y, f32 max_distance, se_sdf_surface_hit* out_hit);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_set_root`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_set_root(se_sdf_scene_handle scene, se_sdf_node_handle node);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_to_object_2d`
-
-<div class="api-signature">
-
-```c
-extern se_object_2d_handle se_sdf_scene_to_object_2d(se_sdf_scene_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_to_object_3d`
-
-<div class="api-signature">
-
-```c
-extern se_object_3d_handle se_sdf_scene_to_object_3d(se_sdf_scene_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_validate`
-
-<div class="api-signature">
-
-```c
-extern b8 se_sdf_scene_validate(se_sdf_scene_handle scene, char* error_message, sz error_message_size);
+extern b8 se_sdf_set_root(se_sdf_handle sdf, se_sdf_node_handle node);
 ```
 
 </div>
@@ -1220,7 +860,31 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern s_json* se_sdf_to_json(se_sdf_scene_handle scene);
+extern s_json* se_sdf_to_json(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_to_object_2d`
+
+<div class="api-signature">
+
+```c
+extern se_object_2d_handle se_sdf_to_object_2d(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_to_object_3d`
+
+<div class="api-signature">
+
+```c
+extern se_object_3d_handle se_sdf_to_object_3d(se_sdf_handle sdf);
 ```
 
 </div>
@@ -1239,26 +903,26 @@ extern s_mat4 se_sdf_transform(s_vec3 translation, s_vec3 rotation, s_vec3 scale
 
 No inline description found in header comments.
 
-## Enums
-
-### `se_sdf_control_type`
+### `se_sdf_validate`
 
 <div class="api-signature">
 
 ```c
-typedef enum { SE_SDF_CONTROL_FLOAT, SE_SDF_CONTROL_VEC2, SE_SDF_CONTROL_VEC3, SE_SDF_CONTROL_VEC4, SE_SDF_CONTROL_INT, SE_SDF_CONTROL_MAT4 } se_sdf_control_type;
+extern b8 se_sdf_validate(se_sdf_handle sdf, char* error_message, sz error_message_size);
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_object_type`
+## Enums
+
+### `se_sdf_node_type`
 
 <div class="api-signature">
 
 ```c
-typedef enum { SE_SDF_NONE, // Container/group node with no shape SE_SDF_SPHERE, SE_SDF_BOX, SE_SDF_ROUND_BOX, SE_SDF_BOX_FRAME, SE_SDF_TORUS, SE_SDF_CAPPED_TORUS, SE_SDF_LINK, SE_SDF_CYLINDER, SE_SDF_CONE, SE_SDF_CONE_INFINITE, SE_SDF_PLANE, SE_SDF_HEX_PRISM, SE_SDF_CAPSULE, SE_SDF_VERTICAL_CAPSULE, SE_SDF_CAPPED_CYLINDER, SE_SDF_CAPPED_CYLINDER_ARBITRARY, SE_SDF_ROUNDED_CYLINDER, SE_SDF_CAPPED_CONE, SE_SDF_CAPPED_CONE_ARBITRARY, SE_SDF_SOLID_ANGLE, SE_SDF_CUT_SPHERE, SE_SDF_CUT_HOLLOW_SPHERE, SE_SDF_DEATH_STAR, SE_SDF_ROUND_CONE, SE_SDF_ROUND_CONE_ARBITRARY, SE_SDF_VESICA_SEGMENT, SE_SDF_RHOMBUS, SE_SDF_OCTAHEDRON, SE_SDF_OCTAHEDRON_BOUND, SE_SDF_PYRAMID, SE_SDF_TRIANGLE, SE_SDF_QUAD } se_sdf_object_type;
+typedef enum { SE_SDF_NODE_GROUP, SE_SDF_NODE_PRIMITIVE, SE_SDF_NODE_REF } se_sdf_node_type;
 ```
 
 </div>
@@ -1277,24 +941,12 @@ typedef enum { SE_SDF_OP_NONE, SE_SDF_OP_UNION, SE_SDF_OP_INTERSECTION, SE_SDF_O
 
 No inline description found in header comments.
 
-### `se_sdf_primitive_param`
-
-<div class="api-signature">
-
-```c
-typedef enum { SE_SDF_PRIMITIVE_PARAM_RADIUS, SE_SDF_PRIMITIVE_PARAM_RADIUS_A, SE_SDF_PRIMITIVE_PARAM_RADIUS_B, SE_SDF_PRIMITIVE_PARAM_HEIGHT, SE_SDF_PRIMITIVE_PARAM_THICKNESS, SE_SDF_PRIMITIVE_PARAM_SIZE_X, SE_SDF_PRIMITIVE_PARAM_SIZE_Y, SE_SDF_PRIMITIVE_PARAM_SIZE_Z } se_sdf_primitive_param;
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_primitive_type`
 
 <div class="api-signature">
 
 ```c
-typedef enum { SE_SDF_PRIMITIVE_SPHERE = SE_SDF_SPHERE, SE_SDF_PRIMITIVE_BOX = SE_SDF_BOX, SE_SDF_PRIMITIVE_ROUND_BOX = SE_SDF_ROUND_BOX, SE_SDF_PRIMITIVE_BOX_FRAME = SE_SDF_BOX_FRAME, SE_SDF_PRIMITIVE_TORUS = SE_SDF_TORUS, SE_SDF_PRIMITIVE_CAPPED_TORUS = SE_SDF_CAPPED_TORUS, SE_SDF_PRIMITIVE_LINK = SE_SDF_LINK, SE_SDF_PRIMITIVE_CYLINDER = SE_SDF_CYLINDER, SE_SDF_PRIMITIVE_CONE = SE_SDF_CONE, SE_SDF_PRIMITIVE_CONE_INFINITE = SE_SDF_CONE_INFINITE, SE_SDF_PRIMITIVE_PLANE = SE_SDF_PLANE, SE_SDF_PRIMITIVE_HEX_PRISM = SE_SDF_HEX_PRISM, SE_SDF_PRIMITIVE_CAPSULE = SE_SDF_CAPSULE, SE_SDF_PRIMITIVE_VERTICAL_CAPSULE = SE_SDF_VERTICAL_CAPSULE, SE_SDF_PRIMITIVE_CAPPED_CYLINDER = SE_SDF_CAPPED_CYLINDER, SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY = SE_SDF_CAPPED_CYLINDER_ARBITRARY, SE_SDF_PRIMITIVE_ROUNDED_CYLINDER = SE_SDF_ROUNDED_CYLINDER, SE_SDF_PRIMITIVE_CAPPED_CONE = SE_SDF_CAPPED_CONE, SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY = SE_SDF_CAPPED_CONE_ARBITRARY, SE_SDF_PRIMITIVE_SOLID_ANGLE = SE_SDF_SOLID_ANGLE, SE_SDF_PRIMITIVE_CUT_SPHERE = SE_SDF_CUT_SPHERE, SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE = SE_SDF_CUT_HOLLOW_SPHERE, SE_SDF_PRIMITIVE_DEATH_STAR = SE_SDF_DEATH_STAR, SE_SDF_PRIMITIVE_ROUND_CONE = SE_SDF_ROUND_CONE, SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY = SE_SDF_ROUND_CONE_ARBITRARY, SE_SDF_PRIMITIVE_VESICA_SEGMENT = SE_SDF_VESICA_SEGMENT, SE_SDF_PRIMITIVE_RHOMBUS = SE_SDF_RHOMBUS, SE_SDF_PRIMITIVE_OCTAHEDRON = SE_SDF_OCTAHEDRON, SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND = SE_SDF_OCTAHEDRON_BOUND, SE_SDF_PRIMITIVE_PYRAMID = SE_SDF_PYRAMID, SE_SDF_PRIMITIVE_TRIANGLE = SE_SDF_TRIANGLE, SE_SDF_PRIMITIVE_QUAD = SE_SDF_QUAD } se_sdf_primitive_type;
+typedef enum { SE_SDF_PRIMITIVE_SPHERE = 1, SE_SDF_PRIMITIVE_BOX = 2, SE_SDF_PRIMITIVE_ROUND_BOX = 3, SE_SDF_PRIMITIVE_BOX_FRAME = 4, SE_SDF_PRIMITIVE_TORUS = 5, SE_SDF_PRIMITIVE_CAPPED_TORUS = 6, SE_SDF_PRIMITIVE_LINK = 7, SE_SDF_PRIMITIVE_CYLINDER = 8, SE_SDF_PRIMITIVE_CONE = 9, SE_SDF_PRIMITIVE_CONE_INFINITE = 10, SE_SDF_PRIMITIVE_PLANE = 11, SE_SDF_PRIMITIVE_HEX_PRISM = 12, SE_SDF_PRIMITIVE_CAPSULE = 13, SE_SDF_PRIMITIVE_VERTICAL_CAPSULE = 14, SE_SDF_PRIMITIVE_CAPPED_CYLINDER = 15, SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY = 16, SE_SDF_PRIMITIVE_ROUNDED_CYLINDER = 17, SE_SDF_PRIMITIVE_CAPPED_CONE = 18, SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY = 19, SE_SDF_PRIMITIVE_SOLID_ANGLE = 20, SE_SDF_PRIMITIVE_CUT_SPHERE = 21, SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE = 22, SE_SDF_PRIMITIVE_DEATH_STAR = 23, SE_SDF_PRIMITIVE_ROUND_CONE = 24, SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY = 25, SE_SDF_PRIMITIVE_VESICA_SEGMENT = 26, SE_SDF_PRIMITIVE_RHOMBUS = 27, SE_SDF_PRIMITIVE_OCTAHEDRON = 28, SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND = 29, SE_SDF_PRIMITIVE_PYRAMID = 30, SE_SDF_PRIMITIVE_TRIANGLE = 31, SE_SDF_PRIMITIVE_QUAD = 32 } se_sdf_primitive_type;
 ```
 
 </div>
@@ -1321,6 +973,42 @@ No inline description found in header comments.
 
 ```c
 typedef struct s_json s_json;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_bake_desc`
+
+<div class="api-signature">
+
+```c
+typedef struct { se_sdf_prepare_desc prepare; } se_sdf_bake_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_bake_result`
+
+<div class="api-signature">
+
+```c
+typedef struct { se_sdf_bounds bounds; u32 lod_count; se_sdf_lod_volume lods[4]; } se_sdf_bake_result;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_bounds`
+
+<div class="api-signature">
+
+```c
+typedef struct { s_vec3 min; s_vec3 max; s_vec3 center; f32 radius; b8 valid; b8 has_unbounded_primitives; } se_sdf_bounds;
 ```
 
 </div>
@@ -1471,18 +1159,6 @@ typedef struct { s_vec2 angle_sin_cos; } se_sdf_cone_infinite_desc;
 
 No inline description found in header comments.
 
-### `se_sdf_control_handle`
-
-<div class="api-signature">
-
-```c
-typedef s_handle se_sdf_control_handle;
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_cut_hollow_sphere_desc`
 
 <div class="api-signature">
@@ -1531,12 +1207,36 @@ typedef struct { f32 radius_a; f32 radius_b; f32 separation; } se_sdf_death_star
 
 No inline description found in header comments.
 
+### `se_sdf_desc`
+
+<div class="api-signature">
+
+```c
+typedef struct { sz initial_node_capacity; } se_sdf_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_frame_desc`
 
 <div class="api-signature">
 
 ```c
 typedef struct { s_vec2 resolution; f32 time_seconds; s_vec2 mouse_normalized; se_camera_handle camera; b8 has_scene_depth_texture; u32 scene_depth_texture; } se_sdf_frame_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_handle`
+
+<div class="api-signature">
+
+```c
+typedef s_handle se_sdf_handle;
 ```
 
 </div>
@@ -1561,6 +1261,18 @@ No inline description found in header comments.
 
 ```c
 typedef struct { f32 half_length; f32 outer_radius; f32 inner_radius; } se_sdf_link_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_lod_volume`
+
+<div class="api-signature">
+
+```c
+typedef struct { u32 resolution; se_texture_handle texture; s_vec3 voxel_size; f32 max_distance; b8 valid; } se_sdf_lod_volume;
 ```
 
 </div>
@@ -1651,24 +1363,24 @@ typedef struct { s_mat4 transform; se_sdf_operation operation; f32 operation_amo
 
 No inline description found in header comments.
 
-### `se_sdf_noise`
+### `se_sdf_node_ref_desc`
 
 <div class="api-signature">
 
 ```c
-typedef struct { b8 active; f32 scale; f32 offset; f32 frequency; } se_sdf_noise;
+typedef struct { se_sdf_handle source; s_mat4 transform; se_sdf_operation operation; f32 operation_amount; } se_sdf_node_ref_desc;
 ```
 
 </div>
 
 No inline description found in header comments.
 
-### `se_sdf_object`
+### `se_sdf_noise`
 
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf_object { s_mat4 transform; se_sdf_scene_handle source_scene; se_sdf_node_handle source_node; se_sdf_object_type type; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; struct { s_vec3 size; f32 roundness; } round_box; struct { s_vec3 size; f32 thickness; } box_frame; struct { s_vec2 radii; } torus; struct { s_vec2 axis_sin_cos; f32 major_radius; f32 minor_radius; } capped_torus; struct { f32 half_length; f32 outer_radius; f32 inner_radius; } link; struct { s_vec3 axis_and_radius; } cylinder; struct { s_vec2 angle_sin_cos; f32 height; } cone; struct { s_vec2 angle_sin_cos; } cone_infinite; struct { s_vec3 normal; f32 offset; } plane; struct { s_vec2 half_size; } hex_prism; struct { s_vec3 a; s_vec3 b; f32 radius; } capsule; struct { f32 height; f32 radius; } vertical_capsule; struct { f32 radius; f32 half_height; } capped_cylinder; struct { s_vec3 a; s_vec3 b; f32 radius; } capped_cylinder_arbitrary; struct { f32 outer_radius; f32 corner_radius; f32 half_height; } rounded_cylinder; struct { f32 height; f32 radius_base; f32 radius_top; } capped_cone; struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } capped_cone_arbitrary; struct { s_vec2 angle_sin_cos; f32 radius; } solid_angle; struct { f32 radius; f32 cut_height; } cut_sphere; struct { f32 radius; f32 cut_height; f32 thickness; } cut_hollow_sphere; struct { f32 radius_a; f32 radius_b; f32 separation; } death_star; struct { f32 radius_base; f32 radius_top; f32 height; } round_cone; struct { s_vec3 a; s_vec3 b; f32 radius_a; f32 radius_b; } round_cone_arbitrary; struct { s_vec3 a; s_vec3 b; f32 width; } vesica_segment; struct { f32 length_a; f32 length_b; f32 height; f32 corner_radius; } rhombus; struct { f32 size; } octahedron; struct { f32 size; } octahedron_bound; struct { f32 height; } pyramid; struct { s_vec3 a; s_vec3 b; s_vec3 c; } triangle; struct { s_vec3 a; s_vec3 b; s_vec3 c; s_vec3 d; } quad; }; se_sdf_operation operation; f32 operation_amount; se_sdf_noise noise; s_vec3 color; b8 has_color; s_array(struct se_sdf_object, children); } se_sdf_object;
+typedef struct { b8 active; f32 scale; f32 offset; f32 frequency; } se_sdf_noise;
 ```
 
 </div>
@@ -1717,6 +1429,30 @@ No inline description found in header comments.
 
 ```c
 typedef struct { s_vec3 normal; f32 offset; } se_sdf_plane_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_prepare_desc`
+
+<div class="api-signature">
+
+```c
+typedef struct { u32 lod_count; u32 lod_resolutions[4]; u32 brick_size; u32 brick_border; f32 max_distance_scale; b8 force_rebuild; } se_sdf_prepare_desc;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_prepare_status`
+
+<div class="api-signature">
+
+```c
+typedef struct { b8 pending; b8 applied; b8 failed; b8 ready; se_result result; } se_sdf_prepare_status;
 ```
 
 </div>
@@ -1788,7 +1524,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { sz shader_source_capacity; b8 auto_rebuild_on_scene_change; b8 enable_shader_debug_output; } se_sdf_renderer_desc;
+typedef struct { u32 brick_budget; u32 brick_upload_budget; u32 max_visible_instances; f32 lod_fade_ratio; b8 use_compute_if_available; b8 front_to_back_sort; } se_sdf_renderer_desc;
 ```
 
 </div>
@@ -1801,6 +1537,18 @@ No inline description found in header comments.
 
 ```c
 typedef s_handle se_sdf_renderer_handle;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_renderer_stats`
+
+<div class="api-signature">
+
+```c
+typedef struct { u32 visible_refs; u32 resident_bricks; u32 page_misses; f32 average_march_steps; u32 selected_lod_counts[4]; } se_sdf_renderer_stats;
 ```
 
 </div>
@@ -1867,30 +1615,6 @@ typedef struct { f32 outer_radius; f32 corner_radius; f32 half_height; } se_sdf_
 
 No inline description found in header comments.
 
-### `se_sdf_scene_bounds`
-
-<div class="api-signature">
-
-```c
-typedef struct { s_vec3 min; s_vec3 max; s_vec3 center; f32 radius; b8 valid; b8 has_unbounded_primitives; } se_sdf_scene_bounds;
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_scene_handle`
-
-<div class="api-signature">
-
-```c
-typedef s_handle se_sdf_scene_handle;
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_solid_angle_desc`
 
 <div class="api-signature">
@@ -1915,18 +1639,6 @@ typedef struct { f32 radius; } se_sdf_sphere_desc;
 
 No inline description found in header comments.
 
-### `se_sdf_string`
-
-<div class="api-signature">
-
-```c
-typedef struct { char* data; sz capacity; sz size; b8 oom; } se_sdf_string;
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_stylized_desc`
 
 <div class="api-signature">
@@ -1944,19 +1656,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { s_vec3 position; s_vec3 normal; f32 distance; se_sdf_scene_handle scene; se_sdf_node_handle node; b8 hit; } se_sdf_surface_hit;
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_symbol_allocator`
-
-<div class="api-signature">
-
-```c
-typedef struct { u32 next_id; } se_sdf_symbol_allocator;
+typedef struct { s_vec3 position; s_vec3 normal; f32 distance; se_sdf_handle sdf; se_sdf_node_handle node; b8 hit; } se_sdf_surface_hit;
 ```
 
 </div>

@@ -65,7 +65,7 @@ typedef struct {
 	se_camera_handle camera_3d;
 	se_scene_3d_handle sdf_camera_scene;
 	se_camera_handle sdf_camera;
-	se_sdf_scene_handle sdf_scene;
+	se_sdf_handle sdf_scene;
 	se_sdf_renderer_handle sdf_renderer;
 	se_model_handle cube_model;
 	se_model_handle gizmo_model_3d_x;
@@ -102,6 +102,7 @@ typedef struct {
 
 	se_object_2d_handle selected_2d;
 	se_object_3d_handle selected_3d;
+	se_sdf_node_handle selected_sdf_node;
 
 	editor_target target;
 	editor_gizmo_axis active_axis;
@@ -122,6 +123,8 @@ typedef struct {
 
 	f64 next_status_time;
 	u64 frame_index;
+	u64 sdf_prepared_generation;
+	u64 sdf_prepare_attempt_generation;
 } editor_showcase_app;
 
 static void editor_apply_camera_pose_3d(editor_showcase_app* app);
@@ -203,6 +206,94 @@ static const c8* editor_target_name(const editor_target target) {
 		case EDITOR_TARGET_SDF: return "sdf";
 		default: return "unknown";
 	}
+}
+
+static se_editor_item editor_make_sdf_node_item(const editor_showcase_app* app, const se_sdf_node_handle node) {
+	se_editor_item item = {0};
+	if (!app) {
+		return item;
+	}
+	item.category = SE_EDITOR_CATEGORY_SDF;
+	item.handle = node;
+	item.owner_handle = app->sdf_scene;
+	return item;
+}
+
+static b8 editor_is_sdf_node_valid(editor_showcase_app* app, const se_sdf_node_handle node) {
+	se_editor_item item = {0};
+	if (!app || !app->editor || app->sdf_scene == SE_SDF_NULL || node == SE_SDF_NODE_NULL) {
+		return false;
+	}
+	item = editor_make_sdf_node_item(app, node);
+	return se_editor_validate_item(app->editor, &item);
+}
+
+static se_sdf_node_handle editor_pick_default_sdf_node(editor_showcase_app* app) {
+	se_sdf_node_handle fallback = SE_SDF_NODE_NULL;
+	if (!app || app->sdf_scene == SE_SDF_NULL) {
+		return SE_SDF_NODE_NULL;
+	}
+	fallback = se_sdf_get_root(app->sdf_scene);
+	for (u32 i = 0u; i < se_sdf_get_node_count(app->sdf_scene); ++i) {
+		const se_sdf_node_handle node = se_sdf_get_node(app->sdf_scene, i);
+		const se_sdf_node_type type = se_sdf_node_get_type(app->sdf_scene, node);
+		if (node == SE_SDF_NODE_NULL) {
+			continue;
+		}
+		if (type == SE_SDF_NODE_PRIMITIVE) {
+			return node;
+		}
+		if (fallback == SE_SDF_NODE_NULL) {
+			fallback = node;
+		}
+	}
+	return fallback;
+}
+
+static void editor_refresh_selected_sdf_node(editor_showcase_app* app) {
+	if (!app || app->sdf_scene == SE_SDF_NULL) {
+		return;
+	}
+	if (editor_is_sdf_node_valid(app, app->selected_sdf_node)) {
+		return;
+	}
+	app->selected_sdf_node = editor_pick_default_sdf_node(app);
+}
+
+static se_sdf_prepare_desc editor_sdf_prepare_desc(void) {
+	se_sdf_prepare_desc desc = SE_SDF_PREPARE_DESC_DEFAULTS;
+	desc.lod_count = 3u;
+	desc.lod_resolutions[0] = 32u;
+	desc.lod_resolutions[1] = 16u;
+	desc.lod_resolutions[2] = 8u;
+	desc.lod_resolutions[3] = 0u;
+	return desc;
+}
+
+static b8 editor_prepare_sdf_if_needed(editor_showcase_app* app, const b8 align_camera) {
+	const u64 generation = app ? se_sdf_get_generation(app->sdf_scene) : 0u;
+	const se_sdf_prepare_desc prepare_desc = editor_sdf_prepare_desc();
+	if (!app || app->sdf_scene == SE_SDF_NULL) {
+		return false;
+	}
+	editor_refresh_selected_sdf_node(app);
+	if (app->sdf_prepare_attempt_generation == generation) {
+		return app->sdf_prepared_generation == generation;
+	}
+	app->sdf_prepare_attempt_generation = generation;
+	if (se_sdf_get_root(app->sdf_scene) == SE_SDF_NODE_NULL) {
+		app->sdf_prepared_generation = 0u;
+		return false;
+	}
+	if (!se_sdf_prepare(app->sdf_scene, &prepare_desc)) {
+		app->sdf_prepared_generation = 0u;
+		return false;
+	}
+	app->sdf_prepared_generation = generation;
+	if (align_camera && app->sdf_camera != S_HANDLE_NULL) {
+		(void)se_sdf_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
+	}
+	return true;
 }
 
 static editor_target editor_target_from_env(void) {
@@ -542,17 +633,25 @@ static b8 editor_apply_scene_3d_action(editor_showcase_app* app, const c8* actio
 
 static b8 editor_apply_sdf_action(editor_showcase_app* app, const c8* action, const se_editor_value* value, const se_editor_value* aux_value) {
 	se_editor_item sdf_item = {0};
-	if (!app || app->sdf_scene == SE_SDF_SCENE_NULL) {
+	if (!app || app->sdf_scene == SE_SDF_NULL) {
 		return false;
 	}
 	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SDF, app->sdf_scene, &sdf_item)) {
 		if (se_editor_apply_action(app->editor, &sdf_item, action, value, aux_value)) {
+			if (strcmp(action, "clear") == 0) {
+				app->selected_sdf_node = SE_SDF_NODE_NULL;
+				app->sdf_prepared_generation = 0u;
+				app->sdf_prepare_attempt_generation = 0u;
+			}
 			return true;
 		}
 		editor_log_error(action);
 	}
 	if (strcmp(action, "clear") == 0) {
-		se_sdf_scene_clear(app->sdf_scene);
+		se_sdf_clear(app->sdf_scene);
+		app->selected_sdf_node = SE_SDF_NODE_NULL;
+		app->sdf_prepared_generation = 0u;
+		app->sdf_prepare_attempt_generation = 0u;
 		return true;
 	}
 	return false;
@@ -588,6 +687,45 @@ static b8 editor_apply_object_3d_transform(editor_showcase_app* app, const se_ob
 	}
 	se_object_3d_set_transform(object, transform);
 	return true;
+}
+
+static b8 editor_apply_sdf_node_transform(editor_showcase_app* app, const se_sdf_node_handle node, const s_mat4* transform) {
+	se_editor_item item = {0};
+	se_editor_value value = se_editor_value_mat4(*transform);
+	if (!app || node == SE_SDF_NODE_NULL || !transform) {
+		return false;
+	}
+	item = editor_make_sdf_node_item(app, node);
+	if (app->editor && se_editor_apply_set(app->editor, &item, "transform", &value)) {
+		return true;
+	}
+	if (app->editor) {
+		editor_log_error("set sdf transform");
+	}
+	return se_sdf_node_set_transform(app->sdf_scene, node, transform);
+}
+
+static se_camera_handle editor_active_3d_camera(const editor_showcase_app* app) {
+	if (!app) {
+		return S_HANDLE_NULL;
+	}
+	if (app->target == EDITOR_TARGET_SDF) {
+		return app->sdf_camera;
+	}
+	if (app->target == EDITOR_TARGET_SCENE_3D) {
+		return app->camera_3d;
+	}
+	return S_HANDLE_NULL;
+}
+
+static b8 editor_has_selected_3d_target(const editor_showcase_app* app) {
+	if (!app) {
+		return false;
+	}
+	if (app->target == EDITOR_TARGET_SDF) {
+		return app->selected_sdf_node != SE_SDF_NODE_NULL;
+	}
+	return app->selected_3d != S_HANDLE_NULL;
 }
 
 static void editor_remove_object_2d_slot(editor_showcase_app* app, const se_object_2d_handle handle) {
@@ -740,13 +878,41 @@ static se_object_3d_handle editor_spawn_object_3d(editor_showcase_app* app, cons
 	return handle;
 }
 
-static s_vec3 editor_get_selected_3d_position(editor_showcase_app* app) {
-	s_mat4 transform = s_mat4_identity;
-	if (!app || app->selected_3d == S_HANDLE_NULL) {
-		return s_vec3(0.0f, 0.0f, 0.0f);
+static s_mat4 editor_get_selected_3d_transform(editor_showcase_app* app) {
+	if (!app) {
+		return s_mat4_identity;
 	}
-	transform = se_object_3d_get_transform(app->selected_3d);
+	if (app->target == EDITOR_TARGET_SDF) {
+		if (app->selected_sdf_node == SE_SDF_NODE_NULL) {
+			return s_mat4_identity;
+		}
+		return se_sdf_node_get_transform(app->sdf_scene, app->selected_sdf_node);
+	}
+	if (app->selected_3d == S_HANDLE_NULL) {
+		return s_mat4_identity;
+	}
+	return se_object_3d_get_transform(app->selected_3d);
+}
+
+static s_vec3 editor_get_selected_3d_position(editor_showcase_app* app) {
+	const s_mat4 transform = editor_get_selected_3d_transform(app);
 	return s_mat4_get_translation(&transform);
+}
+
+static b8 editor_apply_selected_3d_transform(editor_showcase_app* app, const s_mat4* transform) {
+	if (!app || !transform) {
+		return false;
+	}
+	if (app->target == EDITOR_TARGET_SDF) {
+		if (app->selected_sdf_node == SE_SDF_NODE_NULL) {
+			return false;
+		}
+		return editor_apply_sdf_node_transform(app, app->selected_sdf_node, transform);
+	}
+	if (app->selected_3d == S_HANDLE_NULL) {
+		return false;
+	}
+	return editor_apply_object_3d_transform(app, app->selected_3d, transform);
 }
 
 static b8 editor_pick_filter_scene_2d(const se_object_2d_handle object, void* user_data) {
@@ -862,6 +1028,53 @@ static se_object_3d_handle editor_pick_scene_object_3d(editor_showcase_app* app)
 	return S_HANDLE_NULL;
 }
 
+static se_sdf_node_handle editor_pick_sdf_node(editor_showcase_app* app) {
+	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
+	f32 viewport_width = 0.0f;
+	f32 viewport_height = 0.0f;
+	se_sdf_surface_hit hit = {0};
+	s_vec3 ray_origin = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 ray_dir = s_vec3(0.0f, 0.0f, -1.0f);
+	se_sdf_node_handle picked = SE_SDF_NODE_NULL;
+	f32 best_t = 1e30f;
+	if (!app || app->sdf_scene == SE_SDF_NULL || app->sdf_camera == S_HANDLE_NULL) {
+		return SE_SDF_NODE_NULL;
+	}
+	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
+		return SE_SDF_NODE_NULL;
+	}
+	if (!se_camera_screen_to_ray(
+			app->sdf_camera,
+			mouse_framebuffer.x,
+			mouse_framebuffer.y,
+			viewport_width,
+			viewport_height,
+			&ray_origin,
+			&ray_dir)) {
+		return SE_SDF_NODE_NULL;
+	}
+	if (se_sdf_raycast(app->sdf_scene, &ray_origin, &ray_dir, 512.0f, &hit) &&
+		hit.hit &&
+		hit.sdf == app->sdf_scene &&
+		hit.node != SE_SDF_NODE_NULL) {
+		return hit.node;
+	}
+	for (u32 i = 0u; i < se_sdf_get_node_count(app->sdf_scene); ++i) {
+		const se_sdf_node_handle node = se_sdf_get_node(app->sdf_scene, i);
+		const s_mat4 transform = se_sdf_node_get_transform(app->sdf_scene, node);
+		const s_vec3 center = s_mat4_get_translation(&transform);
+		f32 t = 0.0f;
+		if (node == SE_SDF_NODE_NULL) {
+			continue;
+		}
+		if (editor_ray_hits_sphere(&ray_origin, &ray_dir, &center, 0.55f, &t) && t < best_t) {
+			best_t = t;
+			picked = node;
+		}
+	}
+	return picked;
+}
+
 static editor_gizmo_axis editor_pick_2d_gizmo_axis(editor_showcase_app* app, const s_vec2* mouse_ndc) {
 	s_vec2 selected_pos = s_vec2(0.0f, 0.0f);
 	s_vec2 x_handle_pos = s_vec2(0.0f, 0.0f);
@@ -887,13 +1100,14 @@ static editor_gizmo_axis editor_pick_2d_gizmo_axis(editor_showcase_app* app, con
 static editor_gizmo_axis editor_pick_3d_gizmo_axis(editor_showcase_app* app, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
 	s_vec3 object_pos = s_vec3(0.0f, 0.0f, 0.0f);
 	s_vec2 center_screen = s_vec2(0.0f, 0.0f);
+	const se_camera_handle camera = editor_active_3d_camera(app);
 	editor_gizmo_axis best_axis = EDITOR_GIZMO_AXIS_NONE;
 	f32 best_distance = 1e30f;
-	if (!app || app->selected_3d == S_HANDLE_NULL || app->camera_3d == S_HANDLE_NULL || !mouse_framebuffer) {
+	if (!app || !editor_has_selected_3d_target(app) || camera == S_HANDLE_NULL || !mouse_framebuffer) {
 		return EDITOR_GIZMO_AXIS_NONE;
 	}
 	object_pos = editor_get_selected_3d_position(app);
-	if (!se_camera_world_to_screen(app->camera_3d, &object_pos, viewport_width, viewport_height, &center_screen)) {
+	if (!se_camera_world_to_screen(camera, &object_pos, viewport_width, viewport_height, &center_screen)) {
 		return EDITOR_GIZMO_AXIS_NONE;
 	}
 	if (editor_distance_vec2(mouse_framebuffer, &center_screen) <= EDITOR_3D_GIZMO_PICK_THRESHOLD_PX) {
@@ -914,7 +1128,7 @@ static editor_gizmo_axis editor_pick_3d_gizmo_axis(editor_showcase_app* app, con
 		for (u32 i = 0; i < 3u; ++i) {
 			s_vec2 endpoint_screen = s_vec2(0.0f, 0.0f);
 			s_vec3 endpoint_world = s_vec3_add(&object_pos, &s_vec3_muls(&axis_dirs[i], EDITOR_3D_GIZMO_AXIS_LENGTH));
-			if (!se_camera_world_to_screen(app->camera_3d, &endpoint_world, viewport_width, viewport_height, &endpoint_screen)) {
+			if (!se_camera_world_to_screen(camera, &endpoint_world, viewport_width, viewport_height, &endpoint_screen)) {
 				continue;
 			}
 			const f32 distance = editor_distance_point_segment(mouse_framebuffer, &center_screen, &endpoint_screen);
@@ -963,10 +1177,11 @@ static void editor_update_drag_2d(editor_showcase_app* app) {
 
 static void editor_begin_drag_3d(editor_showcase_app* app, const editor_gizmo_axis axis, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
 	se_camera* camera_ptr = NULL;
+	const se_camera_handle camera = editor_active_3d_camera(app);
 	s_vec3 camera_forward = s_vec3(0.0f, 0.0f, -1.0f);
 	s_vec3 side = s_vec3(0.0f, 0.0f, 0.0f);
 	s_vec3 plane_hit = s_vec3(0.0f, 0.0f, 0.0f);
-	if (!app || app->selected_3d == S_HANDLE_NULL || !mouse_framebuffer) {
+	if (!app || !editor_has_selected_3d_target(app) || camera == S_HANDLE_NULL || !mouse_framebuffer) {
 		return;
 	}
 	app->dragging = true;
@@ -978,7 +1193,7 @@ static void editor_begin_drag_3d(editor_showcase_app* app, const editor_gizmo_ax
 	app->drag_axis_param_start = 0.0f;
 	app->drag_axis_world = s_vec3(0.0f, 0.0f, 0.0f);
 
-	camera_ptr = se_camera_get(app->camera_3d);
+	camera_ptr = se_camera_get(camera);
 	if (camera_ptr) {
 		camera_forward = s_vec3_sub(&camera_ptr->target, &camera_ptr->position);
 		camera_forward = s_vec3_normalize(&camera_forward);
@@ -994,7 +1209,7 @@ static void editor_begin_drag_3d(editor_showcase_app* app, const editor_gizmo_ax
 
 	if (axis == EDITOR_GIZMO_AXIS_FREE) {
 		if (se_camera_screen_to_plane(
-				app->camera_3d,
+				camera,
 				mouse_framebuffer->x,
 				mouse_framebuffer->y,
 				viewport_width,
@@ -1021,7 +1236,7 @@ static void editor_begin_drag_3d(editor_showcase_app* app, const editor_gizmo_ax
 		app->drag_plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
 	}
 	if (se_camera_screen_to_plane(
-			app->camera_3d,
+			camera,
 			mouse_framebuffer->x,
 			mouse_framebuffer->y,
 			viewport_width,
@@ -1038,11 +1253,12 @@ static void editor_update_drag_3d(editor_showcase_app* app, const s_vec2* mouse_
 	s_vec3 plane_hit = s_vec3(0.0f, 0.0f, 0.0f);
 	s_vec3 new_position = s_vec3(0.0f, 0.0f, 0.0f);
 	s_mat4 transform = s_mat4_identity;
-	if (!app || !app->dragging || app->selected_3d == S_HANDLE_NULL || !mouse_framebuffer) {
+	const se_camera_handle camera = editor_active_3d_camera(app);
+	if (!app || !app->dragging || !editor_has_selected_3d_target(app) || camera == S_HANDLE_NULL || !mouse_framebuffer) {
 		return;
 	}
 	if (!se_camera_screen_to_plane(
-			app->camera_3d,
+			camera,
 			mouse_framebuffer->x,
 			mouse_framebuffer->y,
 			viewport_width,
@@ -1062,9 +1278,9 @@ static void editor_update_drag_3d(editor_showcase_app* app, const s_vec2* mouse_
 		const f32 axis_delta = axis_param - app->drag_axis_param_start;
 		new_position = s_vec3_add(&app->drag_start_pos_3d, &s_vec3_muls(&app->drag_axis_world, axis_delta));
 	}
-	transform = se_object_3d_get_transform(app->selected_3d);
+	transform = editor_get_selected_3d_transform(app);
 	s_mat4_set_translation(&transform, &new_position);
-	(void)editor_apply_object_3d_transform(app, app->selected_3d, &transform);
+	(void)editor_apply_selected_3d_transform(app, &transform);
 }
 
 static void editor_end_drag(editor_showcase_app* app) {
@@ -1171,7 +1387,7 @@ static void editor_update_3d_gizmo_visuals(editor_showcase_app* app) {
 	if (!app || app->gizmo_3d_center == S_HANDLE_NULL || app->gizmo_3d_x == S_HANDLE_NULL || app->gizmo_3d_y == S_HANDLE_NULL || app->gizmo_3d_z == S_HANDLE_NULL) {
 		return;
 	}
-	if (app->target != EDITOR_TARGET_SCENE_3D || app->selected_3d == S_HANDLE_NULL) {
+	if ((app->target != EDITOR_TARGET_SCENE_3D && app->target != EDITOR_TARGET_SDF) || !editor_has_selected_3d_target(app)) {
 		tc = s_mat4_scale(&tc, &scale_center);
 		tx = s_mat4_scale(&tx, &scale_x);
 		ty = s_mat4_scale(&ty, &scale_y);
@@ -1297,9 +1513,109 @@ static void editor_load_active_target_json(editor_showcase_app* app) {
 		(void)se_editor_scene_3d_json_load(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
 		return;
 	}
-	if (se_editor_sdf_json_load(app->editor, app->sdf_scene, se_editor_get_sdf_json_path(app->editor))) {
-		(void)se_sdf_scene_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
+	if (!se_editor_sdf_json_load(app->editor, app->sdf_scene, se_editor_get_sdf_json_path(app->editor))) {
+		return;
 	}
+	app->selected_sdf_node = SE_SDF_NODE_NULL;
+	app->sdf_prepared_generation = 0u;
+	app->sdf_prepare_attempt_generation = 0u;
+	editor_refresh_selected_sdf_node(app);
+	(void)editor_prepare_sdf_if_needed(app, true);
+}
+
+static b8 editor_find_matching_sdf_node(
+	editor_showcase_app* app,
+	const s_vec3* expected_position,
+	const s_vec3* expected_color,
+	const f32 expected_radius
+) {
+	if (!app || app->sdf_scene == SE_SDF_NULL || !expected_position || !expected_color) {
+		return false;
+	}
+	for (u32 i = 0u; i < se_sdf_get_node_count(app->sdf_scene); ++i) {
+		se_sdf_primitive_desc primitive = {0};
+		s_vec3 color = s_vec3(0.0f, 0.0f, 0.0f);
+		const se_sdf_node_handle node = se_sdf_get_node(app->sdf_scene, i);
+		const s_mat4 transform = se_sdf_node_get_transform(app->sdf_scene, node);
+		const s_vec3 position = s_mat4_get_translation(&transform);
+		if (node == SE_SDF_NODE_NULL || !se_sdf_node_get_primitive(app->sdf_scene, node, &primitive)) {
+			continue;
+		}
+		if (primitive.type != SE_SDF_PRIMITIVE_SPHERE || !se_sdf_node_get_color(app->sdf_scene, node, &color)) {
+			continue;
+		}
+		{
+			const s_vec3 delta_position = s_vec3_sub(&position, expected_position);
+			const s_vec3 delta_color = s_vec3_sub(&color, expected_color);
+			if (s_vec3_length(&delta_position) > 0.05f || s_vec3_length(&delta_color) > 0.05f) {
+				continue;
+			}
+		}
+		if (fabsf(primitive.sphere.radius - expected_radius) > 0.05f) {
+			continue;
+		}
+		return true;
+	}
+	return false;
+}
+
+static b8 editor_run_sdf_json_selftest(editor_showcase_app* app) {
+	static const c8* path = "/tmp/editor_showcase_sdf_selftest.json";
+	se_editor_item item = {0};
+	se_editor_value value = se_editor_value_none();
+	s_mat4 transform = s_mat4_identity;
+	s_vec3 expected_position = s_vec3(0.0f, 0.0f, 0.0f);
+	s_vec3 expected_color = s_vec3(0.14f, 0.78f, 0.96f);
+	const f32 expected_radius = 0.96f;
+	if (!app || !app->editor || app->sdf_scene == SE_SDF_NULL) {
+		return false;
+	}
+	editor_refresh_selected_sdf_node(app);
+	if (app->selected_sdf_node == SE_SDF_NODE_NULL) {
+		return false;
+	}
+	item = editor_make_sdf_node_item(app, app->selected_sdf_node);
+	transform = se_sdf_node_get_transform(app->sdf_scene, app->selected_sdf_node);
+	expected_position = s_mat4_get_translation(&transform);
+	expected_position.x += 0.38f;
+	expected_position.y += 0.18f;
+	expected_position.z -= 0.12f;
+	s_mat4_set_translation(&transform, &expected_position);
+	value = se_editor_value_mat4(transform);
+	if (!se_editor_apply_set(app->editor, &item, "transform", &value)) {
+		return false;
+	}
+	value = se_editor_value_vec3(expected_color);
+	if (!se_editor_apply_set(app->editor, &item, "color", &value)) {
+		return false;
+	}
+	value = se_editor_value_float(expected_radius);
+	if (!se_editor_apply_set(app->editor, &item, "radius", &value)) {
+		return false;
+	}
+	app->sdf_prepared_generation = 0u;
+	app->sdf_prepare_attempt_generation = 0u;
+	if (!editor_prepare_sdf_if_needed(app, false)) {
+		return false;
+	}
+	if (!se_editor_sdf_json_save(app->editor, app->sdf_scene, path)) {
+		return false;
+	}
+	(void)editor_apply_sdf_action(app, "clear", NULL, NULL);
+	if (se_sdf_get_root(app->sdf_scene) != SE_SDF_NODE_NULL) {
+		return false;
+	}
+	if (!se_editor_sdf_json_load(app->editor, app->sdf_scene, path)) {
+		return false;
+	}
+	app->selected_sdf_node = SE_SDF_NODE_NULL;
+	app->sdf_prepared_generation = 0u;
+	app->sdf_prepare_attempt_generation = 0u;
+	editor_refresh_selected_sdf_node(app);
+	if (!editor_prepare_sdf_if_needed(app, false)) {
+		return false;
+	}
+	return editor_find_matching_sdf_node(app, &expected_position, &expected_color, expected_radius);
 }
 
 static void editor_update_details_panel(editor_showcase_app* app) {
@@ -1333,6 +1649,14 @@ static void editor_update_details_panel(editor_showcase_app* app) {
 			category == SE_EDITOR_CATEGORY_OBJECT_2D ? app->selected_2d : app->selected_3d;
 		for (u32 i = 0u; i < (u32)item_count; ++i) {
 			if (items[i].handle == selected_handle) {
+				app->details_item_index = i;
+				break;
+			}
+		}
+	}
+	if (category == SE_EDITOR_CATEGORY_SDF && app->selected_sdf_node != SE_SDF_NODE_NULL) {
+		for (u32 i = 0u; i < (u32)item_count; ++i) {
+			if (items[i].owner_handle == app->sdf_scene && items[i].handle == app->selected_sdf_node) {
 				app->details_item_index = i;
 				break;
 			}
@@ -1433,6 +1757,8 @@ static void editor_update_ui_status(editor_showcase_app* app) {
 }
 
 static void editor_update_details_controls(editor_showcase_app* app) {
+	const se_editor_item* items = NULL;
+	sz item_count = 0u;
 	if (!app || !app->editor) {
 		return;
 	}
@@ -1482,6 +1808,18 @@ static void editor_update_details_controls(editor_showcase_app* app) {
 	}
 	if (app->target == EDITOR_TARGET_SDF && se_window_is_key_pressed(app->window, SE_KEY_C)) {
 		(void)editor_apply_sdf_action(app, "clear", NULL, NULL);
+	}
+	if (app->target == EDITOR_TARGET_SDF &&
+		se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_SDF), &items, &item_count) &&
+		item_count > 0u) {
+		if (app->details_item_index >= (u32)item_count) {
+			app->details_item_index = (u32)item_count - 1u;
+		}
+		if (items[app->details_item_index].owner_handle == app->sdf_scene) {
+			app->selected_sdf_node = (se_sdf_node_handle)items[app->details_item_index].handle;
+		} else if (items[app->details_item_index].handle == app->sdf_scene) {
+			app->selected_sdf_node = SE_SDF_NODE_NULL;
+		}
 	}
 }
 
@@ -1650,15 +1988,15 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	se_camera_set_window_aspect(app->sdf_camera, app->window);
 	se_camera_set_perspective(app->sdf_camera, 52.0f, 0.05f, 200.0f);
 
-	app->sdf_scene = se_sdf_scene_create(NULL);
-	if (app->sdf_scene == SE_SDF_SCENE_NULL) {
+	app->sdf_scene = se_sdf_create(NULL);
+	if (app->sdf_scene == SE_SDF_NULL) {
 		editor_log_error("create sdf scene");
 		return false;
 	}
 	sdf_root_desc.operation = SE_SDF_OP_SMOOTH_UNION;
 	sdf_root_desc.operation_amount = 0.35f;
 	sdf_root = se_sdf_node_create_group(app->sdf_scene, &sdf_root_desc);
-	if (sdf_root == SE_SDF_NODE_NULL || !se_sdf_scene_set_root(app->sdf_scene, sdf_root)) {
+	if (sdf_root == SE_SDF_NODE_NULL || !se_sdf_set_root(app->sdf_scene, sdf_root)) {
 		editor_log_error("sdf root");
 		return false;
 	}
@@ -1680,11 +2018,21 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 		return false;
 	}
 	app->sdf_renderer = se_sdf_renderer_create(NULL);
-	if (app->sdf_renderer == SE_SDF_RENDERER_NULL || !se_sdf_renderer_set_scene(app->sdf_renderer, app->sdf_scene)) {
+	if (app->sdf_renderer == SE_SDF_RENDERER_NULL || !se_sdf_renderer_set_sdf(app->sdf_renderer, app->sdf_scene)) {
 		editor_log_error("sdf renderer");
 		return false;
 	}
-	(void)se_sdf_scene_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
+	app->selected_sdf_node = sdf_sphere;
+	{
+		const se_sdf_prepare_desc prepare_desc = editor_sdf_prepare_desc();
+		if (!se_sdf_prepare(app->sdf_scene, &prepare_desc)) {
+			editor_log_error("prepare sdf");
+			return false;
+		}
+	}
+	app->sdf_prepared_generation = se_sdf_get_generation(app->sdf_scene);
+	app->sdf_prepare_attempt_generation = app->sdf_prepared_generation;
+	(void)se_sdf_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
 
 	editor_config.context = app->context;
 	editor_config.window = app->window;
@@ -1699,6 +2047,14 @@ static b8 editor_setup_scenes(editor_showcase_app* app) {
 	if (!app->editor) {
 		editor_log_error("create editor");
 		return false;
+	}
+	if (app->target == EDITOR_TARGET_SDF) {
+		const c8* sdf_selftest = getenv("SE_EDITOR_SHOWCASE_SDF_SELFTEST");
+		if (sdf_selftest && sdf_selftest[0] != '\0' && strcmp(sdf_selftest, "0") != 0) {
+			editor_apply_camera_pose_3d(app);
+			editor_apply_camera_pose_sdf(app);
+			return true;
+		}
 	}
 
 	app->gizmo_2d_center = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
@@ -1804,6 +2160,14 @@ static void editor_remove_selected_object(editor_showcase_app* app) {
 	}
 	if (app->target == EDITOR_TARGET_SCENE_3D) {
 		editor_delete_object_3d(app, app->selected_3d);
+		return;
+	}
+	if (app->target == EDITOR_TARGET_SDF && app->selected_sdf_node != SE_SDF_NODE_NULL) {
+		se_sdf_node_destroy(app->sdf_scene, app->selected_sdf_node);
+		app->selected_sdf_node = SE_SDF_NODE_NULL;
+		app->sdf_prepared_generation = 0u;
+		app->sdf_prepare_attempt_generation = 0u;
+		editor_refresh_selected_sdf_node(app);
 	}
 }
 
@@ -2001,6 +2365,36 @@ static void editor_update_scene_3d_interaction(editor_showcase_app* app) {
 	}
 }
 
+static void editor_update_sdf_interaction(editor_showcase_app* app) {
+	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
+	f32 viewport_width = 0.0f;
+	f32 viewport_height = 0.0f;
+	if (!app || app->target != EDITOR_TARGET_SDF) {
+		return;
+	}
+	editor_refresh_selected_sdf_node(app);
+	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
+		return;
+	}
+	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT) && !editor_is_alt_down(app)) {
+		editor_gizmo_axis axis = editor_pick_3d_gizmo_axis(app, &mouse_framebuffer, viewport_width, viewport_height);
+		if (axis != EDITOR_GIZMO_AXIS_NONE) {
+			editor_begin_drag_3d(app, axis, &mouse_framebuffer, viewport_width, viewport_height);
+			return;
+		}
+		app->selected_sdf_node = editor_pick_sdf_node(app);
+		if (app->selected_sdf_node != SE_SDF_NODE_NULL) {
+			editor_begin_drag_3d(app, EDITOR_GIZMO_AXIS_FREE, &mouse_framebuffer, viewport_width, viewport_height);
+		}
+	}
+	if (app->dragging && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
+		editor_update_drag_3d(app, &mouse_framebuffer, viewport_width, viewport_height);
+	}
+	if (app->dragging && se_window_is_mouse_released(app->window, SE_MOUSE_LEFT)) {
+		editor_end_drag(app);
+	}
+}
+
 static void editor_cleanup(editor_showcase_app* app) {
 	if (!app) {
 		return;
@@ -2025,9 +2419,9 @@ static void editor_cleanup(editor_showcase_app* app) {
 		se_sdf_renderer_destroy(app->sdf_renderer);
 		app->sdf_renderer = SE_SDF_RENDERER_NULL;
 	}
-	if (app->sdf_scene != SE_SDF_SCENE_NULL) {
-		se_sdf_scene_destroy(app->sdf_scene);
-		app->sdf_scene = SE_SDF_SCENE_NULL;
+	if (app->sdf_scene != SE_SDF_NULL) {
+		se_sdf_destroy(app->sdf_scene);
+		app->sdf_scene = SE_SDF_NULL;
 	}
 	if (app->sdf_camera_scene != S_HANDLE_NULL) {
 		se_scene_3d_destroy(app->sdf_camera_scene);
@@ -2082,6 +2476,15 @@ int main(void) {
 		editor_cleanup(&app);
 		return 1;
 	}
+	if (app.target == EDITOR_TARGET_SDF) {
+		const c8* sdf_selftest = getenv("SE_EDITOR_SHOWCASE_SDF_SELFTEST");
+		if (sdf_selftest && sdf_selftest[0] != '\0' && strcmp(sdf_selftest, "0") != 0) {
+			const b8 ok = editor_run_sdf_json_selftest(&app);
+			printf("editor_showcase :: sdf selftest %s\n", ok ? "ok" : "failed");
+			editor_cleanup(&app);
+			return ok ? 0 : 1;
+		}
+	}
 
 	printf("editor_showcase controls:\n");
 	printf("  Tab: cycle active editor target (scene_2d / scene_3d / sdf)\n");
@@ -2123,6 +2526,7 @@ int main(void) {
 
 		editor_update_scene_2d_interaction(&app);
 		editor_update_scene_3d_interaction(&app);
+		editor_update_sdf_interaction(&app);
 
 		editor_update_2d_object_colors(&app);
 		editor_update_2d_gizmo_visuals(&app);
@@ -2150,7 +2554,9 @@ int main(void) {
 			frame.resolution = s_vec2(fb_w > 0u ? (f32)fb_w : 1280.0f, fb_h > 0u ? (f32)fb_h : 720.0f);
 			frame.time_seconds = (f32)se_window_get_time(app.window);
 			(void)se_sdf_frame_set_camera(&frame, app.sdf_camera);
-			if (app.sdf_renderer != SE_SDF_RENDERER_NULL) {
+			if (app.sdf_renderer != SE_SDF_RENDERER_NULL &&
+				editor_prepare_sdf_if_needed(&app, false) &&
+				app.sdf_prepared_generation == se_sdf_get_generation(app.sdf_scene)) {
 				(void)se_sdf_renderer_render(app.sdf_renderer, &frame);
 			}
 		}

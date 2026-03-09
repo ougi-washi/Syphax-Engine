@@ -248,6 +248,42 @@ se_texture_handle se_texture_create_3d_rgba16f(const f32 *data, const u32 width,
 	return texture_handle;
 }
 
+se_texture_handle se_texture_create_3d_r16f(const f32 *data, const u32 width, const u32 height, const u32 depth, const se_texture_wrap wrap) {
+	se_context *ctx = se_current_context();
+	if (!ctx || !data || width == 0u || height == 0u || depth == 0u) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	if (s_array_get_capacity(&ctx->textures) == 0) {
+		s_array_init(&ctx->textures);
+	}
+
+	se_texture_handle texture_handle = s_array_increment(&ctx->textures);
+	se_texture *texture = s_array_get(&ctx->textures, texture_handle);
+	memset(texture, 0, sizeof(*texture));
+
+	texture->width = (i32)width;
+	texture->height = (i32)height;
+	texture->depth = (i32)depth;
+	texture->channels = 1;
+	texture->target = GL_TEXTURE_3D;
+	texture->wrap = wrap;
+	texture->path[0] = '\0';
+
+	glGenTextures(1, &texture->id);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_3D, texture->id);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, (GLsizei)width, (GLsizei)height, (GLsizei)depth, 0, GL_RED, GL_FLOAT, data);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	se_texture_set_wrap_params(GL_TEXTURE_3D, wrap);
+
+	se_set_last_error(SE_RESULT_OK);
+	return texture_handle;
+}
+
 se_texture_handle se_texture_find_by_id(const u32 texture_id) {
 	se_context *ctx = se_current_context();
 	if (!ctx || texture_id == 0u) {
