@@ -119,16 +119,12 @@ static void se_context_log_leaks(se_context *context) {
 			s_array_get_size(&context->vfx_2ds),
 			s_array_get_size(&context->vfx_3ds));
 	}
-	if (s_array_get_size(&context->sdfs) > 0 ||
-		s_array_get_size(&context->sdf_physicses) > 0 ||
-		s_array_get_size(&context->sdf_renderers) > 0) {
+	if (s_array_get_size(&context->sdfs) > 0) {
 		se_debug_log(
 			SE_DEBUG_LEVEL_WARN,
 			SE_DEBUG_CATEGORY_CORE,
-				"se_context_log_leaks :: context teardown with sdf alive (scenes=%zu, physics=%zu, renderers=%zu)",
-			s_array_get_size(&context->sdfs),
-			s_array_get_size(&context->sdf_physicses),
-			s_array_get_size(&context->sdf_renderers));
+				"se_context_log_leaks :: context teardown with sdf alive (scenes=%zu)",
+			s_array_get_size(&context->sdfs));
 	}
 }
 
@@ -155,8 +151,6 @@ se_context *se_context_create(void) {
 	s_array_init(&context->objects_3d);
 	s_array_init(&context->scenes_3d);
 	s_array_init(&context->sdfs);
-	s_array_init(&context->sdf_physicses);
-	s_array_init(&context->sdf_renderers);
 	s_array_init(&context->vfx_2ds);
 	s_array_init(&context->vfx_3ds);
 	s_array_init(&context->ui_roots);

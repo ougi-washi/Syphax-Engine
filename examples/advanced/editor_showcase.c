@@ -4,2408 +4,230 @@
 #include "se_editor.h"
 #include "se_graphics.h"
 #include "se_scene.h"
-#include "se_shader.h"
-#include "se_sdf.h"
-#include "se_ui.h"
+#include "se_window.h"
 
 #include <math.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
-
-#define SHOWCASE_WIDTH 1400
-#define SHOWCASE_HEIGHT 860
-
-#define EDITOR_2D_GIZMO_HANDLE_OFFSET 0.14f
-#define EDITOR_2D_GIZMO_HANDLE_SIZE 0.024f
-#define EDITOR_2D_GIZMO_PICK_RADIUS 0.050f
-#define EDITOR_2D_PICK_FALLBACK_RADIUS 0.12f
-#define EDITOR_3D_GIZMO_AXIS_LENGTH 1.25f
-#define EDITOR_3D_GIZMO_AXIS_THICKNESS 0.05f
-#define EDITOR_3D_GIZMO_CENTER_SIZE 0.16f
-#define EDITOR_3D_GIZMO_PICK_THRESHOLD_PX 18.0f
-#define EDITOR_3D_PICK_RADIUS 1.10f
-#define EDITOR_3D_PICK_FALLBACK_RADIUS_MIN 0.70f
-#define EDITOR_DETAILS_ITEM_LINES 12
-#define EDITOR_DETAILS_PROPERTY_LINES 12
 
 typedef enum {
-	EDITOR_TARGET_SCENE_2D = 0,
-	EDITOR_TARGET_SCENE_3D,
-	EDITOR_TARGET_SDF
-} editor_target;
-
-typedef enum {
-	EDITOR_GIZMO_AXIS_NONE = 0,
-	EDITOR_GIZMO_AXIS_FREE,
-	EDITOR_GIZMO_AXIS_X,
-	EDITOR_GIZMO_AXIS_Y,
-	EDITOR_GIZMO_AXIS_Z
-} editor_gizmo_axis;
-
-typedef struct {
-	se_object_2d_handle handle;
-	s_vec3 base_color;
-} editor_object_2d_slot;
-typedef s_array(editor_object_2d_slot, editor_object_2d_slots);
-
-typedef struct {
-	se_object_3d_handle handle;
-} editor_object_3d_slot;
-typedef s_array(editor_object_3d_slot, editor_object_3d_slots);
+	EDITOR_SHOWCASE_TARGET_SCENE_2D = 0,
+	EDITOR_SHOWCASE_TARGET_SCENE_3D
+} editor_showcase_target;
 
 typedef struct {
 	se_context* context;
 	se_window_handle window;
 	se_editor* editor;
-
 	se_scene_2d_handle scene_2d;
 	se_scene_3d_handle scene_3d;
 	se_camera_handle camera_3d;
-	se_scene_3d_handle sdf_camera_scene;
-	se_camera_handle sdf_camera;
-	se_sdf_handle sdf_scene;
-	se_sdf_renderer_handle sdf_renderer;
-	se_model_handle cube_model;
-	se_model_handle gizmo_model_3d_x;
-	se_model_handle gizmo_model_3d_y;
-	se_model_handle gizmo_model_3d_z;
-	se_model_handle gizmo_model_3d_center;
-	s_vec3 camera_target_3d;
-	f32 camera_yaw_3d;
-	f32 camera_pitch_3d;
-	f32 camera_distance_3d;
-	s_vec3 camera_target_sdf;
-	f32 camera_yaw_sdf;
-	f32 camera_pitch_sdf;
-	f32 camera_distance_sdf;
-
-	se_ui_handle ui;
-	se_ui_widget_handle ui_panel;
-	se_ui_widget_handle ui_title;
-	se_ui_widget_handle ui_status;
-	se_ui_widget_handle ui_details_panel;
-	se_ui_widget_handle ui_details_title;
-	se_ui_widget_handle ui_details_body;
-
-	editor_object_2d_slots objects_2d;
-	editor_object_3d_slots objects_3d;
-
-	se_object_2d_handle gizmo_2d_center;
-	se_object_2d_handle gizmo_2d_x;
-	se_object_2d_handle gizmo_2d_y;
-	se_object_3d_handle gizmo_3d_center;
-	se_object_3d_handle gizmo_3d_x;
-	se_object_3d_handle gizmo_3d_y;
-	se_object_3d_handle gizmo_3d_z;
-
-	se_object_2d_handle selected_2d;
-	se_object_3d_handle selected_3d;
-	se_sdf_node_handle selected_sdf_node;
-
-	editor_target target;
-	editor_gizmo_axis active_axis;
-	b8 details_scene_scope;
-	b8 dragging;
-	u32 details_item_index;
-	u32 details_property_index;
-	u32 details_component_index;
-
-	s_vec2 drag_start_mouse_ndc;
-	s_vec2 drag_start_pos_2d;
-	s_vec3 drag_start_pos_3d;
-	s_vec3 drag_axis_world;
-	s_vec3 drag_plane_point;
-	s_vec3 drag_plane_normal;
-	s_vec3 drag_start_hit_world;
-	f32 drag_axis_param_start;
-
-	f64 next_status_time;
-	u64 frame_index;
-	u64 sdf_prepared_generation;
-	u64 sdf_prepare_attempt_generation;
+	editor_showcase_target target;
+	s_vec3 camera_target;
+	f32 camera_yaw;
+	f32 camera_pitch;
+	f32 camera_distance;
 } editor_showcase_app;
 
-static void editor_apply_camera_pose_3d(editor_showcase_app* app);
-static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt);
-static void editor_apply_camera_pose_sdf(editor_showcase_app* app);
-static void editor_update_camera_sdf(editor_showcase_app* app, const f32 dt);
-
-static const c8* EDITOR_GIZMO_3D_VERTEX_SOURCE =
-	"#version 330 core\n"
-	"layout(location = 0) in vec3 in_position;\n"
-	"layout(location = 3) in mat4 in_instance_mvp;\n"
-	"void main() {\n"
-	"\tgl_Position = in_instance_mvp * vec4(in_position, 1.0);\n"
-	"}\n";
-
-static const c8* EDITOR_GIZMO_3D_FRAGMENT_SOURCE =
-	"#version 330 core\n"
-	"uniform vec3 u_color;\n"
-	"out vec4 frag_color;\n"
-	"void main() {\n"
-	"\tfrag_color = vec4(u_color, 1.0);\n"
-	"}\n";
-
-static f32 editor_clampf(const f32 value, const f32 min_value, const f32 max_value) {
-	if (value < min_value) {
-		return min_value;
-	}
-	if (value > max_value) {
-		return max_value;
-	}
-	return value;
+static const c8* editor_showcase_target_name(const editor_showcase_target target) {
+	return target == EDITOR_SHOWCASE_TARGET_SCENE_2D ? "scene_2d" : "scene_3d";
 }
 
-static f32 editor_distance_vec2(const s_vec2* a, const s_vec2* b) {
-	const s_vec2 delta = s_vec2_sub(a, b);
-	return s_vec2_length(&delta);
-}
-
-static f32 editor_distance_point_segment(const s_vec2* point, const s_vec2* a, const s_vec2* b) {
-	const s_vec2 ab = s_vec2_sub(b, a);
-	const f32 ab_len2 = s_vec2_dot(&ab, &ab);
-	if (ab_len2 <= 0.000001f) {
-		return editor_distance_vec2(point, a);
-	}
-	const s_vec2 ap = s_vec2_sub(point, a);
-	f32 t = s_vec2_dot(&ap, &ab) / ab_len2;
-	t = editor_clampf(t, 0.0f, 1.0f);
-	const s_vec2 projected = s_vec2(a->x + ab.x * t, a->y + ab.y * t);
-	return editor_distance_vec2(point, &projected);
-}
-
-static s_vec3 editor_color_from_index(const u32 index) {
-	const f32 i = (f32)index;
-	const f32 r = 0.28f + 0.58f * fabsf(sinf(i * 1.11f + 0.23f));
-	const f32 g = 0.24f + 0.62f * fabsf(sinf(i * 1.47f + 1.19f));
-	const f32 b = 0.30f + 0.55f * fabsf(sinf(i * 1.73f + 2.41f));
-	return s_vec3(r, g, b);
-}
-
-static void editor_text_append(c8* text, const sz text_size, const c8* format, ...) {
-	sz len = 0u;
-	va_list args;
-	if (!text || text_size == 0u || !format) {
+static void editor_showcase_apply_camera(editor_showcase_app* app) {
+	if (!app || app->camera_3d == S_HANDLE_NULL) {
 		return;
 	}
-	len = strlen(text);
-	if (len + 1u >= text_size) {
-		return;
-	}
-	va_start(args, format);
-	(void)vsnprintf(text + len, text_size - len, format, args);
-	va_end(args);
-}
-
-static const c8* editor_target_name(const editor_target target) {
-	switch (target) {
-		case EDITOR_TARGET_SCENE_2D: return "scene_2d";
-		case EDITOR_TARGET_SCENE_3D: return "scene_3d";
-		case EDITOR_TARGET_SDF: return "sdf";
-		default: return "unknown";
-	}
-}
-
-static se_editor_item editor_make_sdf_node_item(const editor_showcase_app* app, const se_sdf_node_handle node) {
-	se_editor_item item = {0};
-	if (!app) {
-		return item;
-	}
-	item.category = SE_EDITOR_CATEGORY_SDF;
-	item.handle = node;
-	item.owner_handle = app->sdf_scene;
-	return item;
-}
-
-static b8 editor_is_sdf_node_valid(editor_showcase_app* app, const se_sdf_node_handle node) {
-	se_editor_item item = {0};
-	if (!app || !app->editor || app->sdf_scene == SE_SDF_NULL || node == SE_SDF_NODE_NULL) {
-		return false;
-	}
-	item = editor_make_sdf_node_item(app, node);
-	return se_editor_validate_item(app->editor, &item);
-}
-
-static se_sdf_node_handle editor_pick_default_sdf_node(editor_showcase_app* app) {
-	se_sdf_node_handle fallback = SE_SDF_NODE_NULL;
-	if (!app || app->sdf_scene == SE_SDF_NULL) {
-		return SE_SDF_NODE_NULL;
-	}
-	fallback = se_sdf_get_root(app->sdf_scene);
-	for (u32 i = 0u; i < se_sdf_get_node_count(app->sdf_scene); ++i) {
-		const se_sdf_node_handle node = se_sdf_get_node(app->sdf_scene, i);
-		const se_sdf_node_type type = se_sdf_node_get_type(app->sdf_scene, node);
-		if (node == SE_SDF_NODE_NULL) {
-			continue;
-		}
-		if (type == SE_SDF_NODE_PRIMITIVE) {
-			return node;
-		}
-		if (fallback == SE_SDF_NODE_NULL) {
-			fallback = node;
-		}
-	}
-	return fallback;
-}
-
-static void editor_refresh_selected_sdf_node(editor_showcase_app* app) {
-	if (!app || app->sdf_scene == SE_SDF_NULL) {
-		return;
-	}
-	if (editor_is_sdf_node_valid(app, app->selected_sdf_node)) {
-		return;
-	}
-	app->selected_sdf_node = editor_pick_default_sdf_node(app);
-}
-
-static se_sdf_prepare_desc editor_sdf_prepare_desc(void) {
-	se_sdf_prepare_desc desc = SE_SDF_PREPARE_DESC_DEFAULTS;
-	desc.lod_count = 3u;
-	desc.lod_resolutions[0] = 32u;
-	desc.lod_resolutions[1] = 16u;
-	desc.lod_resolutions[2] = 8u;
-	desc.lod_resolutions[3] = 0u;
-	return desc;
-}
-
-static b8 editor_prepare_sdf_if_needed(editor_showcase_app* app, const b8 align_camera) {
-	const u64 generation = app ? se_sdf_get_generation(app->sdf_scene) : 0u;
-	const se_sdf_prepare_desc prepare_desc = editor_sdf_prepare_desc();
-	if (!app || app->sdf_scene == SE_SDF_NULL) {
-		return false;
-	}
-	editor_refresh_selected_sdf_node(app);
-	if (app->sdf_prepare_attempt_generation == generation) {
-		return app->sdf_prepared_generation == generation;
-	}
-	app->sdf_prepare_attempt_generation = generation;
-	if (se_sdf_get_root(app->sdf_scene) == SE_SDF_NODE_NULL) {
-		app->sdf_prepared_generation = 0u;
-		return false;
-	}
-	if (!se_sdf_prepare(app->sdf_scene, &prepare_desc)) {
-		app->sdf_prepared_generation = 0u;
-		return false;
-	}
-	app->sdf_prepared_generation = generation;
-	if (align_camera && app->sdf_camera != S_HANDLE_NULL) {
-		(void)se_sdf_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
-	}
-	return true;
-}
-
-static editor_target editor_target_from_env(void) {
-	const c8* value = getenv("SE_EDITOR_SHOWCASE_TARGET");
-	if (!value) {
-		return EDITOR_TARGET_SCENE_2D;
-	}
-	if (strcmp(value, "2d") == 0 || strcmp(value, "scene_2d") == 0) {
-		return EDITOR_TARGET_SCENE_2D;
-	}
-	if (strcmp(value, "3d") == 0 || strcmp(value, "scene_3d") == 0) {
-		return EDITOR_TARGET_SCENE_3D;
-	}
-	if (strcmp(value, "sdf") == 0) {
-		return EDITOR_TARGET_SDF;
-	}
-	return EDITOR_TARGET_SCENE_2D;
-}
-
-static void editor_set_gizmo_model_color(const se_model_handle model, const s_vec3* color) {
-	se_shader_handle shader = S_HANDLE_NULL;
-	if (model == S_HANDLE_NULL || !color) {
-		return;
-	}
-	shader = se_model_get_mesh_shader(model, 0u);
-	if (shader != S_HANDLE_NULL) {
-		se_shader_set_vec3(shader, "u_color", color);
-	}
-}
-
-static se_model_handle editor_create_colored_gizmo_model(const s_vec3* color) {
-	se_shader_handle shader = S_HANDLE_NULL;
-	se_model_handle model = S_HANDLE_NULL;
-	se_shaders_ptr shaders = {0};
-	shader = se_shader_load_from_memory(EDITOR_GIZMO_3D_VERTEX_SOURCE, EDITOR_GIZMO_3D_FRAGMENT_SOURCE);
-	if (shader == S_HANDLE_NULL) {
-		return S_HANDLE_NULL;
-	}
-	s_array_init(&shaders);
-	s_array_reserve(&shaders, 1u);
+	const s_vec3 rotation = s_vec3(app->camera_pitch, app->camera_yaw, 0.0f);
+	se_camera_set_rotation(app->camera_3d, &rotation);
 	{
-		s_handle shader_entry = s_array_increment(&shaders);
-		se_shader_handle* slot = s_array_get(&shaders, shader_entry);
-		if (slot) {
-			*slot = shader;
-		}
+		const s_vec3 forward = se_camera_get_forward_vector(app->camera_3d);
+		const s_vec3 position = s_vec3_sub(&app->camera_target, &s_vec3_muls(&forward, app->camera_distance));
+		se_camera_set_location(app->camera_3d, &position);
 	}
-	model = se_model_load_obj_with_flags(SE_RESOURCE_PUBLIC("models/cube.obj"), &shaders, SE_MESH_DATA_GPU);
-	s_array_clear(&shaders);
-	if (model == S_HANDLE_NULL) {
-		se_shader_destroy(shader);
-		return S_HANDLE_NULL;
-	}
-	if (color) {
-		editor_set_gizmo_model_color(model, color);
-	}
-	return model;
+	se_camera_set_target(app->camera_3d, &app->camera_target);
+	se_camera_set_window_aspect(app->camera_3d, app->window);
 }
 
-static se_editor_category editor_active_details_category(const editor_showcase_app* app) {
-	if (!app) {
-		return SE_EDITOR_CATEGORY_COUNT;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_2D) {
-		return app->details_scene_scope ? SE_EDITOR_CATEGORY_SCENE_2D : SE_EDITOR_CATEGORY_OBJECT_2D;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		return app->details_scene_scope ? SE_EDITOR_CATEGORY_SCENE_3D : SE_EDITOR_CATEGORY_OBJECT_3D;
-	}
-	return SE_EDITOR_CATEGORY_SDF;
-}
-
-static const c8* editor_value_type_short(const se_editor_value_type type) {
-	switch (type) {
-		case SE_EDITOR_VALUE_BOOL: return "bool";
-		case SE_EDITOR_VALUE_INT: return "int";
-		case SE_EDITOR_VALUE_UINT: return "uint";
-		case SE_EDITOR_VALUE_U64: return "u64";
-		case SE_EDITOR_VALUE_FLOAT: return "float";
-		case SE_EDITOR_VALUE_DOUBLE: return "double";
-		case SE_EDITOR_VALUE_VEC2: return "vec2";
-		case SE_EDITOR_VALUE_VEC3: return "vec3";
-		case SE_EDITOR_VALUE_VEC4: return "vec4";
-		case SE_EDITOR_VALUE_MAT3: return "mat3";
-		case SE_EDITOR_VALUE_MAT4: return "mat4";
-		case SE_EDITOR_VALUE_HANDLE: return "handle";
-		case SE_EDITOR_VALUE_POINTER: return "ptr";
-		case SE_EDITOR_VALUE_TEXT: return "text";
-		case SE_EDITOR_VALUE_NONE:
-		default: return "none";
-	}
-}
-
-static void editor_format_value(const se_editor_value* value, c8* out_text, const sz out_text_size) {
-	if (!out_text || out_text_size == 0u) {
-		return;
-	}
-	out_text[0] = '\0';
-	if (!value) {
-		snprintf(out_text, out_text_size, "null");
-		return;
-	}
-	switch (value->type) {
-		case SE_EDITOR_VALUE_BOOL:
-			snprintf(out_text, out_text_size, "%s", value->bool_value ? "true" : "false");
-			break;
-		case SE_EDITOR_VALUE_INT:
-			snprintf(out_text, out_text_size, "%d", value->int_value);
-			break;
-		case SE_EDITOR_VALUE_UINT:
-			snprintf(out_text, out_text_size, "%u", value->uint_value);
-			break;
-		case SE_EDITOR_VALUE_U64:
-			snprintf(out_text, out_text_size, "%llu", (unsigned long long)value->u64_value);
-			break;
-		case SE_EDITOR_VALUE_FLOAT:
-			snprintf(out_text, out_text_size, "%.3f", value->float_value);
-			break;
-		case SE_EDITOR_VALUE_DOUBLE:
-			snprintf(out_text, out_text_size, "%.3f", value->double_value);
-			break;
-		case SE_EDITOR_VALUE_VEC2:
-			snprintf(out_text, out_text_size, "(%.3f, %.3f)", value->vec2_value.x, value->vec2_value.y);
-			break;
-		case SE_EDITOR_VALUE_VEC3:
-			snprintf(out_text, out_text_size, "(%.3f, %.3f, %.3f)", value->vec3_value.x, value->vec3_value.y, value->vec3_value.z);
-			break;
-		case SE_EDITOR_VALUE_VEC4:
-			snprintf(out_text, out_text_size, "(%.3f, %.3f, %.3f, %.3f)", value->vec4_value.x, value->vec4_value.y, value->vec4_value.z, value->vec4_value.w);
-			break;
-		case SE_EDITOR_VALUE_MAT3:
-			snprintf(
-				out_text,
-				out_text_size,
-				"[%.2f %.2f %.2f | %.2f %.2f %.2f | %.2f %.2f %.2f]",
-				value->mat3_value.m[0][0], value->mat3_value.m[0][1], value->mat3_value.m[0][2],
-				value->mat3_value.m[1][0], value->mat3_value.m[1][1], value->mat3_value.m[1][2],
-				value->mat3_value.m[2][0], value->mat3_value.m[2][1], value->mat3_value.m[2][2]);
-			break;
-		case SE_EDITOR_VALUE_MAT4:
-			snprintf(
-				out_text,
-				out_text_size,
-				"[%.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f | %.2f %.2f %.2f %.2f]",
-				value->mat4_value.m[0][0], value->mat4_value.m[0][1], value->mat4_value.m[0][2], value->mat4_value.m[0][3],
-				value->mat4_value.m[1][0], value->mat4_value.m[1][1], value->mat4_value.m[1][2], value->mat4_value.m[1][3],
-				value->mat4_value.m[2][0], value->mat4_value.m[2][1], value->mat4_value.m[2][2], value->mat4_value.m[2][3],
-				value->mat4_value.m[3][0], value->mat4_value.m[3][1], value->mat4_value.m[3][2], value->mat4_value.m[3][3]);
-			break;
-		case SE_EDITOR_VALUE_HANDLE:
-			snprintf(out_text, out_text_size, "%llu", (unsigned long long)value->handle_value);
-			break;
-		case SE_EDITOR_VALUE_POINTER:
-			snprintf(out_text, out_text_size, "%p", value->pointer_value);
-			break;
-		case SE_EDITOR_VALUE_TEXT:
-			snprintf(out_text, out_text_size, "%s", value->text_value);
-			break;
-		case SE_EDITOR_VALUE_NONE:
-		default:
-			snprintf(out_text, out_text_size, "none");
-			break;
-	}
-}
-
-static u32 editor_value_component_count(const se_editor_value_type type) {
-	switch (type) {
-		case SE_EDITOR_VALUE_VEC2: return 2u;
-		case SE_EDITOR_VALUE_VEC3: return 3u;
-		case SE_EDITOR_VALUE_VEC4: return 4u;
-		case SE_EDITOR_VALUE_MAT3: return 9u;
-		case SE_EDITOR_VALUE_MAT4: return 16u;
-		default: return 1u;
-	}
-}
-
-static b8 editor_step_property_value(
-	const se_editor_property* property,
-	const i32 direction,
-	const u32 component_index,
-	const f32 amount,
-	se_editor_value* out_value
-) {
-	u64 u64_step = 1u;
-	if (!property || !out_value || !property->editable || direction == 0) {
-		return false;
-	}
-	*out_value = property->value;
-	switch (property->value.type) {
-		case SE_EDITOR_VALUE_BOOL:
-			out_value->bool_value = !property->value.bool_value;
-			return true;
-		case SE_EDITOR_VALUE_INT:
-			out_value->int_value += direction * s_max(1, (i32)roundf(amount));
-			return true;
-		case SE_EDITOR_VALUE_UINT:
-			if (direction < 0 && out_value->uint_value > 0u) {
-				out_value->uint_value--;
-			} else if (direction > 0) {
-				out_value->uint_value++;
-			}
-			return true;
-		case SE_EDITOR_VALUE_U64:
-			if (direction < 0) {
-				u64_step = out_value->u64_value > 0u ? 1u : 0u;
-				out_value->u64_value -= u64_step;
-			} else if (direction > 0) {
-				out_value->u64_value += 1u;
-			}
-			return true;
-		case SE_EDITOR_VALUE_FLOAT:
-			out_value->float_value += (f32)direction * amount;
-			return true;
-		case SE_EDITOR_VALUE_DOUBLE:
-			out_value->double_value += (f64)direction * (f64)amount;
-			return true;
-		case SE_EDITOR_VALUE_VEC2: {
-			f32* v = &out_value->vec2_value.x;
-			v[component_index % 2u] += (f32)direction * amount;
-			return true;
-		}
-		case SE_EDITOR_VALUE_VEC3: {
-			f32* v = &out_value->vec3_value.x;
-			v[component_index % 3u] += (f32)direction * amount;
-			return true;
-		}
-		case SE_EDITOR_VALUE_VEC4: {
-			f32* v = &out_value->vec4_value.x;
-			v[component_index % 4u] += (f32)direction * amount;
-			return true;
-		}
-		case SE_EDITOR_VALUE_MAT3: {
-			const u32 idx = component_index % 9u;
-			const u32 row = idx / 3u;
-			const u32 col = idx % 3u;
-			out_value->mat3_value.m[row][col] += (f32)direction * amount;
-			return true;
-		}
-		case SE_EDITOR_VALUE_MAT4: {
-			const u32 idx = component_index % 16u;
-			const u32 row = idx / 4u;
-			const u32 col = idx % 4u;
-			out_value->mat4_value.m[row][col] += (f32)direction * amount;
-			return true;
-		}
-		case SE_EDITOR_VALUE_HANDLE:
-			if (direction < 0 && out_value->handle_value > 0u) {
-				out_value->handle_value -= 1u;
-			} else if (direction > 0) {
-				out_value->handle_value += 1u;
-			}
-			return true;
-		default:
-			return false;
-	}
-}
-
-static b8 editor_get_mouse_framebuffer(editor_showcase_app* app, s_vec2* out_mouse, f32* out_width, f32* out_height) {
-	u32 framebuffer_width = 0;
-	u32 framebuffer_height = 0;
-	f32 mouse_x = 0.0f;
-	f32 mouse_y = 0.0f;
-	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
-	if (!app || app->window == S_HANDLE_NULL) {
-		return false;
-	}
-	se_window_get_framebuffer_size(app->window, &framebuffer_width, &framebuffer_height);
-	if (framebuffer_width <= 1u || framebuffer_height <= 1u) {
-		return false;
-	}
-	mouse_x = se_window_get_mouse_position_x(app->window);
-	mouse_y = se_window_get_mouse_position_y(app->window);
-	if (!se_window_window_to_framebuffer(app->window, mouse_x, mouse_y, &mouse_framebuffer)) {
-		mouse_framebuffer = s_vec2(mouse_x, mouse_y);
-	}
-	if (out_mouse) {
-		*out_mouse = mouse_framebuffer;
-	}
-	if (out_width) {
-		*out_width = (f32)framebuffer_width;
-	}
-	if (out_height) {
-		*out_height = (f32)framebuffer_height;
-	}
-	return true;
-}
-
-static void editor_log_error(const c8* label) {
-	printf("editor_showcase :: %s failed (%s)\n", label, se_result_str(se_get_last_error()));
-}
-
-static b8 editor_apply_scene_2d_action(editor_showcase_app* app, const c8* action, se_object_2d_handle object) {
-	se_editor_item scene_item = {0};
-	se_editor_value value = se_editor_value_handle(object);
-	if (!app || app->scene_2d == S_HANDLE_NULL) {
-		return false;
-	}
-	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SCENE_2D, app->scene_2d, &scene_item)) {
-		if (se_editor_apply_action(app->editor, &scene_item, action, &value, NULL)) {
-			return true;
-		}
-		editor_log_error(action);
-	}
-	if (strcmp(action, "add_object") == 0) {
-		se_scene_2d_add_object(app->scene_2d, object);
-		return true;
-	}
-	if (strcmp(action, "remove_object") == 0) {
-		se_scene_2d_remove_object(app->scene_2d, object);
-		return true;
-	}
-	return false;
-}
-
-static b8 editor_apply_scene_3d_action(editor_showcase_app* app, const c8* action, se_object_3d_handle object) {
-	se_editor_item scene_item = {0};
-	se_editor_value value = se_editor_value_handle(object);
-	if (!app || app->scene_3d == S_HANDLE_NULL) {
-		return false;
-	}
-	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SCENE_3D, app->scene_3d, &scene_item)) {
-		if (se_editor_apply_action(app->editor, &scene_item, action, &value, NULL)) {
-			return true;
-		}
-		editor_log_error(action);
-	}
-	if (strcmp(action, "add_object") == 0) {
-		se_scene_3d_add_object(app->scene_3d, object);
-		return true;
-	}
-	if (strcmp(action, "remove_object") == 0) {
-		se_scene_3d_remove_object(app->scene_3d, object);
-		return true;
-	}
-	return false;
-}
-
-static b8 editor_apply_sdf_action(editor_showcase_app* app, const c8* action, const se_editor_value* value, const se_editor_value* aux_value) {
-	se_editor_item sdf_item = {0};
-	if (!app || app->sdf_scene == SE_SDF_NULL) {
-		return false;
-	}
-	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_SDF, app->sdf_scene, &sdf_item)) {
-		if (se_editor_apply_action(app->editor, &sdf_item, action, value, aux_value)) {
-			if (strcmp(action, "clear") == 0) {
-				app->selected_sdf_node = SE_SDF_NODE_NULL;
-				app->sdf_prepared_generation = 0u;
-				app->sdf_prepare_attempt_generation = 0u;
-			}
-			return true;
-		}
-		editor_log_error(action);
-	}
-	if (strcmp(action, "clear") == 0) {
-		se_sdf_clear(app->sdf_scene);
-		app->selected_sdf_node = SE_SDF_NODE_NULL;
-		app->sdf_prepared_generation = 0u;
-		app->sdf_prepare_attempt_generation = 0u;
-		return true;
-	}
-	return false;
-}
-
-static b8 editor_apply_object_2d_position(editor_showcase_app* app, const se_object_2d_handle object, const s_vec2* position) {
-	se_editor_item item = {0};
-	se_editor_value value = se_editor_value_vec2(*position);
-	if (!app || object == S_HANDLE_NULL || !position) {
-		return false;
-	}
-	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_OBJECT_2D, object, &item)) {
-		if (se_editor_apply_set(app->editor, &item, "position", &value)) {
-			return true;
-		}
-		editor_log_error("set object_2d position");
-	}
-	se_object_2d_set_position(object, position);
-	return true;
-}
-
-static b8 editor_apply_object_3d_transform(editor_showcase_app* app, const se_object_3d_handle object, const s_mat4* transform) {
-	se_editor_item item = {0};
-	se_editor_value value = se_editor_value_mat4(*transform);
-	if (!app || object == S_HANDLE_NULL || !transform) {
-		return false;
-	}
-	if (app->editor && se_editor_find_item(app->editor, SE_EDITOR_CATEGORY_OBJECT_3D, object, &item)) {
-		if (se_editor_apply_set(app->editor, &item, "transform", &value)) {
-			return true;
-		}
-		editor_log_error("set object_3d transform");
-	}
-	se_object_3d_set_transform(object, transform);
-	return true;
-}
-
-static b8 editor_apply_sdf_node_transform(editor_showcase_app* app, const se_sdf_node_handle node, const s_mat4* transform) {
-	se_editor_item item = {0};
-	se_editor_value value = se_editor_value_mat4(*transform);
-	if (!app || node == SE_SDF_NODE_NULL || !transform) {
-		return false;
-	}
-	item = editor_make_sdf_node_item(app, node);
-	if (app->editor && se_editor_apply_set(app->editor, &item, "transform", &value)) {
-		return true;
-	}
-	if (app->editor) {
-		editor_log_error("set sdf transform");
-	}
-	return se_sdf_node_set_transform(app->sdf_scene, node, transform);
-}
-
-static se_camera_handle editor_active_3d_camera(const editor_showcase_app* app) {
-	if (!app) {
-		return S_HANDLE_NULL;
-	}
-	if (app->target == EDITOR_TARGET_SDF) {
-		return app->sdf_camera;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		return app->camera_3d;
-	}
-	return S_HANDLE_NULL;
-}
-
-static b8 editor_has_selected_3d_target(const editor_showcase_app* app) {
+static b8 editor_showcase_setup_scene_2d(editor_showcase_app* app) {
+	se_object_2d_handle panel = S_HANDLE_NULL;
+	se_object_2d_handle button = S_HANDLE_NULL;
 	if (!app) {
 		return false;
 	}
-	if (app->target == EDITOR_TARGET_SDF) {
-		return app->selected_sdf_node != SE_SDF_NODE_NULL;
-	}
-	return app->selected_3d != S_HANDLE_NULL;
-}
-
-static void editor_remove_object_2d_slot(editor_showcase_app* app, const se_object_2d_handle handle) {
-	if (!app || handle == S_HANDLE_NULL) {
-		return;
-	}
-	for (sz i = 0; i < s_array_get_size(&app->objects_2d); ++i) {
-		editor_object_2d_slot* slot = s_array_get(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
-		if (slot && slot->handle == handle) {
-			s_array_remove(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
-			return;
-		}
-	}
-}
-
-static void editor_remove_object_3d_slot(editor_showcase_app* app, const se_object_3d_handle handle) {
-	if (!app || handle == S_HANDLE_NULL) {
-		return;
-	}
-	for (sz i = 0; i < s_array_get_size(&app->objects_3d); ++i) {
-		editor_object_3d_slot* slot = s_array_get(&app->objects_3d, s_array_handle(&app->objects_3d, (u32)i));
-		if (slot && slot->handle == handle) {
-			s_array_remove(&app->objects_3d, s_array_handle(&app->objects_3d, (u32)i));
-			return;
-		}
-	}
-}
-
-static b8 editor_contains_object_3d(const editor_showcase_app* app, const se_object_3d_handle handle) {
-	if (!app || handle == S_HANDLE_NULL) {
-		return false;
-	}
-	for (sz i = 0; i < s_array_get_size(&app->objects_3d); ++i) {
-		const editor_object_3d_slot* slot = s_array_get((editor_object_3d_slots*)&app->objects_3d, s_array_handle((editor_object_3d_slots*)&app->objects_3d, (u32)i));
-		if (slot && slot->handle == handle) {
-			return true;
-		}
-	}
-	return false;
-}
-
-static b8 editor_ray_hits_sphere(const s_vec3* ray_origin, const s_vec3* ray_dir, const s_vec3* center, const f32 radius, f32* out_t) {
-	s_vec3 offset = s_vec3(0.0f, 0.0f, 0.0f);
-	f32 b = 0.0f;
-	f32 c = 0.0f;
-	f32 discriminant = 0.0f;
-	f32 t = 0.0f;
-	if (!ray_origin || !ray_dir || !center || radius <= 0.0f) {
-		return false;
-	}
-	offset = s_vec3_sub(ray_origin, center);
-	b = s_vec3_dot(&offset, ray_dir);
-	c = s_vec3_dot(&offset, &offset) - radius * radius;
-	discriminant = b * b - c;
-	if (discriminant < 0.0f) {
-		return false;
-	}
-	t = -b - sqrtf(discriminant);
-	if (t < 0.0f) {
-		t = -b + sqrtf(discriminant);
-	}
-	if (t < 0.0f) {
-		return false;
-	}
-	if (out_t) {
-		*out_t = t;
-	}
-	return true;
-}
-
-static void editor_delete_object_2d(editor_showcase_app* app, const se_object_2d_handle handle) {
-	se_shader_handle shader = S_HANDLE_NULL;
-	if (!app || handle == S_HANDLE_NULL) {
-		return;
-	}
-	shader = se_object_2d_get_shader(handle);
-	(void)editor_apply_scene_2d_action(app, "remove_object", handle);
-	se_object_2d_destroy(handle);
-	if (shader != S_HANDLE_NULL) {
-		se_shader_destroy(shader);
-	}
-	editor_remove_object_2d_slot(app, handle);
-	if (app->selected_2d == handle) {
-		app->selected_2d = S_HANDLE_NULL;
-	}
-}
-
-static void editor_delete_object_3d(editor_showcase_app* app, const se_object_3d_handle handle) {
-	if (!app || handle == S_HANDLE_NULL) {
-		return;
-	}
-	(void)editor_apply_scene_3d_action(app, "remove_object", handle);
-	se_object_3d_destroy(handle);
-	editor_remove_object_3d_slot(app, handle);
-	if (app->selected_3d == handle) {
-		app->selected_3d = S_HANDLE_NULL;
-	}
-}
-
-static se_object_2d_handle editor_spawn_object_2d(editor_showcase_app* app, const s_vec2* position) {
-	editor_object_2d_slot slot = {0};
-	se_object_2d_handle handle = S_HANDLE_NULL;
-	se_shader_handle shader = S_HANDLE_NULL;
-	s_vec2 object_scale = s_vec2(0.10f, 0.10f);
-	if (!app || app->scene_2d == S_HANDLE_NULL || !position) {
-		return S_HANDLE_NULL;
-	}
-	handle = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
-	if (handle == S_HANDLE_NULL) {
-		editor_log_error("create object_2d");
-		return S_HANDLE_NULL;
-	}
-	se_object_2d_set_scale(handle, &object_scale);
-	(void)editor_apply_object_2d_position(app, handle, position);
-	if (!editor_apply_scene_2d_action(app, "add_object", handle)) {
-		se_object_2d_destroy(handle);
-		return S_HANDLE_NULL;
-	}
-	slot.handle = handle;
-	slot.base_color = editor_color_from_index((u32)s_array_get_size(&app->objects_2d));
-	s_array_add(&app->objects_2d, slot);
-	shader = se_object_2d_get_shader(handle);
-	if (shader != S_HANDLE_NULL) {
-		se_shader_set_vec3(shader, "u_color", &slot.base_color);
-	}
-	return handle;
-}
-
-static se_object_3d_handle editor_spawn_object_3d(editor_showcase_app* app, const s_vec3* position) {
-	editor_object_3d_slot slot = {0};
-	se_object_3d_handle handle = S_HANDLE_NULL;
-	s_mat4 transform = s_mat4_identity;
-	const s_vec3 object_scale = s_vec3(0.36f, 0.36f, 0.36f);
-	if (!app || app->scene_3d == S_HANDLE_NULL || app->cube_model == S_HANDLE_NULL || !position) {
-		return S_HANDLE_NULL;
-	}
-	transform = s_mat4_scale(&transform, &object_scale);
-	s_mat4_set_translation(&transform, position);
-	handle = se_object_3d_create(app->cube_model, &transform, 0);
-	if (handle == S_HANDLE_NULL) {
-		editor_log_error("create object_3d");
-		return S_HANDLE_NULL;
-	}
-	if (!editor_apply_scene_3d_action(app, "add_object", handle)) {
-		se_object_3d_destroy(handle);
-		return S_HANDLE_NULL;
-	}
-	slot.handle = handle;
-	s_array_add(&app->objects_3d, slot);
-	return handle;
-}
-
-static s_mat4 editor_get_selected_3d_transform(editor_showcase_app* app) {
-	if (!app) {
-		return s_mat4_identity;
-	}
-	if (app->target == EDITOR_TARGET_SDF) {
-		if (app->selected_sdf_node == SE_SDF_NODE_NULL) {
-			return s_mat4_identity;
-		}
-		return se_sdf_node_get_transform(app->sdf_scene, app->selected_sdf_node);
-	}
-	if (app->selected_3d == S_HANDLE_NULL) {
-		return s_mat4_identity;
-	}
-	return se_object_3d_get_transform(app->selected_3d);
-}
-
-static s_vec3 editor_get_selected_3d_position(editor_showcase_app* app) {
-	const s_mat4 transform = editor_get_selected_3d_transform(app);
-	return s_mat4_get_translation(&transform);
-}
-
-static b8 editor_apply_selected_3d_transform(editor_showcase_app* app, const s_mat4* transform) {
-	if (!app || !transform) {
-		return false;
-	}
-	if (app->target == EDITOR_TARGET_SDF) {
-		if (app->selected_sdf_node == SE_SDF_NODE_NULL) {
-			return false;
-		}
-		return editor_apply_sdf_node_transform(app, app->selected_sdf_node, transform);
-	}
-	if (app->selected_3d == S_HANDLE_NULL) {
-		return false;
-	}
-	return editor_apply_object_3d_transform(app, app->selected_3d, transform);
-}
-
-static b8 editor_pick_filter_scene_2d(const se_object_2d_handle object, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	if (!app) {
-		return false;
-	}
-	if (object == app->gizmo_2d_center || object == app->gizmo_2d_x || object == app->gizmo_2d_y) {
-		return false;
-	}
-	return true;
-}
-
-static b8 editor_pick_filter_scene_3d(const se_object_3d_handle object, void* user_data) {
-	editor_showcase_app* app = (editor_showcase_app*)user_data;
-	if (!app) {
-		return false;
-	}
-	return editor_contains_object_3d(app, object);
-}
-
-static se_object_2d_handle editor_pick_scene_object_2d(editor_showcase_app* app) {
-	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
-	se_object_2d_handle picked = S_HANDLE_NULL;
-	f32 best_distance = EDITOR_2D_PICK_FALLBACK_RADIUS;
-	if (!app || app->scene_2d == S_HANDLE_NULL) {
-		return S_HANDLE_NULL;
-	}
-	se_window_get_mouse_normalized(app->window, &mouse_ndc);
-	if (se_scene_2d_pick_object(app->scene_2d, &mouse_ndc, editor_pick_filter_scene_2d, app, &picked)) {
-		return picked;
-	}
-	for (sz i = 0; i < s_array_get_size(&app->objects_2d); ++i) {
-		const editor_object_2d_slot* slot = s_array_get(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
-		if (!slot || slot->handle == S_HANDLE_NULL) {
-			continue;
-		}
-		const s_vec2 position = se_object_2d_get_position(slot->handle);
-		const f32 distance = editor_distance_vec2(&mouse_ndc, &position);
-		if (distance <= best_distance) {
-			best_distance = distance;
-			picked = slot->handle;
-		}
-	}
-	if (picked != S_HANDLE_NULL) {
-		return picked;
-	}
-	return S_HANDLE_NULL;
-}
-
-static se_object_3d_handle editor_pick_scene_object_3d(editor_showcase_app* app) {
-	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
-	se_object_3d_handle picked = S_HANDLE_NULL;
-	f32 viewport_width = 0.0f;
-	f32 viewport_height = 0.0f;
-	if (!app || app->scene_3d == S_HANDLE_NULL) {
-		return S_HANDLE_NULL;
-	}
-	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
-		return S_HANDLE_NULL;
-	}
-	if (se_scene_3d_pick_object_screen(
-			app->scene_3d,
-			mouse_framebuffer.x,
-			mouse_framebuffer.y,
-			viewport_width,
-			viewport_height,
-			EDITOR_3D_PICK_RADIUS,
-				editor_pick_filter_scene_3d,
-				app,
-				&picked,
-				NULL)) {
-		return picked;
-	}
-	{
-		s_vec3 ray_origin = s_vec3(0.0f, 0.0f, 0.0f);
-		s_vec3 ray_dir = s_vec3(0.0f, 0.0f, -1.0f);
-		f32 best_t = 1e30f;
-		if (se_camera_screen_to_ray(
-				app->camera_3d,
-				mouse_framebuffer.x,
-				mouse_framebuffer.y,
-				viewport_width,
-				viewport_height,
-				&ray_origin,
-				&ray_dir)) {
-			for (sz i = 0; i < s_array_get_size(&app->objects_3d); ++i) {
-				const editor_object_3d_slot* slot = s_array_get(&app->objects_3d, s_array_handle(&app->objects_3d, (u32)i));
-				s_mat4 transform = s_mat4_identity;
-				s_vec3 center = s_vec3(0.0f, 0.0f, 0.0f);
-				s_vec3 scale = s_vec3(1.0f, 1.0f, 1.0f);
-				f32 scale_max = 1.0f;
-				f32 radius = 1.0f;
-				f32 t = 0.0f;
-				if (!slot || slot->handle == S_HANDLE_NULL) {
-					continue;
-				}
-				transform = se_object_3d_get_transform(slot->handle);
-				center = s_mat4_get_translation(&transform);
-				scale = s_mat4_get_scale(&transform);
-				scale_max = s_max(scale.x, s_max(scale.y, scale.z));
-				radius = s_max(EDITOR_3D_PICK_FALLBACK_RADIUS_MIN, scale_max * 1.65f);
-				if (editor_ray_hits_sphere(&ray_origin, &ray_dir, &center, radius, &t) && t < best_t) {
-					best_t = t;
-					picked = slot->handle;
-				}
-			}
-		}
-	}
-	if (picked != S_HANDLE_NULL) {
-		return picked;
-	}
-	return S_HANDLE_NULL;
-}
-
-static se_sdf_node_handle editor_pick_sdf_node(editor_showcase_app* app) {
-	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
-	f32 viewport_width = 0.0f;
-	f32 viewport_height = 0.0f;
-	se_sdf_surface_hit hit = {0};
-	s_vec3 ray_origin = s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec3 ray_dir = s_vec3(0.0f, 0.0f, -1.0f);
-	se_sdf_node_handle picked = SE_SDF_NODE_NULL;
-	f32 best_t = 1e30f;
-	if (!app || app->sdf_scene == SE_SDF_NULL || app->sdf_camera == S_HANDLE_NULL) {
-		return SE_SDF_NODE_NULL;
-	}
-	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
-		return SE_SDF_NODE_NULL;
-	}
-	if (!se_camera_screen_to_ray(
-			app->sdf_camera,
-			mouse_framebuffer.x,
-			mouse_framebuffer.y,
-			viewport_width,
-			viewport_height,
-			&ray_origin,
-			&ray_dir)) {
-		return SE_SDF_NODE_NULL;
-	}
-	if (se_sdf_raycast(app->sdf_scene, &ray_origin, &ray_dir, 512.0f, &hit) &&
-		hit.hit &&
-		hit.sdf == app->sdf_scene &&
-		hit.node != SE_SDF_NODE_NULL) {
-		return hit.node;
-	}
-	for (u32 i = 0u; i < se_sdf_get_node_count(app->sdf_scene); ++i) {
-		const se_sdf_node_handle node = se_sdf_get_node(app->sdf_scene, i);
-		const s_mat4 transform = se_sdf_node_get_transform(app->sdf_scene, node);
-		const s_vec3 center = s_mat4_get_translation(&transform);
-		f32 t = 0.0f;
-		if (node == SE_SDF_NODE_NULL) {
-			continue;
-		}
-		if (editor_ray_hits_sphere(&ray_origin, &ray_dir, &center, 0.55f, &t) && t < best_t) {
-			best_t = t;
-			picked = node;
-		}
-	}
-	return picked;
-}
-
-static editor_gizmo_axis editor_pick_2d_gizmo_axis(editor_showcase_app* app, const s_vec2* mouse_ndc) {
-	s_vec2 selected_pos = s_vec2(0.0f, 0.0f);
-	s_vec2 x_handle_pos = s_vec2(0.0f, 0.0f);
-	s_vec2 y_handle_pos = s_vec2(0.0f, 0.0f);
-	if (!app || app->selected_2d == S_HANDLE_NULL || !mouse_ndc) {
-		return EDITOR_GIZMO_AXIS_NONE;
-	}
-	selected_pos = se_object_2d_get_position(app->selected_2d);
-	x_handle_pos = s_vec2(selected_pos.x + EDITOR_2D_GIZMO_HANDLE_OFFSET, selected_pos.y);
-	y_handle_pos = s_vec2(selected_pos.x, selected_pos.y + EDITOR_2D_GIZMO_HANDLE_OFFSET);
-	if (editor_distance_vec2(mouse_ndc, &x_handle_pos) <= EDITOR_2D_GIZMO_PICK_RADIUS) {
-		return EDITOR_GIZMO_AXIS_X;
-	}
-	if (editor_distance_vec2(mouse_ndc, &y_handle_pos) <= EDITOR_2D_GIZMO_PICK_RADIUS) {
-		return EDITOR_GIZMO_AXIS_Y;
-	}
-	if (editor_distance_vec2(mouse_ndc, &selected_pos) <= EDITOR_2D_GIZMO_PICK_RADIUS) {
-		return EDITOR_GIZMO_AXIS_FREE;
-	}
-	return EDITOR_GIZMO_AXIS_NONE;
-}
-
-static editor_gizmo_axis editor_pick_3d_gizmo_axis(editor_showcase_app* app, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
-	s_vec3 object_pos = s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec2 center_screen = s_vec2(0.0f, 0.0f);
-	const se_camera_handle camera = editor_active_3d_camera(app);
-	editor_gizmo_axis best_axis = EDITOR_GIZMO_AXIS_NONE;
-	f32 best_distance = 1e30f;
-	if (!app || !editor_has_selected_3d_target(app) || camera == S_HANDLE_NULL || !mouse_framebuffer) {
-		return EDITOR_GIZMO_AXIS_NONE;
-	}
-	object_pos = editor_get_selected_3d_position(app);
-	if (!se_camera_world_to_screen(camera, &object_pos, viewport_width, viewport_height, &center_screen)) {
-		return EDITOR_GIZMO_AXIS_NONE;
-	}
-	if (editor_distance_vec2(mouse_framebuffer, &center_screen) <= EDITOR_3D_GIZMO_PICK_THRESHOLD_PX) {
-		return EDITOR_GIZMO_AXIS_FREE;
-	}
-
-	{
-		const s_vec3 axis_dirs[3] = {
-			s_vec3(1.0f, 0.0f, 0.0f),
-			s_vec3(0.0f, 1.0f, 0.0f),
-			s_vec3(0.0f, 0.0f, 1.0f)
-		};
-		const editor_gizmo_axis axes[3] = {
-			EDITOR_GIZMO_AXIS_X,
-			EDITOR_GIZMO_AXIS_Y,
-			EDITOR_GIZMO_AXIS_Z
-		};
-		for (u32 i = 0; i < 3u; ++i) {
-			s_vec2 endpoint_screen = s_vec2(0.0f, 0.0f);
-			s_vec3 endpoint_world = s_vec3_add(&object_pos, &s_vec3_muls(&axis_dirs[i], EDITOR_3D_GIZMO_AXIS_LENGTH));
-			if (!se_camera_world_to_screen(camera, &endpoint_world, viewport_width, viewport_height, &endpoint_screen)) {
-				continue;
-			}
-			const f32 distance = editor_distance_point_segment(mouse_framebuffer, &center_screen, &endpoint_screen);
-			if (distance < best_distance) {
-				best_distance = distance;
-				best_axis = axes[i];
-			}
-		}
-	}
-
-	if (best_distance <= EDITOR_3D_GIZMO_PICK_THRESHOLD_PX) {
-		return best_axis;
-	}
-	return EDITOR_GIZMO_AXIS_NONE;
-}
-
-static void editor_begin_drag_2d(editor_showcase_app* app, const editor_gizmo_axis axis) {
-	if (!app || app->selected_2d == S_HANDLE_NULL) {
-		return;
-	}
-	app->active_axis = axis;
-	app->dragging = true;
-	se_window_get_mouse_normalized(app->window, &app->drag_start_mouse_ndc);
-	app->drag_start_pos_2d = se_object_2d_get_position(app->selected_2d);
-}
-
-static void editor_update_drag_2d(editor_showcase_app* app) {
-	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
-	s_vec2 delta = s_vec2(0.0f, 0.0f);
-	s_vec2 new_position = s_vec2(0.0f, 0.0f);
-	if (!app || !app->dragging || app->selected_2d == S_HANDLE_NULL) {
-		return;
-	}
-	se_window_get_mouse_normalized(app->window, &mouse_ndc);
-	delta = s_vec2_sub(&mouse_ndc, &app->drag_start_mouse_ndc);
-	new_position = s_vec2_add(&app->drag_start_pos_2d, &delta);
-	if (app->active_axis == EDITOR_GIZMO_AXIS_X) {
-		new_position.y = app->drag_start_pos_2d.y;
-	} else if (app->active_axis == EDITOR_GIZMO_AXIS_Y) {
-		new_position.x = app->drag_start_pos_2d.x;
-	}
-	new_position.x = editor_clampf(new_position.x, -0.94f, 0.94f);
-	new_position.y = editor_clampf(new_position.y, -0.92f, 0.92f);
-	(void)editor_apply_object_2d_position(app, app->selected_2d, &new_position);
-}
-
-static void editor_begin_drag_3d(editor_showcase_app* app, const editor_gizmo_axis axis, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
-	se_camera* camera_ptr = NULL;
-	const se_camera_handle camera = editor_active_3d_camera(app);
-	s_vec3 camera_forward = s_vec3(0.0f, 0.0f, -1.0f);
-	s_vec3 side = s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec3 plane_hit = s_vec3(0.0f, 0.0f, 0.0f);
-	if (!app || !editor_has_selected_3d_target(app) || camera == S_HANDLE_NULL || !mouse_framebuffer) {
-		return;
-	}
-	app->dragging = true;
-	app->active_axis = axis;
-	app->drag_start_pos_3d = editor_get_selected_3d_position(app);
-	app->drag_plane_point = app->drag_start_pos_3d;
-	app->drag_plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
-	app->drag_start_hit_world = app->drag_start_pos_3d;
-	app->drag_axis_param_start = 0.0f;
-	app->drag_axis_world = s_vec3(0.0f, 0.0f, 0.0f);
-
-	camera_ptr = se_camera_get(camera);
-	if (camera_ptr) {
-		camera_forward = s_vec3_sub(&camera_ptr->target, &camera_ptr->position);
-		camera_forward = s_vec3_normalize(&camera_forward);
-	}
-
-	if (axis == EDITOR_GIZMO_AXIS_X) {
-		app->drag_axis_world = s_vec3(1.0f, 0.0f, 0.0f);
-	} else if (axis == EDITOR_GIZMO_AXIS_Y) {
-		app->drag_axis_world = s_vec3(0.0f, 1.0f, 0.0f);
-	} else if (axis == EDITOR_GIZMO_AXIS_Z) {
-		app->drag_axis_world = s_vec3(0.0f, 0.0f, 1.0f);
-	}
-
-	if (axis == EDITOR_GIZMO_AXIS_FREE) {
-		if (se_camera_screen_to_plane(
-				camera,
-				mouse_framebuffer->x,
-				mouse_framebuffer->y,
-				viewport_width,
-				viewport_height,
-				&app->drag_plane_point,
-				&app->drag_plane_normal,
-				&plane_hit)) {
-			app->drag_start_hit_world = plane_hit;
-		}
-		return;
-	}
-
-	side = s_vec3_cross(&app->drag_axis_world, &camera_forward);
-	if (s_vec3_length(&side) < 0.0001f) {
-		side = s_vec3_cross(&app->drag_axis_world, &s_vec3(0.0f, 1.0f, 0.0f));
-	}
-	if (s_vec3_length(&side) < 0.0001f) {
-		side = s_vec3_cross(&app->drag_axis_world, &s_vec3(1.0f, 0.0f, 0.0f));
-	}
-	side = s_vec3_normalize(&side);
-	app->drag_plane_normal = s_vec3_cross(&side, &app->drag_axis_world);
-	app->drag_plane_normal = s_vec3_normalize(&app->drag_plane_normal);
-	if (s_vec3_length(&app->drag_plane_normal) < 0.0001f) {
-		app->drag_plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
-	}
-	if (se_camera_screen_to_plane(
-			camera,
-			mouse_framebuffer->x,
-			mouse_framebuffer->y,
-			viewport_width,
-			viewport_height,
-			&app->drag_plane_point,
-			&app->drag_plane_normal,
-			&plane_hit)) {
-		const s_vec3 rel = s_vec3_sub(&plane_hit, &app->drag_plane_point);
-		app->drag_axis_param_start = s_vec3_dot(&rel, &app->drag_axis_world);
-	}
-}
-
-static void editor_update_drag_3d(editor_showcase_app* app, const s_vec2* mouse_framebuffer, const f32 viewport_width, const f32 viewport_height) {
-	s_vec3 plane_hit = s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec3 new_position = s_vec3(0.0f, 0.0f, 0.0f);
-	s_mat4 transform = s_mat4_identity;
-	const se_camera_handle camera = editor_active_3d_camera(app);
-	if (!app || !app->dragging || !editor_has_selected_3d_target(app) || camera == S_HANDLE_NULL || !mouse_framebuffer) {
-		return;
-	}
-	if (!se_camera_screen_to_plane(
-			camera,
-			mouse_framebuffer->x,
-			mouse_framebuffer->y,
-			viewport_width,
-			viewport_height,
-			&app->drag_plane_point,
-			&app->drag_plane_normal,
-			&plane_hit)) {
-		return;
-	}
-
-	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
-		const s_vec3 delta = s_vec3_sub(&plane_hit, &app->drag_start_hit_world);
-		new_position = s_vec3_add(&app->drag_start_pos_3d, &delta);
-	} else {
-		const s_vec3 rel = s_vec3_sub(&plane_hit, &app->drag_plane_point);
-		const f32 axis_param = s_vec3_dot(&rel, &app->drag_axis_world);
-		const f32 axis_delta = axis_param - app->drag_axis_param_start;
-		new_position = s_vec3_add(&app->drag_start_pos_3d, &s_vec3_muls(&app->drag_axis_world, axis_delta));
-	}
-	transform = editor_get_selected_3d_transform(app);
-	s_mat4_set_translation(&transform, &new_position);
-	(void)editor_apply_selected_3d_transform(app, &transform);
-}
-
-static void editor_end_drag(editor_showcase_app* app) {
-	if (!app) {
-		return;
-	}
-	app->dragging = false;
-	app->active_axis = EDITOR_GIZMO_AXIS_NONE;
-}
-
-static void editor_set_2d_object_color(const se_object_2d_handle object, const s_vec3* color) {
-	se_shader_handle shader = S_HANDLE_NULL;
-	if (object == S_HANDLE_NULL || !color) {
-		return;
-	}
-	shader = se_object_2d_get_shader(object);
-	if (shader != S_HANDLE_NULL) {
-		se_shader_set_vec3(shader, "u_color", color);
-	}
-}
-
-static void editor_update_2d_object_colors(editor_showcase_app* app) {
-	if (!app) {
-		return;
-	}
-	for (sz i = 0; i < s_array_get_size(&app->objects_2d); ++i) {
-		editor_object_2d_slot* slot = s_array_get(&app->objects_2d, s_array_handle(&app->objects_2d, (u32)i));
-		s_vec3 color = s_vec3(0.9f, 0.9f, 0.9f);
-		if (!slot || slot->handle == S_HANDLE_NULL) {
-			continue;
-		}
-		color = slot->base_color;
-		if (slot->handle == app->selected_2d) {
-			color = s_vec3(
-				editor_clampf(color.x + 0.18f, 0.0f, 1.0f),
-				editor_clampf(color.y + 0.18f, 0.0f, 1.0f),
-				editor_clampf(color.z + 0.18f, 0.0f, 1.0f));
-		}
-		editor_set_2d_object_color(slot->handle, &color);
-	}
-}
-
-static void editor_update_2d_gizmo_visuals(editor_showcase_app* app) {
-	s_vec2 hidden = s_vec2(-3.0f, -3.0f);
-	s_vec2 selected_pos = s_vec2(0.0f, 0.0f);
-	s_vec2 x_handle_pos = s_vec2(0.0f, 0.0f);
-	s_vec2 y_handle_pos = s_vec2(0.0f, 0.0f);
-	s_vec2 center_scale = s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE);
-	s_vec2 axis_scale = s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE * 0.9f, EDITOR_2D_GIZMO_HANDLE_SIZE * 0.9f);
-	s_vec3 color_center = s_vec3(0.95f, 0.88f, 0.15f);
-	s_vec3 color_x = s_vec3(0.92f, 0.24f, 0.21f);
-	s_vec3 color_y = s_vec3(0.20f, 0.88f, 0.38f);
-	if (!app) {
-		return;
-	}
-	if (app->selected_2d == S_HANDLE_NULL || app->target != EDITOR_TARGET_SCENE_2D) {
-		se_object_2d_set_position(app->gizmo_2d_center, &hidden);
-		se_object_2d_set_position(app->gizmo_2d_x, &hidden);
-		se_object_2d_set_position(app->gizmo_2d_y, &hidden);
-		return;
-	}
-	selected_pos = se_object_2d_get_position(app->selected_2d);
-	x_handle_pos = s_vec2(selected_pos.x + EDITOR_2D_GIZMO_HANDLE_OFFSET, selected_pos.y);
-	y_handle_pos = s_vec2(selected_pos.x, selected_pos.y + EDITOR_2D_GIZMO_HANDLE_OFFSET);
-	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE && app->dragging) {
-		center_scale = s_vec2(center_scale.x * 1.35f, center_scale.y * 1.35f);
-		color_center = s_vec3(1.0f, 0.98f, 0.38f);
-	}
-	if (app->active_axis == EDITOR_GIZMO_AXIS_X && app->dragging) {
-		axis_scale = s_vec2(axis_scale.x * 1.35f, axis_scale.y * 1.35f);
-		color_x = s_vec3(1.0f, 0.50f, 0.42f);
-	}
-	if (app->active_axis == EDITOR_GIZMO_AXIS_Y && app->dragging) {
-		axis_scale = s_vec2(axis_scale.x * 1.35f, axis_scale.y * 1.35f);
-		color_y = s_vec3(0.45f, 1.0f, 0.56f);
-	}
-	se_object_2d_set_position(app->gizmo_2d_center, &selected_pos);
-	se_object_2d_set_position(app->gizmo_2d_x, &x_handle_pos);
-	se_object_2d_set_position(app->gizmo_2d_y, &y_handle_pos);
-	se_object_2d_set_scale(app->gizmo_2d_center, &center_scale);
-	se_object_2d_set_scale(app->gizmo_2d_x, &axis_scale);
-	se_object_2d_set_scale(app->gizmo_2d_y, &axis_scale);
-	editor_set_2d_object_color(app->gizmo_2d_center, &color_center);
-	editor_set_2d_object_color(app->gizmo_2d_x, &color_x);
-	editor_set_2d_object_color(app->gizmo_2d_y, &color_y);
-}
-
-static void editor_update_3d_gizmo_visuals(editor_showcase_app* app) {
-	const s_vec3 hidden_pos = s_vec3(0.0f, -5000.0f, 0.0f);
-	s_vec3 origin = s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec3 scale_center = s_vec3(EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE);
-	s_vec3 scale_x = s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS);
-	s_vec3 scale_y = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS);
-	s_vec3 scale_z = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH);
-	s_vec3 color_center = s_vec3(0.95f, 0.86f, 0.20f);
-	s_vec3 color_x = s_vec3(0.94f, 0.26f, 0.21f);
-	s_vec3 color_y = s_vec3(0.18f, 0.86f, 0.34f);
-	s_vec3 color_z = s_vec3(0.26f, 0.42f, 0.95f);
-	const f32 half_axis = EDITOR_3D_GIZMO_AXIS_LENGTH * 0.5f;
-	s_mat4 tc = s_mat4_identity;
-	s_mat4 tx = s_mat4_identity;
-	s_mat4 ty = s_mat4_identity;
-	s_mat4 tz = s_mat4_identity;
-	if (!app || app->gizmo_3d_center == S_HANDLE_NULL || app->gizmo_3d_x == S_HANDLE_NULL || app->gizmo_3d_y == S_HANDLE_NULL || app->gizmo_3d_z == S_HANDLE_NULL) {
-		return;
-	}
-	if ((app->target != EDITOR_TARGET_SCENE_3D && app->target != EDITOR_TARGET_SDF) || !editor_has_selected_3d_target(app)) {
-		tc = s_mat4_scale(&tc, &scale_center);
-		tx = s_mat4_scale(&tx, &scale_x);
-		ty = s_mat4_scale(&ty, &scale_y);
-		tz = s_mat4_scale(&tz, &scale_z);
-		s_mat4_set_translation(&tc, &hidden_pos);
-		s_mat4_set_translation(&tx, &hidden_pos);
-		s_mat4_set_translation(&ty, &hidden_pos);
-		s_mat4_set_translation(&tz, &hidden_pos);
-		se_object_3d_set_transform(app->gizmo_3d_center, &tc);
-		se_object_3d_set_transform(app->gizmo_3d_x, &tx);
-		se_object_3d_set_transform(app->gizmo_3d_y, &ty);
-		se_object_3d_set_transform(app->gizmo_3d_z, &tz);
-		return;
-	}
-	origin = editor_get_selected_3d_position(app);
-	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
-		scale_center = s_vec3(scale_center.x * 1.25f, scale_center.y * 1.25f, scale_center.z * 1.25f);
-		color_center = s_vec3(1.0f, 0.93f, 0.42f);
-	}
-	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_X) {
-		scale_x = s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH * 1.08f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f);
-		color_x = s_vec3(1.0f, 0.52f, 0.48f);
-	}
-	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_Y) {
-		scale_y = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_LENGTH * 1.08f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f);
-		color_y = s_vec3(0.45f, 1.0f, 0.56f);
-	}
-	if (app->dragging && app->active_axis == EDITOR_GIZMO_AXIS_Z) {
-		scale_z = s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_THICKNESS * 1.35f, EDITOR_3D_GIZMO_AXIS_LENGTH * 1.08f);
-		color_z = s_vec3(0.52f, 0.66f, 1.0f);
-	}
-	tc = s_mat4_scale(&tc, &scale_center);
-	tx = s_mat4_scale(&tx, &scale_x);
-	ty = s_mat4_scale(&ty, &scale_y);
-	tz = s_mat4_scale(&tz, &scale_z);
-	s_mat4_set_translation(&tc, &origin);
-	s_mat4_set_translation(&tx, &s_vec3(origin.x + half_axis, origin.y, origin.z));
-	s_mat4_set_translation(&ty, &s_vec3(origin.x, origin.y + half_axis, origin.z));
-	s_mat4_set_translation(&tz, &s_vec3(origin.x, origin.y, origin.z + half_axis));
-	se_object_3d_set_transform(app->gizmo_3d_center, &tc);
-	se_object_3d_set_transform(app->gizmo_3d_x, &tx);
-	se_object_3d_set_transform(app->gizmo_3d_y, &ty);
-	se_object_3d_set_transform(app->gizmo_3d_z, &tz);
-	editor_set_gizmo_model_color(app->gizmo_model_3d_center, &color_center);
-	editor_set_gizmo_model_color(app->gizmo_model_3d_x, &color_x);
-	editor_set_gizmo_model_color(app->gizmo_model_3d_y, &color_y);
-	editor_set_gizmo_model_color(app->gizmo_model_3d_z, &color_z);
-}
-
-static b8 editor_adjust_selected_property(editor_showcase_app* app, const i32 direction) {
-	const se_editor_item* items = NULL;
-	const se_editor_property* properties = NULL;
-	se_editor_value next_value = se_editor_value_none();
-	se_editor_category category = SE_EDITOR_CATEGORY_COUNT;
-	sz item_count = 0u;
-	sz property_count = 0u;
-	u32 component_count = 1u;
-	se_editor_item selected_item = {0};
-	const f32 amount = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 0.25f : 0.05f;
-	if (!app || !app->editor || direction == 0) {
-		return false;
-	}
-	category = editor_active_details_category(app);
-	if (category == SE_EDITOR_CATEGORY_COUNT) {
-		return false;
-	}
-	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(category), &items, &item_count) || item_count == 0u) {
-		return false;
-	}
-	if (app->details_item_index >= (u32)item_count) {
-		app->details_item_index = (u32)item_count - 1u;
-	}
-	selected_item = items[app->details_item_index];
-	if (!se_editor_collect_properties(app->editor, &selected_item, &properties, &property_count) || property_count == 0u) {
-		return false;
-	}
-	if (app->details_property_index >= (u32)property_count) {
-		app->details_property_index = (u32)property_count - 1u;
-	}
-	component_count = editor_value_component_count(properties[app->details_property_index].value.type);
-	if (app->details_component_index >= component_count) {
-		app->details_component_index = component_count - 1u;
-	}
-	if (!editor_step_property_value(
-			&properties[app->details_property_index],
-			direction,
-			app->details_component_index,
-			amount,
-			&next_value)) {
-		return false;
-	}
-	if (!se_editor_apply_set(app->editor, &selected_item, properties[app->details_property_index].name, &next_value)) {
-		editor_log_error("details set");
-		return false;
-	}
-	return true;
-}
-
-static void editor_save_active_target_json(editor_showcase_app* app) {
-	if (!app || !app->editor) {
-		return;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_2D) {
-		(void)se_editor_scene_2d_json_save(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
-		return;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		(void)se_editor_scene_3d_json_save(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
-		return;
-	}
-	(void)se_editor_sdf_json_save(app->editor, app->sdf_scene, se_editor_get_sdf_json_path(app->editor));
-}
-
-static void editor_load_active_target_json(editor_showcase_app* app) {
-	if (!app || !app->editor) {
-		return;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_2D) {
-		(void)se_editor_scene_2d_json_load(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
-		return;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		(void)se_editor_scene_3d_json_load(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
-		return;
-	}
-	if (!se_editor_sdf_json_load(app->editor, app->sdf_scene, se_editor_get_sdf_json_path(app->editor))) {
-		return;
-	}
-	app->selected_sdf_node = SE_SDF_NODE_NULL;
-	app->sdf_prepared_generation = 0u;
-	app->sdf_prepare_attempt_generation = 0u;
-	editor_refresh_selected_sdf_node(app);
-	(void)editor_prepare_sdf_if_needed(app, true);
-}
-
-static b8 editor_find_matching_sdf_node(
-	editor_showcase_app* app,
-	const s_vec3* expected_position,
-	const s_vec3* expected_color,
-	const f32 expected_radius
-) {
-	if (!app || app->sdf_scene == SE_SDF_NULL || !expected_position || !expected_color) {
-		return false;
-	}
-	for (u32 i = 0u; i < se_sdf_get_node_count(app->sdf_scene); ++i) {
-		se_sdf_primitive_desc primitive = {0};
-		s_vec3 color = s_vec3(0.0f, 0.0f, 0.0f);
-		const se_sdf_node_handle node = se_sdf_get_node(app->sdf_scene, i);
-		const s_mat4 transform = se_sdf_node_get_transform(app->sdf_scene, node);
-		const s_vec3 position = s_mat4_get_translation(&transform);
-		if (node == SE_SDF_NODE_NULL || !se_sdf_node_get_primitive(app->sdf_scene, node, &primitive)) {
-			continue;
-		}
-		if (primitive.type != SE_SDF_PRIMITIVE_SPHERE || !se_sdf_node_get_color(app->sdf_scene, node, &color)) {
-			continue;
-		}
-		{
-			const s_vec3 delta_position = s_vec3_sub(&position, expected_position);
-			const s_vec3 delta_color = s_vec3_sub(&color, expected_color);
-			if (s_vec3_length(&delta_position) > 0.05f || s_vec3_length(&delta_color) > 0.05f) {
-				continue;
-			}
-		}
-		if (fabsf(primitive.sphere.radius - expected_radius) > 0.05f) {
-			continue;
-		}
-		return true;
-	}
-	return false;
-}
-
-static b8 editor_run_sdf_json_selftest(editor_showcase_app* app) {
-	static const c8* path = "/tmp/editor_showcase_sdf_selftest.json";
-	se_editor_item item = {0};
-	se_editor_value value = se_editor_value_none();
-	s_mat4 transform = s_mat4_identity;
-	s_vec3 expected_position = s_vec3(0.0f, 0.0f, 0.0f);
-	s_vec3 expected_color = s_vec3(0.14f, 0.78f, 0.96f);
-	const f32 expected_radius = 0.96f;
-	if (!app || !app->editor || app->sdf_scene == SE_SDF_NULL) {
-		return false;
-	}
-	editor_refresh_selected_sdf_node(app);
-	if (app->selected_sdf_node == SE_SDF_NODE_NULL) {
-		return false;
-	}
-	item = editor_make_sdf_node_item(app, app->selected_sdf_node);
-	transform = se_sdf_node_get_transform(app->sdf_scene, app->selected_sdf_node);
-	expected_position = s_mat4_get_translation(&transform);
-	expected_position.x += 0.38f;
-	expected_position.y += 0.18f;
-	expected_position.z -= 0.12f;
-	s_mat4_set_translation(&transform, &expected_position);
-	value = se_editor_value_mat4(transform);
-	if (!se_editor_apply_set(app->editor, &item, "transform", &value)) {
-		return false;
-	}
-	value = se_editor_value_vec3(expected_color);
-	if (!se_editor_apply_set(app->editor, &item, "color", &value)) {
-		return false;
-	}
-	value = se_editor_value_float(expected_radius);
-	if (!se_editor_apply_set(app->editor, &item, "radius", &value)) {
-		return false;
-	}
-	app->sdf_prepared_generation = 0u;
-	app->sdf_prepare_attempt_generation = 0u;
-	if (!editor_prepare_sdf_if_needed(app, false)) {
-		return false;
-	}
-	if (!se_editor_sdf_json_save(app->editor, app->sdf_scene, path)) {
-		return false;
-	}
-	(void)editor_apply_sdf_action(app, "clear", NULL, NULL);
-	if (se_sdf_get_root(app->sdf_scene) != SE_SDF_NODE_NULL) {
-		return false;
-	}
-	if (!se_editor_sdf_json_load(app->editor, app->sdf_scene, path)) {
-		return false;
-	}
-	app->selected_sdf_node = SE_SDF_NODE_NULL;
-	app->sdf_prepared_generation = 0u;
-	app->sdf_prepare_attempt_generation = 0u;
-	editor_refresh_selected_sdf_node(app);
-	if (!editor_prepare_sdf_if_needed(app, false)) {
-		return false;
-	}
-	return editor_find_matching_sdf_node(app, &expected_position, &expected_color, expected_radius);
-}
-
-static void editor_update_details_panel(editor_showcase_app* app) {
-	const se_editor_item* items = NULL;
-	const se_editor_property* properties = NULL;
-	se_editor_category category = SE_EDITOR_CATEGORY_COUNT;
-	sz item_count = 0u;
-	sz property_count = 0u;
-	u32 item_begin = 0u;
-	u32 prop_begin = 0u;
-	c8 details_text[8192] = {0};
-	c8 value_text[768] = {0};
-	const c8* category_name = NULL;
-	if (!app || !app->editor || app->ui == S_HANDLE_NULL || app->ui_details_body == S_HANDLE_NULL || app->ui_details_title == S_HANDLE_NULL) {
-		return;
-	}
-	category = editor_active_details_category(app);
-	category_name = se_editor_category_name(category);
-	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(category), &items, &item_count) || item_count == 0u) {
-		snprintf(details_text, sizeof(details_text), "No items for category %s", category_name ? category_name : "unknown");
-		(void)se_ui_widget_set_text(app->ui, app->ui_details_body, details_text);
-		return;
-	}
-
-	if (app->details_item_index >= (u32)item_count) {
-		app->details_item_index = (u32)item_count - 1u;
-	}
-	if ((category == SE_EDITOR_CATEGORY_OBJECT_2D && app->selected_2d != S_HANDLE_NULL) ||
-		(category == SE_EDITOR_CATEGORY_OBJECT_3D && app->selected_3d != S_HANDLE_NULL)) {
-		const s_handle selected_handle =
-			category == SE_EDITOR_CATEGORY_OBJECT_2D ? app->selected_2d : app->selected_3d;
-		for (u32 i = 0u; i < (u32)item_count; ++i) {
-			if (items[i].handle == selected_handle) {
-				app->details_item_index = i;
-				break;
-			}
-		}
-	}
-	if (category == SE_EDITOR_CATEGORY_SDF && app->selected_sdf_node != SE_SDF_NODE_NULL) {
-		for (u32 i = 0u; i < (u32)item_count; ++i) {
-			if (items[i].owner_handle == app->sdf_scene && items[i].handle == app->selected_sdf_node) {
-				app->details_item_index = i;
-				break;
-			}
-		}
-	}
-	if (!se_editor_collect_properties(app->editor, &items[app->details_item_index], &properties, &property_count)) {
-		property_count = 0u;
-	}
-	if (property_count > 0u && app->details_property_index >= (u32)property_count) {
-		app->details_property_index = (u32)property_count - 1u;
-	}
-	if (property_count > 0u) {
-		const u32 comp_count = editor_value_component_count(properties[app->details_property_index].value.type);
-		if (comp_count > 0u) {
-			app->details_component_index %= comp_count;
-		}
-	}
-
-	(void)se_ui_widget_set_text(
-		app->ui,
-		app->ui_details_title,
-		"Details | arrows=item/prop | PgUp/PgDn=component | +/- edit | F5 save | F9 load");
-
-	editor_text_append(details_text, sizeof(details_text), "Mode: %s | Scope: %s\n", editor_target_name(app->target), app->details_scene_scope ? "scene" : "object");
-	editor_text_append(details_text, sizeof(details_text), "Category: %s\n", category_name ? category_name : "unknown");
-	editor_text_append(details_text, sizeof(details_text), "Items (%zu):\n", item_count);
-	item_begin = app->details_item_index >= (EDITOR_DETAILS_ITEM_LINES / 2u) ? app->details_item_index - (EDITOR_DETAILS_ITEM_LINES / 2u) : 0u;
-	for (u32 i = item_begin; i < (u32)item_count && i < item_begin + EDITOR_DETAILS_ITEM_LINES; ++i) {
-		editor_text_append(
-			details_text,
-			sizeof(details_text),
-			"%c [%u] %s (h=%llu)\n",
-			i == app->details_item_index ? '>' : ' ',
-			i,
-			items[i].label,
-			(unsigned long long)items[i].handle);
-	}
-	editor_text_append(details_text, sizeof(details_text), "\nProperties (%zu):\n", property_count);
-	if (property_count == 0u) {
-		editor_text_append(details_text, sizeof(details_text), "  none\n");
-	} else {
-		prop_begin = app->details_property_index >= (EDITOR_DETAILS_PROPERTY_LINES / 2u)
-			? app->details_property_index - (EDITOR_DETAILS_PROPERTY_LINES / 2u)
-			: 0u;
-		for (u32 i = prop_begin; i < (u32)property_count && i < prop_begin + EDITOR_DETAILS_PROPERTY_LINES; ++i) {
-			editor_format_value(&properties[i].value, value_text, sizeof(value_text));
-			editor_text_append(
-				details_text,
-				sizeof(details_text),
-				"%c %s%s [%s] = %s\n",
-				i == app->details_property_index ? '>' : ' ',
-				properties[i].name,
-				properties[i].editable ? "*" : "",
-				editor_value_type_short(properties[i].value.type),
-				value_text);
-		}
-		editor_text_append(
-			details_text,
-			sizeof(details_text),
-			"\nSelected component: %u/%u\n",
-			app->details_component_index + 1u,
-			editor_value_component_count(properties[app->details_property_index].value.type));
-	}
-	(void)se_ui_widget_set_text(app->ui, app->ui_details_body, details_text);
-}
-
-static void editor_update_ui_status(editor_showcase_app* app) {
-	c8 status[640] = {0};
-	const c8* axis_name = "none";
-	f64 now = 0.0;
-	if (!app || app->ui == S_HANDLE_NULL || app->ui_status == S_HANDLE_NULL) {
-		return;
-	}
-	now = se_window_get_time(app->window);
-	if (now < app->next_status_time) {
-		return;
-	}
-	if (app->active_axis == EDITOR_GIZMO_AXIS_FREE) {
-		axis_name = "free";
-	} else if (app->active_axis == EDITOR_GIZMO_AXIS_X) {
-		axis_name = "x";
-	} else if (app->active_axis == EDITOR_GIZMO_AXIS_Y) {
-		axis_name = "y";
-	} else if (app->active_axis == EDITOR_GIZMO_AXIS_Z) {
-		axis_name = "z";
-	}
-	snprintf(
-		status,
-		sizeof(status),
-		"Mode=%s | Drag=%s axis=%s | 2D=%zu 3D=%zu | Tab cycle mode | G scene/object details | N add | Delete remove | LMB select+gizmo | F5 save JSON | F9 load JSON",
-		editor_target_name(app->target),
-		app->dragging ? "on" : "off",
-		axis_name,
-		s_array_get_size(&app->objects_2d),
-		s_array_get_size(&app->objects_3d));
-	(void)se_ui_widget_set_text(app->ui, app->ui_status, status);
-	app->next_status_time = now + 0.08;
-}
-
-static void editor_update_details_controls(editor_showcase_app* app) {
-	const se_editor_item* items = NULL;
-	sz item_count = 0u;
-	if (!app || !app->editor) {
-		return;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_G) &&
-		(app->target == EDITOR_TARGET_SCENE_2D || app->target == EDITOR_TARGET_SCENE_3D)) {
-		app->details_scene_scope = !app->details_scene_scope;
-		app->details_item_index = 0u;
-		app->details_property_index = 0u;
-		app->details_component_index = 0u;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_UP) && app->details_item_index > 0u) {
-		app->details_item_index--;
-		app->details_property_index = 0u;
-		app->details_component_index = 0u;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_DOWN)) {
-		app->details_item_index++;
-		app->details_property_index = 0u;
-		app->details_component_index = 0u;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_LEFT) && app->details_property_index > 0u) {
-		app->details_property_index--;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_RIGHT)) {
-		app->details_property_index++;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_PAGE_UP) && app->details_component_index > 0u) {
-		app->details_component_index--;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_PAGE_DOWN)) {
-		app->details_component_index++;
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_MINUS)) {
-		(void)editor_adjust_selected_property(app, -1);
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_EQUAL)) {
-		(void)editor_adjust_selected_property(app, 1);
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_ENTER)) {
-		(void)editor_adjust_selected_property(app, 1);
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_F5)) {
-		editor_save_active_target_json(app);
-	}
-	if (se_window_is_key_pressed(app->window, SE_KEY_F9)) {
-		editor_load_active_target_json(app);
-	}
-	if (app->target == EDITOR_TARGET_SDF && se_window_is_key_pressed(app->window, SE_KEY_C)) {
-		(void)editor_apply_sdf_action(app, "clear", NULL, NULL);
-	}
-	if (app->target == EDITOR_TARGET_SDF &&
-		se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_SDF), &items, &item_count) &&
-		item_count > 0u) {
-		if (app->details_item_index >= (u32)item_count) {
-			app->details_item_index = (u32)item_count - 1u;
-		}
-		if (items[app->details_item_index].owner_handle == app->sdf_scene) {
-			app->selected_sdf_node = (se_sdf_node_handle)items[app->details_item_index].handle;
-		} else if (items[app->details_item_index].handle == app->sdf_scene) {
-			app->selected_sdf_node = SE_SDF_NODE_NULL;
-		}
-	}
-}
-
-static b8 editor_setup_ui(editor_showcase_app* app) {
-	se_ui_style root_style = SE_UI_STYLE_DEFAULT;
-	se_ui_style panel_style = SE_UI_STYLE_DEFAULT;
-	se_ui_widget_handle root = S_HANDLE_NULL;
-	if (!app || app->window == S_HANDLE_NULL) {
-		return false;
-	}
-	app->ui = se_ui_create(app->window, 64);
-	if (app->ui == S_HANDLE_NULL) {
-		return false;
-	}
-
-	root = se_ui_create_root(app->ui);
-	root_style.normal.background_color.w = 0.0f;
-	root_style.hovered.background_color.w = 0.0f;
-	root_style.pressed.background_color.w = 0.0f;
-	root_style.disabled.background_color.w = 0.0f;
-	root_style.focused.background_color.w = 0.0f;
-	root_style.normal.border_width = 0.0f;
-	root_style.hovered.border_width = 0.0f;
-	root_style.pressed.border_width = 0.0f;
-	root_style.disabled.border_width = 0.0f;
-	root_style.focused.border_width = 0.0f;
-	(void)se_ui_widget_set_style(app->ui, root, &root_style);
-
-	app->ui_panel = se_ui_add_panel(root, {
-		.id = "editor_hud",
-		.position = s_vec2(0.012f, 0.012f),
-		.size = s_vec2(0.98f, 0.12f)
-	});
-	se_ui_vstack(app->ui, app->ui_panel, 0.004f, se_ui_edge_all(0.010f));
-
-	app->ui_title = se_ui_add_text(app->ui_panel, {
-		.id = "editor_title",
-		.text = "Advanced Editor Showcase | 2D + 3D + SDF Scene Kit",
-		.size = s_vec2(0.96f, 0.048f),
-		.font_size = 28.0f
-	});
-
-	app->ui_status = se_ui_add_text(app->ui_panel, {
-		.id = "editor_status",
-		.text = "Initializing editor state...",
-		.size = s_vec2(0.96f, 0.050f),
-		.font_size = 18.0f
-	});
-
-	panel_style.normal.background_color = s_vec4(0.03f, 0.06f, 0.10f, 0.92f);
-	panel_style.normal.border_color = s_vec4(0.21f, 0.63f, 0.84f, 1.0f);
-	panel_style.normal.text_color = s_vec4(0.94f, 0.98f, 1.0f, 1.0f);
-	panel_style.normal.border_width = 0.004f;
-	panel_style.hovered = panel_style.normal;
-	panel_style.pressed = panel_style.normal;
-	panel_style.disabled = panel_style.normal;
-	panel_style.focused = panel_style.normal;
-	(void)se_ui_widget_set_style(app->ui, app->ui_panel, &panel_style);
-
-	app->ui_details_panel = se_ui_add_panel(root, {
-		.id = "editor_details",
-		.position = s_vec2(0.655f, 0.145f),
-		.size = s_vec2(0.324f, 0.842f)
-	});
-	se_ui_vstack(app->ui, app->ui_details_panel, 0.005f, se_ui_edge_all(0.010f));
-
-	app->ui_details_title = se_ui_add_text(app->ui_details_panel, {
-		.id = "details_title",
-		.text = "Details",
-		.size = s_vec2(0.96f, 0.060f),
-		.font_size = 23.0f
-	});
-	app->ui_details_body = se_ui_add_text(app->ui_details_panel, {
-		.id = "details_body",
-		.text = "Collecting editor properties...",
-		.size = s_vec2(0.96f, 0.75f),
-		.font_size = 18.0f
-	});
-
-	panel_style.normal.background_color = s_vec4(0.06f, 0.07f, 0.09f, 0.93f);
-	panel_style.normal.border_color = s_vec4(0.35f, 0.78f, 0.40f, 0.95f);
-	panel_style.normal.text_color = s_vec4(0.95f, 0.97f, 1.0f, 1.0f);
-	panel_style.hovered = panel_style.normal;
-	panel_style.pressed = panel_style.normal;
-	panel_style.disabled = panel_style.normal;
-	panel_style.focused = panel_style.normal;
-	(void)se_ui_widget_set_style(app->ui, app->ui_details_panel, &panel_style);
-	return true;
-}
-
-static b8 editor_setup_scenes(editor_showcase_app* app) {
-	se_editor_config editor_config = SE_EDITOR_CONFIG_DEFAULTS;
-	se_sdf_node_group_desc sdf_root_desc = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
-	se_sdf_node_primitive_desc box_desc = {0};
-	se_sdf_node_primitive_desc sphere_desc = {0};
-	se_sdf_node_handle sdf_root = SE_SDF_NODE_NULL;
-	se_sdf_node_handle sdf_box = SE_SDF_NODE_NULL;
-	se_sdf_node_handle sdf_sphere = SE_SDF_NODE_NULL;
-	s_mat4 hidden_center = s_mat4_identity;
-	s_mat4 hidden_x = s_mat4_identity;
-	s_mat4 hidden_y = s_mat4_identity;
-	s_mat4 hidden_z = s_mat4_identity;
-	if (!app) {
-		return false;
-	}
-	app->scene_2d = se_scene_2d_create(&s_vec2((f32)SHOWCASE_WIDTH, (f32)SHOWCASE_HEIGHT), 128);
+	app->scene_2d = se_scene_2d_create(&s_vec2(1280.0f, 720.0f), 4);
 	if (app->scene_2d == S_HANDLE_NULL) {
-		editor_log_error("create scene_2d");
 		return false;
 	}
 	se_scene_2d_set_fit_to_window(app->scene_2d, app->window, &s_vec2(1.0f, 1.0f));
 
-	app->scene_3d = se_scene_3d_create_for_window(app->window, 128);
+	panel = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/panel.glsl"), &s_mat3_identity, 0);
+	button = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
+	if (panel == S_HANDLE_NULL || button == S_HANDLE_NULL) {
+		return false;
+	}
+
+	se_object_2d_set_scale(panel, &s_vec2(0.62f, 0.46f));
+	se_object_2d_set_position(button, &s_vec2(0.12f, -0.05f));
+	se_object_2d_set_scale(button, &s_vec2(0.20f, 0.12f));
+	se_scene_2d_add_object(app->scene_2d, panel);
+	se_scene_2d_add_object(app->scene_2d, button);
+	return true;
+}
+
+static b8 editor_showcase_setup_scene_3d(editor_showcase_app* app) {
+	se_model_handle cube_model = S_HANDLE_NULL;
+	se_object_3d_handle cubes = S_HANDLE_NULL;
+	if (!app) {
+		return false;
+	}
+	app->scene_3d = se_scene_3d_create_for_window(app->window, 32);
 	if (app->scene_3d == S_HANDLE_NULL) {
-		editor_log_error("create scene_3d");
 		return false;
 	}
 	app->camera_3d = se_scene_3d_get_camera(app->scene_3d);
 	if (app->camera_3d == S_HANDLE_NULL) {
-		editor_log_error("scene_3d camera");
 		return false;
 	}
-	app->camera_target_3d = s_vec3(0.0f, 0.5f, 0.0f);
-	app->camera_yaw_3d = 0.55f;
-	app->camera_pitch_3d = 0.32f;
-	app->camera_distance_3d = 7.5f;
-	se_camera_set_target_mode(app->camera_3d, true);
-	se_camera_set_window_aspect(app->camera_3d, app->window);
-	se_camera_set_perspective(app->camera_3d, 52.0f, 0.05f, 220.0f);
-	app->camera_target_sdf = s_vec3(0.0f, 0.0f, 0.0f);
-	app->camera_yaw_sdf = 0.70f;
-	app->camera_pitch_sdf = 0.34f;
-	app->camera_distance_sdf = 6.8f;
 
-	app->cube_model = se_model_load_obj_simple(
+	app->camera_target = s_vec3(0.0f, 0.3f, 0.0f);
+	app->camera_yaw = 0.54f;
+	app->camera_pitch = 0.30f;
+	app->camera_distance = 8.0f;
+	se_camera_set_target_mode(app->camera_3d, true);
+	se_camera_set_perspective(app->camera_3d, 52.0f, 0.05f, 200.0f);
+	editor_showcase_apply_camera(app);
+
+	cube_model = se_model_load_obj_simple(
 		SE_RESOURCE_PUBLIC("models/cube.obj"),
 		SE_RESOURCE_EXAMPLE("scene3d/scene3d_vertex.glsl"),
 		SE_RESOURCE_EXAMPLE("scene3d/scene3d_fragment.glsl"));
-	if (app->cube_model == S_HANDLE_NULL) {
-		editor_log_error("load cube model");
+	if (cube_model == S_HANDLE_NULL) {
 		return false;
 	}
-	app->gizmo_model_3d_x = editor_create_colored_gizmo_model(&s_vec3(0.94f, 0.26f, 0.21f));
-	app->gizmo_model_3d_y = editor_create_colored_gizmo_model(&s_vec3(0.18f, 0.86f, 0.34f));
-	app->gizmo_model_3d_z = editor_create_colored_gizmo_model(&s_vec3(0.26f, 0.42f, 0.95f));
-	app->gizmo_model_3d_center = editor_create_colored_gizmo_model(&s_vec3(0.95f, 0.86f, 0.20f));
-	if (app->gizmo_model_3d_x == S_HANDLE_NULL ||
-		app->gizmo_model_3d_y == S_HANDLE_NULL ||
-		app->gizmo_model_3d_z == S_HANDLE_NULL ||
-		app->gizmo_model_3d_center == S_HANDLE_NULL) {
-		editor_log_error("create 3d gizmo models");
+	cubes = se_scene_3d_add_model(app->scene_3d, cube_model, &s_mat4_identity);
+	if (cubes == S_HANDLE_NULL) {
 		return false;
 	}
 
-	app->sdf_camera_scene = se_scene_3d_create_for_window(app->window, 1);
-	if (app->sdf_camera_scene == S_HANDLE_NULL) {
-		editor_log_error("create sdf camera scene");
-		return false;
+	for (i32 x = -2; x <= 2; ++x) {
+		for (i32 z = -2; z <= 2; ++z) {
+			s_mat4 tile = s_mat4_identity;
+			tile = s_mat4_scale(&tile, &s_vec3(0.8f, 0.08f, 0.8f));
+			s_mat4_set_translation(&tile, &s_vec3((f32)x * 1.1f, -0.55f, (f32)z * 1.1f));
+			se_object_3d_add_instance(cubes, &tile, &s_mat4_identity);
+		}
 	}
-	app->sdf_camera = se_scene_3d_get_camera(app->sdf_camera_scene);
-	if (app->sdf_camera == S_HANDLE_NULL) {
-		editor_log_error("sdf camera");
-		return false;
-	}
-	se_camera_set_target_mode(app->sdf_camera, true);
-	se_camera_set_window_aspect(app->sdf_camera, app->window);
-	se_camera_set_perspective(app->sdf_camera, 52.0f, 0.05f, 200.0f);
 
-	app->sdf_scene = se_sdf_create(NULL);
-	if (app->sdf_scene == SE_SDF_NULL) {
-		editor_log_error("create sdf scene");
-		return false;
-	}
-	sdf_root_desc.operation = SE_SDF_OP_SMOOTH_UNION;
-	sdf_root_desc.operation_amount = 0.35f;
-	sdf_root = se_sdf_node_create_group(app->sdf_scene, &sdf_root_desc);
-	if (sdf_root == SE_SDF_NODE_NULL || !se_sdf_set_root(app->sdf_scene, sdf_root)) {
-		editor_log_error("sdf root");
-		return false;
-	}
-	box_desc.transform = s_mat4_identity;
-	box_desc.operation = SE_SDF_OP_UNION;
-	box_desc.primitive.type = SE_SDF_PRIMITIVE_BOX;
-	box_desc.primitive.box.size = s_vec3(1.40f, 1.00f, 1.10f);
-	sphere_desc.transform = s_mat4_identity;
-	s_mat4_set_translation(&sphere_desc.transform, &s_vec3(0.45f, 0.25f, 0.0f));
-	sphere_desc.operation = SE_SDF_OP_UNION;
-	sphere_desc.primitive.type = SE_SDF_PRIMITIVE_SPHERE;
-	sphere_desc.primitive.sphere.radius = 0.82f;
-	sdf_box = se_sdf_node_create_primitive(app->sdf_scene, &box_desc);
-	sdf_sphere = se_sdf_node_create_primitive(app->sdf_scene, &sphere_desc);
-	if (sdf_box == SE_SDF_NODE_NULL || sdf_sphere == SE_SDF_NODE_NULL ||
-		!se_sdf_node_add_child(app->sdf_scene, sdf_root, sdf_box) ||
-		!se_sdf_node_add_child(app->sdf_scene, sdf_root, sdf_sphere)) {
-		editor_log_error("sdf nodes");
-		return false;
-	}
-	app->sdf_renderer = se_sdf_renderer_create(NULL);
-	if (app->sdf_renderer == SE_SDF_RENDERER_NULL || !se_sdf_renderer_set_sdf(app->sdf_renderer, app->sdf_scene)) {
-		editor_log_error("sdf renderer");
-		return false;
-	}
-	app->selected_sdf_node = sdf_sphere;
 	{
-		const se_sdf_prepare_desc prepare_desc = editor_sdf_prepare_desc();
-		if (!se_sdf_prepare(app->sdf_scene, &prepare_desc)) {
-			editor_log_error("prepare sdf");
-			return false;
-		}
+		s_mat4 center = s_mat4_identity;
+		center = s_mat4_scale(&center, &s_vec3(0.9f, 0.9f, 0.9f));
+		s_mat4_set_translation(&center, &s_vec3(0.0f, 0.35f, 0.0f));
+		se_object_3d_add_instance(cubes, &center, &s_mat4_identity);
 	}
-	app->sdf_prepared_generation = se_sdf_get_generation(app->sdf_scene);
-	app->sdf_prepare_attempt_generation = app->sdf_prepared_generation;
-	(void)se_sdf_align_camera(app->sdf_scene, app->sdf_camera, NULL, NULL);
-
-	editor_config.context = app->context;
-	editor_config.window = app->window;
-	editor_config.focused_scene_2d = app->scene_2d;
-	editor_config.focused_scene_3d = app->scene_3d;
-	editor_config.focused_sdf = app->sdf_scene;
-	editor_config.focused_sdf_camera = app->sdf_camera;
-	editor_config.scene_2d_json_path = "scene2d_editor_showcase.json";
-	editor_config.scene_3d_json_path = "scene3d_editor_showcase.json";
-	editor_config.sdf_json_path = "sdf_editor_showcase.json";
-	app->editor = se_editor_create(&editor_config);
-	if (!app->editor) {
-		editor_log_error("create editor");
-		return false;
+	{
+		s_mat4 side = s_mat4_identity;
+		side = s_mat4_scale(&side, &s_vec3(0.6f, 1.2f, 0.6f));
+		s_mat4_set_translation(&side, &s_vec3(1.6f, 0.65f, -1.0f));
+		se_object_3d_add_instance(cubes, &side, &s_mat4_identity);
 	}
-	if (app->target == EDITOR_TARGET_SDF) {
-		const c8* sdf_selftest = getenv("SE_EDITOR_SHOWCASE_SDF_SELFTEST");
-		if (sdf_selftest && sdf_selftest[0] != '\0' && strcmp(sdf_selftest, "0") != 0) {
-			editor_apply_camera_pose_3d(app);
-			editor_apply_camera_pose_sdf(app);
-			return true;
-		}
-	}
-
-	app->gizmo_2d_center = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
-	app->gizmo_2d_x = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
-	app->gizmo_2d_y = se_object_2d_create(SE_RESOURCE_EXAMPLE("scene2d/button.glsl"), &s_mat3_identity, 0);
-	if (app->gizmo_2d_center == S_HANDLE_NULL || app->gizmo_2d_x == S_HANDLE_NULL || app->gizmo_2d_y == S_HANDLE_NULL) {
-		editor_log_error("create 2d gizmo objects");
-		return false;
-	}
-	se_object_2d_set_scale(app->gizmo_2d_center, &s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE));
-	se_object_2d_set_scale(app->gizmo_2d_x, &s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE));
-	se_object_2d_set_scale(app->gizmo_2d_y, &s_vec2(EDITOR_2D_GIZMO_HANDLE_SIZE, EDITOR_2D_GIZMO_HANDLE_SIZE));
-	se_scene_2d_add_object(app->scene_2d, app->gizmo_2d_center);
-	se_scene_2d_add_object(app->scene_2d, app->gizmo_2d_x);
-	se_scene_2d_add_object(app->scene_2d, app->gizmo_2d_y);
-	se_object_2d_set_position(app->gizmo_2d_center, &s_vec2(-3.0f, -3.0f));
-	se_object_2d_set_position(app->gizmo_2d_x, &s_vec2(-3.0f, -3.0f));
-	se_object_2d_set_position(app->gizmo_2d_y, &s_vec2(-3.0f, -3.0f));
-
-	hidden_center = s_mat4_scale(&hidden_center, &s_vec3(EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE, EDITOR_3D_GIZMO_CENTER_SIZE));
-	hidden_x = s_mat4_scale(&hidden_x, &s_vec3(EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS));
-	hidden_y = s_mat4_scale(&hidden_y, &s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH, EDITOR_3D_GIZMO_AXIS_THICKNESS));
-	hidden_z = s_mat4_scale(&hidden_z, &s_vec3(EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_THICKNESS, EDITOR_3D_GIZMO_AXIS_LENGTH));
-	s_mat4_set_translation(&hidden_center, &s_vec3(0.0f, -5000.0f, 0.0f));
-	s_mat4_set_translation(&hidden_x, &s_vec3(0.0f, -5000.0f, 0.0f));
-	s_mat4_set_translation(&hidden_y, &s_vec3(0.0f, -5000.0f, 0.0f));
-	s_mat4_set_translation(&hidden_z, &s_vec3(0.0f, -5000.0f, 0.0f));
-	app->gizmo_3d_center = se_object_3d_create(app->gizmo_model_3d_center, &hidden_center, 0);
-	app->gizmo_3d_x = se_object_3d_create(app->gizmo_model_3d_x, &hidden_x, 0);
-	app->gizmo_3d_y = se_object_3d_create(app->gizmo_model_3d_y, &hidden_y, 0);
-	app->gizmo_3d_z = se_object_3d_create(app->gizmo_model_3d_z, &hidden_z, 0);
-	if (app->gizmo_3d_center == S_HANDLE_NULL || app->gizmo_3d_x == S_HANDLE_NULL || app->gizmo_3d_y == S_HANDLE_NULL || app->gizmo_3d_z == S_HANDLE_NULL) {
-		editor_log_error("create 3d gizmo objects");
-		return false;
-	}
-	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_center);
-	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_x);
-	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_y);
-	se_scene_3d_add_object(app->scene_3d, app->gizmo_3d_z);
-
-	app->selected_2d = editor_spawn_object_2d(app, &s_vec2(-0.60f, -0.30f));
-	(void)editor_spawn_object_2d(app, &s_vec2(-0.10f, -0.05f));
-	(void)editor_spawn_object_2d(app, &s_vec2(0.44f, 0.26f));
-
-	app->selected_3d = editor_spawn_object_3d(app, &s_vec3(-1.1f, 0.35f, -0.7f));
-	(void)editor_spawn_object_3d(app, &s_vec3(0.0f, 0.35f, 0.0f));
-	(void)editor_spawn_object_3d(app, &s_vec3(1.25f, 0.35f, 0.55f));
-	editor_apply_camera_pose_3d(app);
-	editor_apply_camera_pose_sdf(app);
-
 	return true;
 }
 
-static b8 editor_screen_to_horizontal_plane(editor_showcase_app* app, const f32 plane_y, s_vec3* out_world) {
-	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
-	f32 viewport_width = 0.0f;
-	f32 viewport_height = 0.0f;
-	s_vec3 plane_point = s_vec3(0.0f, plane_y, 0.0f);
-	s_vec3 plane_normal = s_vec3(0.0f, 1.0f, 0.0f);
-	if (!app || app->camera_3d == S_HANDLE_NULL || !out_world) {
-		return false;
-	}
-	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
-		return false;
-	}
-	return se_camera_screen_to_plane(
-		app->camera_3d,
-		mouse_framebuffer.x,
-		mouse_framebuffer.y,
-		viewport_width,
-		viewport_height,
-		&plane_point,
-		&plane_normal,
-		out_world);
-}
-
-static void editor_add_object_from_cursor(editor_showcase_app* app) {
-	if (!app) {
+static void editor_showcase_print_counts(editor_showcase_app* app) {
+	se_editor_counts counts = {0};
+	if (!app || !app->editor) {
 		return;
 	}
-	if (app->target == EDITOR_TARGET_SCENE_2D) {
-		s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
-		se_window_get_mouse_normalized(app->window, &mouse_ndc);
-		app->selected_2d = editor_spawn_object_2d(app, &mouse_ndc);
-		return;
-	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		s_vec3 world = s_vec3(0.0f, 0.35f, 0.0f);
-		if (editor_screen_to_horizontal_plane(app, 0.35f, &world)) {
-			world.y = 0.35f;
-		}
-		app->selected_3d = editor_spawn_object_3d(app, &world);
+	if (se_editor_collect_counts(app->editor, &counts)) {
+		printf(
+			"editor_showcase :: counts windows=%u scenes2d=%u scenes3d=%u objects2d=%u objects3d=%u queued=%u\n",
+			counts.windows,
+			counts.scenes_2d,
+			counts.scenes_3d,
+			counts.objects_2d,
+			counts.objects_3d,
+			counts.queued_commands);
 	}
 }
 
-static void editor_remove_selected_object(editor_showcase_app* app) {
-	if (!app) {
+static void editor_showcase_save_active(editor_showcase_app* app) {
+	b8 ok = false;
+	if (!app || !app->editor) {
 		return;
 	}
-	if (app->target == EDITOR_TARGET_SCENE_2D) {
-		editor_delete_object_2d(app, app->selected_2d);
-		return;
+	if (app->target == EDITOR_SHOWCASE_TARGET_SCENE_2D) {
+		ok = se_editor_scene_2d_json_save(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
+	} else {
+		ok = se_editor_scene_3d_json_save(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
 	}
-	if (app->target == EDITOR_TARGET_SCENE_3D) {
-		editor_delete_object_3d(app, app->selected_3d);
-		return;
-	}
-	if (app->target == EDITOR_TARGET_SDF && app->selected_sdf_node != SE_SDF_NODE_NULL) {
-		se_sdf_node_destroy(app->sdf_scene, app->selected_sdf_node);
-		app->selected_sdf_node = SE_SDF_NODE_NULL;
-		app->sdf_prepared_generation = 0u;
-		app->sdf_prepare_attempt_generation = 0u;
-		editor_refresh_selected_sdf_node(app);
-	}
+	printf("editor_showcase :: %s save %s\n", editor_showcase_target_name(app->target), ok ? "ok" : se_result_str(se_get_last_error()));
 }
 
-static b8 editor_is_alt_down(editor_showcase_app* app) {
-	if (!app) {
-		return false;
-	}
-	return se_window_is_key_down(app->window, SE_KEY_LEFT_ALT) || se_window_is_key_down(app->window, SE_KEY_RIGHT_ALT);
-}
-
-static void editor_apply_camera_pose_3d(editor_showcase_app* app) {
-	if (!app || app->camera_3d == S_HANDLE_NULL) {
+static void editor_showcase_load_active(editor_showcase_app* app) {
+	b8 ok = false;
+	if (!app || !app->editor) {
 		return;
 	}
-	const s_vec3 rotation = s_vec3(app->camera_pitch_3d, app->camera_yaw_3d, 0.0f);
-	se_camera_set_rotation(app->camera_3d, &rotation);
-	const s_vec3 forward = se_camera_get_forward_vector(app->camera_3d);
-	const s_vec3 position = s_vec3_sub(&app->camera_target_3d, &s_vec3_muls(&forward, app->camera_distance_3d));
-	se_camera_set_location(app->camera_3d, &position);
-	se_camera_set_target(app->camera_3d, &app->camera_target_3d);
-	se_camera_set_window_aspect(app->camera_3d, app->window);
-}
-
-static void editor_apply_camera_pose_sdf(editor_showcase_app* app) {
-	if (!app || app->sdf_camera == S_HANDLE_NULL) {
-		return;
+	if (app->target == EDITOR_SHOWCASE_TARGET_SCENE_2D) {
+		ok = se_editor_scene_2d_json_load(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
+	} else {
+		ok = se_editor_scene_3d_json_load(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
 	}
-	const s_vec3 rotation = s_vec3(app->camera_pitch_sdf, app->camera_yaw_sdf, 0.0f);
-	se_camera_set_rotation(app->sdf_camera, &rotation);
-	const s_vec3 forward = se_camera_get_forward_vector(app->sdf_camera);
-	const s_vec3 position = s_vec3_sub(&app->camera_target_sdf, &s_vec3_muls(&forward, app->camera_distance_sdf));
-	se_camera_set_location(app->sdf_camera, &position);
-	se_camera_set_target(app->sdf_camera, &app->camera_target_sdf);
-	se_camera_set_window_aspect(app->sdf_camera, app->window);
+	printf("editor_showcase :: %s load %s\n", editor_showcase_target_name(app->target), ok ? "ok" : se_result_str(se_get_last_error()));
 }
 
-static void editor_update_camera_3d(editor_showcase_app* app, const f32 dt) {
+static void editor_showcase_update_camera(editor_showcase_app* app, const f32 dt) {
 	s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
 	s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
-	if (!app || app->target != EDITOR_TARGET_SCENE_3D || app->dragging) {
+	s_vec3 move = s_vec3(0.0f, 0.0f, 0.0f);
+	if (!app || app->target != EDITOR_SHOWCASE_TARGET_SCENE_3D) {
 		return;
 	}
 
-	const b8 alt = editor_is_alt_down(app);
 	se_window_get_mouse_delta(app->window, &mouse_delta);
 	se_window_get_scroll(app->window, &scroll_delta);
 
-	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
-		app->camera_yaw_3d += mouse_delta.x * 0.007f;
-		app->camera_pitch_3d = editor_clampf(app->camera_pitch_3d - mouse_delta.y * 0.007f, -1.45f, 1.45f);
-	}
-	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_MIDDLE)) {
-		const s_vec3 right = se_camera_get_right_vector(app->camera_3d);
-		const s_vec3 up = se_camera_get_up_vector(app->camera_3d);
-		const f32 pan_scale = s_max(0.01f, app->camera_distance_3d * 0.0025f);
-		s_vec3 pan = s_vec3_muls(&right, -mouse_delta.x * pan_scale);
-		pan = s_vec3_add(&pan, &s_vec3_muls(&up, mouse_delta.y * pan_scale));
-		app->camera_target_3d = s_vec3_add(&app->camera_target_3d, &pan);
-	}
-	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT)) {
-		app->camera_distance_3d += mouse_delta.y * 0.028f * s_max(1.0f, app->camera_distance_3d);
+	if (se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
+		app->camera_yaw += mouse_delta.x * 0.008f;
+		app->camera_pitch = s_max(-1.35f, s_min(1.35f, app->camera_pitch - mouse_delta.y * 0.008f));
 	}
 	if (fabsf(scroll_delta.y) > 0.0001f) {
-		app->camera_distance_3d -= scroll_delta.y * 0.9f;
+		app->camera_distance = s_max(2.0f, s_min(32.0f, app->camera_distance - scroll_delta.y * 0.8f));
 	}
 
-	if (se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT) && !alt) {
-		const s_vec3 forward = se_camera_get_forward_vector(app->camera_3d);
-		const s_vec3 right = se_camera_get_right_vector(app->camera_3d);
-		s_vec3 move = s_vec3(0.0f, 0.0f, 0.0f);
-		if (se_window_is_key_down(app->window, SE_KEY_W)) move = s_vec3_add(&move, &forward);
-		if (se_window_is_key_down(app->window, SE_KEY_S)) move = s_vec3_sub(&move, &forward);
-		if (se_window_is_key_down(app->window, SE_KEY_D)) move = s_vec3_add(&move, &right);
-		if (se_window_is_key_down(app->window, SE_KEY_A)) move = s_vec3_sub(&move, &right);
+	{
+		const s_vec3 forward_xz = s_vec3(sinf(app->camera_yaw), 0.0f, -cosf(app->camera_yaw));
+		const s_vec3 right_xz = s_vec3(cosf(app->camera_yaw), 0.0f, sinf(app->camera_yaw));
+		const f32 move_speed = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 8.0f : 4.0f;
+		if (se_window_is_key_down(app->window, SE_KEY_W)) move = s_vec3_add(&move, &forward_xz);
+		if (se_window_is_key_down(app->window, SE_KEY_S)) move = s_vec3_sub(&move, &forward_xz);
+		if (se_window_is_key_down(app->window, SE_KEY_D)) move = s_vec3_add(&move, &right_xz);
+		if (se_window_is_key_down(app->window, SE_KEY_A)) move = s_vec3_sub(&move, &right_xz);
 		if (se_window_is_key_down(app->window, SE_KEY_E)) move.y += 1.0f;
 		if (se_window_is_key_down(app->window, SE_KEY_Q)) move.y -= 1.0f;
-		const f32 move_len = s_vec3_length(&move);
-		if (move_len > 0.0001f) {
-			const f32 speed = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 12.0f : 6.0f;
-			move = s_vec3_muls(&s_vec3_divs(&move, move_len), speed * s_max(dt, 0.0f));
-			app->camera_target_3d = s_vec3_add(&app->camera_target_3d, &move);
+		if (s_vec3_length(&move) > 0.0001f) {
+			const s_vec3 move_dir = s_vec3_normalize(&move);
+			move = s_vec3_muls(&move_dir, move_speed * s_max(dt, 0.0f));
+			app->camera_target = s_vec3_add(&app->camera_target, &move);
 		}
 	}
 
-	app->camera_distance_3d = editor_clampf(app->camera_distance_3d, 1.5f, 120.0f);
-	editor_apply_camera_pose_3d(app);
+	if (se_window_is_key_pressed(app->window, SE_KEY_R)) {
+		app->camera_target = s_vec3(0.0f, 0.3f, 0.0f);
+		app->camera_yaw = 0.54f;
+		app->camera_pitch = 0.30f;
+		app->camera_distance = 8.0f;
+	}
+
+	editor_showcase_apply_camera(app);
 }
 
-static void editor_update_camera_sdf(editor_showcase_app* app, const f32 dt) {
-	s_vec2 mouse_delta = s_vec2(0.0f, 0.0f);
-	s_vec2 scroll_delta = s_vec2(0.0f, 0.0f);
-	if (!app || app->target != EDITOR_TARGET_SDF || app->dragging || app->sdf_camera == S_HANDLE_NULL) {
-		return;
-	}
-	const b8 alt = editor_is_alt_down(app);
-	se_window_get_mouse_delta(app->window, &mouse_delta);
-	se_window_get_scroll(app->window, &scroll_delta);
-
-	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
-		app->camera_yaw_sdf += mouse_delta.x * 0.007f;
-		app->camera_pitch_sdf = editor_clampf(app->camera_pitch_sdf - mouse_delta.y * 0.007f, -1.45f, 1.45f);
-	}
-	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_MIDDLE)) {
-		const s_vec3 right = se_camera_get_right_vector(app->sdf_camera);
-		const s_vec3 up = se_camera_get_up_vector(app->sdf_camera);
-		const f32 pan_scale = s_max(0.01f, app->camera_distance_sdf * 0.0025f);
-		s_vec3 pan = s_vec3_muls(&right, -mouse_delta.x * pan_scale);
-		pan = s_vec3_add(&pan, &s_vec3_muls(&up, mouse_delta.y * pan_scale));
-		app->camera_target_sdf = s_vec3_add(&app->camera_target_sdf, &pan);
-	}
-	if (alt && se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT)) {
-		app->camera_distance_sdf += mouse_delta.y * 0.028f * s_max(1.0f, app->camera_distance_sdf);
-	}
-	if (fabsf(scroll_delta.y) > 0.0001f) {
-		app->camera_distance_sdf -= scroll_delta.y * 0.9f;
-	}
-
-	if (se_window_is_mouse_down(app->window, SE_MOUSE_RIGHT) && !alt) {
-		const s_vec3 forward = se_camera_get_forward_vector(app->sdf_camera);
-		const s_vec3 right = se_camera_get_right_vector(app->sdf_camera);
-		s_vec3 move = s_vec3(0.0f, 0.0f, 0.0f);
-		if (se_window_is_key_down(app->window, SE_KEY_W)) move = s_vec3_add(&move, &forward);
-		if (se_window_is_key_down(app->window, SE_KEY_S)) move = s_vec3_sub(&move, &forward);
-		if (se_window_is_key_down(app->window, SE_KEY_D)) move = s_vec3_add(&move, &right);
-		if (se_window_is_key_down(app->window, SE_KEY_A)) move = s_vec3_sub(&move, &right);
-		if (se_window_is_key_down(app->window, SE_KEY_E)) move.y += 1.0f;
-		if (se_window_is_key_down(app->window, SE_KEY_Q)) move.y -= 1.0f;
-		const f32 move_len = s_vec3_length(&move);
-		if (move_len > 0.0001f) {
-			const f32 speed = se_window_is_key_down(app->window, SE_KEY_LEFT_SHIFT) ? 12.0f : 6.0f;
-			move = s_vec3_muls(&s_vec3_divs(&move, move_len), speed * s_max(dt, 0.0f));
-			app->camera_target_sdf = s_vec3_add(&app->camera_target_sdf, &move);
-		}
-	}
-
-	app->camera_distance_sdf = editor_clampf(app->camera_distance_sdf, 1.5f, 120.0f);
-	editor_apply_camera_pose_sdf(app);
-}
-
-static void editor_update_scene_2d_interaction(editor_showcase_app* app) {
-	s_vec2 mouse_ndc = s_vec2(0.0f, 0.0f);
-	if (!app || app->target != EDITOR_TARGET_SCENE_2D) {
-		return;
-	}
-	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT)) {
-		editor_gizmo_axis axis = EDITOR_GIZMO_AXIS_NONE;
-		se_object_2d_handle picked = S_HANDLE_NULL;
-		se_window_get_mouse_normalized(app->window, &mouse_ndc);
-		axis = editor_pick_2d_gizmo_axis(app, &mouse_ndc);
-		if (axis != EDITOR_GIZMO_AXIS_NONE) {
-			editor_begin_drag_2d(app, axis);
-			return;
-		}
-		picked = editor_pick_scene_object_2d(app);
-		app->selected_2d = picked;
-		if (picked != S_HANDLE_NULL) {
-			editor_begin_drag_2d(app, EDITOR_GIZMO_AXIS_FREE);
-		}
-	}
-	if (app->dragging && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
-		editor_update_drag_2d(app);
-	}
-	if (app->dragging && se_window_is_mouse_released(app->window, SE_MOUSE_LEFT)) {
-		editor_end_drag(app);
-	}
-}
-
-static void editor_update_scene_3d_interaction(editor_showcase_app* app) {
-	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
-	f32 viewport_width = 0.0f;
-	f32 viewport_height = 0.0f;
-	if (!app || app->target != EDITOR_TARGET_SCENE_3D) {
-		return;
-	}
-	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
-		return;
-	}
-
-	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT) && !editor_is_alt_down(app)) {
-		editor_gizmo_axis axis = editor_pick_3d_gizmo_axis(app, &mouse_framebuffer, viewport_width, viewport_height);
-		if (axis != EDITOR_GIZMO_AXIS_NONE) {
-			editor_begin_drag_3d(app, axis, &mouse_framebuffer, viewport_width, viewport_height);
-			return;
-		}
-		app->selected_3d = editor_pick_scene_object_3d(app);
-		if (app->selected_3d != S_HANDLE_NULL) {
-			editor_begin_drag_3d(app, EDITOR_GIZMO_AXIS_FREE, &mouse_framebuffer, viewport_width, viewport_height);
-		}
-	}
-	if (app->dragging && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
-		editor_update_drag_3d(app, &mouse_framebuffer, viewport_width, viewport_height);
-	}
-	if (app->dragging && se_window_is_mouse_released(app->window, SE_MOUSE_LEFT)) {
-		editor_end_drag(app);
-	}
-}
-
-static void editor_update_sdf_interaction(editor_showcase_app* app) {
-	s_vec2 mouse_framebuffer = s_vec2(0.0f, 0.0f);
-	f32 viewport_width = 0.0f;
-	f32 viewport_height = 0.0f;
-	if (!app || app->target != EDITOR_TARGET_SDF) {
-		return;
-	}
-	editor_refresh_selected_sdf_node(app);
-	if (!editor_get_mouse_framebuffer(app, &mouse_framebuffer, &viewport_width, &viewport_height)) {
-		return;
-	}
-	if (se_window_is_mouse_pressed(app->window, SE_MOUSE_LEFT) && !editor_is_alt_down(app)) {
-		editor_gizmo_axis axis = editor_pick_3d_gizmo_axis(app, &mouse_framebuffer, viewport_width, viewport_height);
-		if (axis != EDITOR_GIZMO_AXIS_NONE) {
-			editor_begin_drag_3d(app, axis, &mouse_framebuffer, viewport_width, viewport_height);
-			return;
-		}
-		app->selected_sdf_node = editor_pick_sdf_node(app);
-		if (app->selected_sdf_node != SE_SDF_NODE_NULL) {
-			editor_begin_drag_3d(app, EDITOR_GIZMO_AXIS_FREE, &mouse_framebuffer, viewport_width, viewport_height);
-		}
-	}
-	if (app->dragging && se_window_is_mouse_down(app->window, SE_MOUSE_LEFT)) {
-		editor_update_drag_3d(app, &mouse_framebuffer, viewport_width, viewport_height);
-	}
-	if (app->dragging && se_window_is_mouse_released(app->window, SE_MOUSE_LEFT)) {
-		editor_end_drag(app);
-	}
-}
-
-static void editor_cleanup(editor_showcase_app* app) {
+static void editor_showcase_cleanup(editor_showcase_app* app) {
 	if (!app) {
 		return;
 	}
 	if (app->editor) {
 		se_editor_destroy(app->editor);
 		app->editor = NULL;
-	}
-	if (app->ui != S_HANDLE_NULL) {
-		se_ui_destroy(app->ui);
-		app->ui = S_HANDLE_NULL;
 	}
 	if (app->scene_2d != S_HANDLE_NULL) {
 		se_scene_2d_destroy_full(app->scene_2d, true);
@@ -2415,21 +237,6 @@ static void editor_cleanup(editor_showcase_app* app) {
 		se_scene_3d_destroy_full(app->scene_3d, true, true);
 		app->scene_3d = S_HANDLE_NULL;
 	}
-	if (app->sdf_renderer != SE_SDF_RENDERER_NULL) {
-		se_sdf_renderer_destroy(app->sdf_renderer);
-		app->sdf_renderer = SE_SDF_RENDERER_NULL;
-	}
-	if (app->sdf_scene != SE_SDF_NULL) {
-		se_sdf_destroy(app->sdf_scene);
-		app->sdf_scene = SE_SDF_NULL;
-	}
-	if (app->sdf_camera_scene != S_HANDLE_NULL) {
-		se_scene_3d_destroy(app->sdf_camera_scene);
-		app->sdf_camera_scene = S_HANDLE_NULL;
-	}
-	se_sdf_shutdown();
-	s_array_clear(&app->objects_2d);
-	s_array_clear(&app->objects_3d);
 	if (app->context) {
 		se_context_destroy(app->context);
 		app->context = NULL;
@@ -2438,136 +245,75 @@ static void editor_cleanup(editor_showcase_app* app) {
 
 int main(void) {
 	editor_showcase_app app = {0};
-	printf("advanced/editor_showcase :: Interactive scene editor example\n");
-	se_debug_set_level(SE_DEBUG_LEVEL_WARN);
-
-	s_array_init(&app.objects_2d);
-	s_array_init(&app.objects_3d);
-	app.target = editor_target_from_env();
-	app.active_axis = EDITOR_GIZMO_AXIS_NONE;
-	app.details_scene_scope = false;
-	app.details_item_index = 0u;
-	app.details_property_index = 0u;
-	app.details_component_index = 0u;
+	se_editor_config editor_config = SE_EDITOR_CONFIG_DEFAULTS;
 
 	app.context = se_context_create();
-	if (!app.context) {
-		printf("editor_showcase :: failed to create context\n");
-		return 1;
-	}
-
-	app.window = se_window_create("Syphax - Advanced Editor Showcase", SHOWCASE_WIDTH, SHOWCASE_HEIGHT);
+	app.window = se_window_create("Syphax - Editor Showcase", 1280, 720);
 	if (app.window == S_HANDLE_NULL) {
 		printf("editor_showcase :: window unavailable (%s)\n", se_result_str(se_get_last_error()));
-		editor_cleanup(&app);
-		return 0;
+		editor_showcase_cleanup(&app);
+		return 1;
 	}
+
 	se_window_set_exit_key(app.window, SE_KEY_ESCAPE);
 	se_window_set_target_fps(app.window, 60);
-	se_render_set_background(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
+	se_render_set_background(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
 
-	if (!editor_setup_ui(&app)) {
-		printf("editor_showcase :: ui setup failed (%s)\n", se_result_str(se_get_last_error()));
-		editor_cleanup(&app);
+	if (!editor_showcase_setup_scene_2d(&app) || !editor_showcase_setup_scene_3d(&app)) {
+		printf("editor_showcase :: setup failed (%s)\n", se_result_str(se_get_last_error()));
+		editor_showcase_cleanup(&app);
 		return 1;
 	}
-	if (!editor_setup_scenes(&app)) {
-		printf("editor_showcase :: scene setup failed (%s)\n", se_result_str(se_get_last_error()));
-		editor_cleanup(&app);
+
+	editor_config.context = app.context;
+	editor_config.window = app.window;
+	editor_config.focused_scene_2d = app.scene_2d;
+	editor_config.focused_scene_3d = app.scene_3d;
+	editor_config.scene_2d_json_path = "scene2d_editor_showcase.json";
+	editor_config.scene_3d_json_path = "scene3d_editor_showcase.json";
+	app.editor = se_editor_create(&editor_config);
+	if (!app.editor) {
+		printf("editor_showcase :: editor create failed (%s)\n", se_result_str(se_get_last_error()));
+		editor_showcase_cleanup(&app);
 		return 1;
 	}
-	if (app.target == EDITOR_TARGET_SDF) {
-		const c8* sdf_selftest = getenv("SE_EDITOR_SHOWCASE_SDF_SELFTEST");
-		if (sdf_selftest && sdf_selftest[0] != '\0' && strcmp(sdf_selftest, "0") != 0) {
-			const b8 ok = editor_run_sdf_json_selftest(&app);
-			printf("editor_showcase :: sdf selftest %s\n", ok ? "ok" : "failed");
-			editor_cleanup(&app);
-			return ok ? 0 : 1;
-		}
-	}
 
+	editor_showcase_print_counts(&app);
 	printf("editor_showcase controls:\n");
-	printf("  Tab: cycle active editor target (scene_2d / scene_3d / sdf)\n");
-	printf("  G: toggle details scope (scene/object) for 2D/3D targets\n");
-	printf("  Up/Down: select item | Left/Right: select property | PgUp/PgDn: select component\n");
-	printf("  +/- or Enter: edit selected property (editable fields only)\n");
-	printf("  F5 save json | F9 load json for active target\n");
-	printf("  Left Mouse: select and drag with gizmo handles\n");
-	printf("  N: add object at cursor (2D/3D)\n");
-	printf("  Delete/Backspace: remove selected object\n");
-	printf("  3D/SDF camera: Alt+LMB orbit, Alt+MMB pan, Alt+RMB or wheel zoom, RMB+WASDQE fly\n");
-	printf("  SDF mode: C clears SDF scene\n");
+	printf("  Tab: switch between scene_2d and scene_3d\n");
+	printf("  F5: save active scene json through se_editor\n");
+	printf("  F9: load active scene json through se_editor\n");
+	printf("  3D mode: left mouse orbit, wheel zoom, WASD + QE move, R reset\n");
 	printf("  Esc: quit\n");
 
 	while (!se_window_should_close(app.window)) {
 		const f32 dt = (f32)se_window_get_delta_time(app.window);
 		se_window_begin_frame(app.window);
-		app.frame_index++;
 
 		if (se_window_is_key_pressed(app.window, SE_KEY_TAB)) {
-			if (app.dragging) {
-				editor_end_drag(&app);
-			}
-			app.target = (editor_target)(((u32)app.target + 1u) % 3u);
-			app.details_item_index = 0u;
-			app.details_property_index = 0u;
-			app.details_component_index = 0u;
+			app.target = app.target == EDITOR_SHOWCASE_TARGET_SCENE_2D
+				? EDITOR_SHOWCASE_TARGET_SCENE_3D
+				: EDITOR_SHOWCASE_TARGET_SCENE_2D;
+			printf("editor_showcase :: target = %s\n", editor_showcase_target_name(app.target));
 		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_N)) {
-			editor_add_object_from_cursor(&app);
+		if (se_window_is_key_pressed(app.window, SE_KEY_F5)) {
+			editor_showcase_save_active(&app);
 		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_DELETE) || se_window_is_key_pressed(app.window, SE_KEY_BACKSPACE)) {
-			editor_remove_selected_object(&app);
+		if (se_window_is_key_pressed(app.window, SE_KEY_F9)) {
+			editor_showcase_load_active(&app);
 		}
-		editor_update_details_controls(&app);
 
-		editor_update_camera_3d(&app, dt);
-		editor_update_camera_sdf(&app, dt);
-
-		editor_update_scene_2d_interaction(&app);
-		editor_update_scene_3d_interaction(&app);
-		editor_update_sdf_interaction(&app);
-
-		editor_update_2d_object_colors(&app);
-		editor_update_2d_gizmo_visuals(&app);
-		editor_update_3d_gizmo_visuals(&app);
-		editor_update_ui_status(&app);
-		editor_update_details_panel(&app);
-
-		if (app.ui != S_HANDLE_NULL) {
-			se_ui_tick(app.ui);
-		}
+		editor_showcase_update_camera(&app, dt);
 
 		se_render_clear();
-		if (app.target == EDITOR_TARGET_SCENE_2D) {
+		if (app.target == EDITOR_SHOWCASE_TARGET_SCENE_2D) {
 			se_scene_2d_draw(app.scene_2d, app.window);
-		} else if (app.target == EDITOR_TARGET_SCENE_3D) {
-			se_scene_3d_draw(app.scene_3d, app.window);
 		} else {
-			u32 fb_w = 0;
-			u32 fb_h = 0;
-			se_window_get_framebuffer_size(app.window, &fb_w, &fb_h);
-			if (app.sdf_camera != S_HANDLE_NULL) {
-				se_camera_set_aspect(app.sdf_camera, fb_w > 0u ? (f32)fb_w : 1280.0f, fb_h > 0u ? (f32)fb_h : 720.0f);
-			}
-			se_sdf_frame_desc frame = SE_SDF_FRAME_DESC_DEFAULTS;
-			frame.resolution = s_vec2(fb_w > 0u ? (f32)fb_w : 1280.0f, fb_h > 0u ? (f32)fb_h : 720.0f);
-			frame.time_seconds = (f32)se_window_get_time(app.window);
-			(void)se_sdf_frame_set_camera(&frame, app.sdf_camera);
-			if (app.sdf_renderer != SE_SDF_RENDERER_NULL &&
-				editor_prepare_sdf_if_needed(&app, false) &&
-				app.sdf_prepared_generation == se_sdf_get_generation(app.sdf_scene)) {
-				(void)se_sdf_renderer_render(app.sdf_renderer, &frame);
-			}
-		}
-		if (app.ui != S_HANDLE_NULL) {
-			se_render_set_background(s_vec4(0.0f, 0.0f, 0.0f, 0.0f));
-			se_ui_draw(app.ui);
-			se_render_set_background(s_vec4(0.02f, 0.03f, 0.05f, 1.0f));
+			se_scene_3d_draw(app.scene_3d, app.window);
 		}
 		se_window_end_frame(app.window);
 	}
 
-	editor_cleanup(&app);
+	editor_showcase_cleanup(&app);
 	return 0;
 }

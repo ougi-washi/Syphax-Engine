@@ -55,7 +55,9 @@ typedef struct se_sdf {
 } se_sdf;
 
 #define se_sdf_create(...) se_sdf_create_internal(&(se_sdf){__VA_ARGS__})
+#define SE_SDF_NULL S_HANDLE_NULL
 extern se_sdf_handle se_sdf_create_internal(const se_sdf* sdf);
+extern void se_sdf_shutdown(void);
 extern void se_sdf_add_child(se_sdf_handle parent, se_sdf_handle child);
 extern void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera); 
 extern void se_sdf_bake(se_sdf_handle sdf);

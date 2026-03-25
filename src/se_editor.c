@@ -4,7 +4,6 @@
 
 #include "se_graphics.h"
 #include "se_ext.h"
-#include "se_sdf.h"
 #include "se_texture.h"
 
 #include "syphax/s_array.h"
@@ -60,11 +59,8 @@ struct se_editor {
 	se_vfx_3d_handle focused_vfx_3d;
 	se_scene_2d_handle focused_scene_2d;
 	se_scene_3d_handle focused_scene_3d;
-	se_sdf_handle focused_sdf;
-	se_camera_handle focused_sdf_camera;
 	c8 scene_2d_json_path[SE_MAX_PATH_LENGTH];
 	c8 scene_3d_json_path[SE_MAX_PATH_LENGTH];
-	c8 sdf_json_path[SE_MAX_PATH_LENGTH];
 
 	se_editor_audio_clip_refs clips;
 	se_editor_audio_stream_refs streams;
@@ -401,9 +397,6 @@ struct se_editor {
 #define SE_EDITOR_NAME_SCENE3D "scene3d"
 #define SE_EDITOR_NAME_SCENE3D_MS "scene3d_ms"
 #define SE_EDITOR_NAME_SCENE3D_U "scene3d[%u]"
-#define SE_EDITOR_NAME_SDF "sdf"
-#define SE_EDITOR_NAME_SDF_U "sdf[%u]"
-#define SE_EDITOR_NAME_SDF_NODE_U "sdf_node[%u]"
 #define SE_EDITOR_NAME_SCROLLBOX_SELECTED "scrollbox_selected"
 #define SE_EDITOR_NAME_SCROLLBOX_SET_SELECTED "scrollbox_set_selected"
 #define SE_EDITOR_NAME_SCROLLBOX_SINGLE_SELECT "scrollbox_single_select"
@@ -565,8 +558,6 @@ struct se_editor {
 
 #define SE_EDITOR_DEFAULT_SCENE_2D_JSON_PATH "scene2d_snapshot.json"
 #define SE_EDITOR_DEFAULT_SCENE_3D_JSON_PATH "scene3d_snapshot.json"
-#define SE_EDITOR_DEFAULT_SDF_JSON_PATH "sdf_snapshot.json"
-
 static void se_editor_copy_text(c8* dst, sz dst_size, const c8* src) {
 	if (!dst || dst_size == 0u) {
 		return;
@@ -726,9 +717,6 @@ static void se_editor_set_default_json_paths(se_editor* editor) {
 	if (editor->scene_3d_json_path[0] == '\0') {
 		se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), SE_EDITOR_DEFAULT_SCENE_3D_JSON_PATH);
 	}
-	if (editor->sdf_json_path[0] == '\0') {
-		se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), SE_EDITOR_DEFAULT_SDF_JSON_PATH);
-	}
 }
 
 static void se_editor_refresh_defaults_internal(se_editor* editor) {
@@ -776,9 +764,6 @@ static void se_editor_refresh_defaults_internal(se_editor* editor) {
 	}
 	if (editor->focused_scene_3d == S_HANDLE_NULL && s_array_get_size(&context->scenes_3d) > 0) {
 		editor->focused_scene_3d = s_array_handle(&context->scenes_3d, 0u);
-	}
-	if (editor->focused_sdf_camera != S_HANDLE_NULL && !se_camera_get(editor->focused_sdf_camera)) {
-		editor->focused_sdf_camera = S_HANDLE_NULL;
 	}
 	se_editor_set_default_json_paths(editor);
 }
@@ -1704,534 +1689,6 @@ static b8 se_editor_collect_scene_3d_properties(se_editor* editor, const se_edit
 		}
 	}
 	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->scene_3d_json_path, true);
-	return true;
-}
-
-static b8 se_editor_item_is_sdf_node(const se_editor_item* item) {
-	return item &&
-		item->category == SE_EDITOR_CATEGORY_SDF &&
-		item->handle != S_HANDLE_NULL &&
-		item->owner_handle != S_HANDLE_NULL;
-}
-
-static const c8* se_editor_sdf_node_type_name(const se_sdf_node_type type) {
-	switch (type) {
-		case SE_SDF_NODE_GROUP: return "group";
-		case SE_SDF_NODE_PRIMITIVE: return "primitive";
-		case SE_SDF_NODE_REF: return "ref";
-		default: return "unknown";
-	}
-}
-
-static b8 se_editor_collect_sdf_primitive_properties(se_editor* editor, const se_sdf_primitive_desc* primitive) {
-	if (!editor || !primitive) {
-		return false;
-	}
-	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_TYPE, (i32)primitive->type, false);
-	switch (primitive->type) {
-		case SE_SDF_PRIMITIVE_SPHERE:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->sphere.radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_BOX:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_SIZE, primitive->box.size, true);
-			return true;
-		case SE_SDF_PRIMITIVE_ROUND_BOX:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_SIZE, primitive->round_box.size, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_ROUNDNESS, primitive->round_box.roundness, true);
-			return true;
-		case SE_SDF_PRIMITIVE_BOX_FRAME:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_SIZE, primitive->box_frame.size, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_THICKNESS, primitive->box_frame.thickness, true);
-			return true;
-		case SE_SDF_PRIMITIVE_TORUS:
-			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->torus.radii, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CAPPED_TORUS:
-			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_AXIS_SIN_COS, primitive->capped_torus.axis_sin_cos, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_MAJOR_RADIUS, primitive->capped_torus.major_radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_MINOR_RADIUS, primitive->capped_torus.minor_radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_LINK:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HALF_LENGTH, primitive->link.half_length, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_OUTER_RADIUS, primitive->link.outer_radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_INNER_RADIUS, primitive->link.inner_radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CYLINDER:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_AXIS_AND_RADIUS, primitive->cylinder.axis_and_radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CONE:
-			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_AXIS_SIN_COS, primitive->cone.angle_sin_cos, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HEIGHT, primitive->cone.height, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CONE_INFINITE:
-			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_AXIS_SIN_COS, primitive->cone_infinite.angle_sin_cos, true);
-			return true;
-		case SE_SDF_PRIMITIVE_PLANE:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_NORMAL, primitive->plane.normal, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_OFFSET, primitive->plane.offset, true);
-			return true;
-		case SE_SDF_PRIMITIVE_HEX_PRISM:
-			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_HALF_SIZE, primitive->hex_prism.half_size, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CAPSULE:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->capsule.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->capsule.b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->capsule.radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HEIGHT, primitive->vertical_capsule.height, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->vertical_capsule.radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->capped_cylinder.radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HALF_HEIGHT, primitive->capped_cylinder.half_height, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->capped_cylinder_arbitrary.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->capped_cylinder_arbitrary.b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->capped_cylinder_arbitrary.radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_ROUNDED_CYLINDER:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_OUTER_RADIUS, primitive->rounded_cylinder.outer_radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_CORNER_RADIUS, primitive->rounded_cylinder.corner_radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HALF_HEIGHT, primitive->rounded_cylinder.half_height, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CAPPED_CONE:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HEIGHT, primitive->capped_cone.height, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_BASE, primitive->capped_cone.radius_base, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_TOP, primitive->capped_cone.radius_top, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->capped_cone_arbitrary.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->capped_cone_arbitrary.b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_A, primitive->capped_cone_arbitrary.radius_a, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_B, primitive->capped_cone_arbitrary.radius_b, true);
-			return true;
-		case SE_SDF_PRIMITIVE_SOLID_ANGLE:
-			se_editor_add_property_vec2(&editor->properties, SE_EDITOR_NAME_AXIS_SIN_COS, primitive->solid_angle.angle_sin_cos, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->solid_angle.radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CUT_SPHERE:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->cut_sphere.radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_CUT_HEIGHT, primitive->cut_sphere.cut_height, true);
-			return true;
-		case SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, primitive->cut_hollow_sphere.radius, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_CUT_HEIGHT, primitive->cut_hollow_sphere.cut_height, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_THICKNESS, primitive->cut_hollow_sphere.thickness, true);
-			return true;
-		case SE_SDF_PRIMITIVE_DEATH_STAR:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_A, primitive->death_star.radius_a, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_B, primitive->death_star.radius_b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_SEPARATION, primitive->death_star.separation, true);
-			return true;
-		case SE_SDF_PRIMITIVE_ROUND_CONE:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_BASE, primitive->round_cone.radius_base, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_TOP, primitive->round_cone.radius_top, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HEIGHT, primitive->round_cone.height, true);
-			return true;
-		case SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->round_cone_arbitrary.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->round_cone_arbitrary.b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_A, primitive->round_cone_arbitrary.radius_a, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS_B, primitive->round_cone_arbitrary.radius_b, true);
-			return true;
-		case SE_SDF_PRIMITIVE_VESICA_SEGMENT:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->vesica_segment.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->vesica_segment.b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_WIDTH, primitive->vesica_segment.width, true);
-			return true;
-		case SE_SDF_PRIMITIVE_RHOMBUS:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_LENGTH_A, primitive->rhombus.length_a, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_LENGTH_B, primitive->rhombus.length_b, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HEIGHT, primitive->rhombus.height, true);
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_CORNER_RADIUS, primitive->rhombus.corner_radius, true);
-			return true;
-		case SE_SDF_PRIMITIVE_OCTAHEDRON:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_SIZE, primitive->octahedron.size, true);
-			return true;
-		case SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_SIZE, primitive->octahedron_bound.size, true);
-			return true;
-		case SE_SDF_PRIMITIVE_PYRAMID:
-			se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_HEIGHT, primitive->pyramid.height, true);
-			return true;
-		case SE_SDF_PRIMITIVE_TRIANGLE:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->triangle.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->triangle.b, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_C, primitive->triangle.c, true);
-			return true;
-		case SE_SDF_PRIMITIVE_QUAD:
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_A, primitive->quad.a, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_B, primitive->quad.b, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_C, primitive->quad.c, true);
-			se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_D, primitive->quad.d, true);
-			return true;
-		default:
-			return false;
-	}
-}
-
-static b8 se_editor_apply_sdf_primitive_property(
-	const se_sdf_handle sdf,
-	const se_sdf_node_handle node,
-	const se_editor_command* command
-) {
-	se_sdf_primitive_desc primitive = {0};
-	f32 f32_value = 0.0f;
-	s_vec2 vec2_value = s_vec2(0.0f, 0.0f);
-	s_vec3 vec3_value = s_vec3(0.0f, 0.0f, 0.0f);
-	if (!command || !se_sdf_node_get_primitive(sdf, node, &primitive)) {
-		return false;
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_RADIUS) == 0) {
-		if (primitive.type == SE_SDF_PRIMITIVE_TORUS) {
-			return se_editor_value_as_vec2(&command->value, &primitive.torus.radii) &&
-				se_sdf_node_set_primitive(sdf, node, &primitive);
-		}
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		switch (primitive.type) {
-			case SE_SDF_PRIMITIVE_SPHERE: primitive.sphere.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_CAPSULE: primitive.capsule.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE: primitive.vertical_capsule.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_CAPPED_CYLINDER: primitive.capped_cylinder.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY: primitive.capped_cylinder_arbitrary.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_SOLID_ANGLE: primitive.solid_angle.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_CUT_SPHERE: primitive.cut_sphere.radius = f32_value; break;
-			case SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE: primitive.cut_hollow_sphere.radius = f32_value; break;
-			default: return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_SIZE) == 0) {
-		if (primitive.type == SE_SDF_PRIMITIVE_OCTAHEDRON || primitive.type == SE_SDF_PRIMITIVE_OCTAHEDRON_BOUND) {
-			if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-				return false;
-			}
-			if (primitive.type == SE_SDF_PRIMITIVE_OCTAHEDRON) {
-				primitive.octahedron.size = f32_value;
-			} else {
-				primitive.octahedron_bound.size = f32_value;
-			}
-			return se_sdf_node_set_primitive(sdf, node, &primitive);
-		}
-		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
-			return false;
-		}
-		switch (primitive.type) {
-			case SE_SDF_PRIMITIVE_BOX: primitive.box.size = vec3_value; break;
-			case SE_SDF_PRIMITIVE_ROUND_BOX: primitive.round_box.size = vec3_value; break;
-			case SE_SDF_PRIMITIVE_BOX_FRAME: primitive.box_frame.size = vec3_value; break;
-			default: return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_ROUNDNESS) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.round_box.roundness) &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_THICKNESS) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_BOX_FRAME) {
-			primitive.box_frame.thickness = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE) {
-			primitive.cut_hollow_sphere.thickness = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_AXIS_SIN_COS) == 0) {
-		if (!se_editor_value_as_vec2(&command->value, &vec2_value)) {
-			return false;
-		}
-		switch (primitive.type) {
-			case SE_SDF_PRIMITIVE_CAPPED_TORUS: primitive.capped_torus.axis_sin_cos = vec2_value; break;
-			case SE_SDF_PRIMITIVE_CONE: primitive.cone.angle_sin_cos = vec2_value; break;
-			case SE_SDF_PRIMITIVE_CONE_INFINITE: primitive.cone_infinite.angle_sin_cos = vec2_value; break;
-			case SE_SDF_PRIMITIVE_SOLID_ANGLE: primitive.solid_angle.angle_sin_cos = vec2_value; break;
-			default: return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_MAJOR_RADIUS) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.capped_torus.major_radius) &&
-			primitive.type == SE_SDF_PRIMITIVE_CAPPED_TORUS &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_MINOR_RADIUS) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.capped_torus.minor_radius) &&
-			primitive.type == SE_SDF_PRIMITIVE_CAPPED_TORUS &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_HALF_LENGTH) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.link.half_length) &&
-			primitive.type == SE_SDF_PRIMITIVE_LINK &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_OUTER_RADIUS) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_LINK) {
-			primitive.link.outer_radius = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_ROUNDED_CYLINDER) {
-			primitive.rounded_cylinder.outer_radius = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_INNER_RADIUS) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.link.inner_radius) &&
-			primitive.type == SE_SDF_PRIMITIVE_LINK &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_AXIS_AND_RADIUS) == 0) {
-		return se_editor_value_as_vec3(&command->value, &primitive.cylinder.axis_and_radius) &&
-			primitive.type == SE_SDF_PRIMITIVE_CYLINDER &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_HEIGHT) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		switch (primitive.type) {
-			case SE_SDF_PRIMITIVE_CONE: primitive.cone.height = f32_value; break;
-			case SE_SDF_PRIMITIVE_VERTICAL_CAPSULE: primitive.vertical_capsule.height = f32_value; break;
-			case SE_SDF_PRIMITIVE_CAPPED_CONE: primitive.capped_cone.height = f32_value; break;
-			case SE_SDF_PRIMITIVE_ROUND_CONE: primitive.round_cone.height = f32_value; break;
-			case SE_SDF_PRIMITIVE_RHOMBUS: primitive.rhombus.height = f32_value; break;
-			case SE_SDF_PRIMITIVE_PYRAMID: primitive.pyramid.height = f32_value; break;
-			default: return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_OFFSET) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.plane.offset) &&
-			primitive.type == SE_SDF_PRIMITIVE_PLANE &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_NORMAL) == 0) {
-		return se_editor_value_as_vec3(&command->value, &primitive.plane.normal) &&
-			primitive.type == SE_SDF_PRIMITIVE_PLANE &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_HALF_SIZE) == 0) {
-		return se_editor_value_as_vec2(&command->value, &primitive.hex_prism.half_size) &&
-			primitive.type == SE_SDF_PRIMITIVE_HEX_PRISM &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_HALF_HEIGHT) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_CAPPED_CYLINDER) {
-			primitive.capped_cylinder.half_height = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_ROUNDED_CYLINDER) {
-			primitive.rounded_cylinder.half_height = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_A) == 0 || strcmp(command->name, SE_EDITOR_NAME_B) == 0 ||
-		strcmp(command->name, SE_EDITOR_NAME_C) == 0 || strcmp(command->name, SE_EDITOR_NAME_D) == 0) {
-		if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
-			return false;
-		}
-		switch (primitive.type) {
-			case SE_SDF_PRIMITIVE_CAPSULE:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.capsule.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.capsule.b = vec3_value;
-				else return false;
-				break;
-			case SE_SDF_PRIMITIVE_CAPPED_CYLINDER_ARBITRARY:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.capped_cylinder_arbitrary.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.capped_cylinder_arbitrary.b = vec3_value;
-				else return false;
-				break;
-			case SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.capped_cone_arbitrary.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.capped_cone_arbitrary.b = vec3_value;
-				else return false;
-				break;
-			case SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.round_cone_arbitrary.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.round_cone_arbitrary.b = vec3_value;
-				else return false;
-				break;
-			case SE_SDF_PRIMITIVE_VESICA_SEGMENT:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.vesica_segment.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.vesica_segment.b = vec3_value;
-				else return false;
-				break;
-			case SE_SDF_PRIMITIVE_TRIANGLE:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.triangle.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.triangle.b = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_C) == 0) primitive.triangle.c = vec3_value;
-				else return false;
-				break;
-			case SE_SDF_PRIMITIVE_QUAD:
-				if (strcmp(command->name, SE_EDITOR_NAME_A) == 0) primitive.quad.a = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_B) == 0) primitive.quad.b = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_C) == 0) primitive.quad.c = vec3_value;
-				else if (strcmp(command->name, SE_EDITOR_NAME_D) == 0) primitive.quad.d = vec3_value;
-				else return false;
-				break;
-			default:
-				return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_A) == 0 || strcmp(command->name, SE_EDITOR_NAME_RADIUS_B) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_CAPPED_CONE_ARBITRARY) {
-			if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_A) == 0) primitive.capped_cone_arbitrary.radius_a = f32_value;
-			else primitive.capped_cone_arbitrary.radius_b = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_ROUND_CONE_ARBITRARY) {
-			if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_A) == 0) primitive.round_cone_arbitrary.radius_a = f32_value;
-			else primitive.round_cone_arbitrary.radius_b = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_DEATH_STAR) {
-			if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_A) == 0) primitive.death_star.radius_a = f32_value;
-			else primitive.death_star.radius_b = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_BASE) == 0 || strcmp(command->name, SE_EDITOR_NAME_RADIUS_TOP) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_CAPPED_CONE) {
-			if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_BASE) == 0) primitive.capped_cone.radius_base = f32_value;
-			else primitive.capped_cone.radius_top = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_ROUND_CONE) {
-			if (strcmp(command->name, SE_EDITOR_NAME_RADIUS_BASE) == 0) primitive.round_cone.radius_base = f32_value;
-			else primitive.round_cone.radius_top = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_WIDTH) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.vesica_segment.width) &&
-			primitive.type == SE_SDF_PRIMITIVE_VESICA_SEGMENT &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_LENGTH_A) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.rhombus.length_a) &&
-			primitive.type == SE_SDF_PRIMITIVE_RHOMBUS &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_LENGTH_B) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.rhombus.length_b) &&
-			primitive.type == SE_SDF_PRIMITIVE_RHOMBUS &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_CORNER_RADIUS) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_RHOMBUS) {
-			primitive.rhombus.corner_radius = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_ROUNDED_CYLINDER) {
-			primitive.rounded_cylinder.corner_radius = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_CUT_HEIGHT) == 0) {
-		if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-			return false;
-		}
-		if (primitive.type == SE_SDF_PRIMITIVE_CUT_SPHERE) {
-			primitive.cut_sphere.cut_height = f32_value;
-		} else if (primitive.type == SE_SDF_PRIMITIVE_CUT_HOLLOW_SPHERE) {
-			primitive.cut_hollow_sphere.cut_height = f32_value;
-		} else {
-			return false;
-		}
-		return se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_SEPARATION) == 0) {
-		return se_editor_value_as_f32(&command->value, &primitive.death_star.separation) &&
-			primitive.type == SE_SDF_PRIMITIVE_DEATH_STAR &&
-			se_sdf_node_set_primitive(sdf, node, &primitive);
-	}
-	return false;
-}
-
-static b8 se_editor_collect_sdf_node_properties(se_editor* editor, const se_editor_item* item) {
-	const se_sdf_handle sdf = (se_sdf_handle)item->owner_handle;
-	const se_sdf_node_handle node = (se_sdf_node_handle)item->handle;
-	const se_sdf_node_type type = se_sdf_node_get_type(sdf, node);
-	const se_sdf_noise noise = se_sdf_node_get_noise(sdf, node);
-	const se_sdf_node_handle parent = se_sdf_node_get_parent(sdf, node);
-	s_vec3 color = s_vec3(0.0f, 0.0f, 0.0f);
-	se_sdf_primitive_desc primitive = {0};
-	if (!se_editor_item_is_sdf_node(item)) {
-		return false;
-	}
-	(void)se_sdf_node_get_color(sdf, node, &color);
-	se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_SCENE, sdf, false);
-	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_TYPE, (i32)type, false);
-	se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_PARENT, parent, false);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_CHILD_COUNT, se_sdf_node_get_child_count(sdf, node), false);
-	se_editor_add_property_mat4(&editor->properties, SE_EDITOR_NAME_TRANSFORM, se_sdf_node_get_transform(sdf, node), true);
-	se_editor_add_property_int(&editor->properties, SE_EDITOR_NAME_OPERATION, (i32)se_sdf_node_get_operation(sdf, node), true);
-	se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_OPERATION_AMOUNT, se_sdf_node_get_operation_amount(sdf, node), true);
-	if (type == SE_SDF_NODE_REF) {
-		se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_SOURCE, se_sdf_node_get_ref_source(sdf, node), false);
-		return true;
-	}
-	if (type == SE_SDF_NODE_PRIMITIVE) {
-		se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_HAS_COLOR, se_sdf_node_has_color(sdf, node), true);
-		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_COLOR, color, true);
-		se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_NOISE_ACTIVE, noise.active, true);
-		se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_NOISE_SCALE, noise.scale, true);
-		se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_NOISE_OFFSET, noise.offset, true);
-		se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_NOISE_FREQUENCY, noise.frequency, true);
-		if (se_sdf_node_get_primitive(sdf, node, &primitive)) {
-			return se_editor_collect_sdf_primitive_properties(editor, &primitive);
-		}
-	}
-	return true;
-}
-
-static b8 se_editor_collect_sdf_properties(se_editor* editor, const se_editor_item* item) {
-	const se_sdf_handle sdf = (se_sdf_handle)item->handle;
-	se_sdf_bounds bounds = SE_SDF_BOUNDS_DEFAULTS;
-	c8 validation_message[SE_MAX_PATH_LENGTH] = {0};
-	const b8 valid = se_sdf_validate(sdf, validation_message, sizeof(validation_message));
-	if (se_editor_item_is_sdf_node(item)) {
-		return se_editor_collect_sdf_node_properties(editor, item);
-	}
-	if (sdf == SE_SDF_NULL) {
-		return false;
-	}
-	se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_ROOT, se_sdf_get_root(sdf), true);
-	se_editor_add_property_uint(&editor->properties, SE_EDITOR_NAME_NODE_COUNT, se_sdf_get_node_count(sdf), false);
-	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_VALID, valid, false);
-	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_MESSAGE, validation_message, false);
-	se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_BOUNDS_VALID, se_sdf_calculate_bounds(sdf, &bounds), false);
-	if (bounds.valid) {
-		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_BOUNDS_MIN, bounds.min, false);
-		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_BOUNDS_MAX, bounds.max, false);
-		se_editor_add_property_vec3(&editor->properties, SE_EDITOR_NAME_CENTER, bounds.center, false);
-		se_editor_add_property_float(&editor->properties, SE_EDITOR_NAME_RADIUS, bounds.radius, false);
-		se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_HAS_UNBOUNDED_PRIMITIVES, bounds.has_unbounded_primitives, false);
-	}
-	se_editor_add_property_handle(&editor->properties, SE_EDITOR_NAME_CAMERA, editor->focused_sdf_camera, true);
-	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->sdf_json_path, true);
 	return true;
 }
 
@@ -3529,144 +2986,6 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 			path = editor->scene_3d_json_path;
 		}
 		return se_editor_scene_3d_json_load(editor, scene_handle, path);
-	}
-	return false;
-}
-
-static b8 se_editor_apply_sdf_command(se_editor* editor, const se_editor_command* command) {
-	const b8 is_node = se_editor_item_is_sdf_node(&command->item);
-	const se_sdf_handle sdf = is_node ? (se_sdf_handle)command->item.owner_handle : (se_sdf_handle)command->item.handle;
-	const se_sdf_node_handle node = is_node ? (se_sdf_node_handle)command->item.handle : SE_SDF_NODE_NULL;
-	s_handle handle_value = S_HANDLE_NULL;
-	s_mat4 mat4_value = s_mat4_identity;
-	s_vec3 vec3_value = s_vec3(0.0f, 0.0f, 0.0f);
-	se_sdf_noise noise = SE_SDF_NOISE_DEFAULTS;
-	se_sdf_operation operation = SE_SDF_OP_NONE;
-	f32 f32_value = 0.0f;
-	i32 i32_value = 0;
-	const c8* path = NULL;
-	b8 bool_value = false;
-	b8 align_camera = true;
-	if (!editor || sdf == SE_SDF_NULL) {
-		return false;
-	}
-	if (is_node) {
-		if (strcmp(command->name, SE_EDITOR_NAME_TRANSFORM) == 0) {
-			if (!se_editor_value_as_mat4(&command->value, &mat4_value)) {
-				return false;
-			}
-			return se_sdf_node_set_transform(sdf, node, &mat4_value);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_OPERATION) == 0) {
-			if (!se_editor_value_as_i32(&command->value, &i32_value)) {
-				return false;
-			}
-			operation = (se_sdf_operation)i32_value;
-			return se_sdf_node_set_operation(sdf, node, operation);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_OPERATION_AMOUNT) == 0) {
-			if (!se_editor_value_as_f32(&command->value, &f32_value)) {
-				return false;
-			}
-			return se_sdf_node_set_operation_amount(sdf, node, f32_value);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_HAS_COLOR) == 0) {
-			s_vec3 color = s_vec3(1.0f, 1.0f, 1.0f);
-			if (!se_editor_command_read_bool(command, se_sdf_node_has_color(sdf, node), &bool_value)) {
-				return false;
-			}
-			if (!bool_value) {
-				return se_sdf_node_set_color(sdf, node, NULL);
-			}
-			if (!se_sdf_node_get_color(sdf, node, &color)) {
-				color = s_vec3(1.0f, 1.0f, 1.0f);
-			}
-			return se_sdf_node_set_color(sdf, node, &color);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_COLOR) == 0) {
-			if (!se_editor_value_as_vec3(&command->value, &vec3_value)) {
-				return false;
-			}
-			return se_sdf_node_set_color(sdf, node, &vec3_value);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_NOISE_ACTIVE) == 0) {
-			noise = se_sdf_node_get_noise(sdf, node);
-			if (!se_editor_command_read_bool(command, noise.active, &bool_value)) {
-				return false;
-			}
-			noise.active = bool_value;
-			return se_sdf_node_set_noise(sdf, node, &noise);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_NOISE_SCALE) == 0) {
-			noise = se_sdf_node_get_noise(sdf, node);
-			if (!se_editor_value_as_f32(&command->value, &noise.scale)) {
-				return false;
-			}
-			return se_sdf_node_set_noise(sdf, node, &noise);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_NOISE_OFFSET) == 0) {
-			noise = se_sdf_node_get_noise(sdf, node);
-			if (!se_editor_value_as_f32(&command->value, &noise.offset)) {
-				return false;
-			}
-			return se_sdf_node_set_noise(sdf, node, &noise);
-		}
-		if (strcmp(command->name, SE_EDITOR_NAME_NOISE_FREQUENCY) == 0) {
-			noise = se_sdf_node_get_noise(sdf, node);
-			if (!se_editor_value_as_f32(&command->value, &noise.frequency)) {
-				return false;
-			}
-			return se_sdf_node_set_noise(sdf, node, &noise);
-		}
-		return se_editor_apply_sdf_primitive_property(sdf, node, command);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_ROOT) == 0) {
-		if (!se_editor_value_as_handle(&command->value, &handle_value)) {
-			return false;
-		}
-		return se_sdf_set_root(sdf, (se_sdf_node_handle)handle_value);
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_CAMERA) == 0) {
-		if (!se_editor_value_as_handle(&command->value, &handle_value)) {
-			return false;
-		}
-		editor->focused_sdf_camera = (se_camera_handle)handle_value;
-		return true;
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_JSON_PATH) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			return false;
-		}
-		se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), path);
-		return true;
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_CLEAR) == 0) {
-		se_sdf_clear(sdf);
-		return true;
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_SAVE_FILE) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			path = editor->sdf_json_path;
-		}
-		return se_editor_sdf_json_save(editor, sdf, path);
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_LOAD_FILE) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			path = editor->sdf_json_path;
-		}
-		if (!se_editor_sdf_json_load(editor, sdf, path)) {
-			return false;
-		}
-		if (se_editor_value_as_bool(&command->aux_value, &align_camera) && !align_camera) {
-			return true;
-		}
-		if (editor->focused_sdf_camera != S_HANDLE_NULL) {
-			(void)se_sdf_align_camera(sdf, editor->focused_sdf_camera, NULL, NULL);
-		}
-		return true;
 	}
 	return false;
 }
@@ -5369,7 +4688,6 @@ const c8* se_editor_category_name(se_editor_category category) {
 		case SE_EDITOR_CATEGORY_OBJECT_2D: return SE_EDITOR_NAME_OBJECT2D;
 		case SE_EDITOR_CATEGORY_SCENE_3D: return SE_EDITOR_NAME_SCENE3D;
 		case SE_EDITOR_CATEGORY_OBJECT_3D: return SE_EDITOR_NAME_OBJECT3D;
-		case SE_EDITOR_CATEGORY_SDF: return SE_EDITOR_NAME_SDF;
 		case SE_EDITOR_CATEGORY_UI: return SE_EDITOR_NAME_UI;
 		case SE_EDITOR_CATEGORY_UI_WIDGET: return SE_EDITOR_NAME_UI_WIDGET;
 		case SE_EDITOR_CATEGORY_VFX_2D: return SE_EDITOR_NAME_VFX2D;
@@ -5411,7 +4729,6 @@ se_editor_category se_editor_category_from_name(const c8* name) {
 		{ SE_EDITOR_NAME_SCENE, SE_EDITOR_CATEGORY_SCENE_2D },
 		{ SE_EDITOR_NAME_SCENE2, SE_EDITOR_CATEGORY_SCENE_2D },
 		{ SE_EDITOR_NAME_SCENE3, SE_EDITOR_CATEGORY_SCENE_3D },
-		{ SE_EDITOR_NAME_SDF, SE_EDITOR_CATEGORY_SDF },
 		{ SE_EDITOR_NAME_OBJECT2, SE_EDITOR_CATEGORY_OBJECT_2D },
 		{ SE_EDITOR_NAME_OBJECT3, SE_EDITOR_CATEGORY_OBJECT_3D }
 	};
@@ -5492,11 +4809,8 @@ se_editor* se_editor_create(const se_editor_config* config) {
 	editor->focused_vfx_3d = cfg.focused_vfx_3d;
 	editor->focused_scene_2d = cfg.focused_scene_2d;
 	editor->focused_scene_3d = cfg.focused_scene_3d;
-	editor->focused_sdf = cfg.focused_sdf;
-	editor->focused_sdf_camera = cfg.focused_sdf_camera;
 	se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), cfg.scene_2d_json_path);
 	se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), cfg.scene_3d_json_path);
-	se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), cfg.sdf_json_path);
 	se_editor_refresh_defaults_internal(editor);
 
 	se_set_last_error(SE_RESULT_OK);
@@ -5530,8 +4844,6 @@ void se_editor_reset(se_editor* editor) {
 	editor->focused_vfx_3d = S_HANDLE_NULL;
 	editor->focused_scene_2d = S_HANDLE_NULL;
 	editor->focused_scene_3d = S_HANDLE_NULL;
-	editor->focused_sdf = SE_SDF_NULL;
-	editor->focused_sdf_camera = S_HANDLE_NULL;
 	se_editor_refresh_defaults_internal(editor);
 }
 
@@ -5714,35 +5026,6 @@ se_scene_3d_handle se_editor_get_focused_scene_3d(const se_editor* editor) {
 	return editor->focused_scene_3d;
 }
 
-void se_editor_set_focused_sdf(se_editor* editor, se_sdf_handle sdf) {
-	if (!editor) {
-		return;
-	}
-	editor->focused_sdf = sdf;
-}
-
-se_sdf_handle se_editor_get_focused_sdf(const se_editor* editor) {
-	if (!editor) {
-		return SE_SDF_NULL;
-	}
-	return editor->focused_sdf;
-}
-
-void se_editor_set_focused_sdf_camera(se_editor* editor, se_camera_handle camera) {
-	if (!editor) {
-		return;
-	}
-	editor->focused_sdf_camera = camera;
-	se_editor_refresh_defaults_internal(editor);
-}
-
-se_camera_handle se_editor_get_focused_sdf_camera(const se_editor* editor) {
-	if (!editor) {
-		return S_HANDLE_NULL;
-	}
-	return editor->focused_sdf_camera;
-}
-
 void se_editor_set_scene_2d_json_path(se_editor* editor, const c8* path) {
 	if (!editor) {
 		return;
@@ -5771,21 +5054,6 @@ const c8* se_editor_get_scene_3d_json_path(const se_editor* editor) {
 		return NULL;
 	}
 	return editor->scene_3d_json_path;
-}
-
-void se_editor_set_sdf_json_path(se_editor* editor, const c8* path) {
-	if (!editor) {
-		return;
-	}
-	se_editor_copy_text(editor->sdf_json_path, sizeof(editor->sdf_json_path), path);
-	se_editor_set_default_json_paths(editor);
-}
-
-const c8* se_editor_get_sdf_json_path(const se_editor* editor) {
-	if (!editor) {
-		return NULL;
-	}
-	return editor->sdf_json_path;
 }
 
 b8 se_editor_scene_2d_json_save(se_editor* editor, se_scene_2d_handle scene, const c8* path) {
@@ -5866,54 +5134,13 @@ b8 se_editor_scene_3d_json_load(se_editor* editor, se_scene_3d_handle scene, con
 	return true;
 }
 
-b8 se_editor_sdf_json_save(se_editor* editor, se_sdf_handle sdf, const c8* path) {
-	s_json* root = NULL;
-	(void)editor;
-	if (sdf == SE_SDF_NULL || !path || path[0] == '\0') {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	root = se_sdf_to_json(sdf);
-	if (!root) {
-		return false;
-	}
-	if (!se_editor_json_write_file(path, root)) {
-		s_json_free(root);
-		return false;
-	}
-	s_json_free(root);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-b8 se_editor_sdf_json_load(se_editor* editor, se_sdf_handle sdf, const c8* path) {
-	s_json* root = NULL;
-	(void)editor;
-	if (sdf == SE_SDF_NULL || !path || path[0] == '\0') {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	if (!se_editor_json_read_file(path, &root)) {
-		return false;
-	}
-	if (!se_sdf_from_json(sdf, root)) {
-		s_json_free(root);
-		return false;
-	}
-	s_json_free(root);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
 b8 se_editor_scene_kit_json_save(
 	se_editor* editor,
 	const c8* scene_2d_path,
-	const c8* scene_3d_path,
-	const c8* sdf_path
+	const c8* scene_3d_path
 ) {
 	const c8* use_scene_2d_path = scene_2d_path;
 	const c8* use_scene_3d_path = scene_3d_path;
-	const c8* use_sdf_path = sdf_path;
 	if (!editor) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -5924,9 +5151,6 @@ b8 se_editor_scene_kit_json_save(
 	}
 	if (!use_scene_3d_path || use_scene_3d_path[0] == '\0') {
 		use_scene_3d_path = editor->scene_3d_json_path;
-	}
-	if (!use_sdf_path || use_sdf_path[0] == '\0') {
-		use_sdf_path = editor->sdf_json_path;
 	}
 	if (editor->focused_scene_2d != S_HANDLE_NULL &&
 		!se_editor_scene_2d_json_save(editor, editor->focused_scene_2d, use_scene_2d_path)) {
@@ -5936,10 +5160,6 @@ b8 se_editor_scene_kit_json_save(
 		!se_editor_scene_3d_json_save(editor, editor->focused_scene_3d, use_scene_3d_path)) {
 		return false;
 	}
-	if (editor->focused_sdf != SE_SDF_NULL &&
-		!se_editor_sdf_json_save(editor, editor->focused_sdf, use_sdf_path)) {
-		return false;
-	}
 	se_set_last_error(SE_RESULT_OK);
 	return true;
 }
@@ -5947,13 +5167,10 @@ b8 se_editor_scene_kit_json_save(
 b8 se_editor_scene_kit_json_load(
 	se_editor* editor,
 	const c8* scene_2d_path,
-	const c8* scene_3d_path,
-	const c8* sdf_path,
-	b8 align_sdf_camera
+	const c8* scene_3d_path
 ) {
 	const c8* use_scene_2d_path = scene_2d_path;
 	const c8* use_scene_3d_path = scene_3d_path;
-	const c8* use_sdf_path = sdf_path;
 	if (!editor) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
@@ -5965,9 +5182,6 @@ b8 se_editor_scene_kit_json_load(
 	if (!use_scene_3d_path || use_scene_3d_path[0] == '\0') {
 		use_scene_3d_path = editor->scene_3d_json_path;
 	}
-	if (!use_sdf_path || use_sdf_path[0] == '\0') {
-		use_sdf_path = editor->sdf_json_path;
-	}
 	if (editor->focused_scene_2d != S_HANDLE_NULL &&
 		!se_editor_scene_2d_json_load(editor, editor->focused_scene_2d, use_scene_2d_path)) {
 		return false;
@@ -5975,13 +5189,6 @@ b8 se_editor_scene_kit_json_load(
 	if (editor->focused_scene_3d != S_HANDLE_NULL &&
 		!se_editor_scene_3d_json_load(editor, editor->focused_scene_3d, use_scene_3d_path)) {
 		return false;
-	}
-	if (editor->focused_sdf != SE_SDF_NULL &&
-		!se_editor_sdf_json_load(editor, editor->focused_sdf, use_sdf_path)) {
-		return false;
-	}
-	if (align_sdf_camera && editor->focused_sdf != SE_SDF_NULL && editor->focused_sdf_camera != S_HANDLE_NULL) {
-		(void)se_sdf_align_camera(editor->focused_sdf, editor->focused_sdf_camera, NULL, NULL);
 	}
 	se_set_last_error(SE_RESULT_OK);
 	return true;
@@ -6126,7 +5333,6 @@ b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts) {
 	out_counts->audio_clips = (u32)s_array_get_size(&editor->clips);
 	out_counts->audio_streams = (u32)s_array_get_size(&editor->streams);
 	out_counts->audio_captures = (u32)s_array_get_size(&editor->captures);
-	out_counts->sdfs = editor->focused_sdf != SE_SDF_NULL ? 1u : 0u;
 	out_counts->queued_commands = (u32)s_array_get_size(&editor->queue);
 	if (editor->physics_2d) {
 		out_counts->physics_2d_bodies = se_physics_world_2d_get_body_count(editor->physics_2d);
@@ -6212,40 +5418,6 @@ b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_m
 			}
 			snprintf(label, sizeof(label), SE_EDITOR_NAME_PHYSICS3D_BODY_U, i);
 			se_editor_push_item(&editor->items, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, body_handle, editor->physics_3d, NULL, NULL, i, label);
-		}
-	}
-	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_SDF) && editor->focused_sdf != SE_SDF_NULL) {
-		const u32 node_count = se_sdf_get_node_count(editor->focused_sdf);
-		snprintf(label, sizeof(label), SE_EDITOR_NAME_SDF_U, 0u);
-		se_editor_push_item(
-			&editor->items,
-			SE_EDITOR_CATEGORY_SDF,
-			editor->focused_sdf,
-			S_HANDLE_NULL,
-			NULL,
-			NULL,
-			0u,
-			label);
-		for (u32 i = 0u; i < node_count; ++i) {
-			const se_sdf_node_handle node = se_sdf_get_node(editor->focused_sdf, i);
-			if (node == SE_SDF_NODE_NULL) {
-				continue;
-			}
-			snprintf(
-				label,
-				sizeof(label),
-				SE_EDITOR_NAME_SDF_NODE_U " %s",
-				i,
-				se_editor_sdf_node_type_name(se_sdf_node_get_type(editor->focused_sdf, node)));
-			se_editor_push_item(
-				&editor->items,
-				SE_EDITOR_CATEGORY_SDF,
-				node,
-				editor->focused_sdf,
-				NULL,
-				NULL,
-				i + 1u,
-				label);
 		}
 	}
 	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_AUDIO_CLIP)) {
@@ -6443,9 +5615,6 @@ b8 se_editor_collect_properties(se_editor* editor, const se_editor_item* item, c
 			break;
 		case SE_EDITOR_CATEGORY_OBJECT_3D:
 			ok = se_editor_collect_object_3d_properties(editor, item);
-			break;
-		case SE_EDITOR_CATEGORY_SDF:
-			ok = se_editor_collect_sdf_properties(editor, item);
 			break;
 		case SE_EDITOR_CATEGORY_UI:
 			ok = se_editor_collect_ui_properties(editor, item);
@@ -6795,9 +5964,6 @@ b8 se_editor_apply_command(se_editor* editor, const se_editor_command* command) 
 			break;
 		case SE_EDITOR_CATEGORY_OBJECT_3D:
 			ok = se_editor_apply_object_3d_command(editor, command);
-			break;
-		case SE_EDITOR_CATEGORY_SDF:
-			ok = se_editor_apply_sdf_command(editor, command);
 			break;
 		case SE_EDITOR_CATEGORY_UI:
 			ok = se_editor_apply_ui_command(editor, command);
