@@ -42,13 +42,12 @@ typedef s_handle se_vfx_2d_handle;
 typedef s_handle se_vfx_3d_handle;
 typedef s_handle se_vfx_emitter_2d_handle;
 typedef s_handle se_vfx_emitter_3d_handle;
+typedef s_handle se_sdf_handle;
 
 struct se_simulation;
 struct se_physics_world_2d;
 struct se_physics_world_3d;
-struct se_sdf;
 struct se_sdf_physics;
-struct se_sdf_renderer;
 
 typedef struct se_context {
 	s_array(struct se_window, windows);
@@ -64,8 +63,6 @@ typedef struct se_context {
 	s_array(struct se_object_3d, objects_3d);
 	s_array(struct se_scene_3d, scenes_3d);
 	s_array(struct se_sdf, sdfs);
-	s_array(struct se_sdf_physics, sdf_physicses);
-	s_array(struct se_sdf_renderer, sdf_renderers);
 	s_array(struct se_vfx_2d, vfx_2ds);
 	s_array(struct se_vfx_3d, vfx_3ds);
 	s_array(struct se_ui_root, ui_roots);

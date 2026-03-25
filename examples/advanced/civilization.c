@@ -48,25 +48,11 @@ typedef struct unit_t {
 } unit_t;
 
 typedef struct world_t {
-    se_scene_3d_handle scene;
-
-    se_sdf_handle landscape;
-    se_object_3d_handle buildings;
-    se_object_3d_handle units;
-
-    se_model_handle building_model;
-    se_model_handle unit_model;
-
+    se_camera_handle camera;
+    se_sdf_handle sdf_handle;
+    se_sdf_renderer_handle sdf_renderer;
     se_input_handle* input;
 } world_t;
-
-se_object_3d_handle create_object(world_t *world, const se_model_handle model, const sz max_instances) {
-    if (!world || world->scene == S_HANDLE_NULL || model == S_HANDLE_NULL) {
-        return S_HANDLE_NULL;
-    }
-    const s_mat4 transform = s_mat4_identity;
-    return se_object_3d_create(model, &transform, max_instances);
-}
 
 typedef struct ui_t {
     se_ui_handle tooltip;
@@ -106,38 +92,64 @@ void bind_camera(se_camera_handle camera, se_input_handle *input) {
 }
 
 void init_world(world_t *world, se_window_handle window) {
-    world->scene = se_scene_3d_create_for_window(window, 128);
-    if (world->scene == S_HANDLE_NULL) {
-        se_log("civilization :: failed to create 3D scene");
-        return;
-    }
-
-	b8 landscape_loaded = se_sdf_from_json_file(world->landscape, SE_RESOURCE_EXAMPLE("civilization/landscape.json"));
-	b8 buildings_loaded = se_object_3d_from_json_file(world->buildings, SE_RESOURCE_EXAMPLE("civilization/buildings.json"));
-	b8 units_loaded = se_object_3d_from_json_file(world->units, SE_RESOURCE_EXAMPLE("civilization/units.json"));
-
-	if (!landscape_loaded || !buildings_loaded || !units_loaded) {
-		se_log("civilization :: failed to load");
-		return;
-	}
-	(void)se_sdf_prepare(world->landscape, NULL);
-
-	se_object_3d_handle landscape_object_3d = se_sdf_to_object_3d(world->landscape);
-	se_scene_3d_add_object(world->scene, landscape_object_3d);
-	se_scene_3d_add_object(world->scene, world->buildings);
-	se_scene_3d_add_object(world->scene, world->units);
-
-	se_camera_handle camera = se_scene_3d_get_camera(world->scene);
-	se_camera_set_location(camera, &s_vec3(.0f, 5.0f, -1.f));
-	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
+    
+    world->camera = se_camera_create(); 
+	se_camera_set_location(world->camera, &s_vec3(.0f, 5.0f, -1.f));
+	se_camera_set_target(world->camera, &s_vec3(0.0f, 0.0f, 0.0f));
     world->input = se_input_create(window, 128);
-    bind_camera(camera, world->input);
+    bind_camera(world->camera, world->input);
+
+    world->sdf_handle = se_sdf_create(NULL);
+	se_sdf_node_primitive_desc sphere_node_desc = {
+		.transform = s_mat4_identity,
+		.operation = SE_SDF_OP_UNION,
+		.primitive = {
+			.type = SE_SDF_PRIMITIVE_SPHERE,
+			.sphere = {
+				.radius = 1. 
+			}
+		}
+	};
+	se_sdf_node_handle sphere_node_handle = se_sdf_node_create_primitive(world->sdf_handle, &sphere_node_desc);
+    se_sdf_set_root(world->sdf_handle, sphere_node_handle);
+	
+    se_sdf_renderer_set_sdf(world->sdf_renderer, world->sdf_handle);
+	{
+		se_sdf_raymarch_quality quality = SE_SDF_RAYMARCH_QUALITY_DEFAULTS;
+		quality.max_steps = 56;
+		quality.hit_epsilon = 0.0025f;
+		quality.enable_shadows = 0;
+		quality.shadow_steps = 0;
+		quality.shadow_strength = 0.0f;
+		se_sdf_renderer_set_quality(world->sdf_renderer, &quality);
+	}
+	(void)se_sdf_renderer_set_light_rig(
+		world->sdf_renderer,
+		&s_vec3(-0.55f, -0.85f, -0.20f),
+		&s_vec3(1.0f, 0.98f, 0.94f),
+		&s_vec3(0.09f, 0.12f, 0.16f),
+		0.03f
+	);
+    se_sdf_prepare_desc prepare_desc = SE_SDF_PREPARE_DESC_DEFAULTS;
+    prepare_desc.lod_count = 1u;
+    prepare_desc.lod_resolutions[0] = 4u;
+    se_sdf_prepare_async(world->sdf_handle, NULL);
 }
 
 void render_world(world_t *world, se_window_handle window) {
 	se_debug_trace_begin("render_world");
 
-	se_scene_3d_draw(world->scene, window);
+    // set frame desc
+	u32 width = 0u;
+	u32 height = 0u;
+	se_window_get_framebuffer_size(window, &width, &height);
+	se_sdf_frame_desc frame_desc = SE_SDF_FRAME_DESC_DEFAULTS;
+	frame_desc.camera = world->camera;
+	frame_desc.resolution = s_vec2((f32)s_max(width, 1u), (f32)s_max(height, 1u));
+	frame_desc.time_seconds = (f32)se_window_get_time(window);
+    
+    // render
+    se_sdf_renderer_render(world->sdf_renderer, &frame_desc); 
 
 	se_debug_trace_end("render_world");
 }
@@ -163,10 +175,6 @@ i32 main() {
 		render_ui(window);
         se_debug_render_overlay(window, NULL);
     );
-
-    if (world.scene != S_HANDLE_NULL) {
-        se_scene_3d_destroy_full(world.scene, true, true);
-    }
 
     se_context_destroy(ctx);
 }
