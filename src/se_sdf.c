@@ -172,7 +172,7 @@ void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
 		out,
 		capacity,
 		"void main() {\n"
-		"\tvec2 ndc = v_uv * 2.0 - 1.0;\n"
+		"\tvec2 ndc = vec2(v_uv.x * 2.0 - 1.0, 1.0 - v_uv.y * 2.0);\n"
 		"\tvec4 near_clip = vec4(ndc, -1.0, 1.0);\n"
 		"\tvec4 far_clip = vec4(ndc, 1.0, 1.0);\n"
 		"\tvec4 near_world_h = u_inv_view_projection * near_clip;\n"
