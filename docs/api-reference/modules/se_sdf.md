@@ -132,7 +132,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf { s_mat4 transform; se_sdf_type type; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; se_sdf_noise noise_0; se_sdf_noise noise_1; se_sdf_noise noise_2; se_sdf_noise noise_3; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
+typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; se_sdf_noise noise_0; se_sdf_noise noise_1; se_sdf_noise noise_2; se_sdf_noise noise_3; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
 ```
 
 </div>

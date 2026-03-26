@@ -19,13 +19,18 @@
 #define SE_SDF_FAR_DISTANCE 256.0f
 #define SE_SDF_HIT_EPSILON 0.001f
 #define SE_SDF_MATRIX_EPSILON 0.00001f
+#define SE_SDF_DEFAULT_SMOOTH_UNION_AMOUNT 0.35f
+#define SE_SDF_MIN_SMOOTH_UNION_AMOUNT 0.0001f
 #define SE_SDF_HANDLE_FMT "%llu"
 #define SE_SDF_HANDLE_ARG(_handle) ((unsigned long long)(_handle))
 
 static se_sdf* se_sdf_from_handle(se_context* ctx, const se_sdf_handle sdf);
 static b8 se_sdf_transform_is_zero(const s_mat4* transform);
 static b8 se_sdf_has_primitive(const se_sdf* sdf);
+static f32 se_sdf_get_operation_amount(const se_sdf* sdf);
 static void se_sdf_append(c8* out, const sz capacity, const c8* fmt, ...);
+static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operation);
+static void se_sdf_gen_operator_functions(c8* out, const sz capacity);
 static void se_sdf_gen_uniform_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, const se_sdf_handle sdf);
@@ -55,6 +60,16 @@ static b8 se_sdf_has_primitive(const se_sdf* sdf) {
 	return sdf && (sdf->type == SE_SDF_SPHERE || sdf->type == SE_SDF_BOX);
 }
 
+static f32 se_sdf_get_operation_amount(const se_sdf* sdf) {
+	if (!sdf) {
+		return 0.0f;
+	}
+	if (sdf->operation == SE_SDF_SMOOTH_UNION && sdf->operation_amount <= 0.0f) {
+		return SE_SDF_DEFAULT_SMOOTH_UNION_AMOUNT;
+	}
+	return sdf->operation_amount;
+}
+
 static void se_sdf_append(c8* out, const sz capacity, const c8* fmt, ...) {
 	if (!out || capacity == 0 || !fmt) {
 		return;
@@ -69,6 +84,34 @@ static void se_sdf_append(c8* out, const sz capacity, const c8* fmt, ...) {
 	va_end(args);
 }
 
+static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operation) {
+	switch (operation) {
+		case SE_SDF_SMOOTH_UNION:
+			return "sdf_op_smooth_union";
+		case SE_SDF_UNION:
+		default:
+			return "sdf_op_union";
+	}
+}
+
+static void se_sdf_gen_operator_functions(c8* out, const sz capacity) {
+	se_sdf_append(
+		out,
+		capacity,
+		"float sdf_op_union(float a, float b, float amount) {\n"
+		"\treturn min(a, b);\n"
+		"}\n\n");
+	se_sdf_append(
+		out,
+		capacity,
+		"float sdf_op_smooth_union(float a, float b, float amount) {\n"
+		"\tfloat k = max(amount, %.4f);\n"
+		"\tfloat h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);\n"
+		"\treturn mix(b, a, h) - k * h * (1.0 - h);\n"
+		"}\n\n",
+		SE_SDF_MIN_SMOOTH_UNION_AMOUNT);
+}
+
 static void se_sdf_gen_uniform_recursive(c8* out, const sz capacity, const se_sdf_handle sdf) {
 	se_context* ctx = se_current_context();
 	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
@@ -76,6 +119,7 @@ static void se_sdf_gen_uniform_recursive(c8* out, const sz capacity, const se_sd
 	if (!sdf_ptr) {
 		return;
 	}
+	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_operation_amount;\n", SE_SDF_HANDLE_ARG(sdf));
 	if (sdf_ptr->type == SE_SDF_SPHERE) {
 		se_sdf_append(out, capacity, "uniform mat4 _" SE_SDF_HANDLE_FMT "_inv_transform;\n", SE_SDF_HANDLE_ARG(sdf));
 		se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_radius;\n", SE_SDF_HANDLE_ARG(sdf));
@@ -92,9 +136,11 @@ static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_s
 	se_context* ctx = se_current_context();
 	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
 	se_sdf_handle* child = NULL;
+	const c8* operation_function = NULL;
 	if (!sdf_ptr) {
 		return;
 	}
+	operation_function = se_sdf_get_operation_function_name(sdf_ptr->operation);
 	s_foreach(&sdf_ptr->children, child) {
 		se_sdf_gen_function_recursive(out, capacity, *child);
 	}
@@ -125,10 +171,22 @@ static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_s
 	se_sdf_append(out, capacity, "float sdf_" SE_SDF_HANDLE_FMT "(vec3 p) {\n", SE_SDF_HANDLE_ARG(sdf));
 	se_sdf_append(out, capacity, "\tfloat d = %.1f;\n", SE_SDF_FAR_DISTANCE);
 	if (se_sdf_has_primitive(sdf_ptr)) {
-		se_sdf_append(out, capacity, "\td = min(d, sdf_" SE_SDF_HANDLE_FMT "_primitive(p));\n", SE_SDF_HANDLE_ARG(sdf));
+		se_sdf_append(
+			out,
+			capacity,
+			"\td = %s(d, sdf_" SE_SDF_HANDLE_FMT "_primitive(p), _" SE_SDF_HANDLE_FMT "_operation_amount);\n",
+			operation_function,
+			SE_SDF_HANDLE_ARG(sdf),
+			SE_SDF_HANDLE_ARG(sdf));
 	}
 	s_foreach(&sdf_ptr->children, child) {
-		se_sdf_append(out, capacity, "\td = min(d, sdf_" SE_SDF_HANDLE_FMT "(p));\n", SE_SDF_HANDLE_ARG(*child));
+		se_sdf_append(
+			out,
+			capacity,
+			"\td = %s(d, sdf_" SE_SDF_HANDLE_FMT "(p), _" SE_SDF_HANDLE_FMT "_operation_amount);\n",
+			operation_function,
+			SE_SDF_HANDLE_ARG(*child),
+			SE_SDF_HANDLE_ARG(sdf));
 	}
 	se_sdf_append(out, capacity, "\treturn d;\n}\n\n");
 }
@@ -154,6 +212,7 @@ void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
 	se_sdf_append(out, capacity, "out vec4 frag_color;\n\n");
 	se_sdf_gen_uniform(out, capacity, sdf);
 	se_sdf_append(out, capacity, "\n");
+	se_sdf_gen_operator_functions(out, capacity);
 	se_sdf_gen_function(out, capacity, sdf);
 	se_sdf_append(out, capacity, "float scene_sdf(vec3 p) {\n");
 	se_sdf_append(out, capacity, "\treturn sdf_" SE_SDF_HANDLE_FMT "(p);\n", SE_SDF_HANDLE_ARG(sdf));
@@ -241,9 +300,11 @@ static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, cons
 	if (!sdf_ptr) {
 		return;
 	}
+	c8 uniform_name[64] = {0};
+	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_operation_amount", SE_SDF_HANDLE_ARG(sdf));
+	se_shader_set_float(shader, uniform_name, se_sdf_get_operation_amount(sdf_ptr));
 	if (sdf_ptr->type == SE_SDF_SPHERE || sdf_ptr->type == SE_SDF_BOX) {
 		const s_mat4 inverse = s_mat4_inverse(&sdf_ptr->transform);
-		c8 uniform_name[64] = {0};
 		snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_inv_transform", SE_SDF_HANDLE_ARG(sdf));
 		se_shader_set_mat4(shader, uniform_name, &inverse);
 		if (sdf_ptr->type == SE_SDF_SPHERE) {

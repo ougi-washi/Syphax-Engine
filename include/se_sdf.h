@@ -35,6 +35,8 @@ typedef struct se_sdf_noise {
 typedef struct se_sdf {
     s_mat4 transform;
     se_sdf_type type;
+	se_sdf_operator operation;
+	f32 operation_amount;
     union {
         struct { f32 radius; } sphere;
         struct { s_vec3 size; } box;
