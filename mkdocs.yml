@@ -136,6 +136,7 @@ nav:
           - ui_basics: examples/default/ui_basics.md
           - audio_basics: examples/default/audio_basics.md
           - model_viewer: examples/default/model_viewer.md
+          - sdf: examples/default/sdf.md
       - Advanced:
           - array_handles: examples/advanced/array_handles.md
           - context_lifecycle: examples/advanced/context_lifecycle.md
@@ -144,7 +145,6 @@ nav:
           - multi_window: examples/advanced/multi_window.md
           - navigation_grid: examples/advanced/navigation_grid.md
           - rts_integration: examples/advanced/rts_integration.md
-          - sdf_playground: examples/advanced/sdf_playground.md
           - simulation_intro: examples/advanced/simulation_intro.md
           - simulation_advanced: examples/advanced/simulation_advanced.md
           - ui_showcase: examples/advanced/ui_showcase.md

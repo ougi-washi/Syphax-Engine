@@ -16,7 +16,7 @@ Use this when render setup/cleanup must stay explicit and consistent across diff
 
 ```c
 se_render_init(...);
-se_render_set_background_color(...);
+se_render_set_background(...);
 ```
 
 Use this tiny call path first, then continue with the four progressive snippets below.
@@ -32,7 +32,7 @@ Build the smallest compileable setup that touches `se_graphics` with explicit ha
 Key API calls:
 
 - `se_render_init`
-- `se_render_set_background_color`
+- `se_render_set_background`
 - `se_render_clear`
 
 ## Step 2: Add Core Feature
@@ -48,7 +48,7 @@ What changed from previous step: this step layers one additional capability with
 Key API calls:
 
 - `se_render_init`
-- `se_render_set_background_color`
+- `se_render_set_background`
 - `se_render_clear`
 - `se_render_set_blending`
 - `se_render_unbind_framebuffer`
@@ -66,7 +66,7 @@ What changed from previous step: this step layers one additional capability with
 Key API calls:
 
 - `se_render_init`
-- `se_render_set_background_color`
+- `se_render_set_background`
 - `se_render_clear`
 - `se_render_set_blending`
 - `se_render_unbind_framebuffer`
@@ -85,7 +85,7 @@ What changed from previous step: this step layers one additional capability with
 Key API calls:
 
 - `se_render_init`
-- `se_render_set_background_color`
+- `se_render_set_background`
 - `se_render_clear`
 - `se_render_set_blending`
 - `se_render_unbind_framebuffer`

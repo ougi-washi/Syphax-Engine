@@ -19,6 +19,7 @@ declare -a DEFAULT_TARGETS=(
 	ui_basics
 	audio_basics
 	model_viewer
+	sdf
 )
 
 declare -a ADVANCED_TARGETS=(
@@ -29,7 +30,6 @@ declare -a ADVANCED_TARGETS=(
 	multi_window
 	navigation_grid
 	rts_integration
-	sdf_playground
 	simulation_intro
 	simulation_advanced
 	ui_showcase

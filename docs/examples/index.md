@@ -1,13 +1,13 @@
 ---
 title: Examples Index
-summary: One page per runnable example target.
+summary: Reference pages for documented runnable example targets.
 prerequisites:
   - Build toolchain available.
 ---
 
 # Examples Index
 
-Use this section to find build/run commands, controls, and small edits for each target.
+Use this section to find build/run commands, controls, and small edits for documented targets.
 
 ## Default examples
 
@@ -21,6 +21,7 @@ Use this section to find build/run commands, controls, and small edits for each 
 - [ui_basics](default/ui_basics.md)
 - [audio_basics](default/audio_basics.md)
 - [model_viewer](default/model_viewer.md)
+- [sdf](default/sdf.md)
 
 ## Advanced examples
 
@@ -31,7 +32,6 @@ Use this section to find build/run commands, controls, and small edits for each 
 - [multi_window](advanced/multi_window.md)
 - [navigation_grid](advanced/navigation_grid.md)
 - [rts_integration](advanced/rts_integration.md)
-- [sdf_playground](advanced/sdf_playground.md)
 - [simulation_intro](advanced/simulation_intro.md)
 - [simulation_advanced](advanced/simulation_advanced.md)
 - [ui_showcase](advanced/ui_showcase.md)

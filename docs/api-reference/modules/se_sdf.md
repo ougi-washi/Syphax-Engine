@@ -348,7 +348,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
+typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; se_sdf_shading shading; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
 ```
 
 </div>
@@ -385,6 +385,18 @@ No inline description found in header comments.
 
 ```c
 typedef struct se_sdf_point_light { s_vec3 position; s_vec3 color; f32 radius; } se_sdf_point_light;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_shading`
+
+<div class="api-signature">
+
+```c
+typedef struct se_sdf_shading { s_vec3 ambient; s_vec3 diffuse; s_vec3 specular; f32 roughness; f32 shadow_bias; f32 shadow_smooothness; } se_sdf_shading;
 ```
 
 </div>

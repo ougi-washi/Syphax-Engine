@@ -1,11 +1,17 @@
 #include "se_sdf.h"
 
 int main(void) {
-	se_sdf_desc sdf_desc = SE_SDF_DESC_DEFAULTS;
-	se_sdf_handle sdf = se_sdf_create(&sdf_desc);
-	se_sdf_clear(sdf);
-	se_sdf_node_group_desc group = SE_SDF_NODE_GROUP_DESC_DEFAULTS;
-	se_sdf_node_handle root = se_sdf_node_create_group(sdf, &group);
-	se_sdf_set_root(sdf, root);
+	se_sdf_handle scene = se_sdf_create(
+		.operation = SE_SDF_SMOOTH_UNION,
+		.operation_amount = 0.35f);
+	se_sdf_handle sphere = se_sdf_create(
+		.type = SE_SDF_SPHERE,
+		.sphere = {.radius = 1.0f});
+	se_sdf_handle ground = se_sdf_create(
+		.type = SE_SDF_BOX,
+		.box = {.size = {10.0f, 0.01f, 10.0f}});
+	se_sdf_add_child(scene, ground);
+	se_sdf_add_child(scene, sphere);
+	se_sdf_destroy(scene);
 	return 0;
 }

@@ -16,7 +16,7 @@ Use `se_debug` for features that map directly to its module boundary.
 
 ```c
 #include "se_debug.h"
-se_debug_dump_last_frame_timing_lines(buf, sizeof(buf));
+se_debug_dump_frame_timing_lines(buf, sizeof(buf));
 ```
 
 ## Step-by-step explanation

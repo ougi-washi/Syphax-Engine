@@ -53,6 +53,7 @@ Key API calls:
 - `se_debug_trace_end`
 - `se_debug_frame_end`
 - `se_debug_set_overlay_enabled`
+- `se_debug_get_frame_timing`
 
 ## Step 3: Interactive / Tunable
 
@@ -72,6 +73,8 @@ Key API calls:
 - `se_debug_trace_end`
 - `se_debug_frame_end`
 - `se_debug_set_overlay_enabled`
+- `se_debug_get_frame_timing`
+- `se_debug_dump_frame_timing_lines`
 
 ## Step 4: Complete Practical Demo
 

@@ -38,7 +38,7 @@ i32 main() {
 	se_sdf_set_position(sphere, &s_vec3(0.0f, 1.0f, 0.0f));
 	se_sdf_add_noise(sphere,
 		.type = SE_SDF_NOISE_PERLIN,
-		.frequency = 1.25f,
+		.frequency = 2.f,
 		.offset = {0.0f, 0.0f, 0.0f},
 	);
 
@@ -57,7 +57,7 @@ i32 main() {
 	// lights
 	se_sdf_point_light_handle orb_light = se_sdf_add_point_light(scene,
 		.position = {2.5f, 3.0f, -2.0f},
-		.color = {1.0f, 0.2f, 0.1f},
+		.color = {1.0f, 1.f, 0.1f},
 		.radius = 9.0f,
 	);
 	se_sdf_add_directional_light(scene,
