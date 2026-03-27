@@ -27,6 +27,42 @@ extern void se_sdf_add_child(se_sdf_handle parent, se_sdf_handle child);
 
 No inline description found in header comments.
 
+### `se_sdf_add_directional_light_internal`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_directional_light_handle se_sdf_add_directional_light_internal(se_sdf_handle sdf, const se_sdf_directional_light directional_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_add_noise_internal`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_noise_handle se_sdf_add_noise_internal(se_sdf_handle sdf, const se_sdf_noise noise);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_add_point_light_internal`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_point_light_handle se_sdf_add_point_light_internal(se_sdf_handle sdf, const se_sdf_point_light point_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_bake`
 
 <div class="api-signature">
@@ -51,6 +87,198 @@ extern se_sdf_handle se_sdf_create_internal(const se_sdf* sdf);
 
 No inline description found in header comments.
 
+### `se_sdf_destroy`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_destroy(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_directional_light_set_color`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_directional_light_set_color(se_sdf_directional_light_handle directional_light, const s_vec3* color);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_directional_light_set_direction`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_directional_light_set_direction(se_sdf_directional_light_handle directional_light, const s_vec3* direction);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_directional_light_color`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_directional_light_color(se_sdf_directional_light_handle directional_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_directional_light_direction`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_directional_light_direction(se_sdf_directional_light_handle directional_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_noise_frequency`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_noise_frequency(se_sdf_noise_handle noise);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_noise_offset`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_noise_offset(se_sdf_noise_handle noise);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_point_light_color`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_point_light_color(se_sdf_point_light_handle point_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_point_light_position`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_point_light_position(se_sdf_point_light_handle point_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_point_light_radius`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_point_light_radius(se_sdf_point_light_handle point_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_noise_set_frequency`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_noise_set_frequency(se_sdf_noise_handle noise, f32 frequency);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_noise_set_offset`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_noise_set_offset(se_sdf_noise_handle noise, const s_vec3* offset);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_point_light_remove`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_point_light_remove(se_sdf_handle sdf, se_sdf_point_light_handle point_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_point_light_set_color`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_point_light_set_color(se_sdf_point_light_handle point_light, const s_vec3* color);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_point_light_set_position`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_point_light_set_position(se_sdf_point_light_handle point_light, const s_vec3* position);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_point_light_set_radius`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_point_light_set_radius(se_sdf_point_light_handle point_light, f32 radius);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_render`
 
 <div class="api-signature">
@@ -69,18 +297,6 @@ No inline description found in header comments.
 
 ```c
 extern void se_sdf_set_position(se_sdf_handle sdf, const s_vec3* position);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_shutdown`
-
-<div class="api-signature">
-
-```c
-extern void se_sdf_shutdown(void);
 ```
 
 </div>
@@ -132,7 +348,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; se_sdf_noise noise_0; se_sdf_noise noise_1; se_sdf_noise noise_2; se_sdf_noise noise_3; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
+typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_directional_light`
+
+<div class="api-signature">
+
+```c
+typedef struct se_sdf_directional_light { s_vec3 direction; s_vec3 color; } se_sdf_directional_light;
 ```
 
 </div>
@@ -145,6 +373,18 @@ No inline description found in header comments.
 
 ```c
 typedef struct se_sdf_noise { se_sdf_noise_type type; f32 frequency; s_vec3 offset; } se_sdf_noise;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_point_light`
+
+<div class="api-signature">
+
+```c
+typedef struct se_sdf_point_light { s_vec3 position; s_vec3 color; f32 radius; } se_sdf_point_light;
 ```
 
 </div>

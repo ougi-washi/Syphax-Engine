@@ -32,24 +32,44 @@ typedef struct se_sdf_noise {
     s_vec3 offset;
 } se_sdf_noise;
 
+typedef struct se_sdf_directional_light {
+    s_vec3 direction;
+    s_vec3 color;
+} se_sdf_directional_light;
+
+typedef struct se_sdf_point_light {
+    s_vec3 position;
+    s_vec3 color;
+	f32 radius;
+} se_sdf_point_light;
+
+typedef struct se_sdf_shading {
+    s_vec3 ambient;
+    s_vec3 diffuse;
+    s_vec3 specular;
+    f32 roughness;
+	f32 shadow_bias;
+	f32 shadow_smooothness;
+} se_sdf_shading;
+
 typedef struct se_sdf {
     s_mat4 transform;
     se_sdf_type type;
 	se_sdf_operator operation;
 	f32 operation_amount;
+	se_sdf_shading shading;
     union {
         struct { f32 radius; } sphere;
         struct { s_vec3 size; } box;
     };
-    se_sdf_noise noise_0;
-    se_sdf_noise noise_1;
-    se_sdf_noise noise_2;
-    se_sdf_noise noise_3;
 
-    // nodes/scene
+	// nodes/scene
     // don't set manually
     se_sdf_handle parent;
     s_array(se_sdf_handle, children);
+	s_array(se_sdf_noise_handle, noises);
+	s_array(se_sdf_point_light_handle, point_lights);
+	s_array(se_sdf_directional_light_handle, directional_lights);
     se_quad quad;
     se_shader_handle shader;
 	se_framebuffer_handle output;
@@ -59,8 +79,33 @@ typedef struct se_sdf {
 #define se_sdf_create(...) se_sdf_create_internal(&(se_sdf){__VA_ARGS__})
 #define SE_SDF_NULL S_HANDLE_NULL
 extern se_sdf_handle se_sdf_create_internal(const se_sdf* sdf);
-extern void se_sdf_shutdown(void);
+extern void se_sdf_destroy(se_sdf_handle sdf);
 extern void se_sdf_add_child(se_sdf_handle parent, se_sdf_handle child);
+
+#define se_sdf_add_noise(sdf, ...) se_sdf_add_noise_internal((sdf), (se_sdf_noise){__VA_ARGS__})
+extern se_sdf_noise_handle se_sdf_add_noise_internal(se_sdf_handle sdf, const se_sdf_noise noise);
+extern f32 se_sdf_get_noise_frequency(se_sdf_noise_handle noise);
+extern void se_sdf_noise_set_frequency(se_sdf_noise_handle noise, f32 frequency);
+extern s_vec3 se_sdf_get_noise_offset(se_sdf_noise_handle noise);
+extern void se_sdf_noise_set_offset(se_sdf_noise_handle noise, const s_vec3* offset);
+
+#define se_sdf_add_point_light(sdf, ...) se_sdf_add_point_light_internal((sdf), (se_sdf_point_light){__VA_ARGS__})
+extern se_sdf_point_light_handle se_sdf_add_point_light_internal(se_sdf_handle sdf, const se_sdf_point_light point_light);
+extern void se_sdf_point_light_remove(se_sdf_handle sdf, se_sdf_point_light_handle point_light);
+extern s_vec3 se_sdf_get_point_light_position(se_sdf_point_light_handle point_light);
+extern void se_sdf_point_light_set_position(se_sdf_point_light_handle point_light, const s_vec3* position);
+extern s_vec3 se_sdf_get_point_light_color(se_sdf_point_light_handle point_light);
+extern void se_sdf_point_light_set_color(se_sdf_point_light_handle point_light, const s_vec3* color);
+extern f32 se_sdf_get_point_light_radius(se_sdf_point_light_handle point_light);
+extern void se_sdf_point_light_set_radius(se_sdf_point_light_handle point_light, f32 radius);
+
+#define se_sdf_add_directional_light(sdf, ...) se_sdf_add_directional_light_internal((sdf), (se_sdf_directional_light){__VA_ARGS__})
+extern se_sdf_directional_light_handle se_sdf_add_directional_light_internal(se_sdf_handle sdf, const se_sdf_directional_light directional_light);
+extern s_vec3 se_sdf_get_directional_light_direction(se_sdf_directional_light_handle directional_light);
+extern void se_sdf_directional_light_set_direction(se_sdf_directional_light_handle directional_light, const s_vec3* direction);
+extern s_vec3 se_sdf_get_directional_light_color(se_sdf_directional_light_handle directional_light);
+extern void se_sdf_directional_light_set_color(se_sdf_directional_light_handle directional_light, const s_vec3* color);
+
 extern void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera); 
 extern void se_sdf_bake(se_sdf_handle sdf);
 extern void se_sdf_set_position(se_sdf_handle sdf, const s_vec3* position);

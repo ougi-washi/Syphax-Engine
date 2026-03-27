@@ -151,6 +151,9 @@ se_context *se_context_create(void) {
 	s_array_init(&context->objects_3d);
 	s_array_init(&context->scenes_3d);
 	s_array_init(&context->sdfs);
+	s_array_init(&context->sdf_noises);
+	s_array_init(&context->sdf_point_lights);
+	s_array_init(&context->sdf_directional_lights);
 	s_array_init(&context->vfx_2ds);
 	s_array_init(&context->vfx_3ds);
 	s_array_init(&context->ui_roots);
@@ -190,7 +193,13 @@ void se_context_destroy(se_context *context) {
 	}
 	context->ui_text_handle = NULL;
 	context->default_text_handle = NULL;
-	se_sdf_shutdown();
+	while (s_array_get_size(&context->sdfs) > 0) {
+		se_sdf_handle sdf_handle = s_array_handle(&context->sdfs, (u32)(s_array_get_size(&context->sdfs) - 1));
+		se_sdf_destroy(sdf_handle);
+	}
+	s_array_clear(&context->sdf_noises);
+	s_array_clear(&context->sdf_point_lights);
+	s_array_clear(&context->sdf_directional_lights);
 
 	while (s_array_get_size(&context->vfx_2ds) > 0) {
 		se_vfx_2d_handle vfx_handle = s_array_handle(&context->vfx_2ds, (u32)(s_array_get_size(&context->vfx_2ds) - 1));

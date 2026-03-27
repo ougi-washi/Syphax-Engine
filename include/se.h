@@ -43,6 +43,9 @@ typedef s_handle se_vfx_3d_handle;
 typedef s_handle se_vfx_emitter_2d_handle;
 typedef s_handle se_vfx_emitter_3d_handle;
 typedef s_handle se_sdf_handle;
+typedef s_handle se_sdf_noise_handle;
+typedef s_handle se_sdf_point_light_handle;
+typedef s_handle se_sdf_directional_light_handle;
 
 struct se_simulation;
 struct se_physics_world_2d;
@@ -63,6 +66,9 @@ typedef struct se_context {
 	s_array(struct se_object_3d, objects_3d);
 	s_array(struct se_scene_3d, scenes_3d);
 	s_array(struct se_sdf, sdfs);
+	s_array(struct se_sdf_noise, sdf_noises);
+	s_array(struct se_sdf_point_light, sdf_point_lights);
+	s_array(struct se_sdf_directional_light, sdf_directional_lights);
 	s_array(struct se_vfx_2d, vfx_2ds);
 	s_array(struct se_vfx_3d, vfx_3ds);
 	s_array(struct se_ui_root, ui_roots);
