@@ -31,8 +31,12 @@
 #define SE_SDF_DEFAULT_SPECULAR_G 0.19f
 #define SE_SDF_DEFAULT_SPECULAR_B 0.22f
 #define SE_SDF_DEFAULT_ROUGHNESS 0.35f
+#define SE_SDF_DEFAULT_SHADING_BIAS 0.5f
+#define SE_SDF_DEFAULT_SHADING_SMOOTHNESS 1.0f
+#define SE_SDF_DEFAULT_SHADOW_SOFTNESS 8.0f
 #define SE_SDF_DEFAULT_SHADOW_BIAS 0.02f
-#define SE_SDF_DEFAULT_SHADOW_SMOOTHNESS 6.0f
+#define SE_SDF_DEFAULT_SHADOW_SAMPLES 48u
+#define SE_SDF_MAX_SHADOW_SAMPLES 128u
 #define SE_SDF_DEFAULT_POINT_LIGHT_RADIUS 8.0f
 #define SE_SDF_DEFAULT_LIGHT_DIR_X 0.45f
 #define SE_SDF_DEFAULT_LIGHT_DIR_Y 0.85f
@@ -54,6 +58,7 @@ static void se_sdf_release_directional_light_references(se_context* ctx, se_sdf*
 static b8 se_sdf_transform_is_zero(const s_mat4* transform);
 static b8 se_sdf_vec3_is_zero(const s_vec3* value);
 static b8 se_sdf_shading_is_zero(const se_sdf_shading* shading);
+static b8 se_sdf_shadow_is_zero(const se_sdf_shadow* shadow);
 static s_vec4 se_sdf_mul_mat4_vec4(const s_mat4* matrix, const s_vec4* vector);
 static s_vec3 se_sdf_transform_point(const s_mat4* transform, const s_vec3* point);
 static s_vec3 se_sdf_transform_direction(const s_mat4* transform, const s_vec3* direction);
@@ -64,6 +69,8 @@ static b8 se_sdf_needs_inverse_transform(const se_sdf* sdf);
 static b8 se_sdf_has_lights_recursive(const se_sdf_handle sdf);
 static se_sdf_shading se_sdf_get_default_shading(void);
 static se_sdf_shading se_sdf_get_shading_defaulted(const se_sdf* sdf);
+static se_sdf_shadow se_sdf_get_default_shadow(void);
+static se_sdf_shadow se_sdf_get_shadow_defaulted(const se_sdf* sdf);
 static f32 se_sdf_get_operation_amount(const se_sdf* sdf);
 static f32 se_sdf_get_noise_frequency_defaulted(const se_sdf_noise* noise);
 static f32 se_sdf_get_point_light_radius_defaulted(const se_sdf_point_light* point_light);
@@ -249,8 +256,15 @@ static b8 se_sdf_shading_is_zero(const se_sdf_shading* shading) {
 		&& se_sdf_vec3_is_zero(&shading->diffuse)
 		&& se_sdf_vec3_is_zero(&shading->specular)
 		&& fabsf(shading->roughness) <= SE_SDF_MATRIX_EPSILON
-		&& fabsf(shading->shadow_bias) <= SE_SDF_MATRIX_EPSILON
-		&& fabsf(shading->shadow_smooothness) <= SE_SDF_MATRIX_EPSILON);
+		&& fabsf(shading->bias) <= SE_SDF_MATRIX_EPSILON
+		&& fabsf(shading->smoothness) <= SE_SDF_MATRIX_EPSILON);
+}
+
+static b8 se_sdf_shadow_is_zero(const se_sdf_shadow* shadow) {
+	return !shadow
+		|| (fabsf(shadow->softness) <= SE_SDF_MATRIX_EPSILON
+		&& fabsf(shadow->bias) <= SE_SDF_MATRIX_EPSILON
+		&& shadow->samples == 0u);
 }
 
 static s_vec4 se_sdf_mul_mat4_vec4(const s_mat4* matrix, const s_vec4* vector) {
@@ -326,8 +340,8 @@ static se_sdf_shading se_sdf_get_default_shading(void) {
 		.diffuse = s_vec3(SE_SDF_DEFAULT_BASE_R, SE_SDF_DEFAULT_BASE_G, SE_SDF_DEFAULT_BASE_B),
 		.specular = s_vec3(SE_SDF_DEFAULT_SPECULAR_R, SE_SDF_DEFAULT_SPECULAR_G, SE_SDF_DEFAULT_SPECULAR_B),
 		.roughness = SE_SDF_DEFAULT_ROUGHNESS,
-		.shadow_bias = SE_SDF_DEFAULT_SHADOW_BIAS,
-		.shadow_smooothness = SE_SDF_DEFAULT_SHADOW_SMOOTHNESS,
+		.bias = SE_SDF_DEFAULT_SHADING_BIAS,
+		.smoothness = SE_SDF_DEFAULT_SHADING_SMOOTHNESS,
 	};
 }
 
@@ -340,13 +354,33 @@ static se_sdf_shading se_sdf_get_shading_defaulted(const se_sdf* sdf) {
 		shading = sdf->shading;
 	}
 	shading.roughness = fminf(fmaxf(shading.roughness, 0.0f), 1.0f);
-	if (shading.shadow_bias <= 0.0f) {
-		shading.shadow_bias = SE_SDF_DEFAULT_SHADOW_BIAS;
-	}
-	if (shading.shadow_smooothness <= 0.0f) {
-		shading.shadow_smooothness = SE_SDF_DEFAULT_SHADOW_SMOOTHNESS;
-	}
+	shading.bias = fminf(fmaxf(shading.bias, 0.0f), 1.0f);
+	shading.smoothness = fmaxf(shading.smoothness, 0.0f);
 	return shading;
+}
+
+static se_sdf_shadow se_sdf_get_default_shadow(void) {
+	return (se_sdf_shadow){
+		.softness = SE_SDF_DEFAULT_SHADOW_SOFTNESS,
+		.bias = SE_SDF_DEFAULT_SHADOW_BIAS,
+		.samples = SE_SDF_DEFAULT_SHADOW_SAMPLES,
+	};
+}
+
+static se_sdf_shadow se_sdf_get_shadow_defaulted(const se_sdf* sdf) {
+	se_sdf_shadow shadow = se_sdf_get_default_shadow();
+	if (!sdf) {
+		return shadow;
+	}
+	if (!se_sdf_shadow_is_zero(&sdf->shadow)) {
+		shadow = sdf->shadow;
+	}
+	shadow.softness = fmaxf(shadow.softness, 0.0f);
+	shadow.bias = fmaxf(shadow.bias, 0.0f);
+	shadow.samples = shadow.samples == 0u
+		? SE_SDF_DEFAULT_SHADOW_SAMPLES
+		: (u16)((shadow.samples > SE_SDF_MAX_SHADOW_SAMPLES) ? SE_SDF_MAX_SHADOW_SAMPLES : shadow.samples);
+	return shadow;
 }
 
 static f32 se_sdf_get_operation_amount(const se_sdf* sdf) {
@@ -520,22 +554,35 @@ static void se_sdf_gen_shading_helpers(c8* out, const sz capacity) {
 		"\tvec3 diffuse;\n"
 		"\tvec3 specular;\n"
 		"\tfloat roughness;\n"
-		"\tfloat shadow_bias;\n"
-		"\tfloat shadow_smoothness;\n"
+		"\tfloat bias;\n"
+		"\tfloat smoothness;\n"
+		"};\n\n"
+		"struct sdf_shadow_data {\n"
+		"\tfloat softness;\n"
+		"\tfloat bias;\n"
+		"\tfloat samples;\n"
 		"};\n\n"
 		"struct sdf_surface_data {\n"
 		"\tfloat distance;\n"
 		"\tsdf_shading_data shading;\n"
+		"\tsdf_shadow_data shadow;\n"
 		"};\n\n"
-		"sdf_shading_data sdf_make_shading(vec3 ambient, vec3 diffuse, vec3 specular, float roughness, float shadow_bias, float shadow_smoothness) {\n"
+		"sdf_shading_data sdf_make_shading(vec3 ambient, vec3 diffuse, vec3 specular, float roughness, float bias, float smoothness) {\n"
 		"\tsdf_shading_data shading;\n"
 		"\tshading.ambient = ambient;\n"
 		"\tshading.diffuse = diffuse;\n"
 		"\tshading.specular = specular;\n"
 		"\tshading.roughness = clamp(roughness, 0.0, 1.0);\n"
-		"\tshading.shadow_bias = max(shadow_bias, 0.0005);\n"
-		"\tshading.shadow_smoothness = max(shadow_smoothness, 0.0001);\n"
+		"\tshading.bias = clamp(bias, 0.0, 1.0);\n"
+		"\tshading.smoothness = max(smoothness, 0.0);\n"
 		"\treturn shading;\n"
+		"}\n\n"
+		"sdf_shadow_data sdf_make_shadow(float softness, float bias, int samples) {\n"
+		"\tsdf_shadow_data shadow;\n"
+		"\tshadow.softness = max(softness, 0.0);\n"
+		"\tshadow.bias = max(bias, 0.0);\n"
+		"\tshadow.samples = clamp(float(max(samples, 1)), 1.0, 128.0);\n"
+		"\treturn shadow;\n"
 		"}\n\n"
 		"sdf_shading_data sdf_mix_shading(sdf_shading_data a, sdf_shading_data b, float t) {\n"
 		"\tsdf_shading_data shading;\n"
@@ -543,9 +590,27 @@ static void se_sdf_gen_shading_helpers(c8* out, const sz capacity) {
 		"\tshading.diffuse = mix(a.diffuse, b.diffuse, t);\n"
 		"\tshading.specular = mix(a.specular, b.specular, t);\n"
 		"\tshading.roughness = mix(a.roughness, b.roughness, t);\n"
-		"\tshading.shadow_bias = mix(a.shadow_bias, b.shadow_bias, t);\n"
-		"\tshading.shadow_smoothness = mix(a.shadow_smoothness, b.shadow_smoothness, t);\n"
+		"\tshading.bias = mix(a.bias, b.bias, t);\n"
+		"\tshading.smoothness = mix(a.smoothness, b.smoothness, t);\n"
 		"\treturn shading;\n"
+		"}\n\n"
+		"sdf_shadow_data sdf_mix_shadow(sdf_shadow_data a, sdf_shadow_data b, float t) {\n"
+		"\tsdf_shadow_data shadow;\n"
+		"\tshadow.softness = mix(a.softness, b.softness, t);\n"
+		"\tshadow.bias = mix(a.bias, b.bias, t);\n"
+		"\tshadow.samples = mix(a.samples, b.samples, t);\n"
+		"\treturn shadow;\n"
+		"}\n\n"
+		"float sdf_shading_band(float value, float bias, float smoothness) {\n"
+		"\tfloat center = clamp(bias, 0.0, 1.0);\n"
+		"\tfloat half_width = max(smoothness * 0.5, 0.0001);\n"
+		"\tfloat band_min = clamp(center - half_width, 0.0, 1.0);\n"
+		"\tfloat band_max = clamp(center + half_width, 0.0, 1.0);\n"
+		"\tfloat band_value = clamp(value, 0.0, 1.0);\n"
+		"\tif (band_max <= band_min + 0.0001) {\n"
+		"\t\treturn band_value >= center ? 1.0 : 0.0;\n"
+		"\t}\n"
+		"\treturn smoothstep(band_min, band_max, band_value);\n"
 		"}\n\n");
 }
 
@@ -553,26 +618,23 @@ static void se_sdf_gen_light_functions(c8* out, const sz capacity) {
 	se_sdf_append(
 		out,
 		capacity,
-		"float sdf_shadow_visibility(vec3 ray_origin, vec3 ray_direction, float min_distance, float max_distance) {\n"
+		"float sdf_shadow_visibility(vec3 ray_origin, vec3 ray_direction, float min_distance, float max_distance, float shadow_softness, int shadow_samples) {\n"
 		"\tfloat visibility = 1.0;\n"
 		"\tfloat travel = min_distance;\n"
-		"\tconst float shadow_softness = 8.0;\n"
-		"\tfor (int i = 0; i < 48; ++i) {\n"
-		"\t\tif (travel >= max_distance) {\n"
+		"\tfloat safe_shadow_softness = max(shadow_softness, 0.0001);\n"
+		"\tint sample_count = clamp(shadow_samples, 1, 128);\n"
+		"\tfor (int i = 0; i < 128; ++i) {\n"
+		"\t\tif (i >= sample_count || travel >= max_distance) {\n"
 		"\t\t\tbreak;\n"
 		"\t\t}\n"
 		"\t\tfloat distance_to_surface = scene_sdf(ray_origin + ray_direction * travel);\n"
 		"\t\tif (distance_to_surface < 0.001) {\n"
 		"\t\t\treturn 0.0;\n"
 		"\t\t}\n"
-		"\t\tvisibility = min(visibility, shadow_softness * distance_to_surface / max(travel, 0.0001));\n"
+		"\t\tvisibility = min(visibility, safe_shadow_softness * distance_to_surface / max(travel, 0.0001));\n"
 		"\t\ttravel += clamp(distance_to_surface, 0.01, 0.35);\n"
 		"\t}\n"
 		"\treturn clamp(visibility, 0.0, 1.0);\n"
-		"}\n\n"
-		"float sdf_shadow_band(float visibility, float shadow_smoothness) {\n"
-		"\tfloat band_half_width = clamp(shadow_smoothness * 0.025, 0.001, 0.45);\n"
-		"\treturn smoothstep(0.5 - band_half_width, 0.5 + band_half_width, visibility);\n"
 		"}\n\n"
 		"void sdf_apply_directional_light(\n"
 		"\tvec3 normal,\n"
@@ -581,8 +643,11 @@ static void se_sdf_gen_light_functions(c8* out, const sz capacity) {
 		"\tvec3 light_direction,\n"
 		"\tvec3 light_color,\n"
 		"\tfloat roughness,\n"
+		"\tfloat shading_bias,\n"
+		"\tfloat shading_smoothness,\n"
+		"\tfloat shadow_softness,\n"
 		"\tfloat shadow_bias,\n"
-		"\tfloat shadow_smoothness,\n"
+		"\tint shadow_samples,\n"
 		"\tout vec3 diffuse_light,\n"
 		"\tout vec3 specular_light) {\n"
 		"\tvec3 dir = normalize(light_direction);\n"
@@ -592,13 +657,14 @@ static void se_sdf_gen_light_functions(c8* out, const sz capacity) {
 		"\t\tspecular_light = vec3(0.0);\n"
 		"\t\treturn;\n"
 		"\t}\n"
-		"\tfloat shadow_visibility = sdf_shadow_visibility(world_position + normal * max(shadow_bias, 0.0005), dir, max(shadow_bias * 2.0, 0.002), 32.0);\n"
-		"\tfloat shadow = sdf_shadow_band(shadow_visibility, shadow_smoothness);\n"
+		"\tfloat diffuse_band = sdf_shading_band(diffuse, shading_bias, shading_smoothness);\n"
+		"\tfloat shadow_visibility = sdf_shadow_visibility(world_position + normal * max(shadow_bias, 0.0005), dir, max(shadow_bias * 2.0, 0.002), 32.0, shadow_softness, shadow_samples);\n"
 		"\tvec3 half_dir = normalize(dir + view_direction);\n"
 		"\tfloat shininess = mix(96.0, 8.0, clamp(roughness, 0.0, 1.0));\n"
 		"\tfloat specular = pow(max(dot(normal, half_dir), 0.0), shininess) * mix(1.0, 0.18, clamp(roughness, 0.0, 1.0));\n"
-		"\tdiffuse_light = light_color * diffuse * shadow * 0.78;\n"
-		"\tspecular_light = light_color * specular * shadow * 0.35;\n"
+		"\tfloat specular_band = sdf_shading_band(specular, shading_bias, shading_smoothness);\n"
+		"\tdiffuse_light = light_color * diffuse * diffuse_band * shadow_visibility * 0.78;\n"
+		"\tspecular_light = light_color * specular * specular_band * shadow_visibility * 0.35;\n"
 		"}\n\n"
 		"void sdf_apply_point_light(\n"
 		"\tvec3 normal,\n"
@@ -608,8 +674,11 @@ static void se_sdf_gen_light_functions(c8* out, const sz capacity) {
 		"\tvec3 light_color,\n"
 		"\tfloat radius,\n"
 		"\tfloat roughness,\n"
+		"\tfloat shading_bias,\n"
+		"\tfloat shading_smoothness,\n"
+		"\tfloat shadow_softness,\n"
 		"\tfloat shadow_bias,\n"
-		"\tfloat shadow_smoothness,\n"
+		"\tint shadow_samples,\n"
 		"\tout vec3 diffuse_light,\n"
 		"\tout vec3 specular_light) {\n"
 		"\tvec3 to_light = light_position - world_position;\n"
@@ -629,13 +698,14 @@ static void se_sdf_gen_light_functions(c8* out, const sz capacity) {
 		"\t\tspecular_light = vec3(0.0);\n"
 		"\t\treturn;\n"
 		"\t}\n"
-		"\tfloat shadow_visibility = sdf_shadow_visibility(world_position + normal * max(shadow_bias, 0.0005), dir, max(shadow_bias * 2.0, 0.002), max(distance_to_light - shadow_bias, 0.01));\n"
-		"\tfloat shadow = sdf_shadow_band(shadow_visibility, shadow_smoothness);\n"
+		"\tfloat diffuse_band = sdf_shading_band(diffuse, shading_bias, shading_smoothness);\n"
+		"\tfloat shadow_visibility = sdf_shadow_visibility(world_position + normal * max(shadow_bias, 0.0005), dir, max(shadow_bias * 2.0, 0.002), max(distance_to_light - shadow_bias, 0.01), shadow_softness, shadow_samples);\n"
 		"\tvec3 half_dir = normalize(dir + view_direction);\n"
 		"\tfloat shininess = mix(96.0, 8.0, clamp(roughness, 0.0, 1.0));\n"
 		"\tfloat specular = pow(max(dot(normal, half_dir), 0.0), shininess) * mix(1.0, 0.18, clamp(roughness, 0.0, 1.0));\n"
-		"\tdiffuse_light = light_color * diffuse * attenuation * shadow * 0.78;\n"
-		"\tspecular_light = light_color * specular * attenuation * shadow * 0.35;\n"
+		"\tfloat specular_band = sdf_shading_band(specular, shading_bias, shading_smoothness);\n"
+		"\tdiffuse_light = light_color * diffuse * diffuse_band * attenuation * shadow_visibility * 0.78;\n"
+		"\tspecular_light = light_color * specular * specular_band * attenuation * shadow_visibility * 0.35;\n"
 		"}\n\n");
 }
 
@@ -654,8 +724,11 @@ static void se_sdf_gen_uniform_recursive(c8* out, const sz capacity, const se_sd
 	se_sdf_append(out, capacity, "uniform vec3 _" SE_SDF_HANDLE_FMT "_shading_diffuse;\n", SE_SDF_HANDLE_ARG(sdf));
 	se_sdf_append(out, capacity, "uniform vec3 _" SE_SDF_HANDLE_FMT "_shading_specular;\n", SE_SDF_HANDLE_ARG(sdf));
 	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shading_roughness;\n", SE_SDF_HANDLE_ARG(sdf));
-	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shading_shadow_bias;\n", SE_SDF_HANDLE_ARG(sdf));
-	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shading_shadow_smoothness;\n", SE_SDF_HANDLE_ARG(sdf));
+	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shading_bias;\n", SE_SDF_HANDLE_ARG(sdf));
+	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shading_smoothness;\n", SE_SDF_HANDLE_ARG(sdf));
+	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shadow_softness;\n", SE_SDF_HANDLE_ARG(sdf));
+	se_sdf_append(out, capacity, "uniform float _" SE_SDF_HANDLE_FMT "_shadow_bias;\n", SE_SDF_HANDLE_ARG(sdf));
+	se_sdf_append(out, capacity, "uniform int _" SE_SDF_HANDLE_FMT "_shadow_samples;\n", SE_SDF_HANDLE_ARG(sdf));
 	if (se_sdf_needs_inverse_transform(sdf_ptr)) {
 		se_sdf_append(out, capacity, "uniform mat4 _" SE_SDF_HANDLE_FMT "_inv_transform;\n", SE_SDF_HANDLE_ARG(sdf));
 	}
@@ -832,11 +905,18 @@ static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sd
 		"\t\t_" SE_SDF_HANDLE_FMT "_shading_diffuse,\n"
 		"\t\t_" SE_SDF_HANDLE_FMT "_shading_specular,\n"
 		"\t\t_" SE_SDF_HANDLE_FMT "_shading_roughness,\n"
-		"\t\t_" SE_SDF_HANDLE_FMT "_shading_shadow_bias,\n"
-		"\t\t_" SE_SDF_HANDLE_FMT "_shading_shadow_smoothness);\n"
+		"\t\t_" SE_SDF_HANDLE_FMT "_shading_bias,\n"
+		"\t\t_" SE_SDF_HANDLE_FMT "_shading_smoothness);\n"
+		"\tsurface.shadow = sdf_make_shadow(\n"
+		"\t\t_" SE_SDF_HANDLE_FMT "_shadow_softness,\n"
+		"\t\t_" SE_SDF_HANDLE_FMT "_shadow_bias,\n"
+		"\t\t_" SE_SDF_HANDLE_FMT "_shadow_samples);\n"
 		"\tbool has_surface = false;\n",
 		SE_SDF_HANDLE_ARG(sdf),
 		SE_SDF_FAR_DISTANCE,
+		SE_SDF_HANDLE_ARG(sdf),
+		SE_SDF_HANDLE_ARG(sdf),
+		SE_SDF_HANDLE_ARG(sdf),
 		SE_SDF_HANDLE_ARG(sdf),
 		SE_SDF_HANDLE_ARG(sdf),
 		SE_SDF_HANDLE_ARG(sdf),
@@ -865,6 +945,7 @@ static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sd
 					"\t\t} else {\n"
 					"\t\t\tfloat blend = sdf_op_smooth_union_factor(surface.distance, child_surface.distance, _" SE_SDF_HANDLE_FMT "_operation_amount);\n"
 					"\t\t\tsurface.shading = sdf_mix_shading(child_surface.shading, surface.shading, blend);\n"
+					"\t\t\tsurface.shadow = sdf_mix_shadow(child_surface.shadow, surface.shadow, blend);\n"
 					"\t\t\tsurface.distance = sdf_op_smooth_union(surface.distance, child_surface.distance, _" SE_SDF_HANDLE_FMT "_operation_amount);\n"
 					"\t\t}\n"
 					"\t}\n",
@@ -881,6 +962,7 @@ static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sd
 					"\t\tsdf_surface_data child_surface = sdf_" SE_SDF_HANDLE_FMT "_surface(p);\n"
 					"\t\tif (!has_surface || child_surface.distance < surface.distance) {\n"
 					"\t\t\tsurface.shading = child_surface.shading;\n"
+					"\t\t\tsurface.shadow = child_surface.shadow;\n"
 					"\t\t}\n"
 					"\t\tsurface.distance = has_surface ? sdf_op_union(surface.distance, child_surface.distance, _" SE_SDF_HANDLE_FMT "_operation_amount) : child_surface.distance;\n"
 					"\t\thas_surface = true;\n"
@@ -940,7 +1022,7 @@ static void se_sdf_gen_light_apply_recursive(c8* out, const sz capacity, const s
 			"\t{\n"
 			"\t\tvec3 light_diffuse = vec3(0.0);\n"
 			"\t\tvec3 light_specular = vec3(0.0);\n"
-			"\t\tsdf_apply_directional_light(normal, view_direction, hit_position, _directional_light_" SE_SDF_HANDLE_FMT "_direction, _directional_light_" SE_SDF_HANDLE_FMT "_color, shading.roughness, shading.shadow_bias, shading.shadow_smoothness, light_diffuse, light_specular);\n"
+			"\t\tsdf_apply_directional_light(normal, view_direction, hit_position, _directional_light_" SE_SDF_HANDLE_FMT "_direction, _directional_light_" SE_SDF_HANDLE_FMT "_color, shading.roughness, shading.bias, shading.smoothness, shadow.softness, shadow.bias, int(max(round(shadow.samples), 1.0)), light_diffuse, light_specular);\n"
 			"\t\tdiffuse_lighting += light_diffuse;\n"
 			"\t\tspecular_lighting += light_specular;\n"
 			"\t}\n",
@@ -958,7 +1040,7 @@ static void se_sdf_gen_light_apply_recursive(c8* out, const sz capacity, const s
 			"\t{\n"
 			"\t\tvec3 light_diffuse = vec3(0.0);\n"
 			"\t\tvec3 light_specular = vec3(0.0);\n"
-			"\t\tsdf_apply_point_light(normal, view_direction, hit_position, _point_light_" SE_SDF_HANDLE_FMT "_position, _point_light_" SE_SDF_HANDLE_FMT "_color, _point_light_" SE_SDF_HANDLE_FMT "_radius, shading.roughness, shading.shadow_bias, shading.shadow_smoothness, light_diffuse, light_specular);\n"
+			"\t\tsdf_apply_point_light(normal, view_direction, hit_position, _point_light_" SE_SDF_HANDLE_FMT "_position, _point_light_" SE_SDF_HANDLE_FMT "_color, _point_light_" SE_SDF_HANDLE_FMT "_radius, shading.roughness, shading.bias, shading.smoothness, shadow.softness, shadow.bias, int(max(round(shadow.samples), 1.0)), light_diffuse, light_specular);\n"
 			"\t\tdiffuse_lighting += light_diffuse;\n"
 			"\t\tspecular_lighting += light_specular;\n"
 			"\t}\n",
@@ -1054,6 +1136,7 @@ void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
 		"\tvec3 normal = sdf_estimate_normal(hit_position);\n"
 		"\tsdf_surface_data surface = scene_surface(hit_position);\n"
 		"\tsdf_shading_data shading = surface.shading;\n"
+		"\tsdf_shadow_data shadow = surface.shadow;\n"
 		"\tvec3 view_direction = normalize(u_use_orthographic != 0 ? -ray_dir : (u_camera_position - hit_position));\n"
 		"\tvec3 diffuse_lighting = vec3(0.0);\n"
 		"\tvec3 specular_lighting = vec3(0.0);\n");
@@ -1066,7 +1149,7 @@ void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
 			"\t{\n"
 			"\t\tvec3 light_diffuse = vec3(0.0);\n"
 			"\t\tvec3 light_specular = vec3(0.0);\n"
-			"\t\tsdf_apply_directional_light(normal, view_direction, hit_position, vec3(%.2f, %.2f, %.2f), vec3(1.0), shading.roughness, shading.shadow_bias, shading.shadow_smoothness, light_diffuse, light_specular);\n"
+			"\t\tsdf_apply_directional_light(normal, view_direction, hit_position, vec3(%.2f, %.2f, %.2f), vec3(1.0), shading.roughness, shading.bias, shading.smoothness, shadow.softness, shadow.bias, int(max(round(shadow.samples), 1.0)), light_diffuse, light_specular);\n"
 			"\t\tdiffuse_lighting += light_diffuse;\n"
 			"\t\tspecular_lighting += light_specular;\n"
 			"\t}\n",
@@ -1123,10 +1206,17 @@ static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, cons
 	se_shader_set_vec3(shader, uniform_name, &shading.specular);
 	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shading_roughness", SE_SDF_HANDLE_ARG(sdf));
 	se_shader_set_float(shader, uniform_name, shading.roughness);
-	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shading_shadow_bias", SE_SDF_HANDLE_ARG(sdf));
-	se_shader_set_float(shader, uniform_name, shading.shadow_bias);
-	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shading_shadow_smoothness", SE_SDF_HANDLE_ARG(sdf));
-	se_shader_set_float(shader, uniform_name, shading.shadow_smooothness);
+	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shading_bias", SE_SDF_HANDLE_ARG(sdf));
+	se_shader_set_float(shader, uniform_name, shading.bias);
+	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shading_smoothness", SE_SDF_HANDLE_ARG(sdf));
+	se_shader_set_float(shader, uniform_name, shading.smoothness);
+	const se_sdf_shadow shadow = se_sdf_get_shadow_defaulted(sdf_ptr);
+	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shadow_softness", SE_SDF_HANDLE_ARG(sdf));
+	se_shader_set_float(shader, uniform_name, shadow.softness);
+	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shadow_bias", SE_SDF_HANDLE_ARG(sdf));
+	se_shader_set_float(shader, uniform_name, shadow.bias);
+	snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_shadow_samples", SE_SDF_HANDLE_ARG(sdf));
+	se_shader_set_int(shader, uniform_name, (i32)shadow.samples);
 	if (se_sdf_needs_inverse_transform(sdf_ptr)) {
 		const s_mat4 inverse = s_mat4_inverse(&sdf_ptr->transform);
 		snprintf(uniform_name, sizeof(uniform_name), "_" SE_SDF_HANDLE_FMT "_inv_transform", SE_SDF_HANDLE_ARG(sdf));
@@ -1497,6 +1587,177 @@ void se_sdf_directional_light_set_color(se_sdf_directional_light_handle directio
 		return;
 	}
 	directional_light_ptr->color = *color;
+}
+
+se_sdf_shading se_sdf_get_shading(se_sdf_handle sdf) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr) {
+		return (se_sdf_shading){0};
+	}
+	return se_sdf_get_shading_defaulted(sdf_ptr);
+}
+
+void se_sdf_set_shading(se_sdf_handle sdf, const se_sdf_shading* shading) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr || !shading) {
+		return;
+	}
+	sdf_ptr->shading = *shading;
+}
+
+s_vec3 se_sdf_get_shading_ambient(se_sdf_handle sdf) {
+	return se_sdf_get_shading(sdf).ambient;
+}
+
+void se_sdf_set_shading_ambient(se_sdf_handle sdf, const s_vec3* ambient) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shading shading = se_sdf_get_shading(sdf);
+	if (!sdf_ptr || !ambient) {
+		return;
+	}
+	shading.ambient = *ambient;
+	sdf_ptr->shading = shading;
+}
+
+s_vec3 se_sdf_get_shading_diffuse(se_sdf_handle sdf) {
+	return se_sdf_get_shading(sdf).diffuse;
+}
+
+void se_sdf_set_shading_diffuse(se_sdf_handle sdf, const s_vec3* diffuse) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shading shading = se_sdf_get_shading(sdf);
+	if (!sdf_ptr || !diffuse) {
+		return;
+	}
+	shading.diffuse = *diffuse;
+	sdf_ptr->shading = shading;
+}
+
+s_vec3 se_sdf_get_shading_specular(se_sdf_handle sdf) {
+	return se_sdf_get_shading(sdf).specular;
+}
+
+void se_sdf_set_shading_specular(se_sdf_handle sdf, const s_vec3* specular) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shading shading = se_sdf_get_shading(sdf);
+	if (!sdf_ptr || !specular) {
+		return;
+	}
+	shading.specular = *specular;
+	sdf_ptr->shading = shading;
+}
+
+f32 se_sdf_get_shading_roughness(se_sdf_handle sdf) {
+	return se_sdf_get_shading(sdf).roughness;
+}
+
+void se_sdf_set_shading_roughness(se_sdf_handle sdf, f32 roughness) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shading shading = se_sdf_get_shading(sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	shading.roughness = roughness;
+	sdf_ptr->shading = shading;
+}
+
+f32 se_sdf_get_shading_bias(se_sdf_handle sdf) {
+	return se_sdf_get_shading(sdf).bias;
+}
+
+void se_sdf_set_shading_bias(se_sdf_handle sdf, f32 bias) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shading shading = se_sdf_get_shading(sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	shading.bias = bias;
+	sdf_ptr->shading = shading;
+}
+
+f32 se_sdf_get_shading_smoothness(se_sdf_handle sdf) {
+	return se_sdf_get_shading(sdf).smoothness;
+}
+
+void se_sdf_set_shading_smoothness(se_sdf_handle sdf, f32 smoothness) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shading shading = se_sdf_get_shading(sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	shading.smoothness = smoothness;
+	sdf_ptr->shading = shading;
+}
+
+se_sdf_shadow se_sdf_get_shadow(se_sdf_handle sdf) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr) {
+		return (se_sdf_shadow){0};
+	}
+	return se_sdf_get_shadow_defaulted(sdf_ptr);
+}
+
+void se_sdf_set_shadow(se_sdf_handle sdf, const se_sdf_shadow* shadow) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr || !shadow) {
+		return;
+	}
+	sdf_ptr->shadow = *shadow;
+}
+
+f32 se_sdf_get_shadow_softness(se_sdf_handle sdf) {
+	return se_sdf_get_shadow(sdf).softness;
+}
+
+void se_sdf_set_shadow_softness(se_sdf_handle sdf, f32 softness) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shadow shadow = se_sdf_get_shadow(sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	shadow.softness = softness;
+	sdf_ptr->shadow = shadow;
+}
+
+f32 se_sdf_get_shadow_bias(se_sdf_handle sdf) {
+	return se_sdf_get_shadow(sdf).bias;
+}
+
+void se_sdf_set_shadow_bias(se_sdf_handle sdf, f32 bias) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shadow shadow = se_sdf_get_shadow(sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	shadow.bias = bias;
+	sdf_ptr->shadow = shadow;
+}
+
+u16 se_sdf_get_shadow_samples(se_sdf_handle sdf) {
+	return se_sdf_get_shadow(sdf).samples;
+}
+
+void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_shadow shadow = se_sdf_get_shadow(sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	shadow.samples = samples;
+	sdf_ptr->shadow = shadow;
 }
 
 void se_sdf_render_raw(se_sdf_handle sdf, se_camera_handle camera) {

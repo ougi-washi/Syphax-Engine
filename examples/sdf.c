@@ -4,6 +4,7 @@
 #include "se_graphics.h"
 #include "se_sdf.h"
 #include "se_window.h"
+#include "se_debug.h"
 
 i32 main() {
 	se_context* context = se_context_create();
@@ -31,8 +32,13 @@ i32 main() {
 			.diffuse = {0.92f, 0.28f, 0.42f},
 			.specular = {0.80f, 0.74f, 0.78f},
 			.roughness = 0.25f,
-			.shadow_bias = 0.025f,
-			.shadow_smooothness = 1.0f,
+			.bias = 0.46f,
+			.smoothness = 0.18f,
+		},
+		.shadow = {
+			.softness = 10.0f,
+			.bias = 0.025f,
+			.samples = 56,
 		},
 		.sphere = {.radius = 1.0f});
 	se_sdf_set_position(sphere, &s_vec3(0.0f, 1.0f, 0.0f));
@@ -49,10 +55,18 @@ i32 main() {
 			.diffuse = {0.28f, 0.31f, 0.34f},
 			.specular = {0.05f, 0.05f, 0.06f},
 			.roughness = 0.92f,
-			.shadow_bias = 0.02f,
-			.shadow_smooothness = 1.0f,
+			.bias = 0.32f,
+			.smoothness = 0.30f,
+		},
+		.shadow = {
+			.softness = 6.5f,
+			.bias = 0.02f,
+			.samples = 40,
 		},
 		.box = {.size = {10.0f, 0.01f, 10.0f}});
+	se_sdf_set_shading_smoothness(sphere, 0.14f);
+	se_sdf_set_shadow_softness(sphere, 12.0f);
+	se_sdf_set_shadow_samples(ground, 48);
 
 	// lights
 	se_sdf_point_light_handle orb_light = se_sdf_add_point_light(scene,
@@ -76,6 +90,7 @@ i32 main() {
 		se_render_clear();
 		se_sdf_render(scene, camera);
 
+		se_debug_set_overlay_enabled(true);
 		se_window_end_frame(window);
 	}
 

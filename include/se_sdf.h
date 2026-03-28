@@ -48,9 +48,15 @@ typedef struct se_sdf_shading {
     s_vec3 diffuse;
     s_vec3 specular;
     f32 roughness;
-	f32 shadow_bias;
-	f32 shadow_smooothness;
+	f32 bias;
+	f32 smoothness;
 } se_sdf_shading;
+
+typedef struct se_sdf_shadow {
+	f32 softness;
+	f32 bias;
+	u16 samples;
+} se_sdf_shadow;
 
 typedef struct se_sdf {
     s_mat4 transform;
@@ -58,6 +64,7 @@ typedef struct se_sdf {
 	se_sdf_operator operation;
 	f32 operation_amount;
 	se_sdf_shading shading;
+	se_sdf_shadow shadow;
     union {
         struct { f32 radius; } sphere;
         struct { s_vec3 size; } box;
@@ -105,6 +112,30 @@ extern s_vec3 se_sdf_get_directional_light_direction(se_sdf_directional_light_ha
 extern void se_sdf_directional_light_set_direction(se_sdf_directional_light_handle directional_light, const s_vec3* direction);
 extern s_vec3 se_sdf_get_directional_light_color(se_sdf_directional_light_handle directional_light);
 extern void se_sdf_directional_light_set_color(se_sdf_directional_light_handle directional_light, const s_vec3* color);
+
+extern se_sdf_shading se_sdf_get_shading(se_sdf_handle sdf);
+extern void se_sdf_set_shading(se_sdf_handle sdf, const se_sdf_shading* shading);
+extern s_vec3 se_sdf_get_shading_ambient(se_sdf_handle sdf);
+extern void se_sdf_set_shading_ambient(se_sdf_handle sdf, const s_vec3* ambient);
+extern s_vec3 se_sdf_get_shading_diffuse(se_sdf_handle sdf);
+extern void se_sdf_set_shading_diffuse(se_sdf_handle sdf, const s_vec3* diffuse);
+extern s_vec3 se_sdf_get_shading_specular(se_sdf_handle sdf);
+extern void se_sdf_set_shading_specular(se_sdf_handle sdf, const s_vec3* specular);
+extern f32 se_sdf_get_shading_roughness(se_sdf_handle sdf);
+extern void se_sdf_set_shading_roughness(se_sdf_handle sdf, f32 roughness);
+extern f32 se_sdf_get_shading_bias(se_sdf_handle sdf);
+extern void se_sdf_set_shading_bias(se_sdf_handle sdf, f32 bias);
+extern f32 se_sdf_get_shading_smoothness(se_sdf_handle sdf);
+extern void se_sdf_set_shading_smoothness(se_sdf_handle sdf, f32 smoothness);
+
+extern se_sdf_shadow se_sdf_get_shadow(se_sdf_handle sdf);
+extern void se_sdf_set_shadow(se_sdf_handle sdf, const se_sdf_shadow* shadow);
+extern f32 se_sdf_get_shadow_softness(se_sdf_handle sdf);
+extern void se_sdf_set_shadow_softness(se_sdf_handle sdf, f32 softness);
+extern f32 se_sdf_get_shadow_bias(se_sdf_handle sdf);
+extern void se_sdf_set_shadow_bias(se_sdf_handle sdf, f32 bias);
+extern u16 se_sdf_get_shadow_samples(se_sdf_handle sdf);
+extern void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples);
 
 extern void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera); 
 extern void se_sdf_bake(se_sdf_handle sdf);

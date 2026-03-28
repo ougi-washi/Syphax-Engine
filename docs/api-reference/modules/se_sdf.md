@@ -207,6 +207,138 @@ extern f32 se_sdf_get_point_light_radius(se_sdf_point_light_handle point_light);
 
 No inline description found in header comments.
 
+### `se_sdf_get_shading`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_shading se_sdf_get_shading(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shading_ambient`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_shading_ambient(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shading_bias`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_shading_bias(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shading_diffuse`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_shading_diffuse(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shading_roughness`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_shading_roughness(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shading_smoothness`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_shading_smoothness(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shading_specular`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_shading_specular(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shadow`
+
+<div class="api-signature">
+
+```c
+extern se_sdf_shadow se_sdf_get_shadow(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shadow_bias`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_shadow_bias(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shadow_samples`
+
+<div class="api-signature">
+
+```c
+extern u16 se_sdf_get_shadow_samples(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_shadow_softness`
+
+<div class="api-signature">
+
+```c
+extern f32 se_sdf_get_shadow_softness(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_noise_set_frequency`
 
 <div class="api-signature">
@@ -303,6 +435,138 @@ extern void se_sdf_set_position(se_sdf_handle sdf, const s_vec3* position);
 
 No inline description found in header comments.
 
+### `se_sdf_set_shading`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading(se_sdf_handle sdf, const se_sdf_shading* shading);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shading_ambient`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading_ambient(se_sdf_handle sdf, const s_vec3* ambient);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shading_bias`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading_bias(se_sdf_handle sdf, f32 bias);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shading_diffuse`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading_diffuse(se_sdf_handle sdf, const s_vec3* diffuse);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shading_roughness`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading_roughness(se_sdf_handle sdf, f32 roughness);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shading_smoothness`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading_smoothness(se_sdf_handle sdf, f32 smoothness);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shading_specular`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shading_specular(se_sdf_handle sdf, const s_vec3* specular);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shadow`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shadow(se_sdf_handle sdf, const se_sdf_shadow* shadow);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shadow_bias`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shadow_bias(se_sdf_handle sdf, f32 bias);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shadow_samples`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_shadow_softness`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_shadow_softness(se_sdf_handle sdf, f32 softness);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ## Enums
 
 ### `se_sdf_noise_type`
@@ -348,7 +612,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; se_sdf_shading shading; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
+typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; se_sdf_shading shading; se_sdf_shadow shadow; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
 ```
 
 </div>
@@ -396,7 +660,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf_shading { s_vec3 ambient; s_vec3 diffuse; s_vec3 specular; f32 roughness; f32 shadow_bias; f32 shadow_smooothness; } se_sdf_shading;
+typedef struct se_sdf_shading { s_vec3 ambient; s_vec3 diffuse; s_vec3 specular; f32 roughness; f32 bias; f32 smoothness; } se_sdf_shading;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_shadow`
+
+<div class="api-signature">
+
+```c
+typedef struct se_sdf_shadow { f32 softness; f32 bias; u16 samples; } se_sdf_shadow;
 ```
 
 </div>

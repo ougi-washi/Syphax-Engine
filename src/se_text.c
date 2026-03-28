@@ -289,7 +289,7 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 		const i32 c = (u8)raw_c;
 		
 		if (raw_c == '\n') {
-			local_position.y -= new_line_offset * size->y;
+			local_position.y -= new_line_offset * size->y * font_ptr->size / 10.;
 			local_position.x = position->x;
 			continue;
 		}
