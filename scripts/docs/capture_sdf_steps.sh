@@ -60,10 +60,10 @@ if ! [[ "$TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT_SECONDS" -lt 1 ]]; the
 fi
 
 if [[ "$SHOULD_BUILD" -eq 1 ]]; then
-	"$ROOT_DIR/build.sh" sdf
+	"$ROOT_DIR/build.sh" sdf_path_steps
 fi
 
-BINARY="$ROOT_DIR/bin/sdf"
+BINARY="$ROOT_DIR/bin/sdf_path_steps"
 if [[ ! -x "$BINARY" ]]; then
 	echo "Missing binary: $BINARY (build first or use --build)" >&2
 	exit 1
