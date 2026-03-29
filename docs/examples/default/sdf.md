@@ -39,7 +39,7 @@ Compose a small signed-distance scene with shared lights, per-object shading, an
 
 - A parent `se_sdf` scene blends sphere and ground children with smooth union.
 - Noise, point-light, and directional-light handles are attached once and then adjusted through setters.
-- Each SDF object carries its own `se_sdf_shading`, so diffuse, specular, roughness, and `shadow_smooothness` are uploaded as per-object uniforms during render.
+- Each SDF object carries its own `se_sdf_shading` and `se_sdf_shadow`, so material bias/smoothness and shadow softness/sample counts stay per-object during render.
 
 ## Related API links
 

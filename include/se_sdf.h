@@ -58,6 +58,13 @@ typedef struct se_sdf_shadow {
 	u16 samples;
 } se_sdf_shadow;
 
+typedef struct se_sdf_lod {
+	f32 distance;
+	u16 steps;
+	b8 noise;
+	b8 point_lights;
+} se_sdf_lod;
+
 typedef struct se_sdf {
     s_mat4 transform;
     se_sdf_type type;
