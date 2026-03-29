@@ -63,7 +63,14 @@ typedef struct se_sdf_lod {
 	u16 steps;
 	b8 noise;
 	b8 point_lights;
+	b8 shadows;
 } se_sdf_lod;
+
+typedef struct se_sdf_lods {
+	se_sdf_lod low;
+	se_sdf_lod medium;
+	se_sdf_lod high;
+} se_sdf_lods;
 
 typedef struct se_sdf {
     s_mat4 transform;
@@ -72,6 +79,7 @@ typedef struct se_sdf {
 	f32 operation_amount;
 	se_sdf_shading shading;
 	se_sdf_shadow shadow;
+	se_sdf_lods lods;
     union {
         struct { f32 radius; } sphere;
         struct { s_vec3 size; } box;
@@ -119,6 +127,9 @@ extern s_vec3 se_sdf_get_directional_light_direction(se_sdf_directional_light_ha
 extern void se_sdf_directional_light_set_direction(se_sdf_directional_light_handle directional_light, const s_vec3* direction);
 extern s_vec3 se_sdf_get_directional_light_color(se_sdf_directional_light_handle directional_light);
 extern void se_sdf_directional_light_set_color(se_sdf_directional_light_handle directional_light, const s_vec3* color);
+
+extern se_sdf_lods se_sdf_get_lods(se_sdf_handle sdf);
+extern void se_sdf_set_lods(se_sdf_handle sdf, const se_sdf_lods* lods);
 
 extern se_sdf_shading se_sdf_get_shading(se_sdf_handle sdf);
 extern void se_sdf_set_shading(se_sdf_handle sdf, const se_sdf_shading* shading);

@@ -25,7 +25,7 @@ Use this tiny call path first, then continue with the four progressive snippets 
 
 Build the smallest renderable setup: one sphere, one camera, one window loop.
 
-<img src="../assets/img/path/sdf/step1.png" alt="SDF Step 1 capture showing a single shaded sphere">
+<img src="../../assets/img/path/sdf/step1.png" alt="SDF Step 1 capture showing a single shaded sphere">
 
 ```c
 --8<-- "snippets/se_sdf/step1_minimal.c"
@@ -46,7 +46,7 @@ Add the scene graph structure so the example starts rendering the same sphere-pl
 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
-<img src="../assets/img/path/sdf/step2.png" alt="SDF Step 2 capture showing the sphere composed with a ground plane">
+<img src="../../assets/img/path/sdf/step2.png" alt="SDF Step 2 capture showing the sphere composed with a ground plane">
 
 ```c
 --8<-- "snippets/se_sdf/step2_core.c"
@@ -64,7 +64,7 @@ Add tunable surface noise plus a point light so the same scene starts showing th
 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
-<img src="../assets/img/path/sdf/step3.png" alt="SDF Step 3 capture showing noisy surface detail and a point light">
+<img src="../../assets/img/path/sdf/step3.png" alt="SDF Step 3 capture showing noisy surface detail and a point light">
 
 ```c
 --8<-- "snippets/se_sdf/step3_interactive.c"
@@ -86,7 +86,7 @@ Complete the flow with the full `sdf` example scene: shared lights, stylized sha
 
 What changed from previous step: this step layers one additional capability without replacing the previous structure, so you can isolate behavior changes quickly.
 
-<img src="../assets/img/path/sdf/step4.png" alt="SDF Step 4 capture showing the complete SDF example scene">
+<img src="../../assets/img/path/sdf/step4.png" alt="SDF Step 4 capture showing the complete SDF example scene">
 
 ```c
 --8<-- "snippets/se_sdf/step4_complete.c"

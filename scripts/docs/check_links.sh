@@ -22,6 +22,8 @@ docs_dir = os.path.abspath(sys.argv[1])
 check_external = int(sys.argv[2]) == 1
 
 link_pattern = re.compile(r"(!)?\[[^\]]*\]\(([^)]+)\)")
+html_img_src_pattern = re.compile(r"<img\b[^>]*\bsrc=(['\"])(.*?)\1", re.IGNORECASE)
+html_onerror_src_pattern = re.compile(r"""this\.src\s*=\s*(['"])(.*?)\1""", re.IGNORECASE)
 heading_pattern = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 
 
@@ -83,17 +85,16 @@ def resolve_local_link(src_file: str, target: str) -> Tuple[str, str]:
 
     resolved = os.path.normpath(resolved)
 
-    # Docs example pages are rendered under an extra directory level
-    # (e.g. /examples/default/<page>/), so static assets intentionally use
-    # ../../../assets/... in markdown. Validate those against docs/assets.
-    if (
-        not os.path.exists(resolved)
-        and path_part.startswith("../../../assets/")
-        and os.path.normpath(src_file).startswith(os.path.join(docs_dir, "examples"))
-    ):
-        fallback = os.path.normpath(os.path.join(docs_dir, path_part[len("../../../"):]))
-        if os.path.exists(fallback):
-            resolved = fallback
+    # Many docs pages use asset URLs that are relative to the rendered site path
+    # (e.g. ../../assets/... from /path/<slug>/ or ../../../assets/... from
+    # /examples/default/<slug>/). When validating from markdown source paths,
+    # map those back onto docs/assets.
+    if not os.path.exists(resolved):
+        rendered_relative = re.sub(r"^(?:\.\./)+", "", path_part)
+        if rendered_relative.startswith("assets/"):
+            fallback = os.path.normpath(os.path.join(docs_dir, rendered_relative))
+            if os.path.exists(fallback):
+                resolved = fallback
 
     return resolved, anchor
 
@@ -110,51 +111,56 @@ anchors_cache = {path: headings_for_file(path) for path in all_markdown_files}
 errors: List[str] = []
 checked_external: Set[str] = set()
 
+def validate_target(src_file: str, raw_target: str) -> None:
+    target = normalize_target(raw_target)
+    if not target:
+        return
+    if target.startswith("mailto:"):
+        return
+    if target.startswith("http://") or target.startswith("https://"):
+        if check_external and target not in checked_external:
+            checked_external.add(target)
+            try:
+                req = urllib.request.Request(target, method="HEAD", headers={"User-Agent": "syphax-docs-linkcheck"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    if resp.status >= 400:
+                        errors.append(f"{os.path.relpath(src_file, docs_dir)} -> external link failed: {target} (status {resp.status})")
+            except urllib.error.HTTPError as ex:
+                if ex.code >= 400:
+                    errors.append(f"{os.path.relpath(src_file, docs_dir)} -> external link failed: {target} (status {ex.code})")
+            except Exception as ex:
+                errors.append(f"{os.path.relpath(src_file, docs_dir)} -> external link failed: {target} ({ex})")
+        return
+
+    local_path, anchor = resolve_local_link(src_file, target)
+    rel_src = os.path.relpath(src_file, docs_dir)
+
+    if not os.path.exists(local_path):
+        errors.append(f"{rel_src} -> missing file: {target}")
+        return
+
+    if anchor:
+        file_anchors = anchors_cache.get(local_path)
+        if file_anchors is None:
+            file_anchors = headings_for_file(local_path)
+            anchors_cache[local_path] = file_anchors
+        if anchor not in file_anchors:
+            rel_target = os.path.relpath(local_path, docs_dir)
+            errors.append(f"{rel_src} -> missing anchor: {target} (resolved {rel_target}#{anchor})")
+
+
 for src_file in all_markdown_files:
     with open(src_file, "r", encoding="utf-8") as f:
         content = f.read()
 
     for match in link_pattern.finditer(content):
-        is_image = bool(match.group(1))
-        target = normalize_target(match.group(2))
-        if not target:
-            continue
-        if is_image:
-            # image links are validated only as file paths below
-            pass
+        validate_target(src_file, match.group(2))
 
-        if target.startswith("mailto:"):
-            continue
-        if target.startswith("http://") or target.startswith("https://"):
-            if check_external and target not in checked_external:
-                checked_external.add(target)
-                try:
-                    req = urllib.request.Request(target, method="HEAD", headers={"User-Agent": "syphax-docs-linkcheck"})
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        if resp.status >= 400:
-                            errors.append(f"{os.path.relpath(src_file, docs_dir)} -> external link failed: {target} (status {resp.status})")
-                except urllib.error.HTTPError as ex:
-                    if ex.code >= 400:
-                        errors.append(f"{os.path.relpath(src_file, docs_dir)} -> external link failed: {target} (status {ex.code})")
-                except Exception as ex:
-                    errors.append(f"{os.path.relpath(src_file, docs_dir)} -> external link failed: {target} ({ex})")
-            continue
+    for match in html_img_src_pattern.finditer(content):
+        validate_target(src_file, match.group(2))
 
-        local_path, anchor = resolve_local_link(src_file, target)
-        rel_src = os.path.relpath(src_file, docs_dir)
-
-        if not os.path.exists(local_path):
-            errors.append(f"{rel_src} -> missing file: {target}")
-            continue
-
-        if anchor:
-            file_anchors = anchors_cache.get(local_path)
-            if file_anchors is None:
-                file_anchors = headings_for_file(local_path)
-                anchors_cache[local_path] = file_anchors
-            if anchor not in file_anchors:
-                rel_target = os.path.relpath(local_path, docs_dir)
-                errors.append(f"{rel_src} -> missing anchor: {target} (resolved {rel_target}#{anchor})")
+    for match in html_onerror_src_pattern.finditer(content):
+        validate_target(src_file, match.group(2))
 
 if errors:
     print("Link check failed:")

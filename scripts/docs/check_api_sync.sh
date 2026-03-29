@@ -2,12 +2,19 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+API_DIR="$ROOT_DIR/docs/api-reference/modules"
+SNAPSHOT_DIR="$(mktemp -d)"
+cleanup() {
+	rm -rf "$SNAPSHOT_DIR"
+}
+trap cleanup EXIT
 
 cd "$ROOT_DIR"
+cp -a "$API_DIR/." "$SNAPSHOT_DIR/"
 ./scripts/docs/generate_api_reference.sh
-if ! git diff --quiet -- docs/api-reference/modules; then
-	echo "Generated API docs are out of date. Run ./scripts/docs/generate_api_reference.sh and commit changes." >&2
-	git --no-pager diff -- docs/api-reference/modules
+if ! diff -ru "$SNAPSHOT_DIR" "$API_DIR" >/tmp/se_api_sync_diff.log; then
+	echo "Generated API docs are out of date. Run ./scripts/docs/generate_api_reference.sh and keep the updated files." >&2
+	cat /tmp/se_api_sync_diff.log >&2
 	exit 1
 fi
 

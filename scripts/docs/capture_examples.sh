@@ -164,6 +164,7 @@ for target in "${CAPTURE_TARGETS[@]}"; do
 	track="${TRACK_BY_TARGET[$target]}"
 	binary="$ROOT_DIR/bin/$target"
 	output="$ROOT_DIR/docs/assets/img/examples/$track/$target.png"
+	capture_frame="$FRAME"
 
 	if [[ ! -x "$binary" ]]; then
 		echo "Missing binary: $binary (build first or use --build)" >&2
@@ -174,11 +175,16 @@ for target in "${CAPTURE_TARGETS[@]}"; do
 	rm -f "$output"
 	echo "Capturing $target -> ${output#$ROOT_DIR/}"
 
+	if [[ "$target" == "sdf" && "$FRAME" -eq 20 ]]; then
+		# SDF shader warmup is slower in hidden terminal mode; an earlier stable frame avoids spurious timeouts.
+		capture_frame=5
+	fi
+
 	declare -a CMD=(
 		timeout "${TIMEOUT_SECONDS}s"
 		env
 		SE_DOCS_CAPTURE_PATH="$output"
-		SE_DOCS_CAPTURE_FRAME="$FRAME"
+		SE_DOCS_CAPTURE_FRAME="$capture_frame"
 		SE_DOCS_CAPTURE_EXIT=1
 	)
 	if [[ "$target" == "rts_integration" ]]; then

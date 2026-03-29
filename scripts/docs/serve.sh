@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MKDOCS_BIN="mkdocs"
+PYTHONPATH_PREFIX="$ROOT_DIR/scripts/docs/python"
 
 if [[ -x "$ROOT_DIR/.venv/bin/mkdocs" ]]; then
 	MKDOCS_BIN="$ROOT_DIR/.venv/bin/mkdocs"
@@ -13,4 +14,4 @@ fi
 
 cd "$ROOT_DIR"
 ./scripts/docs/generate_api_reference.sh
-"$MKDOCS_BIN" serve --config-file mkdocs.yml
+PYTHONPATH="$PYTHONPATH_PREFIX${PYTHONPATH:+:$PYTHONPATH}" "$MKDOCS_BIN" serve --config-file mkdocs.yml
