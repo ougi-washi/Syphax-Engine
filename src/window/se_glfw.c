@@ -1570,6 +1570,7 @@ static void se_window_render_screen_internal(const se_window_handle window, se_w
 		const f64 elapsed = now - window_ptr->time.frame_start;
 		f64 time_left = target_frame_time - elapsed;
 		if (time_left > 0.0) {
+			se_debug_trace_begin("window_present_sleep");
 			const f64 coarse_guard = 0.001;
 			if (time_left > coarse_guard) {
 				const f64 coarse_sleep = time_left - coarse_guard;
@@ -1585,14 +1586,23 @@ static void se_window_render_screen_internal(const se_window_handle window, se_w
 			if (slept > window_ptr->diagnostics.last_sleep_duration) {
 				window_ptr->diagnostics.last_sleep_duration = slept;
 			}
+			se_debug_trace_end("window_present_sleep");
 		}
 	}
+	se_debug_trace_begin("window_present_overlay");
 	se_debug_render_overlay(window, NULL);
+	se_debug_trace_end("window_present_overlay");
+	se_debug_trace_begin("window_present_swap");
 	se_debug_trace_begin_channel("window_present_gpu", SE_DEBUG_TRACE_CHANNEL_GPU);
 	glfwSwapBuffers((GLFWwindow*)window_ptr->handle);
 	se_debug_trace_end_channel("window_present_gpu", SE_DEBUG_TRACE_CHANNEL_GPU);
+	se_debug_trace_end("window_present_swap");
+	se_debug_trace_begin("window_present_docs");
 	se_window_docs_capture_present(window_ptr);
+	se_debug_trace_end("window_present_docs");
+	se_debug_trace_begin("window_present_terminal");
 	se_window_terminal_mirror_present(window_ptr);
+	se_debug_trace_end("window_present_terminal");
 	window_ptr->diagnostics.frames_presented++;
 	window_ptr->diagnostics.last_present_duration = glfwGetTime() - present_begin;
 	se_debug_trace_end("window_present");

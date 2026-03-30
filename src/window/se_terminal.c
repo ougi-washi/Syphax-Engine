@@ -915,13 +915,17 @@ void se_window_render_screen(const se_window_handle window) {
 		const f64 elapsed = now - window_ptr->time.frame_start;
 		const f64 time_left = target_frame_time - elapsed;
 		if (time_left > 0.0) {
+			se_debug_trace_begin("window_present_sleep");
 			const f64 sleep_begin = se_window_terminal_now_seconds();
 			se_window_terminal_sleep_seconds(time_left);
 			const f64 sleep_end = se_window_terminal_now_seconds();
 			window_ptr->diagnostics.last_sleep_duration = s_max(0.0, sleep_end - sleep_begin);
+			se_debug_trace_end("window_present_sleep");
 		}
 	}
+	se_debug_trace_begin("window_present_terminal");
 	se_window_terminal_present(window_ptr);
+	se_debug_trace_end("window_present_terminal");
 	window_ptr->diagnostics.frames_presented++;
 	window_ptr->diagnostics.last_present_duration = s_max(0.0, se_window_terminal_now_seconds() - present_begin);
 	se_debug_trace_end("window_present");

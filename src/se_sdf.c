@@ -6,6 +6,7 @@
 #include "se_camera.h"
 #include "se_debug.h"
 #include "se_framebuffer.h"
+#include "se_math.h"
 #include "se_shader.h"
 
 #include <math.h>
@@ -50,8 +51,16 @@
 #define SE_SDF_LOD_HIGH_HIT_EPSILON SE_SDF_HIT_EPSILON
 #define SE_SDF_LOD_MEDIUM_HIT_EPSILON 0.002f
 #define SE_SDF_LOD_LOW_HIT_EPSILON 0.004f
+#define SE_SDF_BOUNDS_PAD_PIXELS 4.0f
 #define SE_SDF_HANDLE_FMT "%llu"
 #define SE_SDF_HANDLE_ARG(_handle) ((unsigned long long)(_handle))
+
+typedef struct se_sdf_screen_rect {
+	s_vec2 uv_min;
+	s_vec2 uv_max;
+	b8 active;
+	b8 visible;
+} se_sdf_screen_rect;
 
 static se_sdf* se_sdf_from_handle(se_context* ctx, const se_sdf_handle sdf);
 static se_sdf_noise* se_sdf_noise_from_handle(se_context* ctx, const se_sdf_noise_handle noise);
@@ -66,12 +75,23 @@ static void se_sdf_release_point_light_references(se_context* ctx, se_sdf* sdf_p
 static void se_sdf_release_directional_light_references(se_context* ctx, se_sdf* sdf_ptr);
 static b8 se_sdf_transform_is_zero(const s_mat4* transform);
 static b8 se_sdf_vec3_is_zero(const s_vec3* value);
+static b8 se_sdf_debug_sync_enabled(void);
 static b8 se_sdf_shading_is_zero(const se_sdf_shading* shading);
 static b8 se_sdf_shadow_is_zero(const se_sdf_shadow* shadow);
 static s_vec4 se_sdf_mul_mat4_vec4(const s_mat4* matrix, const s_vec4* vector);
 static s_vec3 se_sdf_transform_point(const s_mat4* transform, const s_vec3* point);
 static s_vec3 se_sdf_transform_direction(const s_mat4* transform, const s_vec3* direction);
+static void se_sdf_box_reset(se_box_3d* box);
+static void se_sdf_box_include_point(se_box_3d* box, const s_vec3* point, b8* has_bounds);
+static void se_sdf_box_include_box(se_box_3d* box, const se_box_3d* other, b8* has_bounds);
+static void se_sdf_box_expand(se_box_3d* box, f32 amount);
+static void se_sdf_box_transform(const se_box_3d* local_box, const s_mat4* transform, se_box_3d* out_world_box);
+static f32 se_sdf_get_noise_bounds_padding(const se_sdf* sdf);
+static b8 se_sdf_get_local_primitive_bounds(const se_sdf* sdf, se_box_3d* out_local_box);
+static b8 se_sdf_compute_world_bounds_recursive(const se_sdf_handle sdf, se_box_3d* out_world_box);
+static se_sdf_screen_rect se_sdf_compute_screen_rect(const se_box_3d* world_box, const se_camera_handle camera, const GLint viewport[4]);
 static b8 se_sdf_noise_is_active(const se_sdf_noise* noise);
+static f32 se_sdf_get_max_noise_padding_recursive(const se_sdf_handle sdf);
 static b8 se_sdf_has_primitive(const se_sdf* sdf);
 static b8 se_sdf_has_noise(const se_sdf* sdf);
 static b8 se_sdf_needs_inverse_transform(const se_sdf* sdf);
@@ -93,6 +113,7 @@ static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operat
 static const c8* se_sdf_get_noise_function_name(const se_sdf_noise_type type);
 static void se_sdf_destroy_shader_runtime(se_sdf* sdf_ptr);
 static void se_sdf_invalidate_shader_chain(const se_sdf_handle sdf);
+static void se_sdf_gen_bounds_helpers(c8* out, const sz capacity);
 static void se_sdf_gen_lod_helpers(c8* out, const sz capacity);
 static void se_sdf_gen_operator_functions(c8* out, const sz capacity);
 static void se_sdf_gen_noise_functions(c8* out, const sz capacity);
@@ -103,6 +124,11 @@ static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_s
 static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_light_apply_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_upload_lod_uniforms(const se_shader_handle shader, const se_sdf* sdf_ptr);
+static void se_sdf_upload_bounds_uniforms(
+	const se_shader_handle shader,
+	const se_box_3d* world_box,
+	const b8 bounds_valid,
+	const se_sdf_screen_rect* rect);
 static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, const se_sdf_handle sdf);
 
 static se_sdf* se_sdf_from_handle(se_context* ctx, const se_sdf_handle sdf) {
@@ -266,6 +292,16 @@ static b8 se_sdf_vec3_is_zero(const s_vec3* value) {
 	return !value || s_vec3_length(value) <= SE_SDF_MATRIX_EPSILON;
 }
 
+static b8 se_sdf_debug_sync_enabled(void) {
+	static i32 cached = -1;
+	if (cached >= 0) {
+		return cached != 0;
+	}
+	const c8* value = getenv("SE_SDF_DEBUG_SYNC");
+	cached = (value && value[0] != '\0' && strcmp(value, "0") != 0) ? 1 : 0;
+	return cached != 0;
+}
+
 static b8 se_sdf_shading_is_zero(const se_sdf_shading* shading) {
 	return !shading
 		|| (se_sdf_vec3_is_zero(&shading->ambient)
@@ -301,8 +337,220 @@ static s_vec3 se_sdf_transform_direction(const s_mat4* transform, const s_vec3* 
 	return s_vec3_normalize(&s_vec3(transformed.x, transformed.y, transformed.z));
 }
 
+static void se_sdf_box_reset(se_box_3d* box) {
+	if (!box) {
+		return;
+	}
+	box->min = s_vec3(0.0f, 0.0f, 0.0f);
+	box->max = s_vec3(0.0f, 0.0f, 0.0f);
+}
+
+static void se_sdf_box_include_point(se_box_3d* box, const s_vec3* point, b8* has_bounds) {
+	if (!box || !point || !has_bounds) {
+		return;
+	}
+	if (!*has_bounds) {
+		box->min = *point;
+		box->max = *point;
+		*has_bounds = true;
+		return;
+	}
+	box->min.x = s_min(box->min.x, point->x);
+	box->min.y = s_min(box->min.y, point->y);
+	box->min.z = s_min(box->min.z, point->z);
+	box->max.x = s_max(box->max.x, point->x);
+	box->max.y = s_max(box->max.y, point->y);
+	box->max.z = s_max(box->max.z, point->z);
+}
+
+static void se_sdf_box_include_box(se_box_3d* box, const se_box_3d* other, b8* has_bounds) {
+	if (!box || !other || !has_bounds) {
+		return;
+	}
+	se_sdf_box_include_point(box, &other->min, has_bounds);
+	se_sdf_box_include_point(box, &other->max, has_bounds);
+}
+
+static void se_sdf_box_expand(se_box_3d* box, f32 amount) {
+	const s_vec3 padding = s_vec3(amount, amount, amount);
+	if (!box || amount <= 0.0f) {
+		return;
+	}
+	box->min = s_vec3_sub(&box->min, &padding);
+	box->max = s_vec3_add(&box->max, &padding);
+}
+
+static void se_sdf_box_transform(const se_box_3d* local_box, const s_mat4* transform, se_box_3d* out_world_box) {
+	const s_vec3 corners[8] = {
+		s_vec3(local_box->min.x, local_box->min.y, local_box->min.z),
+		s_vec3(local_box->min.x, local_box->min.y, local_box->max.z),
+		s_vec3(local_box->min.x, local_box->max.y, local_box->min.z),
+		s_vec3(local_box->min.x, local_box->max.y, local_box->max.z),
+		s_vec3(local_box->max.x, local_box->min.y, local_box->min.z),
+		s_vec3(local_box->max.x, local_box->min.y, local_box->max.z),
+		s_vec3(local_box->max.x, local_box->max.y, local_box->min.z),
+		s_vec3(local_box->max.x, local_box->max.y, local_box->max.z),
+	};
+	b8 has_bounds = false;
+	if (!local_box || !transform || !out_world_box) {
+		return;
+	}
+	se_sdf_box_reset(out_world_box);
+	for (u32 i = 0; i < 8u; ++i) {
+		const s_vec3 world_corner = se_sdf_transform_point(transform, &corners[i]);
+		se_sdf_box_include_point(out_world_box, &world_corner, &has_bounds);
+	}
+}
+
+static f32 se_sdf_get_noise_bounds_padding(const se_sdf* sdf) {
+	se_context* ctx = se_current_context();
+	f32 padding = 0.0f;
+	if (!sdf) {
+		return 0.0f;
+	}
+	for (u32 i = 0; i < (u32)s_array_get_size(&sdf->noises); ++i) {
+		const s_handle noise_handle = s_array_handle_at(&sdf->noises.b, i);
+		const se_sdf_noise_handle* noise_handle_ptr = s_array_get_ptr(&sdf->noises.b, sizeof(se_sdf_noise_handle), noise_handle);
+		const se_sdf_noise* noise = noise_handle_ptr ? se_sdf_noise_from_handle(ctx, *noise_handle_ptr) : NULL;
+		if (se_sdf_noise_is_active(noise)) {
+			padding += SE_SDF_DEFAULT_NOISE_AMOUNT;
+		}
+	}
+	return padding;
+}
+
+static b8 se_sdf_get_local_primitive_bounds(const se_sdf* sdf, se_box_3d* out_local_box) {
+	if (!sdf || !out_local_box) {
+		return false;
+	}
+	if (sdf->type == SE_SDF_SPHERE) {
+		const f32 radius = fabsf(sdf->sphere.radius);
+		*out_local_box = (se_box_3d){
+			.min = s_vec3(-radius, -radius, -radius),
+			.max = s_vec3(radius, radius, radius),
+		};
+		return true;
+	}
+	if (sdf->type == SE_SDF_BOX) {
+		const s_vec3 half = s_vec3(
+			fabsf(sdf->box.size.x),
+			fabsf(sdf->box.size.y),
+			fabsf(sdf->box.size.z));
+		*out_local_box = (se_box_3d){
+			.min = s_vec3(-half.x, -half.y, -half.z),
+			.max = s_vec3(half.x, half.y, half.z),
+		};
+		return true;
+	}
+	return false;
+}
+
+static b8 se_sdf_compute_world_bounds_recursive(const se_sdf_handle sdf, se_box_3d* out_world_box) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_box_3d world_box = {0};
+	se_sdf_handle* child = NULL;
+	b8 has_bounds = false;
+	if (!sdf_ptr || !out_world_box) {
+		return false;
+	}
+	se_sdf_box_reset(&world_box);
+	if (se_sdf_has_primitive(sdf_ptr)) {
+		se_box_3d local_box = {0};
+		se_box_3d primitive_world_box = {0};
+		if (se_sdf_get_local_primitive_bounds(sdf_ptr, &local_box)) {
+			se_sdf_box_transform(&local_box, &sdf_ptr->transform, &primitive_world_box);
+			se_sdf_box_include_box(&world_box, &primitive_world_box, &has_bounds);
+		}
+	}
+	s_foreach(&sdf_ptr->children, child) {
+		se_box_3d child_world_box = {0};
+		if (se_sdf_compute_world_bounds_recursive(*child, &child_world_box)) {
+			se_sdf_box_include_box(&world_box, &child_world_box, &has_bounds);
+		}
+	}
+	if (!has_bounds) {
+		return false;
+	}
+	se_sdf_box_expand(&world_box, se_sdf_get_noise_bounds_padding(sdf_ptr));
+	if (sdf_ptr->operation == SE_SDF_SMOOTH_UNION) {
+		se_sdf_box_expand(&world_box, se_sdf_get_operation_amount(sdf_ptr));
+	}
+	*out_world_box = world_box;
+	return true;
+}
+
+static se_sdf_screen_rect se_sdf_compute_screen_rect(const se_box_3d* world_box, const se_camera_handle camera, const GLint viewport[4]) {
+	const s_vec3 corners[8] = {
+		s_vec3(world_box->min.x, world_box->min.y, world_box->min.z),
+		s_vec3(world_box->min.x, world_box->min.y, world_box->max.z),
+		s_vec3(world_box->min.x, world_box->max.y, world_box->min.z),
+		s_vec3(world_box->min.x, world_box->max.y, world_box->max.z),
+		s_vec3(world_box->max.x, world_box->min.y, world_box->min.z),
+		s_vec3(world_box->max.x, world_box->min.y, world_box->max.z),
+		s_vec3(world_box->max.x, world_box->max.y, world_box->min.z),
+		s_vec3(world_box->max.x, world_box->max.y, world_box->max.z),
+	};
+	se_sdf_screen_rect rect = {
+		.uv_min = s_vec2(0.0f, 0.0f),
+		.uv_max = s_vec2(1.0f, 1.0f),
+		.active = false,
+		.visible = true,
+	};
+	f32 min_x = 0.0f;
+	f32 min_y = 0.0f;
+	f32 max_x = 0.0f;
+	f32 max_y = 0.0f;
+	const f32 width = (f32)viewport[2];
+	const f32 height = (f32)viewport[3];
+	if (!world_box || camera == S_HANDLE_NULL || !viewport || width <= 1.0f || height <= 1.0f) {
+		return rect;
+	}
+	for (u32 i = 0; i < 8u; ++i) {
+		s_vec2 screen = s_vec2(0.0f, 0.0f);
+		if (!se_camera_world_to_screen(camera, &corners[i], width, height, &screen)) {
+			return rect;
+		}
+		if (i == 0u) {
+			min_x = max_x = screen.x;
+			min_y = max_y = screen.y;
+			continue;
+		}
+		min_x = s_min(min_x, screen.x);
+		min_y = s_min(min_y, screen.y);
+		max_x = s_max(max_x, screen.x);
+		max_y = s_max(max_y, screen.y);
+	}
+	rect.active = true;
+	if (max_x <= 0.0f || min_x >= width || max_y <= 0.0f || min_y >= height) {
+		rect.visible = false;
+		return rect;
+	}
+	min_x = s_max(min_x - SE_SDF_BOUNDS_PAD_PIXELS, 0.0f);
+	min_y = s_max(min_y - SE_SDF_BOUNDS_PAD_PIXELS, 0.0f);
+	max_x = s_min(max_x + SE_SDF_BOUNDS_PAD_PIXELS, width);
+	max_y = s_min(max_y + SE_SDF_BOUNDS_PAD_PIXELS, height);
+	rect.uv_min = s_vec2(min_x / width, min_y / height);
+	rect.uv_max = s_vec2(max_x / width, max_y / height);
+	return rect;
+}
+
 static b8 se_sdf_noise_is_active(const se_sdf_noise* noise) {
 	return noise && noise->type != SE_SDF_NOISE_NONE;
+}
+
+static f32 se_sdf_get_max_noise_padding_recursive(const se_sdf_handle sdf) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	se_sdf_handle* child = NULL;
+	f32 max_child_padding = 0.0f;
+	if (!sdf_ptr) {
+		return 0.0f;
+	}
+	s_foreach(&sdf_ptr->children, child) {
+		max_child_padding = fmaxf(max_child_padding, se_sdf_get_max_noise_padding_recursive(*child));
+	}
+	return se_sdf_get_noise_bounds_padding(sdf_ptr) + max_child_padding;
 }
 
 static b8 se_sdf_has_primitive(const se_sdf* sdf) {
@@ -404,7 +652,8 @@ static b8 se_sdf_lod_is_zero(const se_sdf_lod* lod) {
 		|| (lod->distance <= 0.0f
 		&& lod->steps == 0u
 		&& !lod->noise
-		&& !lod->point_lights);
+		&& !lod->point_lights
+		&& !lod->shadows);
 }
 
 static b8 se_sdf_lods_are_zero(const se_sdf_lods* lods) {
@@ -431,18 +680,21 @@ static se_sdf_lods se_sdf_get_default_lods(void) {
 			.steps = SE_SDF_DEFAULT_LOD_HIGH_STEPS,
 			.noise = true,
 			.point_lights = true,
+			.shadows = true,
 		},
 		.medium = {
 			.distance = SE_SDF_DEFAULT_LOD_MEDIUM_DISTANCE,
 			.steps = SE_SDF_DEFAULT_LOD_MEDIUM_STEPS,
 			.noise = true,
 			.point_lights = true,
+			.shadows = true,
 		},
 		.low = {
 			.distance = SE_SDF_FAR_DISTANCE,
 			.steps = SE_SDF_DEFAULT_LOD_LOW_STEPS,
 			.noise = false,
 			.point_lights = false,
+			.shadows = false,
 		},
 	};
 }
@@ -474,10 +726,13 @@ static se_sdf_lods se_sdf_get_lods_defaulted(const se_sdf* sdf) {
 
 	lods.high.noise = sdf->lods.high.noise;
 	lods.high.point_lights = sdf->lods.high.point_lights;
+	lods.high.shadows = sdf->lods.high.shadows;
 	lods.medium.noise = sdf->lods.medium.noise;
 	lods.medium.point_lights = sdf->lods.medium.point_lights;
+	lods.medium.shadows = sdf->lods.medium.shadows;
 	lods.low.noise = sdf->lods.low.noise;
 	lods.low.point_lights = sdf->lods.low.point_lights;
+	lods.low.shadows = sdf->lods.low.shadows;
 
 	lods.low.distance = fminf(fmaxf(lods.low.distance, 0.0f), SE_SDF_FAR_DISTANCE);
 	lods.medium.distance = fminf(fmaxf(lods.medium.distance, 0.0f), lods.low.distance);
@@ -719,6 +974,40 @@ static void se_sdf_gen_shading_helpers(c8* out, const sz capacity) {
 		"}\n\n");
 }
 
+static void se_sdf_gen_bounds_helpers(c8* out, const sz capacity) {
+	se_sdf_append(
+		out,
+		capacity,
+		"struct sdf_bounds_hit {\n"
+		"\tfloat t_enter;\n"
+		"\tfloat t_exit;\n"
+		"\tint hit;\n"
+		"};\n\n"
+		"sdf_bounds_hit sdf_scene_bounds(vec3 ray_origin, vec3 ray_direction) {\n"
+		"\tsdf_bounds_hit bounds;\n"
+		"\tbounds.t_enter = 0.0;\n"
+		"\tbounds.t_exit = %.1ff;\n"
+		"\tbounds.hit = 1;\n"
+		"\tif (u_sdf_bounds_valid == 0) {\n"
+		"\t\treturn bounds;\n"
+		"\t}\n"
+		"\tvec3 safe_dir = vec3(\n"
+		"\t\tabs(ray_direction.x) > 0.0001 ? ray_direction.x : (ray_direction.x < 0.0 ? -0.0001 : 0.0001),\n"
+		"\t\tabs(ray_direction.y) > 0.0001 ? ray_direction.y : (ray_direction.y < 0.0 ? -0.0001 : 0.0001),\n"
+		"\t\tabs(ray_direction.z) > 0.0001 ? ray_direction.z : (ray_direction.z < 0.0 ? -0.0001 : 0.0001));\n"
+		"\tvec3 inv_dir = 1.0 / safe_dir;\n"
+		"\tvec3 t0 = (u_sdf_bounds_min - ray_origin) * inv_dir;\n"
+		"\tvec3 t1 = (u_sdf_bounds_max - ray_origin) * inv_dir;\n"
+		"\tvec3 tmin3 = min(t0, t1);\n"
+		"\tvec3 tmax3 = max(t0, t1);\n"
+		"\tbounds.t_enter = max(max(tmin3.x, tmin3.y), tmin3.z);\n"
+		"\tbounds.t_exit = min(min(tmax3.x, tmax3.y), tmax3.z);\n"
+		"\tbounds.hit = bounds.t_exit >= max(bounds.t_enter, 0.0) ? 1 : 0;\n"
+		"\treturn bounds;\n"
+		"}\n\n",
+		SE_SDF_FAR_DISTANCE);
+}
+
 static void se_sdf_gen_lod_helpers(c8* out, const sz capacity) {
 	se_sdf_append(
 		out,
@@ -729,16 +1018,18 @@ static void se_sdf_gen_lod_helpers(c8* out, const sz capacity) {
 		"\tint steps;\n"
 		"\tint noise_enabled;\n"
 		"\tint point_lights_enabled;\n"
+		"\tint shadows_enabled;\n"
 		"\tfloat hit_epsilon;\n"
 		"\tfloat normal_epsilon;\n"
 		"};\n\n"
-		"sdf_lod_data sdf_make_lod(int band, float max_distance, int steps, int noise_enabled, int point_lights_enabled, float hit_epsilon, float normal_epsilon) {\n"
+		"sdf_lod_data sdf_make_lod(int band, float max_distance, int steps, int noise_enabled, int point_lights_enabled, int shadows_enabled, float hit_epsilon, float normal_epsilon) {\n"
 		"\tsdf_lod_data lod;\n"
 		"\tlod.band = band;\n"
 		"\tlod.max_distance = max(max_distance, 0.0);\n"
 		"\tlod.steps = clamp(steps, 1, 128);\n"
 		"\tlod.noise_enabled = noise_enabled != 0 ? 1 : 0;\n"
 		"\tlod.point_lights_enabled = point_lights_enabled != 0 ? 1 : 0;\n"
+		"\tlod.shadows_enabled = shadows_enabled != 0 ? 1 : 0;\n"
 		"\tlod.hit_epsilon = max(hit_epsilon, 0.0005);\n"
 		"\tlod.normal_epsilon = max(normal_epsilon, lod.hit_epsilon);\n"
 		"\treturn lod;\n"
@@ -747,14 +1038,32 @@ static void se_sdf_gen_lod_helpers(c8* out, const sz capacity) {
 		"\tint sample_cap = max(lod.steps / 2, 1);\n"
 		"\treturn clamp(min(requested_samples, sample_cap), 1, 128);\n"
 		"}\n\n"
+		"float sdf_lod_primary_refine_distance(sdf_lod_data lod) {\n"
+		"\tif (lod.band == 0) {\n"
+		"\t\treturn max(lod.hit_epsilon * 12.0, 0.08);\n"
+		"\t}\n"
+		"\tif (lod.band == 1) {\n"
+		"\t\treturn max(lod.hit_epsilon * 16.0, 0.16);\n"
+		"\t}\n"
+		"\treturn max(lod.hit_epsilon * 24.0, 0.32);\n"
+		"}\n\n"
+		"float sdf_lod_shadow_refine_distance(sdf_lod_data lod) {\n"
+		"\tif (lod.band == 0) {\n"
+		"\t\treturn max(lod.hit_epsilon * 14.0, 0.12);\n"
+		"\t}\n"
+		"\tif (lod.band == 1) {\n"
+		"\t\treturn max(lod.hit_epsilon * 18.0, 0.24);\n"
+		"\t}\n"
+		"\treturn max(lod.hit_epsilon * 28.0, 0.48);\n"
+		"}\n\n"
 		"sdf_lod_data sdf_select_lod(float distance_from_camera) {\n"
 		"\tif (distance_from_camera <= u_sdf_lod_high_distance) {\n"
-		"\t\treturn sdf_make_lod(0, u_sdf_lod_high_distance, u_sdf_lod_high_steps, u_sdf_lod_high_noise, u_sdf_lod_high_point_lights, %.4ff, %.4ff);\n"
+		"\t\treturn sdf_make_lod(0, u_sdf_lod_high_distance, u_sdf_lod_high_steps, u_sdf_lod_high_noise, u_sdf_lod_high_point_lights, u_sdf_lod_high_shadows, %.4ff, %.4ff);\n"
 		"\t}\n"
 		"\tif (distance_from_camera <= u_sdf_lod_medium_distance) {\n"
-		"\t\treturn sdf_make_lod(1, u_sdf_lod_medium_distance, u_sdf_lod_medium_steps, u_sdf_lod_medium_noise, u_sdf_lod_medium_point_lights, %.4ff, %.4ff);\n"
+		"\t\treturn sdf_make_lod(1, u_sdf_lod_medium_distance, u_sdf_lod_medium_steps, u_sdf_lod_medium_noise, u_sdf_lod_medium_point_lights, u_sdf_lod_medium_shadows, %.4ff, %.4ff);\n"
 		"\t}\n"
-		"\treturn sdf_make_lod(2, u_sdf_lod_low_distance, u_sdf_lod_low_steps, u_sdf_lod_low_noise, u_sdf_lod_low_point_lights, %.4ff, %.4ff);\n"
+		"\treturn sdf_make_lod(2, u_sdf_lod_low_distance, u_sdf_lod_low_steps, u_sdf_lod_low_noise, u_sdf_lod_low_point_lights, u_sdf_lod_low_shadows, %.4ff, %.4ff);\n"
 		"}\n\n",
 		SE_SDF_LOD_HIGH_HIT_EPSILON,
 		SE_SDF_LOD_HIGH_HIT_EPSILON,
@@ -770,19 +1079,37 @@ static void se_sdf_gen_light_functions(c8* out, const sz capacity) {
 		capacity,
 		"float sdf_shadow_visibility(vec3 ray_origin, vec3 ray_direction, float min_distance, float max_distance, float shadow_softness, int shadow_samples, sdf_lod_data lod) {\n"
 		"\tfloat visibility = 1.0;\n"
-		"\tfloat travel = min_distance;\n"
+		"\tsdf_bounds_hit bounds = sdf_scene_bounds(ray_origin, ray_direction);\n"
 		"\tfloat safe_shadow_softness = max(shadow_softness, 0.0001);\n"
 		"\tint sample_count = sdf_lod_shadow_samples(lod, shadow_samples);\n"
+		"\tfloat refine_distance = sdf_lod_shadow_refine_distance(lod);\n"
+		"\tif (lod.shadows_enabled == 0) {\n"
+		"\t\treturn 1.0;\n"
+		"\t}\n"
+		"\tif (bounds.hit == 0) {\n"
+		"\t\treturn 1.0;\n"
+		"\t}\n"
+		"\tfloat travel = max(min_distance, max(bounds.t_enter, 0.0));\n"
+		"\tfloat shadow_limit = min(max_distance, bounds.t_exit);\n"
+		"\tif (travel >= shadow_limit) {\n"
+		"\t\treturn 1.0;\n"
+		"\t}\n"
 		"\tfor (int i = 0; i < 128; ++i) {\n"
-		"\t\tif (i >= sample_count || travel >= max_distance) {\n"
+		"\t\tif (i >= sample_count || travel >= shadow_limit) {\n"
 		"\t\t\tbreak;\n"
 		"\t\t}\n"
-		"\t\tfloat distance_to_surface = scene_sdf(ray_origin + ray_direction * travel, lod);\n"
+		"\t\tvec3 sample_position = ray_origin + ray_direction * travel;\n"
+		"\t\tfloat coarse_distance = scene_sdf_coarse(sample_position);\n"
+		"\t\tif (coarse_distance > refine_distance) {\n"
+		"\t\t\ttravel += max(coarse_distance, 0.02);\n"
+		"\t\t\tcontinue;\n"
+		"\t\t}\n"
+		"\t\tfloat distance_to_surface = scene_sdf(sample_position, lod);\n"
 		"\t\tif (distance_to_surface < lod.hit_epsilon) {\n"
 		"\t\t\treturn 0.0;\n"
 		"\t\t}\n"
 		"\t\tvisibility = min(visibility, safe_shadow_softness * distance_to_surface / max(travel, 0.0001));\n"
-		"\t\ttravel += clamp(distance_to_surface, 0.01, 0.35);\n"
+		"\t\ttravel += max(distance_to_surface, 0.02);\n"
 		"\t}\n"
 		"\treturn clamp(visibility, 0.0, 1.0);\n"
 		"}\n\n"
@@ -1213,18 +1540,24 @@ void se_sdf_gen_uniform(c8* out, const sz capacity, const se_sdf_handle sdf) {
 	se_sdf_append(out, capacity, "uniform mat4 u_inv_view_projection;\n");
 	se_sdf_append(out, capacity, "uniform vec3 u_camera_position;\n");
 	se_sdf_append(out, capacity, "uniform int u_use_orthographic;\n");
+	se_sdf_append(out, capacity, "uniform int u_sdf_bounds_valid;\n");
+	se_sdf_append(out, capacity, "uniform vec3 u_sdf_bounds_min;\n");
+	se_sdf_append(out, capacity, "uniform vec3 u_sdf_bounds_max;\n");
 	se_sdf_append(out, capacity, "uniform float u_sdf_lod_high_distance;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_high_steps;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_high_noise;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_high_point_lights;\n");
+	se_sdf_append(out, capacity, "uniform int u_sdf_lod_high_shadows;\n");
 	se_sdf_append(out, capacity, "uniform float u_sdf_lod_medium_distance;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_medium_steps;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_medium_noise;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_medium_point_lights;\n");
+	se_sdf_append(out, capacity, "uniform int u_sdf_lod_medium_shadows;\n");
 	se_sdf_append(out, capacity, "uniform float u_sdf_lod_low_distance;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_low_steps;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_low_noise;\n");
 	se_sdf_append(out, capacity, "uniform int u_sdf_lod_low_point_lights;\n");
+	se_sdf_append(out, capacity, "uniform int u_sdf_lod_low_shadows;\n");
 	se_sdf_gen_uniform_recursive(out, capacity, sdf);
 }
 
@@ -1233,6 +1566,7 @@ void se_sdf_gen_function(c8* out, const sz capacity, const se_sdf_handle sdf) {
 }
 
 void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
+	const f32 coarse_noise_padding = se_sdf_get_max_noise_padding_recursive(sdf);
 	if (!out || capacity == 0) {
 		return;
 	}
@@ -1245,11 +1579,20 @@ void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
 	se_sdf_gen_operator_functions(out, capacity);
 	se_sdf_gen_noise_functions(out, capacity);
 	se_sdf_gen_shading_helpers(out, capacity);
+	se_sdf_gen_bounds_helpers(out, capacity);
 	se_sdf_gen_lod_helpers(out, capacity);
 	se_sdf_gen_function(out, capacity, sdf);
 	se_sdf_gen_surface_recursive(out, capacity, sdf);
 	se_sdf_append(out, capacity, "float scene_sdf(vec3 p, sdf_lod_data lod) {\n");
 	se_sdf_append(out, capacity, "\treturn sdf_" SE_SDF_HANDLE_FMT "(p, lod.noise_enabled != 0);\n", SE_SDF_HANDLE_ARG(sdf));
+	se_sdf_append(out, capacity, "}\n\n");
+	se_sdf_append(out, capacity, "float scene_sdf_coarse(vec3 p) {\n");
+	se_sdf_append(
+		out,
+		capacity,
+		"\treturn sdf_" SE_SDF_HANDLE_FMT "(p, false) - %.3ff;\n",
+		SE_SDF_HANDLE_ARG(sdf),
+		coarse_noise_padding);
 	se_sdf_append(out, capacity, "}\n\n");
 	se_sdf_append(out, capacity, "sdf_surface_data scene_surface(vec3 p, sdf_lod_data lod) {\n");
 	se_sdf_append(out, capacity, "\treturn sdf_" SE_SDF_HANDLE_FMT "_surface(p, lod.noise_enabled != 0);\n", SE_SDF_HANDLE_ARG(sdf));
@@ -1282,22 +1625,42 @@ void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
 		"\t\tray_origin = u_camera_position;\n"
 		"\t\tray_dir = normalize(far_world - u_camera_position);\n"
 		"\t}\n"
-		"\tfloat travel = 0.0;\n"
+		"\tsdf_bounds_hit scene_bounds = sdf_scene_bounds(ray_origin, ray_dir);\n"
+		"\tif (scene_bounds.hit == 0) {\n"
+		"\t\tvec3 sky = mix(vec3(0.05, 0.06, 0.08), vec3(0.16, 0.19, 0.24), clamp(ray_dir.y * 0.5 + 0.5, 0.0, 1.0));\n"
+		"\t\tfrag_color = vec4(sky, 1.0);\n"
+		"\t\treturn;\n"
+		"\t}\n"
+		"\tfloat travel = max(scene_bounds.t_enter, 0.0);\n"
 		"\tvec3 hit_position = ray_origin;\n"
 		"\tbool hit = false;\n"
 		"\tsdf_lod_data lod = sdf_select_lod(0.0);\n"
+		"\tint lod_band = -1;\n"
+		"\tint band_steps = 0;\n"
 		"\tfor (int i = 0; i < %u; ++i) {\n"
 		"\t\tlod = sdf_select_lod(travel);\n"
-		"\t\tif (i >= lod.steps || travel > lod.max_distance) {\n"
+		"\t\tif (lod.band != lod_band) {\n"
+		"\t\t\tlod_band = lod.band;\n"
+		"\t\t\tband_steps = 0;\n"
+		"\t\t}\n"
+		"\t\tfloat march_limit = min(scene_bounds.t_exit, lod.max_distance);\n"
+		"\t\tif (band_steps >= lod.steps || travel > march_limit) {\n"
 		"\t\t\tbreak;\n"
 		"\t\t}\n"
 		"\t\thit_position = ray_origin + ray_dir * travel;\n"
-		"\t\tfloat distance_to_surface = scene_sdf(hit_position, lod);\n"
-		"\t\tif (distance_to_surface < lod.hit_epsilon) {\n"
-		"\t\t\thit = true;\n"
-		"\t\t\tbreak;\n"
+		"\t\tfloat coarse_distance = scene_sdf_coarse(hit_position);\n"
+		"\t\tfloat refine_distance = sdf_lod_primary_refine_distance(lod);\n"
+		"\t\tfloat step_distance = coarse_distance;\n"
+		"\t\tif (coarse_distance <= refine_distance) {\n"
+		"\t\t\tfloat distance_to_surface = scene_sdf(hit_position, lod);\n"
+		"\t\t\tif (distance_to_surface < lod.hit_epsilon) {\n"
+		"\t\t\t\thit = true;\n"
+		"\t\t\t\tbreak;\n"
+		"\t\t\t}\n"
+		"\t\t\tstep_distance = distance_to_surface;\n"
 		"\t\t}\n"
-		"\t\ttravel += distance_to_surface;\n"
+		"\t\ttravel += max(step_distance, lod.hit_epsilon);\n"
+		"\t\tband_steps++;\n"
 		"\t\tif (travel > %.1f) {\n"
 		"\t\t\tbreak;\n"
 		"\t\t}\n"
@@ -1354,10 +1717,13 @@ void se_sdf_gen_vertex(c8* out, const sz capacity) {
 		"#version 330 core\n"
 		"layout(location = 0) in vec2 in_position;\n"
 		"layout(location = 1) in vec2 in_uv;\n"
+		"uniform int u_sdf_rect_active;\n"
+		"uniform vec2 u_sdf_rect_uv_min;\n"
+		"uniform vec2 u_sdf_rect_uv_max;\n"
 		"out vec2 v_uv;\n\n"
 		"void main() {\n"
-		"\tv_uv = in_uv;\n"
-		"\tgl_Position = vec4(in_position, 0.0, 1.0);\n"
+		"\tv_uv = u_sdf_rect_active != 0 ? mix(u_sdf_rect_uv_min, u_sdf_rect_uv_max, in_uv) : in_uv;\n"
+		"\tgl_Position = vec4(v_uv.x * 2.0 - 1.0, 1.0 - v_uv.y * 2.0, 0.0, 1.0);\n"
 		"}\n");
 }
 
@@ -1367,14 +1733,34 @@ static void se_sdf_upload_lod_uniforms(const se_shader_handle shader, const se_s
 	se_shader_set_int(shader, "u_sdf_lod_high_steps", (i32)lods.high.steps);
 	se_shader_set_int(shader, "u_sdf_lod_high_noise", lods.high.noise ? 1 : 0);
 	se_shader_set_int(shader, "u_sdf_lod_high_point_lights", lods.high.point_lights ? 1 : 0);
+	se_shader_set_int(shader, "u_sdf_lod_high_shadows", lods.high.shadows ? 1 : 0);
 	se_shader_set_float(shader, "u_sdf_lod_medium_distance", lods.medium.distance);
 	se_shader_set_int(shader, "u_sdf_lod_medium_steps", (i32)lods.medium.steps);
 	se_shader_set_int(shader, "u_sdf_lod_medium_noise", lods.medium.noise ? 1 : 0);
 	se_shader_set_int(shader, "u_sdf_lod_medium_point_lights", lods.medium.point_lights ? 1 : 0);
+	se_shader_set_int(shader, "u_sdf_lod_medium_shadows", lods.medium.shadows ? 1 : 0);
 	se_shader_set_float(shader, "u_sdf_lod_low_distance", lods.low.distance);
 	se_shader_set_int(shader, "u_sdf_lod_low_steps", (i32)lods.low.steps);
 	se_shader_set_int(shader, "u_sdf_lod_low_noise", lods.low.noise ? 1 : 0);
 	se_shader_set_int(shader, "u_sdf_lod_low_point_lights", lods.low.point_lights ? 1 : 0);
+	se_shader_set_int(shader, "u_sdf_lod_low_shadows", lods.low.shadows ? 1 : 0);
+}
+
+static void se_sdf_upload_bounds_uniforms(
+	const se_shader_handle shader,
+	const se_box_3d* world_box,
+	const b8 bounds_valid,
+	const se_sdf_screen_rect* rect) {
+	const s_vec3 bounds_min = (bounds_valid && world_box) ? world_box->min : s_vec3(0.0f, 0.0f, 0.0f);
+	const s_vec3 bounds_max = (bounds_valid && world_box) ? world_box->max : s_vec3(0.0f, 0.0f, 0.0f);
+	const s_vec2 uv_min = rect ? rect->uv_min : s_vec2(0.0f, 0.0f);
+	const s_vec2 uv_max = rect ? rect->uv_max : s_vec2(1.0f, 1.0f);
+	se_shader_set_int(shader, "u_sdf_bounds_valid", bounds_valid ? 1 : 0);
+	se_shader_set_vec3(shader, "u_sdf_bounds_min", &bounds_min);
+	se_shader_set_vec3(shader, "u_sdf_bounds_max", &bounds_max);
+	se_shader_set_int(shader, "u_sdf_rect_active", (rect && rect->active && rect->visible) ? 1 : 0);
+	se_shader_set_vec2(shader, "u_sdf_rect_uv_min", &uv_min);
+	se_shader_set_vec2(shader, "u_sdf_rect_uv_max", &uv_max);
 }
 
 static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, const se_sdf_handle sdf) {
@@ -1977,20 +2363,63 @@ void se_sdf_render_raw(se_sdf_handle sdf, se_camera_handle camera) {
 	se_context* ctx = se_current_context();
 	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
 	se_camera* camera_ptr = se_camera_get(camera);
+	se_box_3d world_box = {0};
+	se_sdf_screen_rect rect = {
+		.uv_min = s_vec2(0.0f, 0.0f),
+		.uv_max = s_vec2(1.0f, 1.0f),
+		.active = false,
+		.visible = true,
+	};
 	s_mat4 view_projection = s_mat4_identity;
 	s_mat4 inverse_view_projection = s_mat4_identity;
+	GLint viewport[4] = {0, 0, 0, 0};
+	b8 bounds_valid = false;
+	const b8 sync_timing = se_sdf_debug_sync_enabled();
 	if (!sdf_ptr || !camera_ptr || sdf_ptr->shader == S_HANDLE_NULL) {
 		return;
 	}
+	se_debug_trace_begin("sdf_render");
+	se_debug_trace_begin("sdf_bounds_compute");
+	bounds_valid = se_sdf_compute_world_bounds_recursive(sdf, &world_box);
+	se_debug_trace_end("sdf_bounds_compute");
 	view_projection = se_camera_get_view_projection_matrix(camera);
 	inverse_view_projection = s_mat4_inverse(&view_projection);
+	se_debug_trace_begin("sdf_bounds_project");
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	if (bounds_valid) {
+		rect = se_sdf_compute_screen_rect(&world_box, camera, viewport);
+		if (rect.active && !rect.visible) {
+			se_debug_trace_end("sdf_bounds_project");
+			se_debug_trace_end("sdf_render");
+			return;
+		}
+	}
+	se_debug_trace_end("sdf_bounds_project");
+	se_debug_trace_begin("sdf_uniforms_common");
 	se_shader_set_mat4(sdf_ptr->shader, "u_inv_view_projection", &inverse_view_projection);
 	se_shader_set_vec3(sdf_ptr->shader, "u_camera_position", &camera_ptr->position);
 	se_shader_set_int(sdf_ptr->shader, "u_use_orthographic", camera_ptr->use_orthographic ? 1 : 0);
+	se_sdf_upload_bounds_uniforms(sdf_ptr->shader, &world_box, bounds_valid, &rect);
 	se_sdf_upload_lod_uniforms(sdf_ptr->shader, sdf_ptr);
+	se_debug_trace_end("sdf_uniforms_common");
+	se_debug_trace_begin("sdf_uniforms_scene");
 	se_sdf_upload_uniforms_recursive(sdf_ptr->shader, sdf);
+	se_debug_trace_end("sdf_uniforms_scene");
+	if (sync_timing) {
+		se_debug_trace_begin("sdf_draw_sync_before");
+		glFinish();
+		se_debug_trace_end("sdf_draw_sync_before");
+	}
+	se_debug_trace_begin("sdf_draw");
 	se_shader_use(sdf_ptr->shader, true, true);
 	se_quad_render(&sdf_ptr->quad, 0);
+	se_debug_trace_end("sdf_draw");
+	if (sync_timing) {
+		se_debug_trace_begin("sdf_draw_sync_after");
+		glFinish();
+		se_debug_trace_end("sdf_draw_sync_after");
+	}
+	se_debug_trace_end("sdf_render");
 }
 
 void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
@@ -2003,11 +2432,13 @@ void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
 		se_quad_2d_create(&sdf_ptr->quad, 0);
 	}
 	if (sdf_ptr->shader == S_HANDLE_NULL) {
+		se_debug_trace_begin("sdf_shader_compile");
 		c8* vs = calloc(SE_SDF_VERTEX_SHADER_CAPACITY, sizeof(c8));
 		c8* fs = calloc(SE_SDF_FRAGMENT_SHADER_CAPACITY, sizeof(c8));
 		if (!vs || !fs) {
 			free(vs);
 			free(fs);
+			se_debug_trace_end("sdf_shader_compile");
 			return;
 		}
 		se_sdf_gen_vertex(vs, SE_SDF_VERTEX_SHADER_CAPACITY);
@@ -2017,8 +2448,10 @@ void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
 		free(fs);
 		if (sdf_ptr->shader == S_HANDLE_NULL) {
 			se_log("se_sdf_render :: failed to create shader for sdf: " SE_SDF_HANDLE_FMT, SE_SDF_HANDLE_ARG(sdf));
+			se_debug_trace_end("sdf_shader_compile");
 			return;
 		}
+		se_debug_trace_end("sdf_shader_compile");
 	}
 	const GLboolean depth_test_enabled = glIsEnabled(GL_DEPTH_TEST);
 	const GLboolean cull_face_enabled = glIsEnabled(GL_CULL_FACE);

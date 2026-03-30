@@ -7,11 +7,13 @@
 #include "se_window.h"
 
 i32 main(void) {
+	u32 frame_counter = 0u;
 	se_context* context = se_context_create();
 	se_window_handle window = se_window_create("Syphax - SDF", 1280, 720);
 
 	se_window_set_exit_key(window, SE_KEY_ESCAPE);
-	se_window_set_target_fps(window, 60);
+	se_window_set_target_fps(window, 144);
+	se_window_set_vsync(window, false);
 	se_render_set_background(s_vec4(0.05f, 0.06f, 0.08f, 1.0f));
 
 	se_camera_handle camera = se_camera_create();
@@ -78,8 +80,13 @@ i32 main(void) {
 	se_sdf_set_shadow_samples(ground, 48);
 	se_sdf_add_child(scene, ground);
 	se_sdf_add_child(scene, sphere);
+	se_sdf_set_lods(scene, &(se_sdf_lods){
+		.high = {.distance = 14.0f, .steps = 128, .noise = true, .point_lights = true, .shadows = true},
+		.medium = {.distance = 30.0f, .steps = 56, .noise = true, .point_lights = true, .shadows = true},
+		.low = {.distance = 256.0f, .steps = 24, .noise = false, .point_lights = false, .shadows = false},
+	});
 
-	se_debug_set_overlay_enabled(true);
+	se_debug_set_overlay_enabled(false);
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
@@ -87,6 +94,31 @@ i32 main(void) {
 		se_render_clear();
 		se_sdf_render(scene, camera);
 		se_window_end_frame(window);
+		frame_counter++;
+		if ((frame_counter % 60u) == 0u) {
+			se_debug_frame_timing timing = {0};
+			se_debug_trace_stat trace_stats[8] = {0};
+			u32 trace_count = 0u;
+			if (se_debug_get_frame_timing(&timing)) {
+				se_log(
+					"sdf :: frame=%u frame_ms=%.3f fps=%.2f target144=%s present=%.3f other=%.3f",
+					frame_counter,
+					timing.frame_ms,
+					timing.frame_ms > 0.0 ? 1000.0 / timing.frame_ms : 0.0,
+					timing.frame_ms <= (1000.0 / 144.0) ? "yes" : "no",
+					timing.window_present_ms,
+					timing.other_ms);
+			}
+			if (se_debug_get_trace_stats(trace_stats, 8u, &trace_count, true)) {
+				for (u32 i = 0; i < trace_count && i < 8u; ++i) {
+					se_log(
+						"sdf :: trace %s[%s] %.3fms",
+						trace_stats[i].name,
+						se_debug_trace_channel_name((se_debug_trace_channel)trace_stats[i].channel),
+						trace_stats[i].total_ms);
+				}
+			}
+		}
 	}
 
 	se_context_destroy(context);
