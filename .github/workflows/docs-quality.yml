@@ -16,6 +16,8 @@ jobs:
   docs-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/scripts/docs/python
     steps:
       - name: Checkout
         uses: actions/checkout@v4
