@@ -147,18 +147,6 @@ extern s_vec3 se_sdf_get_directional_light_direction(se_sdf_directional_light_ha
 
 No inline description found in header comments.
 
-### `se_sdf_get_lods`
-
-<div class="api-signature">
-
-```c
-extern se_sdf_lods se_sdf_get_lods(se_sdf_handle sdf);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_get_noise_frequency`
 
 <div class="api-signature">
@@ -435,18 +423,6 @@ extern void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera);
 
 No inline description found in header comments.
 
-### `se_sdf_set_lods`
-
-<div class="api-signature">
-
-```c
-extern void se_sdf_set_lods(se_sdf_handle sdf, const se_sdf_lods* lods);
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_sdf_set_position`
 
 <div class="api-signature">
@@ -636,7 +612,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; se_sdf_shading shading; se_sdf_shadow shadow; se_sdf_lods lods; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_framebuffer_handle output; se_texture_handle volume; } se_sdf;
+typedef struct se_sdf { s_mat4 transform; se_sdf_type type; se_sdf_operator operation; f32 operation_amount; se_sdf_shading shading; se_sdf_shadow shadow; union { struct { f32 radius; } sphere; struct { s_vec3 size; } box; }; // nodes/scene // don't set manually se_sdf_handle parent; s_array(se_sdf_handle, children); s_array(se_sdf_noise_handle, noises); s_array(se_sdf_point_light_handle, point_lights); s_array(se_sdf_directional_light_handle, directional_lights); se_quad quad; se_shader_handle shader; se_texture_handle volume; } se_sdf;
 ```
 
 </div>
@@ -649,30 +625,6 @@ No inline description found in header comments.
 
 ```c
 typedef struct se_sdf_directional_light { s_vec3 direction; s_vec3 color; } se_sdf_directional_light;
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_lod`
-
-<div class="api-signature">
-
-```c
-typedef struct se_sdf_lod { f32 distance; u16 steps; b8 noise; b8 point_lights; b8 shadows; } se_sdf_lod;
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_sdf_lods`
-
-<div class="api-signature">
-
-```c
-typedef struct se_sdf_lods { se_sdf_lod low; se_sdf_lod medium; se_sdf_lod high; } se_sdf_lods;
 ```
 
 </div>
