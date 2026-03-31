@@ -4,9 +4,11 @@
 
 #include "render/se_gl.h"
 #include "se_camera.h"
+#include "se_defines.h"
 #include "se_debug.h"
 #include "se_math.h"
 #include "se_shader.h"
+#include "syphax/s_files.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -14,11 +16,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SE_SDF_VERTEX_SHADER_CAPACITY 2048u
 #define SE_SDF_FRAGMENT_SHADER_CAPACITY (256u * 1024u)
-#define SE_SDF_FAR_DISTANCE 256.0f
+#define SE_SDF_FAR_DISTANCE 1000.0f
 #define SE_SDF_MAX_TRACE_STEPS 128u
-#define SE_SDF_HIT_EPSILON 0.001f
+#define SE_SDF_HIT_EPSILON 0.01f
 #define SE_SDF_MATRIX_EPSILON 0.00001f
 #define SE_SDF_DEFAULT_SMOOTH_UNION_AMOUNT 0.35f
 #define SE_SDF_MIN_SMOOTH_UNION_AMOUNT 0.0001f
@@ -42,8 +43,25 @@
 #define SE_SDF_DEFAULT_LIGHT_DIR_X 0.45f
 #define SE_SDF_DEFAULT_LIGHT_DIR_Y 0.85f
 #define SE_SDF_DEFAULT_LIGHT_DIR_Z 0.35f
+#define SE_SDF_VERTEX_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_vert.glsl")
+#define SE_SDF_COMMON_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_common.glsl")
+#define SE_SDF_FRAGMENT_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_fragment_template.glsl")
 #define SE_SDF_HANDLE_FMT "%llu"
 #define SE_SDF_HANDLE_ARG(_handle) ((unsigned long long)(_handle))
+
+typedef struct se_sdf_template_part {
+	const c8* token;
+	const c8* value;
+} se_sdf_template_part;
+
+typedef struct se_sdf_shader_template_state {
+	time_t vertex_mtime;
+	time_t common_mtime;
+	time_t fragment_mtime;
+	b8 initialized;
+} se_sdf_shader_template_state;
+
+static se_sdf_shader_template_state g_se_sdf_shader_templates = {0};
 
 static se_sdf* se_sdf_from_handle(se_context* ctx, const se_sdf_handle sdf);
 static se_sdf_noise* se_sdf_noise_from_handle(se_context* ctx, const se_sdf_noise_handle noise);
@@ -77,24 +95,27 @@ static f32 se_sdf_get_operation_amount(const se_sdf* sdf);
 static f32 se_sdf_get_noise_frequency_defaulted(const se_sdf_noise* noise);
 static f32 se_sdf_get_point_light_radius_defaulted(const se_sdf_point_light* point_light);
 static void se_sdf_append(c8* out, const sz capacity, const c8* fmt, ...);
+static void se_sdf_append_range(c8* out, const sz capacity, const c8* text, const sz text_size);
 static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operation);
 static const c8* se_sdf_get_noise_function_name(const se_sdf_noise_type type);
 static void se_sdf_destroy_shader_runtime(se_sdf* sdf_ptr);
 static void se_sdf_invalidate_shader_chain(const se_sdf_handle sdf);
-static void se_sdf_gen_operator_functions(c8* out, const sz capacity);
-static void se_sdf_gen_noise_functions(c8* out, const sz capacity);
-static void se_sdf_gen_shading_helpers(c8* out, const sz capacity);
-static void se_sdf_gen_shadow_visibility_functions(c8* out, const sz capacity);
-static void se_sdf_gen_lighting_visibility_functions(c8* out, const sz capacity);
+static void se_sdf_invalidate_all_shaders(se_context* ctx);
+static b8 se_sdf_read_resource_text(c8** out_text, const c8* resource_path);
+static b8 se_sdf_read_resource_mtime(time_t* out_mtime, const c8* resource_path);
+static void se_sdf_refresh_shader_templates(se_context* ctx);
+static const c8* se_sdf_find_template_value(const se_sdf_template_part* parts, const sz part_count, const c8* token, const sz token_size);
+static void se_sdf_apply_template(c8* out, const sz capacity, const c8* template_source, const se_sdf_template_part* parts, const sz part_count);
+static void se_sdf_gen_common_constants(c8* out, const sz capacity);
 static void se_sdf_gen_uniform(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_uniform_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_function(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_gen_composite_light_apply_recursive(c8* out, const sz capacity, const se_sdf_handle sdf, const se_sdf_directional_light_handle shadow_light, b8* shadow_light_used);
-static void se_sdf_gen_scene_common(c8* out, const sz capacity, const se_sdf_handle sdf);
-static void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf);
-static void se_sdf_gen_vertex(c8* out, const sz capacity);
+static void se_sdf_gen_scene_wrappers(c8* out, const sz capacity, const se_sdf_handle sdf);
+static void se_sdf_gen_light_apply(c8* out, const sz capacity, const se_sdf_handle sdf);
+static b8 se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf);
 static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, const se_sdf_handle sdf);
 
 static se_sdf* se_sdf_from_handle(se_context* ctx, const se_sdf_handle sdf) {
@@ -452,6 +473,20 @@ static void se_sdf_append(c8* out, const sz capacity, const c8* fmt, ...) {
 	va_end(args);
 }
 
+static void se_sdf_append_range(c8* out, const sz capacity, const c8* text, const sz text_size) {
+	if (!out || capacity == 0 || !text || text_size == 0) {
+		return;
+	}
+	const sz current_length = strlen(out);
+	if (current_length >= capacity - 1u) {
+		return;
+	}
+	const sz available = capacity - current_length - 1u;
+	const sz copy_size = text_size < available ? text_size : available;
+	memcpy(out + current_length, text, copy_size);
+	out[current_length + copy_size] = '\0';
+}
+
 static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operation) {
 	switch (operation) {
 		case SE_SDF_SMOOTH_UNION:
@@ -499,250 +534,143 @@ static void se_sdf_invalidate_shader_chain(const se_sdf_handle sdf) {
 	}
 }
 
-static void se_sdf_gen_operator_functions(c8* out, const sz capacity) {
-	se_sdf_append(
-		out,
-		capacity,
-		"float sdf_op_smooth_union_factor(float a, float b, float amount) {\n"
-		"\tfloat k = max(amount, %.4f);\n"
-		"\treturn clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);\n"
-		"}\n\n",
-		SE_SDF_MIN_SMOOTH_UNION_AMOUNT);
-	se_sdf_append(
-		out,
-		capacity,
-		"float sdf_op_union(float a, float b, float amount) {\n"
-		"\treturn min(a, b);\n"
-		"}\n\n");
-	se_sdf_append(
-		out,
-		capacity,
-		"float sdf_op_smooth_union(float a, float b, float amount) {\n"
-		"\tfloat k = max(amount, %.4f);\n"
-		"\tfloat h = sdf_op_smooth_union_factor(a, b, amount);\n"
-		"\treturn mix(b, a, h) - k * h * (1.0 - h);\n"
-		"}\n\n",
-		SE_SDF_MIN_SMOOTH_UNION_AMOUNT);
+static void se_sdf_invalidate_all_shaders(se_context* ctx) {
+	se_sdf* sdf_ptr = NULL;
+	if (!ctx) {
+		return;
+	}
+	s_foreach(&ctx->sdfs, sdf_ptr) {
+		se_sdf_destroy_shader_runtime(sdf_ptr);
+	}
 }
 
-static void se_sdf_gen_noise_functions(c8* out, const sz capacity) {
-	se_sdf_append(
-		out,
-		capacity,
-		"float sdf_hash13(vec3 p) {\n"
-		"\treturn fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);\n"
-		"}\n\n"
-		"vec3 sdf_hash33(vec3 p) {\n"
-		"\treturn fract(sin(vec3(\n"
-		"\t\tdot(p, vec3(127.1, 311.7, 74.7)),\n"
-		"\t\tdot(p, vec3(269.5, 183.3, 246.1)),\n"
-		"\t\tdot(p, vec3(113.5, 271.9, 124.6)))) * 43758.5453123) * 2.0 - 1.0;\n"
-		"}\n\n"
-		"float sdf_noise_perlin(vec3 p) {\n"
-		"\tvec3 cell = floor(p);\n"
-		"\tvec3 local = fract(p);\n"
-		"\tvec3 fade = local * local * (3.0 - 2.0 * local);\n"
-		"\tfloat n000 = dot(normalize(sdf_hash33(cell + vec3(0.0, 0.0, 0.0))), local - vec3(0.0, 0.0, 0.0));\n"
-		"\tfloat n100 = dot(normalize(sdf_hash33(cell + vec3(1.0, 0.0, 0.0))), local - vec3(1.0, 0.0, 0.0));\n"
-		"\tfloat n010 = dot(normalize(sdf_hash33(cell + vec3(0.0, 1.0, 0.0))), local - vec3(0.0, 1.0, 0.0));\n"
-		"\tfloat n110 = dot(normalize(sdf_hash33(cell + vec3(1.0, 1.0, 0.0))), local - vec3(1.0, 1.0, 0.0));\n"
-		"\tfloat n001 = dot(normalize(sdf_hash33(cell + vec3(0.0, 0.0, 1.0))), local - vec3(0.0, 0.0, 1.0));\n"
-		"\tfloat n101 = dot(normalize(sdf_hash33(cell + vec3(1.0, 0.0, 1.0))), local - vec3(1.0, 0.0, 1.0));\n"
-		"\tfloat n011 = dot(normalize(sdf_hash33(cell + vec3(0.0, 1.0, 1.0))), local - vec3(0.0, 1.0, 1.0));\n"
-		"\tfloat n111 = dot(normalize(sdf_hash33(cell + vec3(1.0, 1.0, 1.0))), local - vec3(1.0, 1.0, 1.0));\n"
-		"\tfloat nx00 = mix(n000, n100, fade.x);\n"
-		"\tfloat nx10 = mix(n010, n110, fade.x);\n"
-		"\tfloat nx01 = mix(n001, n101, fade.x);\n"
-		"\tfloat nx11 = mix(n011, n111, fade.x);\n"
-		"\tfloat nxy0 = mix(nx00, nx10, fade.y);\n"
-		"\tfloat nxy1 = mix(nx01, nx11, fade.y);\n"
-		"\treturn mix(nxy0, nxy1, fade.z);\n"
-		"}\n\n"
-		"float sdf_noise_vornoi(vec3 p) {\n"
-		"\tvec3 cell = floor(p);\n"
-		"\tvec3 local = fract(p);\n"
-		"\tfloat min_distance = 8.0;\n"
-		"\tfor (int z = -1; z <= 1; ++z) {\n"
-		"\t\tfor (int y = -1; y <= 1; ++y) {\n"
-		"\t\t\tfor (int x = -1; x <= 1; ++x) {\n"
-		"\t\t\t\tvec3 neighbor = vec3(float(x), float(y), float(z));\n"
-		"\t\t\t\tvec3 point = neighbor + 0.5 + 0.45 * sdf_hash33(cell + neighbor);\n"
-		"\t\t\t\tmin_distance = min(min_distance, length(local - point));\n"
-		"\t\t\t}\n"
-		"\t\t}\n"
-		"\t}\n"
-		"\treturn 0.5 - min_distance;\n"
-		"}\n\n");
+static b8 se_sdf_read_resource_text(c8** out_text, const c8* resource_path) {
+	c8 absolute_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!out_text || !resource_path) {
+		return false;
+	}
+	*out_text = NULL;
+	if (!se_paths_resolve_resource_path(absolute_path, sizeof(absolute_path), resource_path)) {
+		se_log("se_sdf :: failed to resolve shader template path: %s", resource_path);
+		return false;
+	}
+	if (!s_file_read(absolute_path, out_text, NULL)) {
+		se_log("se_sdf :: failed to read shader template: %s", absolute_path);
+		return false;
+	}
+	return true;
 }
 
-static void se_sdf_gen_shading_helpers(c8* out, const sz capacity) {
-	se_sdf_append(
-		out,
-		capacity,
-		"struct sdf_shading_data {\n"
-		"\tvec3 ambient;\n"
-		"\tvec3 diffuse;\n"
-		"\tvec3 specular;\n"
-		"\tfloat roughness;\n"
-		"\tfloat bias;\n"
-		"\tfloat smoothness;\n"
-		"};\n\n"
-		"struct sdf_shadow_data {\n"
-		"\tfloat softness;\n"
-		"\tfloat bias;\n"
-		"\tfloat samples;\n"
-		"};\n\n"
-		"struct sdf_surface_data {\n"
-		"\tfloat distance;\n"
-		"\tsdf_shading_data shading;\n"
-		"\tsdf_shadow_data shadow;\n"
-		"};\n\n"
-		"sdf_shading_data sdf_make_shading(vec3 ambient, vec3 diffuse, vec3 specular, float roughness, float bias, float smoothness) {\n"
-		"\tsdf_shading_data shading;\n"
-		"\tshading.ambient = ambient;\n"
-		"\tshading.diffuse = diffuse;\n"
-		"\tshading.specular = specular;\n"
-		"\tshading.roughness = clamp(roughness, 0.0, 1.0);\n"
-		"\tshading.bias = clamp(bias, 0.0, 1.0);\n"
-		"\tshading.smoothness = max(smoothness, 0.0);\n"
-		"\treturn shading;\n"
-		"}\n\n"
-		"sdf_shadow_data sdf_make_shadow(float softness, float bias, int samples) {\n"
-		"\tsdf_shadow_data shadow;\n"
-		"\tshadow.softness = max(softness, 0.0);\n"
-		"\tshadow.bias = max(bias, 0.0);\n"
-		"\tshadow.samples = clamp(float(max(samples, 1)), 1.0, 128.0);\n"
-		"\treturn shadow;\n"
-		"}\n\n"
-		"sdf_shading_data sdf_mix_shading(sdf_shading_data a, sdf_shading_data b, float t) {\n"
-		"\tsdf_shading_data shading;\n"
-		"\tshading.ambient = mix(a.ambient, b.ambient, t);\n"
-		"\tshading.diffuse = mix(a.diffuse, b.diffuse, t);\n"
-		"\tshading.specular = mix(a.specular, b.specular, t);\n"
-		"\tshading.roughness = mix(a.roughness, b.roughness, t);\n"
-		"\tshading.bias = mix(a.bias, b.bias, t);\n"
-		"\tshading.smoothness = mix(a.smoothness, b.smoothness, t);\n"
-		"\treturn shading;\n"
-		"}\n\n"
-		"sdf_shadow_data sdf_mix_shadow(sdf_shadow_data a, sdf_shadow_data b, float t) {\n"
-		"\tsdf_shadow_data shadow;\n"
-		"\tshadow.softness = mix(a.softness, b.softness, t);\n"
-		"\tshadow.bias = mix(a.bias, b.bias, t);\n"
-		"\tshadow.samples = mix(a.samples, b.samples, t);\n"
-		"\treturn shadow;\n"
-		"}\n\n"
-		"float sdf_shading_band(float value, float bias, float smoothness) {\n"
-		"\tfloat center = clamp(bias, 0.0, 1.0);\n"
-		"\tfloat half_width = max(smoothness * 0.5, 0.0001);\n"
-		"\tfloat band_min = clamp(center - half_width, 0.0, 1.0);\n"
-		"\tfloat band_max = clamp(center + half_width, 0.0, 1.0);\n"
-		"\tfloat band_value = clamp(value, 0.0, 1.0);\n"
-		"\tif (band_max <= band_min + 0.0001) {\n"
-		"\t\treturn band_value >= center ? 1.0 : 0.0;\n"
-		"\t}\n"
-		"\treturn smoothstep(band_min, band_max, band_value);\n"
-		"}\n\n");
+static b8 se_sdf_read_resource_mtime(time_t* out_mtime, const c8* resource_path) {
+	c8 absolute_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!out_mtime || !resource_path) {
+		return false;
+	}
+	*out_mtime = 0;
+	if (!se_paths_resolve_resource_path(absolute_path, sizeof(absolute_path), resource_path)) {
+		se_log("se_sdf :: failed to resolve shader template path: %s", resource_path);
+		return false;
+	}
+	if (!s_file_mtime(absolute_path, out_mtime)) {
+		se_log("se_sdf :: failed to stat shader template: %s", absolute_path);
+		return false;
+	}
+	return true;
 }
 
-static void se_sdf_gen_shadow_visibility_functions(c8* out, const sz capacity) {
-	se_sdf_append(
-		out,
-		capacity,
-		"float sdf_shadow_visibility(vec3 ray_origin, vec3 ray_direction, float min_distance, float max_distance, float shadow_softness, int shadow_samples) {\n"
-		"\tfloat visibility = 1.0;\n"
-		"\tfloat safe_shadow_softness = max(shadow_softness, 0.0001);\n"
-		"\tint sample_count = clamp(max(shadow_samples, 1), 1, 128);\n"
-		"\tfloat travel = max(min_distance, 0.0);\n"
-		"\tfloat shadow_limit = min(max_distance, %.1ff);\n"
-		"\tif (travel >= shadow_limit) {\n"
-		"\t\treturn 1.0;\n"
-		"\t}\n"
-		"\tfor (int i = 0; i < 128; ++i) {\n"
-		"\t\tif (i >= sample_count || travel >= shadow_limit) {\n"
-		"\t\t\tbreak;\n"
-		"\t\t}\n"
-		"\t\tvec3 sample_position = ray_origin + ray_direction * travel;\n"
-		"\t\tfloat distance_to_surface = scene_sdf(sample_position);\n"
-		"\t\tif (distance_to_surface < %.4ff) {\n"
-		"\t\t\treturn 0.0;\n"
-		"\t\t}\n"
-		"\t\tvisibility = min(visibility, safe_shadow_softness * distance_to_surface / max(travel, 0.0001));\n"
-		"\t\ttravel += max(distance_to_surface, 0.02);\n"
-		"\t}\n"
-		"\treturn clamp(visibility, 0.0, 1.0);\n"
-		"}\n\n",
-		SE_SDF_FAR_DISTANCE,
-		SE_SDF_HIT_EPSILON);
+static void se_sdf_refresh_shader_templates(se_context* ctx) {
+	time_t vertex_mtime = 0;
+	time_t common_mtime = 0;
+	time_t fragment_mtime = 0;
+	if (!ctx) {
+		return;
+	}
+	if (!se_sdf_read_resource_mtime(&vertex_mtime, SE_SDF_VERTEX_SHADER_TEMPLATE_PATH)
+		|| !se_sdf_read_resource_mtime(&common_mtime, SE_SDF_COMMON_SHADER_TEMPLATE_PATH)
+		|| !se_sdf_read_resource_mtime(&fragment_mtime, SE_SDF_FRAGMENT_SHADER_TEMPLATE_PATH)) {
+		return;
+	}
+	if (!g_se_sdf_shader_templates.initialized) {
+		g_se_sdf_shader_templates.vertex_mtime = vertex_mtime;
+		g_se_sdf_shader_templates.common_mtime = common_mtime;
+		g_se_sdf_shader_templates.fragment_mtime = fragment_mtime;
+		g_se_sdf_shader_templates.initialized = true;
+		return;
+	}
+	if (g_se_sdf_shader_templates.vertex_mtime == vertex_mtime
+		&& g_se_sdf_shader_templates.common_mtime == common_mtime
+		&& g_se_sdf_shader_templates.fragment_mtime == fragment_mtime) {
+		return;
+	}
+	g_se_sdf_shader_templates.vertex_mtime = vertex_mtime;
+	g_se_sdf_shader_templates.common_mtime = common_mtime;
+	g_se_sdf_shader_templates.fragment_mtime = fragment_mtime;
+	se_sdf_invalidate_all_shaders(ctx);
 }
 
-static void se_sdf_gen_lighting_visibility_functions(c8* out, const sz capacity) {
+static const c8* se_sdf_find_template_value(const se_sdf_template_part* parts, const sz part_count, const c8* token, const sz token_size) {
+	if (!parts || !token || token_size == 0) {
+		return NULL;
+	}
+	for (sz i = 0; i < part_count; ++i) {
+		const c8* current_token = parts[i].token;
+		if (!current_token) {
+			continue;
+		}
+		if (strlen(current_token) == token_size && strncmp(current_token, token, token_size) == 0) {
+			return parts[i].value ? parts[i].value : "";
+		}
+	}
+	return NULL;
+}
+
+static void se_sdf_apply_template(c8* out, const sz capacity, const c8* template_source, const se_sdf_template_part* parts, const sz part_count) {
+	const c8* cursor = template_source;
+	if (!out || capacity == 0 || !template_source) {
+		return;
+	}
+	out[0] = '\0';
+	while (cursor && *cursor != '\0') {
+		const c8* token_start = strstr(cursor, "{{");
+		if (!token_start) {
+			se_sdf_append_range(out, capacity, cursor, strlen(cursor));
+			break;
+		}
+		se_sdf_append_range(out, capacity, cursor, (sz)(token_start - cursor));
+		const c8* token_end = strstr(token_start, "}}");
+		if (!token_end) {
+			se_sdf_append_range(out, capacity, token_start, strlen(token_start));
+			break;
+		}
+		token_end += 2;
+		const c8* replacement = se_sdf_find_template_value(parts, part_count, token_start, (sz)(token_end - token_start));
+		if (replacement) {
+			se_sdf_append_range(out, capacity, replacement, strlen(replacement));
+		} else {
+			se_sdf_append_range(out, capacity, token_start, (sz)(token_end - token_start));
+		}
+		cursor = token_end;
+	}
+}
+
+static void se_sdf_gen_common_constants(c8* out, const sz capacity) {
+	if (!out || capacity == 0) {
+		return;
+	}
+	out[0] = '\0';
+	se_sdf_append(out, capacity, "const float SDF_FAR_DISTANCE = %.1ff;\n", SE_SDF_FAR_DISTANCE);
+	se_sdf_append(out, capacity, "const int SDF_MAX_TRACE_STEPS = %u;\n", SE_SDF_MAX_TRACE_STEPS);
+	se_sdf_append(out, capacity, "const float SDF_HIT_EPSILON = %.4ff;\n", SE_SDF_HIT_EPSILON);
+	se_sdf_append(out, capacity, "const float SDF_MIN_SMOOTH_UNION_AMOUNT = %.4ff;\n", SE_SDF_MIN_SMOOTH_UNION_AMOUNT);
+	se_sdf_append(out, capacity, "const float SDF_DEFAULT_NOISE_AMOUNT = %.3ff;\n", SE_SDF_DEFAULT_NOISE_AMOUNT);
+	se_sdf_append(out, capacity, "const int SDF_MAX_SHADOW_SAMPLES = %u;\n", SE_SDF_MAX_SHADOW_SAMPLES);
 	se_sdf_append(
 		out,
 		capacity,
-		"void sdf_apply_directional_light_visibility(\n"
-		"\tvec3 normal,\n"
-		"\tvec3 view_direction,\n"
-		"\tvec3 light_direction,\n"
-		"\tvec3 light_color,\n"
-		"\tfloat roughness,\n"
-		"\tfloat shading_bias,\n"
-		"\tfloat shading_smoothness,\n"
-		"\tfloat visibility,\n"
-		"\tout vec3 diffuse_light,\n"
-		"\tout vec3 specular_light) {\n"
-		"\tvec3 dir = normalize(light_direction);\n"
-		"\tfloat diffuse = max(dot(normal, dir), 0.0);\n"
-		"\tif (diffuse <= 0.0 || visibility <= 0.0) {\n"
-		"\t\tdiffuse_light = vec3(0.0);\n"
-		"\t\tspecular_light = vec3(0.0);\n"
-		"\t\treturn;\n"
-		"\t}\n"
-		"\tfloat diffuse_band = sdf_shading_band(diffuse, shading_bias, shading_smoothness);\n"
-		"\tvec3 half_dir = normalize(dir + view_direction);\n"
-		"\tfloat shininess = mix(96.0, 8.0, clamp(roughness, 0.0, 1.0));\n"
-		"\tfloat specular = pow(max(dot(normal, half_dir), 0.0), shininess) * mix(1.0, 0.18, clamp(roughness, 0.0, 1.0));\n"
-		"\tfloat specular_band = sdf_shading_band(specular, shading_bias, shading_smoothness);\n"
-		"\tdiffuse_light = light_color * diffuse * diffuse_band * visibility * 0.78;\n"
-		"\tspecular_light = light_color * specular * specular_band * visibility * 0.35;\n"
-		"}\n\n"
-		"void sdf_apply_point_light_visibility(\n"
-		"\tvec3 normal,\n"
-		"\tvec3 view_direction,\n"
-		"\tvec3 world_position,\n"
-		"\tvec3 light_position,\n"
-		"\tvec3 light_color,\n"
-		"\tfloat radius,\n"
-		"\tfloat roughness,\n"
-		"\tfloat shading_bias,\n"
-		"\tfloat shading_smoothness,\n"
-		"\tfloat visibility,\n"
-		"\tout vec3 diffuse_light,\n"
-		"\tout vec3 specular_light) {\n"
-		"\tvec3 to_light = light_position - world_position;\n"
-		"\tfloat distance_to_light = length(to_light);\n"
-		"\tif (distance_to_light <= 0.0001 || visibility <= 0.0) {\n"
-		"\t\tdiffuse_light = vec3(0.0);\n"
-		"\t\tspecular_light = vec3(0.0);\n"
-		"\t\treturn;\n"
-		"\t}\n"
-		"\tvec3 dir = to_light / distance_to_light;\n"
-		"\tfloat diffuse = max(dot(normal, dir), 0.0);\n"
-		"\tfloat safe_radius = max(radius, 0.0001);\n"
-		"\tfloat attenuation = clamp(1.0 - distance_to_light / safe_radius, 0.0, 1.0);\n"
-		"\tattenuation *= attenuation;\n"
-		"\tif (diffuse <= 0.0 || attenuation <= 0.0) {\n"
-		"\t\tdiffuse_light = vec3(0.0);\n"
-		"\t\tspecular_light = vec3(0.0);\n"
-		"\t\treturn;\n"
-		"\t}\n"
-		"\tfloat diffuse_band = sdf_shading_band(diffuse, shading_bias, shading_smoothness);\n"
-		"\tvec3 half_dir = normalize(dir + view_direction);\n"
-		"\tfloat shininess = mix(96.0, 8.0, clamp(roughness, 0.0, 1.0));\n"
-		"\tfloat specular = pow(max(dot(normal, half_dir), 0.0), shininess) * mix(1.0, 0.18, clamp(roughness, 0.0, 1.0));\n"
-		"\tfloat specular_band = sdf_shading_band(specular, shading_bias, shading_smoothness);\n"
-		"\tdiffuse_light = light_color * diffuse * diffuse_band * attenuation * visibility * 0.78;\n"
-		"\tspecular_light = light_color * specular * specular_band * attenuation * visibility * 0.35;\n"
-		"}\n\n");
+		"const vec3 SDF_DEFAULT_LIGHT_DIRECTION = vec3(%.2f, %.2f, %.2f);\n\n",
+		SE_SDF_DEFAULT_LIGHT_DIR_X,
+		SE_SDF_DEFAULT_LIGHT_DIR_Y,
+		SE_SDF_DEFAULT_LIGHT_DIR_Z);
 }
 
 static void se_sdf_gen_uniform_recursive(c8* out, const sz capacity, const se_sdf_handle sdf) {
@@ -870,7 +798,7 @@ static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_s
 			SE_SDF_HANDLE_ARG(sdf));
 	}
 	se_sdf_append(out, capacity, "float sdf_" SE_SDF_HANDLE_FMT "(vec3 p) {\n", SE_SDF_HANDLE_ARG(sdf));
-	se_sdf_append(out, capacity, "\tfloat d = %.1f;\n", SE_SDF_FAR_DISTANCE);
+	se_sdf_append(out, capacity, "\tfloat d = SDF_FAR_DISTANCE;\n");
 	if (se_sdf_has_primitive(sdf_ptr)) {
 		se_sdf_append(
 			out,
@@ -909,11 +837,10 @@ static void se_sdf_gen_function_recursive(c8* out, const sz capacity, const se_s
 			se_sdf_append(
 				out,
 				capacity,
-				"\t\td += %s(noise_local * _noise_" SE_SDF_HANDLE_FMT "_frequency + _noise_" SE_SDF_HANDLE_FMT "_offset) * %.3ff;\n",
+				"\t\td += %s(noise_local * _noise_" SE_SDF_HANDLE_FMT "_frequency + _noise_" SE_SDF_HANDLE_FMT "_offset) * SDF_DEFAULT_NOISE_AMOUNT;\n",
 				noise_function,
 				SE_SDF_HANDLE_ARG(noise_id),
-				SE_SDF_HANDLE_ARG(noise_id),
-				SE_SDF_DEFAULT_NOISE_AMOUNT);
+				SE_SDF_HANDLE_ARG(noise_id));
 		}
 	}
 	se_sdf_append(out, capacity, "\treturn d;\n}\n\n");
@@ -935,7 +862,7 @@ static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sd
 		capacity,
 		"sdf_surface_data sdf_" SE_SDF_HANDLE_FMT "_surface(vec3 p) {\n"
 		"\tsdf_surface_data surface;\n"
-		"\tsurface.distance = %.1f;\n"
+		"\tsurface.distance = SDF_FAR_DISTANCE;\n"
 		"\tsurface.shading = sdf_make_shading(\n"
 		"\t\t_" SE_SDF_HANDLE_FMT "_shading_ambient,\n"
 		"\t\t_" SE_SDF_HANDLE_FMT "_shading_diffuse,\n"
@@ -949,7 +876,6 @@ static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sd
 		"\t\t_" SE_SDF_HANDLE_FMT "_shadow_samples);\n"
 		"\tbool has_surface = false;\n",
 		SE_SDF_HANDLE_ARG(sdf),
-		SE_SDF_FAR_DISTANCE,
 		SE_SDF_HANDLE_ARG(sdf),
 		SE_SDF_HANDLE_ARG(sdf),
 		SE_SDF_HANDLE_ARG(sdf),
@@ -1028,11 +954,10 @@ static void se_sdf_gen_surface_recursive(c8* out, const sz capacity, const se_sd
 			se_sdf_append(
 				out,
 				capacity,
-				"\t\tsurface.distance += %s(noise_local * _noise_" SE_SDF_HANDLE_FMT "_frequency + _noise_" SE_SDF_HANDLE_FMT "_offset) * %.3ff;\n",
+				"\t\tsurface.distance += %s(noise_local * _noise_" SE_SDF_HANDLE_FMT "_frequency + _noise_" SE_SDF_HANDLE_FMT "_offset) * SDF_DEFAULT_NOISE_AMOUNT;\n",
 				noise_function,
 				SE_SDF_HANDLE_ARG(noise_id),
-				SE_SDF_HANDLE_ARG(noise_id),
-				SE_SDF_DEFAULT_NOISE_AMOUNT);
+				SE_SDF_HANDLE_ARG(noise_id));
 		}
 	}
 	se_sdf_append(out, capacity, "\treturn surface;\n}\n\n");
@@ -1094,112 +1019,32 @@ static void se_sdf_gen_composite_light_apply_recursive(c8* out, const sz capacit
 	}
 }
 
-static void se_sdf_gen_scene_common(c8* out, const sz capacity, const se_sdf_handle sdf) {
-	se_sdf_gen_uniform(out, capacity, sdf);
-	se_sdf_append(out, capacity, "\n");
-	se_sdf_gen_operator_functions(out, capacity);
-	se_sdf_gen_noise_functions(out, capacity);
-	se_sdf_gen_shading_helpers(out, capacity);
-	se_sdf_gen_function(out, capacity, sdf);
-	se_sdf_gen_surface_recursive(out, capacity, sdf);
+static void se_sdf_gen_scene_wrappers(c8* out, const sz capacity, const se_sdf_handle sdf) {
+	if (!out || capacity == 0) {
+		return;
+	}
+	out[0] = '\0';
 	se_sdf_append(out, capacity, "float scene_sdf(vec3 p) {\n");
 	se_sdf_append(out, capacity, "\treturn sdf_" SE_SDF_HANDLE_FMT "(p);\n", SE_SDF_HANDLE_ARG(sdf));
 	se_sdf_append(out, capacity, "}\n\n");
 	se_sdf_append(out, capacity, "sdf_surface_data scene_surface(vec3 p) {\n");
 	se_sdf_append(out, capacity, "\treturn sdf_" SE_SDF_HANDLE_FMT "_surface(p);\n", SE_SDF_HANDLE_ARG(sdf));
 	se_sdf_append(out, capacity, "}\n\n");
-	se_sdf_append(
-		out,
-		capacity,
-		"float sdf_safe_w(float w) {\n"
-		"\treturn abs(w) > 0.00001 ? w : (w < 0.0 ? -0.00001 : 0.00001);\n"
-		"}\n\n"
-		"void sdf_get_view_ray(vec2 uv, out vec3 ray_origin, out vec3 ray_dir) {\n"
-		"\tvec2 ndc = vec2(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0);\n"
-		"\tvec4 near_clip = vec4(ndc, -1.0, 1.0);\n"
-		"\tvec4 far_clip = vec4(ndc, 1.0, 1.0);\n"
-		"\tvec4 near_world_h = u_inv_view_projection * near_clip;\n"
-		"\tvec4 far_world_h = u_inv_view_projection * far_clip;\n"
-		"\tvec3 near_world = near_world_h.xyz / sdf_safe_w(near_world_h.w);\n"
-		"\tvec3 far_world = far_world_h.xyz / sdf_safe_w(far_world_h.w);\n"
-		"\tray_origin = near_world;\n"
-		"\tray_dir = normalize(far_world - near_world);\n"
-		"\tif (u_use_orthographic == 0) {\n"
-		"\t\tray_origin = u_camera_position;\n"
-		"\t\tray_dir = normalize(far_world - u_camera_position);\n"
-		"\t}\n"
-		"}\n\n"
-		"vec3 sdf_sky(vec3 ray_dir) {\n"
-		"\treturn mix(vec3(0.05, 0.06, 0.08), vec3(0.16, 0.19, 0.24), clamp(ray_dir.y * 0.5 + 0.5, 0.0, 1.0));\n"
-		"}\n\n"
-		"vec3 sdf_estimate_normal(vec3 p) {\n"
-		"\tfloat e = %.4ff;\n"
-		"\tfloat dx = scene_sdf(p + vec3(e, 0.0, 0.0)) - scene_sdf(p - vec3(e, 0.0, 0.0));\n"
-		"\tfloat dy = scene_sdf(p + vec3(0.0, e, 0.0)) - scene_sdf(p - vec3(0.0, e, 0.0));\n"
-		"\tfloat dz = scene_sdf(p + vec3(0.0, 0.0, e)) - scene_sdf(p - vec3(0.0, 0.0, e));\n"
-		"\treturn normalize(vec3(dx, dy, dz));\n"
-		"}\n\n",
-		SE_SDF_HIT_EPSILON);
 }
 
-static void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
+static void se_sdf_gen_light_apply(c8* out, const sz capacity, const se_sdf_handle sdf) {
 	const se_sdf_directional_light_handle shadow_light = se_sdf_get_first_directional_light_recursive(sdf);
 	b8 shadow_light_used = false;
 	if (!out || capacity == 0) {
 		return;
 	}
 	out[0] = '\0';
-	se_sdf_append(out, capacity, "#version 330 core\n");
-	se_sdf_append(out, capacity, "in vec2 v_uv;\n");
-	se_sdf_append(out, capacity, "out vec4 frag_color;\n\n");
-	se_sdf_gen_scene_common(out, capacity, sdf);
-	se_sdf_gen_shadow_visibility_functions(out, capacity);
-	se_sdf_gen_lighting_visibility_functions(out, capacity);
-	se_sdf_append(
-		out,
-		capacity,
-		"void main() {\n"
-		"\tvec3 ray_origin = vec3(0.0);\n"
-		"\tvec3 ray_dir = vec3(0.0, 0.0, 1.0);\n"
-		"\tsdf_get_view_ray(v_uv, ray_origin, ray_dir);\n"
-		"\tvec3 sky = sdf_sky(ray_dir);\n"
-		"\tfloat travel = 0.0;\n"
-		"\tvec3 hit_position = ray_origin;\n"
-		"\tbool hit = false;\n"
-		"\tfor (int i = 0; i < %u; ++i) {\n"
-		"\t\tif (travel > %.1f) {\n"
-		"\t\t\tbreak;\n"
-		"\t\t}\n"
-		"\t\thit_position = ray_origin + ray_dir * travel;\n"
-		"\t\tfloat distance_to_surface = scene_sdf(hit_position);\n"
-		"\t\tif (distance_to_surface < %.4ff) {\n"
-		"\t\t\thit = true;\n"
-		"\t\t\tbreak;\n"
-		"\t\t}\n"
-		"\t\ttravel += max(distance_to_surface, %.4ff);\n"
-		"\t}\n"
-		"\tif (!hit) {\n"
-		"\t\tfrag_color = vec4(sky, 1.0);\n"
-		"\t\treturn;\n"
-		"\t}\n"
-		"\tvec3 normal = sdf_estimate_normal(hit_position);\n"
-		"\tsdf_surface_data surface = scene_surface(hit_position);\n"
-		"\tsdf_shading_data shading = surface.shading;\n"
-		"\tvec3 view_direction = normalize(u_use_orthographic != 0 ? -ray_dir : (u_camera_position - hit_position));\n"
-		"\tvec3 diffuse_lighting = vec3(0.0);\n"
-		"\tvec3 specular_lighting = vec3(0.0);\n"
-		"\tfloat shadow_visibility = 1.0;\n",
-		SE_SDF_MAX_TRACE_STEPS,
-		SE_SDF_FAR_DISTANCE,
-		SE_SDF_HIT_EPSILON,
-		SE_SDF_HIT_EPSILON);
 	if (shadow_light != S_HANDLE_NULL) {
 		se_sdf_append(
 			out,
 			capacity,
-			"\tshadow_visibility = sdf_shadow_visibility(hit_position + normal * max(surface.shadow.bias, 0.0005), normalize(_directional_light_" SE_SDF_HANDLE_FMT "_direction), max(surface.shadow.bias * 2.0, %.4ff), 32.0, surface.shadow.softness, int(max(round(surface.shadow.samples), 1.0)));\n",
-			SE_SDF_HANDLE_ARG(shadow_light),
-			SE_SDF_HIT_EPSILON);
+			"\tshadow_visibility = sdf_shadow_visibility(hit_position + normal * max(surface.shadow.bias, 0.0005), normalize(_directional_light_" SE_SDF_HANDLE_FMT "_direction), max(surface.shadow.bias * 2.0, SDF_HIT_EPSILON), 32.0, surface.shadow.softness, int(max(round(surface.shadow.samples), 1.0)));\n",
+			SE_SDF_HANDLE_ARG(shadow_light));
 	}
 	if (se_sdf_has_lights_recursive(sdf)) {
 		se_sdf_gen_composite_light_apply_recursive(out, capacity, sdf, shadow_light, &shadow_light_used);
@@ -1210,21 +1055,11 @@ static void se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle 
 			"\t{\n"
 			"\t\tvec3 light_diffuse = vec3(0.0);\n"
 			"\t\tvec3 light_specular = vec3(0.0);\n"
-			"\t\tsdf_apply_directional_light_visibility(normal, view_direction, vec3(%.2f, %.2f, %.2f), vec3(1.0), shading.roughness, shading.bias, shading.smoothness, 1.0, light_diffuse, light_specular);\n"
+			"\t\tsdf_apply_directional_light_visibility(normal, view_direction, SDF_DEFAULT_LIGHT_DIRECTION, vec3(1.0), shading.roughness, shading.bias, shading.smoothness, 1.0, light_diffuse, light_specular);\n"
 			"\t\tdiffuse_lighting += light_diffuse;\n"
 			"\t\tspecular_lighting += light_specular;\n"
-			"\t}\n",
-			SE_SDF_DEFAULT_LIGHT_DIR_X,
-			SE_SDF_DEFAULT_LIGHT_DIR_Y,
-			SE_SDF_DEFAULT_LIGHT_DIR_Z);
+			"\t}\n");
 	}
-	se_sdf_append(
-		out,
-		capacity,
-		"\tvec3 color = shading.ambient + shading.diffuse * diffuse_lighting + shading.specular * specular_lighting;\n"
-		"\tfloat fog = clamp(travel / 48.0, 0.0, 1.0);\n"
-		"\tfrag_color = vec4(mix(color, sky, fog), 1.0);\n"
-		"}\n");
 }
 
 static void se_sdf_gen_uniform(c8* out, const sz capacity, const se_sdf_handle sdf) {
@@ -1238,22 +1073,61 @@ static void se_sdf_gen_function(c8* out, const sz capacity, const se_sdf_handle 
 	se_sdf_gen_function_recursive(out, capacity, sdf);
 }
 
-static void se_sdf_gen_vertex(c8* out, const sz capacity) {
+static b8 se_sdf_gen_fragment(c8* out, const sz capacity, const se_sdf_handle sdf) {
+	c8* common_template = NULL;
+	c8* fragment_template = NULL;
+	c8* uniforms = NULL;
+	c8* common_constants = NULL;
+	c8* distance_functions = NULL;
+	c8* surface_functions = NULL;
+	c8* scene_wrappers = NULL;
+	c8* light_apply = NULL;
+	b8 success = false;
 	if (!out || capacity == 0) {
-		return;
+		return false;
 	}
 	out[0] = '\0';
-	se_sdf_append(
-		out,
-		capacity,
-		"#version 330 core\n"
-		"layout(location = 0) in vec2 in_position;\n"
-		"layout(location = 1) in vec2 in_uv;\n"
-		"out vec2 v_uv;\n\n"
-		"void main() {\n"
-		"\tgl_Position = vec4(in_position, 0.0, 1.0);\n"
-		"\tv_uv = vec2(in_uv.x, 1.0 - in_uv.y);\n"
-		"}\n");
+	if (!se_sdf_read_resource_text(&common_template, SE_SDF_COMMON_SHADER_TEMPLATE_PATH)
+		|| !se_sdf_read_resource_text(&fragment_template, SE_SDF_FRAGMENT_SHADER_TEMPLATE_PATH)) {
+		goto cleanup;
+	}
+	uniforms = calloc(SE_SDF_FRAGMENT_SHADER_CAPACITY, sizeof(c8));
+	common_constants = calloc(2048u, sizeof(c8));
+	distance_functions = calloc(SE_SDF_FRAGMENT_SHADER_CAPACITY, sizeof(c8));
+	surface_functions = calloc(SE_SDF_FRAGMENT_SHADER_CAPACITY, sizeof(c8));
+	scene_wrappers = calloc(2048u, sizeof(c8));
+	light_apply = calloc(SE_SDF_FRAGMENT_SHADER_CAPACITY, sizeof(c8));
+	if (!uniforms || !common_constants || !distance_functions || !surface_functions || !scene_wrappers || !light_apply) {
+		goto cleanup;
+	}
+	se_sdf_gen_uniform(uniforms, SE_SDF_FRAGMENT_SHADER_CAPACITY, sdf);
+	se_sdf_gen_common_constants(common_constants, 2048u);
+	se_sdf_gen_function(distance_functions, SE_SDF_FRAGMENT_SHADER_CAPACITY, sdf);
+	se_sdf_gen_surface_recursive(surface_functions, SE_SDF_FRAGMENT_SHADER_CAPACITY, sdf);
+	se_sdf_gen_scene_wrappers(scene_wrappers, 2048u, sdf);
+	se_sdf_gen_light_apply(light_apply, SE_SDF_FRAGMENT_SHADER_CAPACITY, sdf);
+	const se_sdf_template_part parts[] = {
+		{ "{{SDF_UNIFORMS}}", uniforms },
+		{ "{{SDF_COMMON_CONSTANTS}}", common_constants },
+		{ "{{SDF_COMMON}}", common_template },
+		{ "{{SDF_DISTANCE_FUNCTIONS}}", distance_functions },
+		{ "{{SDF_SURFACE_FUNCTIONS}}", surface_functions },
+		{ "{{SDF_SCENE_WRAPPERS}}", scene_wrappers },
+		{ "{{SDF_LIGHT_APPLY}}", light_apply },
+	};
+	se_sdf_apply_template(out, capacity, fragment_template, parts, sizeof(parts) / sizeof(parts[0]));
+	success = true;
+
+cleanup:
+	free(common_template);
+	free(fragment_template);
+	free(uniforms);
+	free(common_constants);
+	free(distance_functions);
+	free(surface_functions);
+	free(scene_wrappers);
+	free(light_apply);
+	return success;
 }
 
 static void se_sdf_upload_uniforms_recursive(const se_shader_handle shader, const se_sdf_handle sdf) {
@@ -1854,16 +1728,20 @@ static b8 se_sdf_compile_render_shaders(se_context* ctx, const se_sdf_handle sdf
 	}
 	se_debug_trace_begin("sdf_shader_compile");
 	se_sdf_destroy_shader_runtime(sdf_ptr);
-	vs = calloc(SE_SDF_VERTEX_SHADER_CAPACITY, sizeof(c8));
 	fs = calloc(SE_SDF_FRAGMENT_SHADER_CAPACITY, sizeof(c8));
-	if (!vs || !fs) {
+	if (!fs) {
 		free(vs);
 		free(fs);
 		se_debug_trace_end("sdf_shader_compile");
 		return false;
 	}
-	se_sdf_gen_vertex(vs, SE_SDF_VERTEX_SHADER_CAPACITY);
-	se_sdf_gen_fragment(fs, SE_SDF_FRAGMENT_SHADER_CAPACITY, sdf);
+	if (!se_sdf_read_resource_text(&vs, SE_SDF_VERTEX_SHADER_TEMPLATE_PATH)
+		|| !se_sdf_gen_fragment(fs, SE_SDF_FRAGMENT_SHADER_CAPACITY, sdf)) {
+		free(vs);
+		free(fs);
+		se_debug_trace_end("sdf_shader_compile");
+		return false;
+	}
 	sdf_ptr->shader = se_shader_load_from_memory(vs, fs);
 	free(vs);
 	free(fs);
@@ -1900,6 +1778,7 @@ void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
 	if (!ctx || !sdf_ptr || camera == S_HANDLE_NULL) {
 		return;
 	}
+	se_sdf_refresh_shader_templates(ctx);
 	if (sdf_ptr->quad.vao == 0) {
 		se_quad_2d_create(&sdf_ptr->quad, 0);
 	}
