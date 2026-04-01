@@ -3,11 +3,13 @@
 #include "se_sdf.h"
 
 #include "render/se_gl.h"
+#include "se_graphics.h"
 #include "se_camera.h"
 #include "se_defines.h"
 #include "se_debug.h"
 #include "se_math.h"
 #include "se_shader.h"
+#include "se_framebuffer.h"
 #include "syphax/s_files.h"
 
 #include <math.h>
@@ -1772,7 +1774,7 @@ void se_sdf_render_raw(se_sdf_handle sdf, se_camera_handle camera) {
 	se_debug_trace_end("sdf_render");
 }
 
-void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
+void se_sdf_render_to_framebuffer(se_sdf_handle sdf, se_camera_handle camera, const s_vec2* resolution) {
 	se_context* ctx = se_current_context();
 	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
 	if (!ctx || !sdf_ptr || camera == S_HANDLE_NULL) {
@@ -1785,6 +1787,18 @@ void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
 	if (!se_sdf_compile_render_shaders(ctx, sdf, sdf_ptr)) {
 		return;
 	}
+	if (sdf_ptr->output == S_HANDLE_NULL) {
+		sdf_ptr->output = se_framebuffer_create(resolution);
+	}
+
+	// adjust framebuffer size if needed
+	s_vec2 current_framebuffer_size = {};
+	se_framebuffer_get_size(sdf_ptr->output, &current_framebuffer_size);
+	if (current_framebuffer_size.x != resolution->x || current_framebuffer_size.y != resolution->y) {
+		se_framebuffer_set_size(sdf_ptr->output, resolution);
+	}
+
+	se_framebuffer_bind(sdf_ptr->output);
 	const GLboolean depth_test_enabled = glIsEnabled(GL_DEPTH_TEST);
 	const GLboolean cull_face_enabled = glIsEnabled(GL_CULL_FACE);
 	glDisable(GL_CULL_FACE);
@@ -1796,6 +1810,37 @@ void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera) {
 	if (cull_face_enabled) {
 		glEnable(GL_CULL_FACE);
 	}
+	se_framebuffer_unbind(sdf_ptr->output);
+}
+
+void se_sdf_render_framebuffer_to_window(se_sdf_handle sdf, se_window_handle window) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr || sdf_ptr->output == S_HANDLE_NULL) {
+		return;
+	}
+	se_window* window_ptr = s_array_get(&ctx->windows, window);
+	se_framebuffer* framebuffer_ptr = s_array_get(&ctx->framebuffers, sdf_ptr->output);
+	s_assertf(window_ptr, "se_sdf_render_framebuffer_to_window :: window is null");
+	s_assertf(framebuffer_ptr, "se_sdf_render_framebuffer_to_window :: framebuffer is null");
+	se_render_unbind_framebuffer();
+	se_render_clear();
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glDisable(GL_CULL_FACE);
+	glViewport(0, 0, window_ptr->width, window_ptr->height);
+	se_shader_set_texture(window_ptr->shader, "u_texture", framebuffer_ptr->texture);
+	se_window_render_quad(window);
+	glDepthFunc(GL_LEQUAL);
+	glEnable(GL_CULL_FACE);
+	se_render_set_blending(false);
+}
+
+void se_sdf_render_to_window(se_sdf_handle sdf, se_camera_handle camera, se_window_handle window, const f32 ratio) {
+	se_context* ctx = se_current_context();
+	se_window* window_ptr = s_array_get(&ctx->windows, window);
+	se_sdf_render_to_framebuffer(sdf, camera, &s_vec2(window_ptr->width * ratio, window_ptr->height * ratio));
+	se_sdf_render_framebuffer_to_window(sdf, window);
 }
 
 void se_sdf_bake(se_sdf_handle sdf) {

@@ -77,9 +77,10 @@ typedef struct se_sdf {
 	s_array(se_sdf_noise_handle, noises);
 	s_array(se_sdf_point_light_handle, point_lights);
 	s_array(se_sdf_directional_light_handle, directional_lights);
+    se_texture_handle volume;
     se_quad quad;
     se_shader_handle shader;
-    se_texture_handle volume;
+	se_framebuffer_handle output;
 } se_sdf;
 
 #define se_sdf_create(...) se_sdf_create_internal(&(se_sdf){__VA_ARGS__})
@@ -136,7 +137,9 @@ extern void se_sdf_set_shadow_bias(se_sdf_handle sdf, f32 bias);
 extern u16 se_sdf_get_shadow_samples(se_sdf_handle sdf);
 extern void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples);
 
-extern void se_sdf_render(se_sdf_handle sdf, se_camera_handle camera); 
+extern void se_sdf_render_to_framebuffer(se_sdf_handle sdf, se_camera_handle camera, const s_vec2* resolution);
+extern void se_sdf_render_framebuffer_to_window(se_sdf_handle sdf, se_window_handle window);
+extern void se_sdf_render_to_window(se_sdf_handle sdf, se_camera_handle camera, se_window_handle window, const f32 ratio);
 extern void se_sdf_bake(se_sdf_handle sdf);
 extern void se_sdf_set_position(se_sdf_handle sdf, const s_vec3* position);
 

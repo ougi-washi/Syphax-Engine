@@ -100,39 +100,14 @@ i32 main(void) {
 			se_sdf_add_child(scene, extra);
 		}
 
-	se_debug_set_overlay_enabled(false);
+	se_debug_set_overlay_enabled(true);
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
 		se_camera_set_window_aspect(camera, window);
 		se_render_clear();
-		se_sdf_render(scene, camera);
+		se_sdf_render_to_window(scene, camera, window, .1f);
 		se_window_end_frame(window);
-		frame_counter++;
-		if ((frame_counter % 60u) == 0u) {
-			se_debug_frame_timing timing = {0};
-			se_debug_trace_stat trace_stats[8] = {0};
-			u32 trace_count = 0u;
-			if (se_debug_get_frame_timing(&timing)) {
-				se_log(
-					"sdf :: frame=%u frame_ms=%.3f fps=%.2f target144=%s present=%.3f other=%.3f",
-					frame_counter,
-					timing.frame_ms,
-					timing.frame_ms > 0.0 ? 1000.0 / timing.frame_ms : 0.0,
-					timing.frame_ms <= (1000.0 / 144.0) ? "yes" : "no",
-					timing.window_present_ms,
-					timing.other_ms);
-			}
-			if (se_debug_get_trace_stats(trace_stats, 8u, &trace_count, true)) {
-				for (u32 i = 0; i < trace_count && i < 8u; ++i) {
-					se_log(
-						"sdf :: trace %s[%s] %.3fms",
-						trace_stats[i].name,
-						se_debug_trace_channel_name((se_debug_trace_channel)trace_stats[i].channel),
-						trace_stats[i].total_ms);
-				}
-			}
-		}
 	}
 
 	se_context_destroy(context);
