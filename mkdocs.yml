@@ -190,6 +190,7 @@ nav:
       - se_math.h: api-reference/modules/se_math.md
       - se_model.h: api-reference/modules/se_model.md
       - se_navigation.h: api-reference/modules/se_navigation.md
+      - se_noise.h: api-reference/modules/se_noise.md
       - se_physics.h: api-reference/modules/se_physics.md
       - se_quad.h: api-reference/modules/se_quad.md
       - se_render_buffer.h: api-reference/modules/se_render_buffer.md

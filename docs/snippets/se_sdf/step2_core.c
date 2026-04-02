@@ -48,7 +48,7 @@ int main(void) {
 		se_window_begin_frame(window);
 		se_camera_set_window_aspect(camera, window);
 		se_render_clear();
-		se_sdf_render(scene, camera);
+		se_sdf_render_to_window(scene, camera, window, 0.1f);
 		se_window_end_frame(window);
 	}
 
