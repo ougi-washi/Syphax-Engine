@@ -93,9 +93,9 @@ i32 main(void) {
 
 		if (docs_step >= SE_DOCS_SDF_STEP_3) {
 			se_sdf_noise_handle surface_noise = se_sdf_add_noise(sphere,
-				.type = SE_SDF_NOISE_PERLIN,
+				.type = SE_NOISE_PERLIN,
 				.frequency = 1.25f,
-				.offset = {0.0f, 0.0f, 0.0f},
+				.offset = s_vec2(0.0f, 0.0f),
 			);
 			se_sdf_point_light_handle orb_light = se_sdf_add_point_light(scene,
 				.position = {2.5f, 3.0f, -2.0f},
@@ -125,7 +125,7 @@ i32 main(void) {
 		se_window_begin_frame(window);
 		se_camera_set_window_aspect(camera, window);
 		se_render_clear();
-		se_sdf_render(render_target, camera);
+		se_sdf_render_to_window(render_target, camera, window, 0.05f);
 		se_window_end_frame(window);
 	}
 

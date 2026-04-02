@@ -79,6 +79,7 @@ typedef struct {
 	f64 input_ms;
 	f64 scene2d_ms;
 	f64 scene3d_ms;
+	f64 sdf_ms;
 	f64 text_ms;
 	f64 ui_ms;
 	f64 navigation_ms;

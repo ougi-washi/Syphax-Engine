@@ -51,9 +51,9 @@ int main(void) {
 		},
 		.box = {.size = {10.0f, 0.01f, 10.0f}});
 	se_sdf_noise_handle noise = se_sdf_add_noise(sphere,
-		.type = SE_SDF_NOISE_PERLIN,
+		.type = SE_NOISE_PERLIN,
 		.frequency = 1.25f,
-		.offset = {0.0f, 0.0f, 0.0f},
+		.offset = s_vec2(0.0f, 0.0f),
 	);
 	se_sdf_point_light_handle point_light = se_sdf_add_point_light(scene,
 		.position = {2.5f, 3.0f, -2.0f},

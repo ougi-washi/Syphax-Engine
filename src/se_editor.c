@@ -397,6 +397,7 @@ struct se_editor {
 #define SE_EDITOR_NAME_SCENE3D "scene3d"
 #define SE_EDITOR_NAME_SCENE3D_MS "scene3d_ms"
 #define SE_EDITOR_NAME_SCENE3D_U "scene3d[%u]"
+#define SE_EDITOR_NAME_SDF_MS "sdf_ms"
 #define SE_EDITOR_NAME_SCROLLBOX_SELECTED "scrollbox_selected"
 #define SE_EDITOR_NAME_SCROLLBOX_SET_SELECTED "scrollbox_set_selected"
 #define SE_EDITOR_NAME_SCROLLBOX_SINGLE_SELECT "scrollbox_single_select"
@@ -1517,6 +1518,7 @@ static b8 se_editor_collect_debug_properties(se_editor* editor) {
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_INPUT_MS, timing.input_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_SCENE2D_MS, timing.scene2d_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_SCENE3D_MS, timing.scene3d_ms, false);
+		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_SDF_MS, timing.sdf_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_TEXT_MS, timing.text_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_UI_MS, timing.ui_ms, false);
 		se_editor_add_property_double(&editor->properties, SE_EDITOR_NAME_NAVIGATION_MS, timing.navigation_ms, false);

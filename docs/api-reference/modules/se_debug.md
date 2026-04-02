@@ -372,7 +372,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { u64 frame_index; f64 frame_ms; f64 window_update_ms; f64 input_ms; f64 scene2d_ms; f64 scene3d_ms; f64 text_ms; f64 ui_ms; f64 navigation_ms; f64 window_present_ms; f64 other_ms; } se_debug_frame_timing;
+typedef struct { u64 frame_index; f64 frame_ms; f64 window_update_ms; f64 input_ms; f64 scene2d_ms; f64 scene3d_ms; f64 sdf_ms; f64 text_ms; f64 ui_ms; f64 navigation_ms; f64 window_present_ms; f64 other_ms; } se_debug_frame_timing;
 ```
 
 </div>
