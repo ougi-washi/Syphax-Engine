@@ -16,7 +16,7 @@ Use this when signed-distance content should be assembled from reusable `se_sdf`
 
 ```c
 se_sdf_create(...);
-se_sdf_add_child(...);
+se_sdf_render_to_window(...);
 ```
 
 Use this tiny call path first, then continue with the four progressive snippets below.
@@ -37,7 +37,7 @@ Key API calls:
 - `se_window_create`
 - `se_camera_create`
 - `se_sdf_create`
-- `se_sdf_render`
+- `se_sdf_render_to_window`
 - `se_sdf_destroy`
 
 ## Step 2: Add Core Feature
@@ -98,7 +98,7 @@ Key API calls:
 - `se_sdf_add_directional_light`
 - `se_sdf_point_light_set_radius`
 - `se_sdf_directional_light_set_direction`
-- `se_sdf_render`
+- `se_sdf_render_to_window`
 - `se_sdf_destroy`
 
 ## Common mistakes
