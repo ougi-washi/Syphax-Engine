@@ -21,13 +21,14 @@ Generated API pages by public header.
 | [include/se_math.h](se_math.md) | 6 | 0 | 4 |
 | [include/se_model.h](se_model.md) | 22 | 1 | 8 |
 | [include/se_navigation.h](se_navigation.md) | 34 | 0 | 13 |
+| [include/se_noise.h](se_noise.md) | 3 | 1 | 2 |
 | [include/se_physics.h](se_physics.md) | 101 | 3 | 30 |
 | [include/se_quad.h](se_quad.md) | 6 | 0 | 6 |
 | [include/se_render_buffer.h](se_render_buffer.md) | 9 | 0 | 4 |
 | [include/se_render_frame.h](se_render_frame.md) | 4 | 0 | 1 |
 | [include/se_render_thread.h](se_render_thread.md) | 5 | 0 | 3 |
 | [include/se_scene.h](se_scene.md) | 101 | 0 | 34 |
-| [include/se_sdf.h](se_sdf.md) | 46 | 3 | 6 |
+| [include/se_sdf.h](se_sdf.md) | 50 | 2 | 5 |
 | [include/se_shader.h](se_shader.md) | 32 | 1 | 6 |
 | [include/se_simulation.h](se_simulation.md) | 31 | 0 | 12 |
 | [include/se_text.h](se_text.md) | 6 | 0 | 3 |

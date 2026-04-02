@@ -61,6 +61,16 @@ float sdf_noise_vornoi(vec3 p) {
 	return 0.5 - min_distance;
 }
 
+float sdf_noise_texture_triplanar(sampler2D noise_texture, vec3 p) {
+	vec3 blend = abs(p);
+	blend = max(blend, vec3(0.0001));
+	blend /= max(blend.x + blend.y + blend.z, 0.0001);
+	float sample_x = texture(noise_texture, p.yz + vec2(0.17, 0.53)).r;
+	float sample_y = texture(noise_texture, p.xz + vec2(0.37, 0.11)).r;
+	float sample_z = texture(noise_texture, p.xy + vec2(0.71, 0.29)).r;
+	return (sample_x * blend.x + sample_y * blend.y + sample_z * blend.z) * 2.0 - 1.0;
+}
+
 struct sdf_shading_data {
 	vec3 ambient;
 	vec3 diffuse;

@@ -3,11 +3,11 @@
 #include "se_camera.h"
 #include "se_debug.h"
 #include "se_graphics.h"
+#include "se_noise.h"
 #include "se_sdf.h"
 #include "se_window.h"
 
 i32 main(void) {
-	u32 frame_counter = 0u;
 	se_context* context = se_context_create();
 	se_window_handle window = se_window_create("Syphax - SDF", 1280, 720);
 
@@ -77,28 +77,31 @@ i32 main(void) {
 
 	se_sdf_set_position(sphere, &s_vec3(0.0f, 1.0f, 0.0f));
 	se_sdf_add_noise(sphere,
-		.type = SE_SDF_NOISE_PERLIN,
+		.type = SE_NOISE_PERLIN,
 		.frequency = 2.0f,
-		.offset = {0.25f, 0.0f, 0.0f},
+		.offset = s_vec2(0.25f, 0.0f),
+		.scale = s_vec2(1.0f, 1.0f),
+		.seed = 7u
 	);
 	se_sdf_set_shading_smoothness(sphere, 0.14f);
 	se_sdf_set_shadow_softness(sphere, 12.0f);
 	se_sdf_point_light_set_radius(point_light, 9.0f);
 	se_sdf_directional_light_set_direction(sun, &s_vec3(0.45f, 0.85f, 0.35f));
-		se_sdf_set_shadow_samples(ground, 48);
-		se_sdf_add_child(scene, ground);
-		se_sdf_add_child(scene, sphere);
-		for (u32 i = 0u; i < 10u; ++i) {
-			const b8 is_box = (i % 2u) != 0u;
-			const s_vec3 size = extra_sizes[i];
-			s_vec3 position = extra_positions[i];
-			position.y = is_box ? size.y : size.x;
-			se_sdf_handle extra = is_box
-				? se_sdf_create(.type = SE_SDF_BOX, .shading = {.ambient = {0.04f, 0.03f, 0.05f}, .diffuse = {0.32f, 0.58f, 0.88f}, .specular = {0.25f, 0.25f, 0.28f}, .roughness = 0.72f, .bias = 0.34f, .smoothness = 0.15f}, .shadow = {.softness = 8.0f, .bias = 0.02f, .samples = 28}, .box = {.size = size})
-				: se_sdf_create(.type = SE_SDF_SPHERE, .shading = {.ambient = {0.08f, 0.04f, 0.03f}, .diffuse = {0.92f, 0.52f, 0.24f}, .specular = {0.48f, 0.42f, 0.36f}, .roughness = 0.40f, .bias = 0.40f, .smoothness = 0.16f}, .shadow = {.softness = 8.0f, .bias = 0.02f, .samples = 28}, .sphere = {.radius = size.x});
-			se_sdf_set_position(extra, &position);
-			se_sdf_add_child(scene, extra);
-		}
+	se_sdf_set_shadow_samples(ground, 48);
+	se_sdf_add_child(scene, ground);
+	se_sdf_add_child(scene, sphere);
+	
+	for (u32 i = 0u; i < 10u; ++i) {
+		const b8 is_box = (i % 2u) != 0u;
+		const s_vec3 size = extra_sizes[i];
+		s_vec3 position = extra_positions[i];
+		position.y = is_box ? size.y : size.x;
+		se_sdf_handle extra = is_box
+			? se_sdf_create(.type = SE_SDF_BOX, .shading = {.ambient = {0.04f, 0.03f, 0.05f}, .diffuse = {0.32f, 0.58f, 0.88f}, .specular = {0.25f, 0.25f, 0.28f}, .roughness = 0.72f, .bias = 0.34f, .smoothness = 0.15f}, .shadow = {.softness = 8.0f, .bias = 0.02f, .samples = 28}, .box = {.size = size})
+			: se_sdf_create(.type = SE_SDF_SPHERE, .shading = {.ambient = {0.08f, 0.04f, 0.03f}, .diffuse = {0.92f, 0.52f, 0.24f}, .specular = {0.48f, 0.42f, 0.36f}, .roughness = 0.40f, .bias = 0.40f, .smoothness = 0.16f}, .shadow = {.softness = 8.0f, .bias = 0.02f, .samples = 28}, .sphere = {.radius = size.x});
+		se_sdf_set_position(extra, &position);
+		se_sdf_add_child(scene, extra);
+	}
 
 	se_debug_set_overlay_enabled(true);
 

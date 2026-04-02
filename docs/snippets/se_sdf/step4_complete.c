@@ -61,9 +61,9 @@ int main(void) {
 	);
 	se_sdf_set_position(sphere, &s_vec3(0.0f, 1.0f, 0.0f));
 	se_sdf_add_noise(sphere,
-		.type = SE_SDF_NOISE_PERLIN,
+		.type = SE_NOISE_PERLIN,
 		.frequency = 2.0f,
-		.offset = {0.25f, 0.0f, 0.0f},
+		.offset = s_vec2(0.25f, 0.0f),
 	);
 	se_sdf_set_shading_smoothness(sphere, 0.14f);
 	se_sdf_set_shadow_softness(sphere, 12.0f);

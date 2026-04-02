@@ -13,6 +13,12 @@
 
 typedef s_array(se_debug_trace_event, se_debug_trace_events);
 typedef s_array(se_debug_trace_stat, se_debug_trace_stats_array);
+typedef struct {
+	u64 thread_id;
+	u32 channel;
+	s_handle event_handle;
+} se_debug_active_trace;
+typedef s_array(se_debug_active_trace, se_debug_active_trace_array);
 
 static se_debug_level g_debug_level = SE_DEBUG_LEVEL_INFO;
 static u32 g_debug_category_mask = SE_DEBUG_CATEGORY_ALL;
@@ -20,6 +26,10 @@ static se_debug_log_callback g_log_callback = NULL;
 static void* g_log_user_data = NULL;
 static b8 g_overlay_enabled = false;
 static se_debug_trace_events g_trace_events = {0};
+static se_debug_active_trace_array g_active_trace_events = {0};
+static se_debug_trace_stats_array g_trace_stats_total = {0};
+static se_debug_trace_stats_array g_trace_stats_current_frame = {0};
+static se_debug_trace_stats_array g_trace_stats_last_frame = {0};
 static se_text_handle* g_overlay_text_handle = NULL;
 static se_context* g_overlay_context = NULL;
 static se_debug_frame_timing g_frame_timing_current = {0};
@@ -109,6 +119,22 @@ static void se_debug_trace_events_init(void) {
 		s_array_init(&g_trace_events);
 		s_array_reserve(&g_trace_events, 8192);
 	}
+	if (s_array_get_capacity(&g_active_trace_events) == 0) {
+		s_array_init(&g_active_trace_events);
+		s_array_reserve(&g_active_trace_events, 128);
+	}
+	if (s_array_get_capacity(&g_trace_stats_total) == 0) {
+		s_array_init(&g_trace_stats_total);
+		s_array_reserve(&g_trace_stats_total, 64);
+	}
+	if (s_array_get_capacity(&g_trace_stats_current_frame) == 0) {
+		s_array_init(&g_trace_stats_current_frame);
+		s_array_reserve(&g_trace_stats_current_frame, 64);
+	}
+	if (s_array_get_capacity(&g_trace_stats_last_frame) == 0) {
+		s_array_init(&g_trace_stats_last_frame);
+		s_array_reserve(&g_trace_stats_last_frame, 64);
+	}
 }
 
 static void se_debug_frame_timing_reset(se_debug_frame_timing* timing) {
@@ -116,6 +142,108 @@ static void se_debug_frame_timing_reset(se_debug_frame_timing* timing) {
 		return;
 	}
 	memset(timing, 0, sizeof(*timing));
+}
+
+static void se_debug_frame_timing_add_duration_locked(const c8* name, const f64 duration_seconds);
+
+static void se_debug_trace_stats_clear(se_debug_trace_stats_array* stats) {
+	if (!stats) {
+		return;
+	}
+	while (s_array_get_size(stats) > 0) {
+		s_array_remove(stats, s_array_handle(stats, (u32)(s_array_get_size(stats) - 1)));
+	}
+}
+
+static void se_debug_active_trace_clear(se_debug_active_trace_array* traces) {
+	if (!traces) {
+		return;
+	}
+	while (s_array_get_size(traces) > 0) {
+		s_array_remove(traces, s_array_handle(traces, (u32)(s_array_get_size(traces) - 1)));
+	}
+}
+
+static void se_debug_trace_stats_assign(se_debug_trace_stats_array* dst, const se_debug_trace_stats_array* src) {
+	if (!dst || !src) {
+		return;
+	}
+	se_debug_trace_stats_clear(dst);
+	if (s_array_get_size(src) == 0) {
+		return;
+	}
+	s_array_reserve(dst, s_array_get_size(src));
+	for (sz i = 0; i < s_array_get_size(src); ++i) {
+		const se_debug_trace_stat* stat = s_array_get((se_debug_trace_stats_array*)src, s_array_handle(src, (u32)i));
+		if (!stat) {
+			continue;
+		}
+		s_array_add(dst, *stat);
+	}
+}
+
+static se_debug_trace_stat* se_debug_trace_stat_find_key(
+	se_debug_trace_stats_array* stats,
+	const c8* name,
+	const u64 thread_id,
+	const u32 channel) {
+	if (!stats || !name) {
+		return NULL;
+	}
+	for (sz i = 0; i < s_array_get_size(stats); ++i) {
+		se_debug_trace_stat* stat = s_array_get(stats, s_array_handle(stats, (u32)i));
+		if (!stat) {
+			continue;
+		}
+		if (stat->thread_id != thread_id || stat->channel != channel || strcmp(stat->name, name) != 0) {
+			continue;
+		}
+		return stat;
+	}
+	return NULL;
+}
+
+static void se_debug_trace_stats_accumulate(se_debug_trace_stats_array* stats, const se_debug_trace_event* event) {
+	if (!stats || !event || event->duration <= 0.0) {
+		return;
+	}
+	se_debug_trace_stat* stat = se_debug_trace_stat_find_key(stats, event->name, event->thread_id, event->channel);
+	if (!stat) {
+		se_debug_trace_stat new_stat = {0};
+		strncpy(new_stat.name, event->name, sizeof(new_stat.name) - 1);
+		new_stat.frame_index = event->frame_index;
+		new_stat.thread_id = event->thread_id;
+		new_stat.channel = event->channel;
+		s_array_add(stats, new_stat);
+		stat = se_debug_trace_stat_find_key(stats, event->name, event->thread_id, event->channel);
+		if (!stat) {
+			return;
+		}
+	}
+	const f64 duration_ms = event->duration * 1000.0;
+	stat->frame_index = event->frame_index;
+	stat->call_count++;
+	stat->total_ms += duration_ms;
+	stat->avg_ms = stat->total_ms / (f64)stat->call_count;
+	if (duration_ms > stat->max_ms) {
+		stat->max_ms = duration_ms;
+	}
+}
+
+static void se_debug_trace_event_finalize_locked(se_debug_trace_event* event, const f64 now_seconds) {
+	if (!event || !event->active) {
+		return;
+	}
+	event->end_time = now_seconds;
+	event->duration = s_max(0.0, event->end_time - event->begin_time);
+	event->active = false;
+	if (event->channel == (u32)SE_DEBUG_TRACE_CHANNEL_DEFAULT || event->channel == (u32)SE_DEBUG_TRACE_CHANNEL_CPU) {
+		se_debug_frame_timing_add_duration_locked(event->name, event->duration);
+	}
+	se_debug_trace_stats_accumulate(&g_trace_stats_total, event);
+	if (g_frame_active && event->frame_index == (g_frame_counter + 1u)) {
+		se_debug_trace_stats_accumulate(&g_trace_stats_current_frame, event);
+	}
 }
 
 static void se_debug_frame_timing_add_duration_locked(const c8* name, const f64 duration_seconds) {
@@ -137,6 +265,10 @@ static void se_debug_frame_timing_add_duration_locked(const c8* name, const f64 
 	}
 	if (strcmp(name, "scene3d_render") == 0) {
 		g_frame_timing_current.scene3d_ms += duration_ms;
+		return;
+	}
+	if (strcmp(name, "sdf_render") == 0 || strcmp(name, "sdf_shader_compile") == 0) {
+		g_frame_timing_current.sdf_ms += duration_ms;
 		return;
 	}
 	if (strcmp(name, "text_render") == 0) {
@@ -162,12 +294,14 @@ static void se_debug_frame_timing_finalize_locked(const f64 now_seconds) {
 	if (!g_frame_active) {
 		return;
 	}
+	se_debug_trace_stats_assign(&g_trace_stats_last_frame, &g_trace_stats_current_frame);
 	g_frame_timing_current.frame_ms = s_max(0.0, (now_seconds - g_frame_begin_time) * 1000.0);
 	const f64 accounted_ms =
 		g_frame_timing_current.window_update_ms +
 		g_frame_timing_current.input_ms +
 		g_frame_timing_current.scene2d_ms +
 		g_frame_timing_current.scene3d_ms +
+		g_frame_timing_current.sdf_ms +
 		g_frame_timing_current.text_ms +
 		g_frame_timing_current.ui_ms +
 		g_frame_timing_current.navigation_ms +
@@ -185,12 +319,12 @@ static void se_debug_frame_timing_finalize_locked(const f64 now_seconds) {
 
 static u32 se_debug_trace_depth_locked(const u64 thread_id, const se_debug_trace_channel channel) {
 	u32 depth = 0u;
-	for (sz i = 0; i < s_array_get_size(&g_trace_events); ++i) {
-		const se_debug_trace_event* event = s_array_get(&g_trace_events, s_array_handle(&g_trace_events, (u32)i));
-		if (!event || !event->active) {
+	for (sz i = 0; i < s_array_get_size(&g_active_trace_events); ++i) {
+		const se_debug_active_trace* active_trace = s_array_get(&g_active_trace_events, s_array_handle(&g_active_trace_events, (u32)i));
+		if (!active_trace) {
 			continue;
 		}
-		if (event->thread_id == thread_id && event->channel == (u32)channel) {
+		if (active_trace->thread_id == thread_id && active_trace->channel == (u32)channel) {
 			depth++;
 		}
 	}
@@ -213,27 +347,6 @@ static i32 se_debug_trace_stat_compare_desc(const void* left, const void* right)
 		return -1;
 	}
 	return strcmp(a->name, b->name);
-}
-
-static se_debug_trace_stat* se_debug_trace_stat_find(
-	se_debug_trace_stats_array* stats,
-	const se_debug_trace_event* event) {
-	if (!stats || !event) {
-		return NULL;
-	}
-	for (sz i = 0; i < s_array_get_size(stats); ++i) {
-		se_debug_trace_stat* stat = s_array_get(stats, s_array_handle(stats, (u32)i));
-		if (!stat) {
-			continue;
-		}
-		if (stat->thread_id != event->thread_id ||
-			stat->channel != event->channel ||
-			strcmp(stat->name, event->name) != 0) {
-			continue;
-		}
-		return stat;
-	}
-	return NULL;
 }
 
 static void se_debug_trace_stats_finalize(
@@ -390,6 +503,7 @@ void se_debug_trace_begin_channel(const c8* name, const se_debug_trace_channel c
 	pthread_mutex_lock(&g_trace_mutex);
 	se_debug_trace_events_init();
 	se_debug_trace_event event = {0};
+	se_debug_active_trace active_trace = {0};
 	strncpy(event.name, name, sizeof(event.name) - 1);
 	event.begin_time = now;
 	event.end_time = 0.0;
@@ -399,7 +513,10 @@ void se_debug_trace_begin_channel(const c8* name, const se_debug_trace_channel c
 	event.channel = (u32)channel;
 	event.depth = se_debug_trace_depth_locked(thread_id, channel);
 	event.active = true;
-	s_array_add(&g_trace_events, event);
+	active_trace.thread_id = thread_id;
+	active_trace.channel = (u32)channel;
+	active_trace.event_handle = s_array_add(&g_trace_events, event);
+	s_array_add(&g_active_trace_events, active_trace);
 	pthread_mutex_unlock(&g_trace_mutex);
 }
 
@@ -415,6 +532,28 @@ void se_debug_trace_end_channel(const c8* name, const se_debug_trace_channel cha
 		pthread_mutex_unlock(&g_trace_mutex);
 		return;
 	}
+	for (sz i = s_array_get_size(&g_active_trace_events); i > 0; --i) {
+		const s_handle active_handle = s_array_handle(&g_active_trace_events, (u32)(i - 1));
+		se_debug_active_trace* active_trace = s_array_get(&g_active_trace_events, active_handle);
+		if (!active_trace) {
+			continue;
+		}
+		if (active_trace->thread_id != thread_id || active_trace->channel != (u32)channel) {
+			continue;
+		}
+		se_debug_trace_event* event = s_array_get(&g_trace_events, active_trace->event_handle);
+		if (!event || !event->active) {
+			s_array_remove(&g_active_trace_events, active_handle);
+			continue;
+		}
+		if (strcmp(event->name, name) != 0) {
+			continue;
+		}
+		se_debug_trace_event_finalize_locked(event, now);
+		s_array_remove(&g_active_trace_events, active_handle);
+		pthread_mutex_unlock(&g_trace_mutex);
+		return;
+	}
 	for (sz i = s_array_get_size(&g_trace_events); i > 0; --i) {
 		se_debug_trace_event* event = s_array_get(&g_trace_events, s_array_handle(&g_trace_events, (u32)(i - 1)));
 		if (!event || !event->active) {
@@ -425,12 +564,7 @@ void se_debug_trace_end_channel(const c8* name, const se_debug_trace_channel cha
 			strcmp(event->name, name) != 0) {
 			continue;
 		}
-		event->end_time = now;
-		event->duration = s_max(0.0, event->end_time - event->begin_time);
-		event->active = false;
-		if (channel == SE_DEBUG_TRACE_CHANNEL_DEFAULT || channel == SE_DEBUG_TRACE_CHANNEL_CPU) {
-			se_debug_frame_timing_add_duration_locked(name, event->duration);
-		}
+		se_debug_trace_event_finalize_locked(event, now);
 		pthread_mutex_unlock(&g_trace_mutex);
 		return;
 	}
@@ -466,49 +600,21 @@ b8 se_debug_get_trace_stats(se_debug_trace_stat* out_stats, u32 max_stats, u32* 
 	}
 
 	se_debug_trace_stats_array stats = {0};
+	se_debug_frame_timing frame_timing = {0};
 	s_array_init(&stats);
 
 	pthread_mutex_lock(&g_trace_mutex);
 	se_debug_trace_events_init();
-	const u64 frame_filter = last_frame_only ? g_frame_timing_last.frame_index : 0u;
-	for (sz i = 0; i < s_array_get_size(&g_trace_events); ++i) {
-		const se_debug_trace_event* event = s_array_get(&g_trace_events, s_array_handle(&g_trace_events, (u32)i));
-		if (!event || event->active || event->duration <= 0.0) {
-			continue;
-		}
-		if (last_frame_only && event->frame_index != frame_filter) {
-			continue;
-		}
-
-		se_debug_trace_stat* stat = se_debug_trace_stat_find(&stats, event);
-		if (!stat) {
-			se_debug_trace_stat new_stat = {0};
-			strncpy(new_stat.name, event->name, sizeof(new_stat.name) - 1);
-			new_stat.frame_index = frame_filter;
-			new_stat.thread_id = event->thread_id;
-			new_stat.channel = event->channel;
-			s_array_add(&stats, new_stat);
-			stat = se_debug_trace_stat_find(&stats, event);
-			if (!stat) {
-				continue;
-			}
-		}
-
-		const f64 duration_ms = event->duration * 1000.0;
-		stat->call_count++;
-		stat->total_ms += duration_ms;
-		if (duration_ms > stat->max_ms) {
-			stat->max_ms = duration_ms;
-		}
-	}
-
-	se_debug_trace_stats_finalize(&stats, last_frame_only, &g_frame_timing_last);
-	if (s_array_get_size(&stats) > 1) {
-		qsort(s_array_get_data(&stats), s_array_get_size(&stats), sizeof(se_debug_trace_stat), se_debug_trace_stat_compare_desc);
-	}
+	const se_debug_trace_stats_array* source_stats = last_frame_only ? &g_trace_stats_last_frame : &g_trace_stats_total;
+	s_array_copy(&stats, source_stats);
+	frame_timing = g_frame_timing_last;
 	pthread_mutex_unlock(&g_trace_mutex);
 
 	const u32 stats_count = (u32)s_array_get_size(&stats);
+	se_debug_trace_stats_finalize(&stats, last_frame_only, &frame_timing);
+	if (s_array_get_size(&stats) > 1) {
+		qsort(s_array_get_data(&stats), s_array_get_size(&stats), sizeof(se_debug_trace_stat), se_debug_trace_stat_compare_desc);
+	}
 	const u32 copy_count = max_stats < stats_count ? max_stats : stats_count;
 	if (copy_count > 0u && out_stats) {
 		const se_debug_trace_stat* data = s_array_get_data(&stats);
@@ -594,6 +700,10 @@ void se_debug_dump_trace_stats(c8* out_buffer, sz out_buffer_size, u32 max_entri
 void se_debug_clear_trace_events(void) {
 	pthread_mutex_lock(&g_trace_mutex);
 	se_debug_trace_events_init();
+	se_debug_active_trace_clear(&g_active_trace_events);
+	se_debug_trace_stats_clear(&g_trace_stats_total);
+	se_debug_trace_stats_clear(&g_trace_stats_current_frame);
+	se_debug_trace_stats_clear(&g_trace_stats_last_frame);
 	while (s_array_get_size(&g_trace_events) > 0) {
 		s_array_remove(&g_trace_events, s_array_handle(&g_trace_events, (u32)(s_array_get_size(&g_trace_events) - 1)));
 	}
@@ -606,6 +716,8 @@ void se_debug_frame_begin(void) {
 	if (g_frame_active) {
 		se_debug_frame_timing_finalize_locked(now);
 	}
+	se_debug_trace_events_init();
+	se_debug_trace_stats_clear(&g_trace_stats_current_frame);
 	se_debug_frame_timing_reset(&g_frame_timing_current);
 	g_frame_active = true;
 	g_frame_begin_time = now;
@@ -640,13 +752,14 @@ void se_debug_dump_frame_timing(c8* out_buffer, const sz out_buffer_size) {
 	snprintf(
 		out_buffer,
 		out_buffer_size,
-		"frame=%llu ms=%.3f win_upd=%.3f input=%.3f scene2d=%.3f scene3d=%.3f text=%.3f ui=%.3f nav=%.3f present=%.3f other=%.3f",
+		"frame=%llu ms=%.3f win_upd=%.3f input=%.3f scene2d=%.3f scene3d=%.3f sdf=%.3f text=%.3f ui=%.3f nav=%.3f present=%.3f other=%.3f",
 		(unsigned long long)timing.frame_index,
 		timing.frame_ms,
 		timing.window_update_ms,
 		timing.input_ms,
 		timing.scene2d_ms,
 		timing.scene3d_ms,
+		timing.sdf_ms,
 		timing.text_ms,
 		timing.ui_ms,
 		timing.navigation_ms,
@@ -665,7 +778,7 @@ void se_debug_dump_frame_timing_lines(c8* out_buffer, const sz out_buffer_size) 
 		out_buffer_size,
 		"frame=%llu total=%.3fms\n"
 		"window_update=%.3fms input=%.3fms\n"
-		"scene2d=%.3fms scene3d=%.3fms\n"
+		"scene2d=%.3fms scene3d=%.3fms sdf=%.3fms\n"
 		"text=%.3fms ui=%.3fms\n"
 		"navigation=%.3fms present=%.3fms\n"
 		"other=%.3fms",
@@ -675,6 +788,7 @@ void se_debug_dump_frame_timing_lines(c8* out_buffer, const sz out_buffer_size) 
 		timing.input_ms,
 		timing.scene2d_ms,
 		timing.scene3d_ms,
+		timing.sdf_ms,
 		timing.text_ms,
 		timing.ui_ms,
 		timing.navigation_ms,
