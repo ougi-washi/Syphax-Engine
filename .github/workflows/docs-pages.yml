@@ -66,6 +66,9 @@ jobs:
       - name: Build docs (strict)
         run: mkdocs build --strict --config-file mkdocs.yml
 
+      - name: Generate HTML redirect shims
+        run: ./scripts/docs/generate_html_redirects.sh
+
       - name: Check path rendered snippets
         run: ./scripts/docs/check_path_render.sh
 
