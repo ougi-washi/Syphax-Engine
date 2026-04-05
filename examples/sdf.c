@@ -24,7 +24,7 @@ i32 main(void) {
 
 	se_sdf_handle scene = se_sdf_create(
 		.operation = SE_SDF_SMOOTH_UNION,
-		.operation_amount = 0.35f);
+		.operation_amount = 1.f);
 	se_sdf_handle sphere = se_sdf_create(
 		.type = SE_SDF_SPHERE,
 		.shading = {
@@ -107,6 +107,17 @@ i32 main(void) {
 
 	while (!se_window_should_close(window)) {
 		se_window_begin_frame(window);
+
+		const f64 curr_time = se_window_get_time(window);
+		s_vec3 camera_pos;
+		se_camera_get_location(camera, &camera_pos);
+		camera_pos.x += sin(curr_time * 0.1) * .001;
+		camera_pos.y += cos(curr_time * 0.1) * .001;
+		camera_pos.z += sin(cos(curr_time * 0.1)) * .001; 
+		se_camera_set_location(camera, &camera_pos);
+
+		f64 stepped_time = floor(curr_time * 4.) / 4.;
+		se_sdf_set_position(sphere, &s_vec3(sin(stepped_time) * 5., 1, cos(stepped_time) * 5.));		
 		se_camera_set_window_aspect(camera, window);
 		se_render_clear();
 		se_sdf_render_to_window(scene, camera, window, .1f);
