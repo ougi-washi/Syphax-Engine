@@ -28,7 +28,7 @@ Generated API pages by public header.
 | [include/se_render_frame.h](se_render_frame.md) | 4 | 0 | 1 |
 | [include/se_render_thread.h](se_render_thread.md) | 5 | 0 | 3 |
 | [include/se_scene.h](se_scene.md) | 101 | 0 | 34 |
-| [include/se_sdf.h](se_sdf.md) | 50 | 2 | 5 |
+| [include/se_sdf.h](se_sdf.md) | 52 | 2 | 6 |
 | [include/se_shader.h](se_shader.md) | 32 | 1 | 6 |
 | [include/se_simulation.h](se_simulation.md) | 31 | 0 | 12 |
 | [include/se_text.h](se_text.md) | 6 | 0 | 3 |

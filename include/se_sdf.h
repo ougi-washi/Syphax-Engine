@@ -7,6 +7,8 @@
 #include "se_noise.h"
 #include "se_quad.h"
 
+typedef struct s_json s_json;
+
 typedef enum se_sdf_type {
     SE_SDF_CUSTOM,
     SE_SDF_SPHERE,
@@ -126,6 +128,9 @@ extern f32 se_sdf_get_shadow_bias(se_sdf_handle sdf);
 extern void se_sdf_set_shadow_bias(se_sdf_handle sdf, f32 bias);
 extern u16 se_sdf_get_shadow_samples(se_sdf_handle sdf);
 extern void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples);
+
+extern s_json* se_sdf_to_json(se_sdf_handle sdf);
+extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
 
 extern void se_sdf_render_to_framebuffer(se_sdf_handle sdf, se_camera_handle camera, const s_vec2* resolution);
 extern void se_sdf_render_framebuffer_to_window(se_sdf_handle sdf, se_window_handle window);

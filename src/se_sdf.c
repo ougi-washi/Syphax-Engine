@@ -12,7 +12,9 @@
 #include "se_framebuffer.h"
 #include "se_texture.h"
 #include "syphax/s_files.h"
+#include "syphax/s_json.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -49,8 +51,14 @@
 #define SE_SDF_VERTEX_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_vert.glsl")
 #define SE_SDF_COMMON_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_common.glsl")
 #define SE_SDF_FRAGMENT_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_fragment_template.glsl")
+#define SE_SDF_JSON_FORMAT "se_sdf_json"
+#define SE_SDF_JSON_MAX_SAFE_INTEGER_U64 9007199254740991ULL
 #define SE_SDF_HANDLE_FMT "%llu"
 #define SE_SDF_HANDLE_ARG(_handle) ((unsigned long long)(_handle))
+
+enum {
+	SE_SDF_JSON_VERSION = 1u
+};
 
 typedef struct se_sdf_template_part {
 	const c8* token;
@@ -110,7 +118,41 @@ static b8 se_sdf_copy_texture_content(se_context* ctx, se_texture_handle dst_han
 static void se_sdf_append(c8* out, const sz capacity, const c8* fmt, ...);
 static void se_sdf_append_range(c8* out, const sz capacity, const c8* text, const sz text_size);
 static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operation);
+static i32 se_sdf_base64_value(const c8 c);
+static c8* se_sdf_base64_encode(const u8* data, const sz size);
+static b8 se_sdf_base64_decode(const c8* in, u8** out_data, sz* out_size);
+static b8 se_sdf_json_add_child(s_json* parent, s_json* child);
+static s_json* se_sdf_json_add_object(s_json* parent, const c8* name);
+static s_json* se_sdf_json_add_array(s_json* parent, const c8* name);
+static b8 se_sdf_json_add_u32(s_json* parent, const c8* name, const u32 value);
+static b8 se_sdf_json_add_f32(s_json* parent, const c8* name, const f32 value);
+static b8 se_sdf_json_add_string(s_json* parent, const c8* name, const c8* value);
+static b8 se_sdf_json_add_vec2(s_json* parent, const c8* name, const s_vec2* value);
+static b8 se_sdf_json_add_vec3(s_json* parent, const c8* name, const s_vec3* value);
+static b8 se_sdf_json_add_mat4(s_json* parent, const c8* name, const s_mat4* value);
+static b8 se_sdf_json_number_to_u64(const s_json* node, u64* out_value);
+static b8 se_sdf_json_number_to_u32(const s_json* node, u32* out_value);
+static b8 se_sdf_json_number_to_f32(const s_json* node, f32* out_value);
+static b8 se_sdf_json_string_to_c8(const s_json* node, const c8** out_value);
+static const s_json* se_sdf_json_get_required(const s_json* object, const c8* key, const s_json_type type);
+static b8 se_sdf_json_read_vec2(const s_json* node, s_vec2* out_value);
+static b8 se_sdf_json_read_vec3(const s_json* node, s_vec3* out_value);
+static b8 se_sdf_json_read_mat4(const s_json* node, s_mat4* out_value);
+static const c8* se_sdf_json_type_name(const se_sdf_type type);
+static b8 se_sdf_json_read_type(const s_json* node, se_sdf_type* out_value);
+static const c8* se_sdf_json_operation_name(const se_sdf_operator operation);
+static b8 se_sdf_json_read_operation(const s_json* node, se_sdf_operator* out_value);
+static const c8* se_sdf_json_noise_type_name(const se_noise_type type);
+static b8 se_sdf_json_read_noise_type(const s_json* node, se_noise_type* out_value);
+static const c8* se_sdf_json_texture_wrap_name(const se_texture_wrap wrap);
+static b8 se_sdf_json_read_texture_wrap(const s_json* node, se_texture_wrap* out_value);
+static b8 se_sdf_json_apply_texture_pixels(se_context* ctx, se_texture_handle texture_handle, const u8* pixels, i32 width, i32 height, se_texture_wrap wrap);
+static b8 se_sdf_json_populate_object(se_context* ctx, se_sdf_handle sdf, s_json* object);
+static se_sdf_handle se_sdf_build_from_json_node(const s_json* node);
 static void se_sdf_destroy_shader_runtime(se_sdf* sdf_ptr);
+static void se_sdf_destroy_runtime_resources(se_context* ctx, se_sdf* sdf_ptr);
+static void se_sdf_reset_keep_handle(se_context* ctx, const se_sdf_handle sdf);
+static b8 se_sdf_transfer_state(se_context* ctx, const se_sdf_handle dst, const se_sdf_handle src);
 static void se_sdf_invalidate_shader_chain(const se_sdf_handle sdf);
 static void se_sdf_invalidate_all_shaders(se_context* ctx);
 static b8 se_sdf_read_resource_text(c8** out_text, const c8* resource_path);
@@ -601,6 +643,951 @@ static const c8* se_sdf_get_operation_function_name(const se_sdf_operator operat
 	}
 }
 
+static i32 se_sdf_base64_value(const c8 c) {
+	if (c >= 'A' && c <= 'Z') {
+		return (i32)(c - 'A');
+	}
+	if (c >= 'a' && c <= 'z') {
+		return (i32)(c - 'a' + 26);
+	}
+	if (c >= '0' && c <= '9') {
+		return (i32)(c - '0' + 52);
+	}
+	if (c == '+') {
+		return 62;
+	}
+	if (c == '/') {
+		return 63;
+	}
+	return -1;
+}
+
+static c8* se_sdf_base64_encode(const u8* data, const sz size) {
+	static const c8 table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	if (!data && size > 0u) {
+		return NULL;
+	}
+	if (size == 0u) {
+		c8* out = malloc(1u);
+		if (!out) {
+			return NULL;
+		}
+		out[0] = '\0';
+		return out;
+	}
+	const sz encoded_len = ((size + 2u) / 3u) * 4u;
+	c8* out = malloc(encoded_len + 1u);
+	if (!out) {
+		return NULL;
+	}
+	sz j = 0u;
+	for (sz i = 0u; i < size; i += 3u) {
+		const u32 octet_a = i < size ? data[i] : 0u;
+		const u32 octet_b = (i + 1u) < size ? data[i + 1u] : 0u;
+		const u32 octet_c = (i + 2u) < size ? data[i + 2u] : 0u;
+		const u32 triple = (octet_a << 16u) | (octet_b << 8u) | octet_c;
+		out[j++] = table[(triple >> 18u) & 0x3Fu];
+		out[j++] = table[(triple >> 12u) & 0x3Fu];
+		out[j++] = (i + 1u) < size ? table[(triple >> 6u) & 0x3Fu] : '=';
+		out[j++] = (i + 2u) < size ? table[triple & 0x3Fu] : '=';
+	}
+	out[j] = '\0';
+	return out;
+}
+
+static b8 se_sdf_base64_decode(const c8* in, u8** out_data, sz* out_size) {
+	if (!in || !out_data || !out_size) {
+		return false;
+	}
+	const sz len = strlen(in);
+	if ((len % 4u) != 0u) {
+		return false;
+	}
+	if (len == 0u) {
+		u8* empty = malloc(1u);
+		if (!empty) {
+			return false;
+		}
+		*out_data = empty;
+		*out_size = 0u;
+		return true;
+	}
+	sz padding = 0u;
+	if (in[len - 1u] == '=') {
+		padding++;
+	}
+	if (in[len - 2u] == '=') {
+		padding++;
+	}
+	const sz max_out_size = (len / 4u) * 3u - padding;
+	u8* out = malloc(max_out_size > 0u ? max_out_size : 1u);
+	if (!out) {
+		return false;
+	}
+	sz out_pos = 0u;
+	for (sz i = 0u; i < len; i += 4u) {
+		const c8 c0 = in[i + 0u];
+		const c8 c1 = in[i + 1u];
+		const c8 c2 = in[i + 2u];
+		const c8 c3 = in[i + 3u];
+		const b8 c2_pad = (c2 == '=');
+		const b8 c3_pad = (c3 == '=');
+		if (c0 == '=' || c1 == '=') {
+			free(out);
+			return false;
+		}
+		if (c2_pad && !c3_pad) {
+			free(out);
+			return false;
+		}
+		if ((c2_pad || c3_pad) && (i + 4u) != len) {
+			free(out);
+			return false;
+		}
+		const i32 v0 = se_sdf_base64_value(c0);
+		const i32 v1 = se_sdf_base64_value(c1);
+		const i32 v2 = c2_pad ? 0 : se_sdf_base64_value(c2);
+		const i32 v3 = c3_pad ? 0 : se_sdf_base64_value(c3);
+		if (v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0) {
+			free(out);
+			return false;
+		}
+		const u32 triple =
+			((u32)v0 << 18u) |
+			((u32)v1 << 12u) |
+			((u32)v2 << 6u) |
+			(u32)v3;
+		if (out_pos < max_out_size) {
+			out[out_pos++] = (u8)((triple >> 16u) & 0xFFu);
+		}
+		if (!c2_pad && out_pos < max_out_size) {
+			out[out_pos++] = (u8)((triple >> 8u) & 0xFFu);
+		}
+		if (!c3_pad && out_pos < max_out_size) {
+			out[out_pos++] = (u8)(triple & 0xFFu);
+		}
+	}
+	*out_data = out;
+	*out_size = max_out_size;
+	return true;
+}
+
+static b8 se_sdf_json_add_child(s_json* parent, s_json* child) {
+	if (!parent || !child || !s_json_add(parent, child)) {
+		if (child) {
+			s_json_free(child);
+		}
+		return false;
+	}
+	return true;
+}
+
+static s_json* se_sdf_json_add_object(s_json* parent, const c8* name) {
+	s_json* object = s_json_object_empty(name);
+	if (!object) {
+		return NULL;
+	}
+	if (!se_sdf_json_add_child(parent, object)) {
+		return NULL;
+	}
+	return object;
+}
+
+static s_json* se_sdf_json_add_array(s_json* parent, const c8* name) {
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return NULL;
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return NULL;
+	}
+	return array;
+}
+
+static b8 se_sdf_json_add_u32(s_json* parent, const c8* name, const u32 value) {
+	return se_sdf_json_add_child(parent, s_json_num(name, (f64)value));
+}
+
+static b8 se_sdf_json_add_f32(s_json* parent, const c8* name, const f32 value) {
+	if (!isfinite((f64)value)) {
+		return false;
+	}
+	return se_sdf_json_add_child(parent, s_json_num(name, (f64)value));
+}
+
+static b8 se_sdf_json_add_string(s_json* parent, const c8* name, const c8* value) {
+	return se_sdf_json_add_child(parent, s_json_str(name, value ? value : ""));
+}
+
+static b8 se_sdf_json_add_vec2(s_json* parent, const c8* name, const s_vec2* value) {
+	if (!parent || !value) {
+		return false;
+	}
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return false;
+	}
+	if (!se_sdf_json_add_f32(array, NULL, value->x) ||
+		!se_sdf_json_add_f32(array, NULL, value->y)) {
+		s_json_free(array);
+		return false;
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return false;
+	}
+	return true;
+}
+
+static b8 se_sdf_json_add_vec3(s_json* parent, const c8* name, const s_vec3* value) {
+	if (!parent || !value) {
+		return false;
+	}
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return false;
+	}
+	if (!se_sdf_json_add_f32(array, NULL, value->x) ||
+		!se_sdf_json_add_f32(array, NULL, value->y) ||
+		!se_sdf_json_add_f32(array, NULL, value->z)) {
+		s_json_free(array);
+		return false;
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return false;
+	}
+	return true;
+}
+
+static b8 se_sdf_json_add_mat4(s_json* parent, const c8* name, const s_mat4* value) {
+	if (!parent || !value) {
+		return false;
+	}
+	s_json* array = s_json_array_empty(name);
+	if (!array) {
+		return false;
+	}
+	for (u32 row = 0u; row < 4u; ++row) {
+		for (u32 col = 0u; col < 4u; ++col) {
+			if (!se_sdf_json_add_f32(array, NULL, value->m[row][col])) {
+				s_json_free(array);
+				return false;
+			}
+		}
+	}
+	if (!se_sdf_json_add_child(parent, array)) {
+		return false;
+	}
+	return true;
+}
+
+static b8 se_sdf_json_number_to_u64(const s_json* node, u64* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return false;
+	}
+	const f64 value = node->as.number;
+	if (!isfinite(value) || value < 0.0 || value > (f64)SE_SDF_JSON_MAX_SAFE_INTEGER_U64) {
+		return false;
+	}
+	const u64 integer = (u64)value;
+	if ((f64)integer != value) {
+		return false;
+	}
+	*out_value = integer;
+	return true;
+}
+
+static b8 se_sdf_json_number_to_u32(const s_json* node, u32* out_value) {
+	u64 value = 0u;
+	if (!se_sdf_json_number_to_u64(node, &value) || value > (u64)UINT32_MAX) {
+		return false;
+	}
+	*out_value = (u32)value;
+	return true;
+}
+
+static b8 se_sdf_json_number_to_f32(const s_json* node, f32* out_value) {
+	if (!node || node->type != S_JSON_NUMBER || !out_value) {
+		return false;
+	}
+	const f64 value = node->as.number;
+	if (!isfinite(value) || value < -(f64)FLT_MAX || value > (f64)FLT_MAX) {
+		return false;
+	}
+	*out_value = (f32)value;
+	return true;
+}
+
+static b8 se_sdf_json_string_to_c8(const s_json* node, const c8** out_value) {
+	if (!node || node->type != S_JSON_STRING || !out_value) {
+		return false;
+	}
+	*out_value = node->as.string ? node->as.string : "";
+	return true;
+}
+
+static const s_json* se_sdf_json_get_required(const s_json* object, const c8* key, const s_json_type type) {
+	if (!object || object->type != S_JSON_OBJECT || !key) {
+		return NULL;
+	}
+	const s_json* child = s_json_get(object, key);
+	if (!child || child->type != type) {
+		return NULL;
+	}
+	return child;
+}
+
+static b8 se_sdf_json_read_vec2(const s_json* node, s_vec2* out_value) {
+	if (!node || node->type != S_JSON_ARRAY || !out_value || node->as.children.count != 2u) {
+		return false;
+	}
+	f32 values[2] = {0.0f, 0.0f};
+	for (u32 i = 0u; i < 2u; ++i) {
+		if (!se_sdf_json_number_to_f32(s_json_at(node, i), &values[i])) {
+			return false;
+		}
+	}
+	*out_value = s_vec2(values[0], values[1]);
+	return true;
+}
+
+static b8 se_sdf_json_read_vec3(const s_json* node, s_vec3* out_value) {
+	if (!node || node->type != S_JSON_ARRAY || !out_value || node->as.children.count != 3u) {
+		return false;
+	}
+	f32 values[3] = {0.0f, 0.0f, 0.0f};
+	for (u32 i = 0u; i < 3u; ++i) {
+		if (!se_sdf_json_number_to_f32(s_json_at(node, i), &values[i])) {
+			return false;
+		}
+	}
+	*out_value = s_vec3(values[0], values[1], values[2]);
+	return true;
+}
+
+static b8 se_sdf_json_read_mat4(const s_json* node, s_mat4* out_value) {
+	if (!node || node->type != S_JSON_ARRAY || !out_value || node->as.children.count != 16u) {
+		return false;
+	}
+	s_mat4 parsed = s_mat4_identity;
+	u32 index = 0u;
+	for (u32 row = 0u; row < 4u; ++row) {
+		for (u32 col = 0u; col < 4u; ++col) {
+			if (!se_sdf_json_number_to_f32(s_json_at(node, index++), &parsed.m[row][col])) {
+				return false;
+			}
+		}
+	}
+	*out_value = parsed;
+	return true;
+}
+
+static const c8* se_sdf_json_type_name(const se_sdf_type type) {
+	switch (type) {
+		case SE_SDF_CUSTOM:
+			return "custom";
+		case SE_SDF_SPHERE:
+			return "sphere";
+		case SE_SDF_BOX:
+			return "box";
+		default:
+			return NULL;
+	}
+}
+
+static b8 se_sdf_json_read_type(const s_json* node, se_sdf_type* out_value) {
+	if (!node || !out_value) {
+		return false;
+	}
+	if (node->type == S_JSON_STRING) {
+		const c8* value = node->as.string ? node->as.string : "";
+		if (strcmp(value, "custom") == 0) {
+			*out_value = SE_SDF_CUSTOM;
+			return true;
+		}
+		if (strcmp(value, "sphere") == 0) {
+			*out_value = SE_SDF_SPHERE;
+			return true;
+		}
+		if (strcmp(value, "box") == 0) {
+			*out_value = SE_SDF_BOX;
+			return true;
+		}
+		return false;
+	}
+	if (node->type == S_JSON_NUMBER) {
+		u32 value = 0u;
+		if (!se_sdf_json_number_to_u32(node, &value) || value > (u32)SE_SDF_BOX) {
+			return false;
+		}
+		*out_value = (se_sdf_type)value;
+		return true;
+	}
+	return false;
+}
+
+static const c8* se_sdf_json_operation_name(const se_sdf_operator operation) {
+	switch (operation) {
+		case SE_SDF_UNION:
+			return "union";
+		case SE_SDF_SMOOTH_UNION:
+			return "smooth_union";
+		default:
+			return NULL;
+	}
+}
+
+static b8 se_sdf_json_read_operation(const s_json* node, se_sdf_operator* out_value) {
+	if (!node || !out_value) {
+		return false;
+	}
+	if (node->type == S_JSON_STRING) {
+		const c8* value = node->as.string ? node->as.string : "";
+		if (strcmp(value, "union") == 0) {
+			*out_value = SE_SDF_UNION;
+			return true;
+		}
+		if (strcmp(value, "smooth_union") == 0) {
+			*out_value = SE_SDF_SMOOTH_UNION;
+			return true;
+		}
+		return false;
+	}
+	if (node->type == S_JSON_NUMBER) {
+		u32 value = 0u;
+		if (!se_sdf_json_number_to_u32(node, &value) || value > (u32)SE_SDF_SMOOTH_UNION) {
+			return false;
+		}
+		*out_value = (se_sdf_operator)value;
+		return true;
+	}
+	return false;
+}
+
+static const c8* se_sdf_json_noise_type_name(const se_noise_type type) {
+	switch (type) {
+		case SE_NOISE_SIMPLEX:
+			return "simplex";
+		case SE_NOISE_PERLIN:
+			return "perlin";
+		case SE_NOISE_VORNOI:
+			return "voronoi";
+		case SE_NOISE_WORLEY:
+			return "worley";
+		default:
+			return NULL;
+	}
+}
+
+static b8 se_sdf_json_read_noise_type(const s_json* node, se_noise_type* out_value) {
+	if (!node || !out_value) {
+		return false;
+	}
+	if (node->type == S_JSON_STRING) {
+		const c8* value = node->as.string ? node->as.string : "";
+		if (strcmp(value, "simplex") == 0) {
+			*out_value = SE_NOISE_SIMPLEX;
+			return true;
+		}
+		if (strcmp(value, "perlin") == 0) {
+			*out_value = SE_NOISE_PERLIN;
+			return true;
+		}
+		if (strcmp(value, "voronoi") == 0 || strcmp(value, "vornoi") == 0) {
+			*out_value = SE_NOISE_VORNOI;
+			return true;
+		}
+		if (strcmp(value, "worley") == 0) {
+			*out_value = SE_NOISE_WORLEY;
+			return true;
+		}
+		return false;
+	}
+	if (node->type == S_JSON_NUMBER) {
+		u32 value = 0u;
+		if (!se_sdf_json_number_to_u32(node, &value) || value > (u32)SE_NOISE_WORLEY) {
+			return false;
+		}
+		*out_value = (se_noise_type)value;
+		return true;
+	}
+	return false;
+}
+
+static const c8* se_sdf_json_texture_wrap_name(const se_texture_wrap wrap) {
+	switch (wrap) {
+		case SE_REPEAT:
+			return "repeat";
+		case SE_CLAMP:
+			return "clamp";
+		default:
+			return NULL;
+	}
+}
+
+static b8 se_sdf_json_read_texture_wrap(const s_json* node, se_texture_wrap* out_value) {
+	if (!node || !out_value) {
+		return false;
+	}
+	if (node->type == S_JSON_STRING) {
+		const c8* value = node->as.string ? node->as.string : "";
+		if (strcmp(value, "repeat") == 0) {
+			*out_value = SE_REPEAT;
+			return true;
+		}
+		if (strcmp(value, "clamp") == 0) {
+			*out_value = SE_CLAMP;
+			return true;
+		}
+		return false;
+	}
+	if (node->type == S_JSON_NUMBER) {
+		u32 value = 0u;
+		if (!se_sdf_json_number_to_u32(node, &value) || value > (u32)SE_CLAMP) {
+			return false;
+		}
+		*out_value = (se_texture_wrap)value;
+		return true;
+	}
+	return false;
+}
+
+static b8 se_sdf_json_apply_texture_pixels(se_context* ctx, se_texture_handle texture_handle, const u8* pixels, i32 width, i32 height, se_texture_wrap wrap) {
+	se_texture* texture = se_sdf_texture_from_handle(ctx, texture_handle);
+	if (!texture || !pixels || width <= 0 || height <= 0) {
+		return false;
+	}
+
+	const sz pixel_size = (sz)width * (sz)height * 4u;
+	u8* copy = malloc(pixel_size);
+	if (!copy) {
+		return false;
+	}
+	memcpy(copy, pixels, pixel_size);
+
+	if (texture->cpu_pixels) {
+		free(texture->cpu_pixels);
+	}
+	texture->width = width;
+	texture->height = height;
+	texture->depth = 1;
+	texture->channels = 4;
+	texture->cpu_channels = 4;
+	texture->target = GL_TEXTURE_2D;
+	texture->wrap = wrap;
+	texture->cpu_pixels = copy;
+	texture->cpu_pixels_size = pixel_size;
+	texture->path[0] = '\0';
+
+	if (texture->id == 0u) {
+		glGenTextures(1, &texture->id);
+	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture->id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture->width, texture->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture->cpu_pixels);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap == SE_CLAMP ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap == SE_CLAMP ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+	return true;
+}
+
+static b8 se_sdf_json_populate_object(se_context* ctx, se_sdf_handle sdf, s_json* object) {
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!ctx || !sdf_ptr || !object || object->type != S_JSON_OBJECT) {
+		se_set_last_error(!ctx || !object ? SE_RESULT_INVALID_ARGUMENT : SE_RESULT_NOT_FOUND);
+		return false;
+	}
+
+	const c8* type_name = se_sdf_json_type_name(sdf_ptr->type);
+	const c8* operation_name = se_sdf_json_operation_name(sdf_ptr->operation);
+	const b8 write_operation = sdf_ptr->operation != SE_SDF_UNION;
+	const b8 write_operation_amount = fabsf(sdf_ptr->operation_amount) > SE_SDF_MATRIX_EPSILON;
+	s_json* shading_json = NULL;
+	s_json* shadow_json = NULL;
+	s_json* noises_json = NULL;
+	s_json* point_lights_json = NULL;
+	s_json* directional_lights_json = NULL;
+	s_json* children_json = NULL;
+	if (!type_name || (write_operation && !operation_name) ||
+		!se_sdf_json_add_mat4(object, "transform", &sdf_ptr->transform) ||
+		!se_sdf_json_add_string(object, "type", type_name) ||
+		(write_operation && !se_sdf_json_add_string(object, "operation", operation_name)) ||
+		(write_operation_amount && !se_sdf_json_add_f32(object, "operation_amount", sdf_ptr->operation_amount))) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+
+	if (!se_sdf_shading_is_zero(&sdf_ptr->shading)) {
+		shading_json = se_sdf_json_add_object(object, "shading");
+		if (!shading_json ||
+			!se_sdf_json_add_vec3(shading_json, "ambient", &sdf_ptr->shading.ambient) ||
+			!se_sdf_json_add_vec3(shading_json, "diffuse", &sdf_ptr->shading.diffuse) ||
+			!se_sdf_json_add_vec3(shading_json, "specular", &sdf_ptr->shading.specular) ||
+			!se_sdf_json_add_f32(shading_json, "roughness", sdf_ptr->shading.roughness) ||
+			!se_sdf_json_add_f32(shading_json, "bias", sdf_ptr->shading.bias) ||
+			!se_sdf_json_add_f32(shading_json, "smoothness", sdf_ptr->shading.smoothness)) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	if (!se_sdf_shadow_is_zero(&sdf_ptr->shadow)) {
+		shadow_json = se_sdf_json_add_object(object, "shadow");
+		if (!shadow_json ||
+			!se_sdf_json_add_f32(shadow_json, "softness", sdf_ptr->shadow.softness) ||
+			!se_sdf_json_add_f32(shadow_json, "bias", sdf_ptr->shadow.bias) ||
+			!se_sdf_json_add_u32(shadow_json, "samples", sdf_ptr->shadow.samples)) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	if (sdf_ptr->type == SE_SDF_SPHERE) {
+		s_json* sphere_json = se_sdf_json_add_object(object, "sphere");
+		if (!sphere_json || !se_sdf_json_add_f32(sphere_json, "radius", sdf_ptr->sphere.radius)) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	} else if (sdf_ptr->type == SE_SDF_BOX) {
+		s_json* box_json = se_sdf_json_add_object(object, "box");
+		if (!box_json || !se_sdf_json_add_vec3(box_json, "size", &sdf_ptr->box.size)) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	if (s_array_get_size(&sdf_ptr->noises) > 0u) {
+		noises_json = se_sdf_json_add_array(object, "noises");
+		if (!noises_json) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	for (u32 i = 0; i < (u32)s_array_get_size(&sdf_ptr->noises); ++i) {
+		const s_handle local_handle = s_array_handle_at(&sdf_ptr->noises.b, i);
+		se_texture_handle* noise_handle_ptr = s_array_get(&sdf_ptr->noises, local_handle);
+		se_sdf_noise* noise_ptr = noise_handle_ptr ? se_sdf_noise_from_handle(ctx, (se_sdf_noise_handle)*noise_handle_ptr) : NULL;
+		se_texture* texture_ptr = noise_handle_ptr ? se_sdf_texture_from_handle(ctx, *noise_handle_ptr) : NULL;
+		if (!noise_handle_ptr || !noise_ptr || !texture_ptr || !texture_ptr->cpu_pixels || texture_ptr->width <= 0 || texture_ptr->height <= 0) {
+			se_set_last_error(SE_RESULT_NOT_FOUND);
+			return false;
+		}
+		const sz expected_size = (sz)texture_ptr->width * (sz)texture_ptr->height * 4u;
+		if (texture_ptr->cpu_pixels_size != expected_size) {
+			se_set_last_error(SE_RESULT_UNSUPPORTED);
+			return false;
+		}
+		c8* pixels_b64 = se_sdf_base64_encode(texture_ptr->cpu_pixels, texture_ptr->cpu_pixels_size);
+		if (!pixels_b64) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+		const c8* noise_type_name = se_sdf_json_noise_type_name(noise_ptr->descriptor.type);
+		const c8* wrap_name = se_sdf_json_texture_wrap_name(texture_ptr->wrap);
+		s_json* noise_json = se_sdf_json_add_object(noises_json, NULL);
+		s_json* descriptor_json = noise_json ? se_sdf_json_add_object(noise_json, "descriptor") : NULL;
+		s_json* texture_json = noise_json ? se_sdf_json_add_object(noise_json, "texture") : NULL;
+		const s_vec2 offset = noise_ptr->descriptor.offset;
+		const s_vec2 scale = noise_ptr->descriptor.scale;
+		const b8 ok = noise_type_name && wrap_name &&
+			noise_json && descriptor_json && texture_json &&
+			se_sdf_json_add_string(descriptor_json, "type", noise_type_name) &&
+			se_sdf_json_add_f32(descriptor_json, "frequency", noise_ptr->descriptor.frequency) &&
+			se_sdf_json_add_vec2(descriptor_json, "offset", &offset) &&
+			se_sdf_json_add_vec2(descriptor_json, "scale", &scale) &&
+			se_sdf_json_add_u32(descriptor_json, "seed", noise_ptr->descriptor.seed) &&
+			se_sdf_json_add_string(texture_json, "wrap", wrap_name) &&
+			se_sdf_json_add_u32(texture_json, "width", (u32)texture_ptr->width) &&
+			se_sdf_json_add_u32(texture_json, "height", (u32)texture_ptr->height) &&
+			se_sdf_json_add_string(texture_json, "pixels_rgba_b64", pixels_b64);
+		free(pixels_b64);
+		if (!ok) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	if (s_array_get_size(&sdf_ptr->point_lights) > 0u) {
+		point_lights_json = se_sdf_json_add_array(object, "point_lights");
+		if (!point_lights_json) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	for (u32 i = 0; i < (u32)s_array_get_size(&sdf_ptr->point_lights); ++i) {
+		const s_handle local_handle = s_array_handle_at(&sdf_ptr->point_lights.b, i);
+		se_sdf_point_light_handle* point_light_handle_ptr = s_array_get(&sdf_ptr->point_lights, local_handle);
+		se_sdf_point_light* point_light_ptr = point_light_handle_ptr ? se_sdf_point_light_from_handle(ctx, *point_light_handle_ptr) : NULL;
+		s_json* point_light_json = se_sdf_json_add_object(point_lights_json, NULL);
+		if (!point_light_ptr || !point_light_json ||
+			!se_sdf_json_add_vec3(point_light_json, "position", &point_light_ptr->position) ||
+			!se_sdf_json_add_vec3(point_light_json, "color", &point_light_ptr->color) ||
+			!se_sdf_json_add_f32(point_light_json, "radius", point_light_ptr->radius)) {
+			se_set_last_error(point_light_ptr ? SE_RESULT_OUT_OF_MEMORY : SE_RESULT_NOT_FOUND);
+			return false;
+		}
+	}
+
+	if (s_array_get_size(&sdf_ptr->directional_lights) > 0u) {
+		directional_lights_json = se_sdf_json_add_array(object, "directional_lights");
+		if (!directional_lights_json) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	for (u32 i = 0; i < (u32)s_array_get_size(&sdf_ptr->directional_lights); ++i) {
+		const s_handle local_handle = s_array_handle_at(&sdf_ptr->directional_lights.b, i);
+		se_sdf_directional_light_handle* directional_light_handle_ptr = s_array_get(&sdf_ptr->directional_lights, local_handle);
+		se_sdf_directional_light* directional_light_ptr = directional_light_handle_ptr ? se_sdf_directional_light_from_handle(ctx, *directional_light_handle_ptr) : NULL;
+		s_json* directional_light_json = se_sdf_json_add_object(directional_lights_json, NULL);
+		if (!directional_light_ptr || !directional_light_json ||
+			!se_sdf_json_add_vec3(directional_light_json, "direction", &directional_light_ptr->direction) ||
+			!se_sdf_json_add_vec3(directional_light_json, "color", &directional_light_ptr->color)) {
+			se_set_last_error(directional_light_ptr ? SE_RESULT_OUT_OF_MEMORY : SE_RESULT_NOT_FOUND);
+			return false;
+		}
+	}
+
+	if (s_array_get_size(&sdf_ptr->children) > 0u) {
+		children_json = se_sdf_json_add_array(object, "children");
+		if (!children_json) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			return false;
+		}
+	}
+
+	for (u32 i = 0; i < (u32)s_array_get_size(&sdf_ptr->children); ++i) {
+		const s_handle local_handle = s_array_handle_at(&sdf_ptr->children.b, i);
+		se_sdf_handle* child_handle_ptr = s_array_get(&sdf_ptr->children, local_handle);
+		s_json* child_json = child_handle_ptr ? se_sdf_json_add_object(children_json, NULL) : NULL;
+		if (!child_handle_ptr || !child_json || !se_sdf_json_populate_object(ctx, *child_handle_ptr, child_json)) {
+			if (se_get_last_error() == SE_RESULT_OK) {
+				se_set_last_error(child_handle_ptr ? SE_RESULT_OUT_OF_MEMORY : SE_RESULT_NOT_FOUND);
+			}
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static se_sdf_handle se_sdf_build_from_json_node(const s_json* node) {
+	se_context* ctx = se_current_context();
+	se_sdf_handle sdf = S_HANDLE_NULL;
+	if (!ctx || !node || node->type != S_JSON_OBJECT) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	const s_json* transform_json = s_json_get(node, "transform");
+	const s_json* type_json = s_json_get(node, "type");
+	const s_json* operation_json = s_json_get(node, "operation");
+	const s_json* operation_amount_json = s_json_get(node, "operation_amount");
+	const s_json* shading_json = s_json_get(node, "shading");
+	const s_json* shadow_json = s_json_get(node, "shadow");
+	const s_json* noises_json = s_json_get(node, "noises");
+	const s_json* point_lights_json = s_json_get(node, "point_lights");
+	const s_json* directional_lights_json = s_json_get(node, "directional_lights");
+	const s_json* children_json = s_json_get(node, "children");
+	s_mat4 transform = s_mat4_identity;
+	se_sdf_type type = SE_SDF_CUSTOM;
+	se_sdf_operator operation = SE_SDF_UNION;
+	f32 operation_amount = 0.0f;
+	se_sdf_shading shading = {0};
+	se_sdf_shadow shadow = {0};
+	f32 sphere_radius = 0.0f;
+	s_vec3 box_size = s_vec3(0.0f, 0.0f, 0.0f);
+	u32 shadow_samples = 0u;
+
+	if (!type_json || !se_sdf_json_read_type(type_json, &type)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	if (transform_json) {
+		if (transform_json->type != S_JSON_ARRAY || !se_sdf_json_read_mat4(transform_json, &transform)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return S_HANDLE_NULL;
+		}
+	}
+
+	if (operation_json && !se_sdf_json_read_operation(operation_json, &operation)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+	if (operation_amount_json && !se_sdf_json_number_to_f32(operation_amount_json, &operation_amount)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	if (shading_json) {
+		if (shading_json->type != S_JSON_OBJECT ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(shading_json, "ambient", S_JSON_ARRAY), &shading.ambient) ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(shading_json, "diffuse", S_JSON_ARRAY), &shading.diffuse) ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(shading_json, "specular", S_JSON_ARRAY), &shading.specular) ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(shading_json, "roughness", S_JSON_NUMBER), &shading.roughness) ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(shading_json, "bias", S_JSON_NUMBER), &shading.bias) ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(shading_json, "smoothness", S_JSON_NUMBER), &shading.smoothness)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return S_HANDLE_NULL;
+		}
+	}
+
+	if (shadow_json) {
+		if (shadow_json->type != S_JSON_OBJECT ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(shadow_json, "softness", S_JSON_NUMBER), &shadow.softness) ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(shadow_json, "bias", S_JSON_NUMBER), &shadow.bias) ||
+			!se_sdf_json_number_to_u32(se_sdf_json_get_required(shadow_json, "samples", S_JSON_NUMBER), &shadow_samples) ||
+			shadow_samples > (u32)UINT16_MAX) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return S_HANDLE_NULL;
+		}
+		shadow.samples = (u16)shadow_samples;
+	}
+
+	if ((noises_json && noises_json->type != S_JSON_ARRAY) ||
+		(point_lights_json && point_lights_json->type != S_JSON_ARRAY) ||
+		(directional_lights_json && directional_lights_json->type != S_JSON_ARRAY) ||
+		(children_json && children_json->type != S_JSON_ARRAY)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return S_HANDLE_NULL;
+	}
+
+	if (type == SE_SDF_SPHERE) {
+		const s_json* sphere_json = se_sdf_json_get_required(node, "sphere", S_JSON_OBJECT);
+		if (!sphere_json || !se_sdf_json_number_to_f32(se_sdf_json_get_required(sphere_json, "radius", S_JSON_NUMBER), &sphere_radius)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return S_HANDLE_NULL;
+		}
+	} else if (type == SE_SDF_BOX) {
+		const s_json* box_json = se_sdf_json_get_required(node, "box", S_JSON_OBJECT);
+		if (!box_json || !se_sdf_json_read_vec3(se_sdf_json_get_required(box_json, "size", S_JSON_ARRAY), &box_size)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return S_HANDLE_NULL;
+		}
+	}
+
+	se_sdf descriptor = {
+		.transform = transform,
+		.type = type,
+		.operation = operation,
+		.operation_amount = operation_amount,
+		.shading = shading,
+		.shadow = shadow,
+	};
+	if (type == SE_SDF_SPHERE) {
+		descriptor.sphere.radius = sphere_radius;
+	} else if (type == SE_SDF_BOX) {
+		descriptor.box.size = box_size;
+	}
+	sdf = se_sdf_create_internal(&descriptor);
+	if (sdf == S_HANDLE_NULL) {
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		}
+		return S_HANDLE_NULL;
+	}
+
+	for (sz i = 0; noises_json && i < noises_json->as.children.count; ++i) {
+		const s_json* noise_json = s_json_at(noises_json, i);
+		const s_json* descriptor_json = se_sdf_json_get_required(noise_json, "descriptor", S_JSON_OBJECT);
+		se_noise_2d noise_descriptor = {0};
+		if (!noise_json || !descriptor_json ||
+			!se_sdf_json_read_noise_type(s_json_get(descriptor_json, "type"), &noise_descriptor.type) ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(descriptor_json, "frequency", S_JSON_NUMBER), &noise_descriptor.frequency) ||
+			!se_sdf_json_read_vec2(se_sdf_json_get_required(descriptor_json, "offset", S_JSON_ARRAY), &noise_descriptor.offset) ||
+			!se_sdf_json_read_vec2(se_sdf_json_get_required(descriptor_json, "scale", S_JSON_ARRAY), &noise_descriptor.scale) ||
+			!se_sdf_json_number_to_u32(se_sdf_json_get_required(descriptor_json, "seed", S_JSON_NUMBER), &noise_descriptor.seed)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			goto fail;
+		}
+
+		se_sdf_noise_handle noise_handle = se_sdf_add_noise_internal(sdf, &noise_descriptor);
+		if (noise_handle == S_HANDLE_NULL) {
+			if (se_get_last_error() == SE_RESULT_OK) {
+				se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+			}
+			goto fail;
+		}
+
+		const s_json* texture_json = s_json_get(noise_json, "texture");
+		if (texture_json) {
+			u32 width = 0u;
+			u32 height = 0u;
+			se_texture_wrap wrap = SE_REPEAT;
+			const c8* pixels_b64 = NULL;
+			u8* pixels = NULL;
+			sz pixels_size = 0u;
+			if (texture_json->type != S_JSON_OBJECT ||
+				!se_sdf_json_read_texture_wrap(s_json_get(texture_json, "wrap"), &wrap) ||
+				!se_sdf_json_number_to_u32(se_sdf_json_get_required(texture_json, "width", S_JSON_NUMBER), &width) ||
+				!se_sdf_json_number_to_u32(se_sdf_json_get_required(texture_json, "height", S_JSON_NUMBER), &height) ||
+				!se_sdf_json_string_to_c8(se_sdf_json_get_required(texture_json, "pixels_rgba_b64", S_JSON_STRING), &pixels_b64) ||
+				width == 0u || height == 0u ||
+				!se_sdf_base64_decode(pixels_b64, &pixels, &pixels_size) ||
+				pixels_size != ((sz)width * (sz)height * 4u) ||
+				!se_sdf_json_apply_texture_pixels(ctx, se_sdf_get_noise_texture(noise_handle), pixels, (i32)width, (i32)height, wrap)) {
+				free(pixels);
+				if (se_get_last_error() == SE_RESULT_OK) {
+					se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				}
+				goto fail;
+			}
+			free(pixels);
+		}
+	}
+
+	for (sz i = 0; point_lights_json && i < point_lights_json->as.children.count; ++i) {
+		const s_json* point_light_json = s_json_at(point_lights_json, i);
+		se_sdf_point_light point_light = {0};
+		if (!point_light_json ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(point_light_json, "position", S_JSON_ARRAY), &point_light.position) ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(point_light_json, "color", S_JSON_ARRAY), &point_light.color) ||
+			!se_sdf_json_number_to_f32(se_sdf_json_get_required(point_light_json, "radius", S_JSON_NUMBER), &point_light.radius) ||
+			se_sdf_add_point_light_internal(sdf, point_light) == S_HANDLE_NULL) {
+			if (se_get_last_error() == SE_RESULT_OK) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			}
+			goto fail;
+		}
+	}
+
+	for (sz i = 0; directional_lights_json && i < directional_lights_json->as.children.count; ++i) {
+		const s_json* directional_light_json = s_json_at(directional_lights_json, i);
+		se_sdf_directional_light directional_light = {0};
+		if (!directional_light_json ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(directional_light_json, "direction", S_JSON_ARRAY), &directional_light.direction) ||
+			!se_sdf_json_read_vec3(se_sdf_json_get_required(directional_light_json, "color", S_JSON_ARRAY), &directional_light.color) ||
+			se_sdf_add_directional_light_internal(sdf, directional_light) == S_HANDLE_NULL) {
+			if (se_get_last_error() == SE_RESULT_OK) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			}
+			goto fail;
+		}
+	}
+
+	for (sz i = 0; children_json && i < children_json->as.children.count; ++i) {
+		const s_json* child_json = s_json_at(children_json, i);
+		se_sdf_handle child = se_sdf_build_from_json_node(child_json);
+		if (child == S_HANDLE_NULL) {
+			goto fail;
+		}
+		se_sdf_add_child(sdf, child);
+	}
+
+	return sdf;
+
+fail:
+	if (sdf != S_HANDLE_NULL) {
+		se_sdf_destroy(sdf);
+	}
+	return S_HANDLE_NULL;
+}
+
 static void se_sdf_destroy_shader_runtime(se_sdf* sdf_ptr) {
 	if (!sdf_ptr) {
 		return;
@@ -609,6 +1596,94 @@ static void se_sdf_destroy_shader_runtime(se_sdf* sdf_ptr) {
 		se_shader_destroy(sdf_ptr->shader);
 		sdf_ptr->shader = S_HANDLE_NULL;
 	}
+}
+
+static void se_sdf_destroy_runtime_resources(se_context* ctx, se_sdf* sdf_ptr) {
+	if (!ctx || !sdf_ptr) {
+		return;
+	}
+	if (sdf_ptr->output != S_HANDLE_NULL) {
+		se_framebuffer_destroy(sdf_ptr->output);
+		sdf_ptr->output = S_HANDLE_NULL;
+	}
+	if (sdf_ptr->volume != S_HANDLE_NULL) {
+		se_texture_destroy(sdf_ptr->volume);
+		sdf_ptr->volume = S_HANDLE_NULL;
+	}
+	se_sdf_destroy_shader_runtime(sdf_ptr);
+	se_quad_destroy(&sdf_ptr->quad);
+	memset(&sdf_ptr->quad, 0, sizeof(sdf_ptr->quad));
+}
+
+static void se_sdf_reset_keep_handle(se_context* ctx, const se_sdf_handle sdf) {
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!ctx || !sdf_ptr) {
+		return;
+	}
+	const se_sdf_handle parent = sdf_ptr->parent;
+
+	while (s_array_get_size(&sdf_ptr->children) > 0) {
+		const s_handle local_child_handle = s_array_handle(&sdf_ptr->children, (u32)(s_array_get_size(&sdf_ptr->children) - 1u));
+		se_sdf_handle* child_handle_ptr = s_array_get(&sdf_ptr->children, local_child_handle);
+		if (!child_handle_ptr || *child_handle_ptr == S_HANDLE_NULL || *child_handle_ptr == sdf) {
+			s_array_remove(&sdf_ptr->children, local_child_handle);
+			continue;
+		}
+		se_sdf_destroy(*child_handle_ptr);
+	}
+
+	se_sdf_release_noise_references(ctx, sdf_ptr);
+	se_sdf_release_point_light_references(ctx, sdf_ptr);
+	se_sdf_release_directional_light_references(ctx, sdf_ptr);
+	se_sdf_destroy_runtime_resources(ctx, sdf_ptr);
+	s_array_clear(&sdf_ptr->children);
+	s_array_clear(&sdf_ptr->noises);
+	s_array_clear(&sdf_ptr->point_lights);
+	s_array_clear(&sdf_ptr->directional_lights);
+	s_array_init(&sdf_ptr->children);
+	s_array_init(&sdf_ptr->noises);
+	s_array_init(&sdf_ptr->point_lights);
+	s_array_init(&sdf_ptr->directional_lights);
+	sdf_ptr->transform = s_mat4_identity;
+	sdf_ptr->type = SE_SDF_CUSTOM;
+	sdf_ptr->operation = SE_SDF_UNION;
+	sdf_ptr->operation_amount = 0.0f;
+	sdf_ptr->shading = (se_sdf_shading){0};
+	sdf_ptr->shadow = (se_sdf_shadow){0};
+	sdf_ptr->sphere.radius = 0.0f;
+	sdf_ptr->parent = parent;
+}
+
+static b8 se_sdf_transfer_state(se_context* ctx, const se_sdf_handle dst, const se_sdf_handle src) {
+	se_sdf* dst_ptr = se_sdf_from_handle(ctx, dst);
+	se_sdf* src_ptr = se_sdf_from_handle(ctx, src);
+	if (!ctx || !dst_ptr || !src_ptr || dst == src) {
+		return false;
+	}
+
+	const se_sdf_handle preserved_parent = dst_ptr->parent;
+	se_sdf_reset_keep_handle(ctx, dst);
+	dst_ptr = se_sdf_from_handle(ctx, dst);
+	src_ptr = se_sdf_from_handle(ctx, src);
+	if (!dst_ptr || !src_ptr) {
+		return false;
+	}
+
+	*dst_ptr = *src_ptr;
+	dst_ptr->parent = preserved_parent;
+	for (u32 i = 0; i < (u32)s_array_get_size(&dst_ptr->children); ++i) {
+		const s_handle local_handle = s_array_handle_at(&dst_ptr->children.b, i);
+		se_sdf_handle* child_handle_ptr = s_array_get(&dst_ptr->children, local_handle);
+		se_sdf* child_ptr = child_handle_ptr ? se_sdf_from_handle(ctx, *child_handle_ptr) : NULL;
+		if (child_ptr) {
+			child_ptr->parent = dst;
+		}
+	}
+
+	memset(src_ptr, 0, sizeof(*src_ptr));
+	s_array_remove(&ctx->sdfs, src);
+	se_sdf_invalidate_shader_chain(dst);
+	return true;
 }
 
 static void se_sdf_invalidate_shader_chain(const se_sdf_handle sdf) {
@@ -1354,8 +2429,7 @@ void se_sdf_destroy(se_sdf_handle sdf) {
 	se_sdf_release_point_light_references(ctx, sdf_ptr);
 	se_sdf_release_directional_light_references(ctx, sdf_ptr);
 
-	se_sdf_destroy_shader_runtime(sdf_ptr);
-	se_quad_destroy(&sdf_ptr->quad);
+	se_sdf_destroy_runtime_resources(ctx, sdf_ptr);
 	s_array_clear(&sdf_ptr->children);
 	s_array_clear(&sdf_ptr->noises);
 	s_array_clear(&sdf_ptr->point_lights);
@@ -1803,6 +2877,88 @@ void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples) {
 	}
 	shadow.samples = samples;
 	sdf_ptr->shadow = shadow;
+}
+
+s_json* se_sdf_to_json(se_sdf_handle sdf) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!ctx || sdf == S_HANDLE_NULL || !sdf_ptr) {
+		se_set_last_error(!ctx || sdf == S_HANDLE_NULL ? SE_RESULT_INVALID_ARGUMENT : SE_RESULT_NOT_FOUND);
+		return NULL;
+	}
+
+	s_json* root = s_json_object_empty(NULL);
+	if (!root) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return NULL;
+	}
+	if (!se_sdf_json_populate_object(ctx, sdf, root)) {
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		}
+		s_json_free(root);
+		return NULL;
+	}
+
+	se_set_last_error(SE_RESULT_OK);
+	return root;
+}
+
+b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!ctx || sdf == S_HANDLE_NULL || !root) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!sdf_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	if (root->type != S_JSON_OBJECT) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+
+	const s_json* format_node = s_json_get(root, "format");
+	const s_json* version_node = s_json_get(root, "version");
+	if ((format_node && !version_node) || (!format_node && version_node)) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (format_node && version_node) {
+		const c8* format = NULL;
+		u32 version = 0u;
+		if (!se_sdf_json_string_to_c8(se_sdf_json_get_required(root, "format", S_JSON_STRING), &format) ||
+			!se_sdf_json_number_to_u32(se_sdf_json_get_required(root, "version", S_JSON_NUMBER), &version)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return false;
+		}
+		if (strcmp(format, SE_SDF_JSON_FORMAT) != 0 || version != SE_SDF_JSON_VERSION) {
+			se_set_last_error(SE_RESULT_UNSUPPORTED);
+			return false;
+		}
+	}
+
+	se_sdf_handle staged = se_sdf_build_from_json_node(root);
+	if (staged == S_HANDLE_NULL) {
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		}
+		return false;
+	}
+	if (!se_sdf_transfer_state(ctx, sdf, staged)) {
+		if (se_sdf_from_handle(ctx, staged)) {
+			se_sdf_destroy(staged);
+		}
+		if (se_get_last_error() == SE_RESULT_OK) {
+			se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		}
+		return false;
+	}
+
+	se_set_last_error(SE_RESULT_OK);
+	return true;
 }
 
 static void se_sdf_upload_common_uniforms(

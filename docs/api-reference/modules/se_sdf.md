@@ -123,6 +123,18 @@ extern void se_sdf_directional_light_set_direction(se_sdf_directional_light_hand
 
 No inline description found in header comments.
 
+### `se_sdf_from_json`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_get_directional_light_color`
 
 <div class="api-signature">
@@ -615,6 +627,18 @@ extern void se_sdf_set_shadow_softness(se_sdf_handle sdf, f32 softness);
 
 No inline description found in header comments.
 
+### `se_sdf_to_json`
+
+<div class="api-signature">
+
+```c
+extern s_json* se_sdf_to_json(se_sdf_handle sdf);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ## Enums
 
 ### `se_sdf_operator`
@@ -642,6 +666,18 @@ typedef enum se_sdf_type { SE_SDF_CUSTOM, SE_SDF_SPHERE, SE_SDF_BOX, //... } se_
 No inline description found in header comments.
 
 ## Typedefs
+
+### `s_json`
+
+<div class="api-signature">
+
+```c
+typedef struct s_json s_json;
+```
+
+</div>
+
+No inline description found in header comments.
 
 ### `se_sdf`
 
