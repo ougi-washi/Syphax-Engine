@@ -5,9 +5,14 @@
 #include "se_graphics.h"
 #include "se_scene.h"
 #include "se_window.h"
+#include "syphax/s_json.h"
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
+
+#define EDITOR_SHOWCASE_SCENE_2D_PATH "scene2d_editor_showcase.json"
+#define EDITOR_SHOWCASE_SCENE_3D_PATH "scene3d_editor_showcase.json"
 
 typedef enum {
 	EDITOR_SHOWCASE_TARGET_SCENE_2D = 0,
@@ -151,28 +156,59 @@ static void editor_showcase_print_counts(editor_showcase_app* app) {
 
 static void editor_showcase_save_active(editor_showcase_app* app) {
 	b8 ok = false;
+	s_json* root = NULL;
 	if (!app || !app->editor) {
 		return;
 	}
 	if (app->target == EDITOR_SHOWCASE_TARGET_SCENE_2D) {
-		ok = se_editor_scene_2d_json_save(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
+		root = se_scene_2d_to_json(app->scene_2d);
+		ok = root && se_editor_json_write_file(EDITOR_SHOWCASE_SCENE_2D_PATH, root);
 	} else {
-		ok = se_editor_scene_3d_json_save(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
+		root = se_scene_3d_to_json(app->scene_3d);
+		ok = root && se_editor_json_write_file(EDITOR_SHOWCASE_SCENE_3D_PATH, root);
 	}
+	s_json_free(root);
 	printf("editor_showcase :: %s save %s\n", editor_showcase_target_name(app->target), ok ? "ok" : se_result_str(se_get_last_error()));
 }
 
 static void editor_showcase_load_active(editor_showcase_app* app) {
 	b8 ok = false;
+	s_json* root = NULL;
 	if (!app || !app->editor) {
 		return;
 	}
 	if (app->target == EDITOR_SHOWCASE_TARGET_SCENE_2D) {
-		ok = se_editor_scene_2d_json_load(app->editor, app->scene_2d, se_editor_get_scene_2d_json_path(app->editor));
+		ok = se_editor_json_read_file(EDITOR_SHOWCASE_SCENE_2D_PATH, &root) && se_scene_2d_from_json(app->scene_2d, root);
 	} else {
-		ok = se_editor_scene_3d_json_load(app->editor, app->scene_3d, se_editor_get_scene_3d_json_path(app->editor));
+		ok = se_editor_json_read_file(EDITOR_SHOWCASE_SCENE_3D_PATH, &root) && se_scene_3d_from_json(app->scene_3d, root);
 	}
+	s_json_free(root);
 	printf("editor_showcase :: %s load %s\n", editor_showcase_target_name(app->target), ok ? "ok" : se_result_str(se_get_last_error()));
+}
+
+static void editor_showcase_switch_target(editor_showcase_app* app) {
+	if (!app) {
+		return;
+	}
+	app->target = app->target == EDITOR_SHOWCASE_TARGET_SCENE_2D
+		? EDITOR_SHOWCASE_TARGET_SCENE_3D
+		: EDITOR_SHOWCASE_TARGET_SCENE_2D;
+	printf("editor_showcase :: target = %s\n", editor_showcase_target_name(app->target));
+}
+
+static void editor_showcase_handle_shortcut(editor_showcase_app* app, const se_editor_shortcut_event* event) {
+	if (!app || !event) {
+		return;
+	}
+	if (strcmp(event->action, "save") == 0) {
+		editor_showcase_save_active(app);
+	} else if (strcmp(event->action, "load") == 0) {
+		editor_showcase_load_active(app);
+	} else if (strcmp(event->action, "quit") == 0) {
+		se_window_set_should_close(app->window, true);
+	} else if (strcmp(event->action, "next") == 0 || strcmp(event->action, "previous") == 0) {
+		editor_showcase_switch_target(app);
+	}
 }
 
 static void editor_showcase_update_camera(editor_showcase_app* app, const f32 dt) {
@@ -267,13 +303,14 @@ int main(void) {
 
 	editor_config.context = app.context;
 	editor_config.window = app.window;
-	editor_config.focused_scene_2d = app.scene_2d;
-	editor_config.focused_scene_3d = app.scene_3d;
-	editor_config.scene_2d_json_path = "scene2d_editor_showcase.json";
-	editor_config.scene_3d_json_path = "scene3d_editor_showcase.json";
 	app.editor = se_editor_create(&editor_config);
 	if (!app.editor) {
 		printf("editor_showcase :: editor create failed (%s)\n", se_result_str(se_get_last_error()));
+		editor_showcase_cleanup(&app);
+		return 1;
+	}
+	if (!se_editor_bind_default_shortcuts(app.editor)) {
+		printf("editor_showcase :: shortcut bind failed (%s)\n", se_result_str(se_get_last_error()));
 		editor_showcase_cleanup(&app);
 		return 1;
 	}
@@ -281,26 +318,20 @@ int main(void) {
 	editor_showcase_print_counts(&app);
 	printf("editor_showcase controls:\n");
 	printf("  Tab: switch between scene_2d and scene_3d\n");
-	printf("  F5: save active scene json through se_editor\n");
-	printf("  F9: load active scene json through se_editor\n");
+	printf("  Ctrl+S: save active scene json\n");
+	printf("  Ctrl+O: load active scene json\n");
+	printf("  Ctrl+Q: quit\n");
 	printf("  3D mode: left mouse orbit, wheel zoom, WASD + QE move, R reset\n");
 	printf("  Esc: quit\n");
 
 	while (!se_window_should_close(app.window)) {
 		const f32 dt = (f32)se_window_get_delta_time(app.window);
+		se_editor_shortcut_event event = {0};
 		se_window_begin_frame(app.window);
 
-		if (se_window_is_key_pressed(app.window, SE_KEY_TAB)) {
-			app.target = app.target == EDITOR_SHOWCASE_TARGET_SCENE_2D
-				? EDITOR_SHOWCASE_TARGET_SCENE_3D
-				: EDITOR_SHOWCASE_TARGET_SCENE_2D;
-			printf("editor_showcase :: target = %s\n", editor_showcase_target_name(app.target));
-		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_F5)) {
-			editor_showcase_save_active(&app);
-		}
-		if (se_window_is_key_pressed(app.window, SE_KEY_F9)) {
-			editor_showcase_load_active(&app);
+		se_editor_update_shortcuts(app.editor);
+		while (se_editor_poll_shortcut(app.editor, &event)) {
+			editor_showcase_handle_shortcut(&app, &event);
 		}
 
 		editor_showcase_update_camera(&app, dt);

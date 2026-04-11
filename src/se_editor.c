@@ -17,6 +17,8 @@
 typedef s_array(se_editor_item, se_editor_items);
 typedef s_array(se_editor_property, se_editor_properties);
 typedef s_array(se_editor_command, se_editor_command_queue);
+typedef s_array(se_editor_shortcut, se_editor_shortcuts);
+typedef s_array(se_editor_shortcut_event, se_editor_shortcut_events);
 
 typedef struct {
 	se_audio_clip* clip;
@@ -57,10 +59,10 @@ struct se_editor {
 	se_simulation_handle focused_simulation;
 	se_vfx_2d_handle focused_vfx_2d;
 	se_vfx_3d_handle focused_vfx_3d;
-	se_scene_2d_handle focused_scene_2d;
-	se_scene_3d_handle focused_scene_3d;
-	c8 scene_2d_json_path[SE_MAX_PATH_LENGTH];
-	c8 scene_3d_json_path[SE_MAX_PATH_LENGTH];
+	void* custom_user_data;
+	se_editor_collect_custom_items_fn collect_custom_items;
+	se_editor_collect_custom_properties_fn collect_custom_properties;
+	se_editor_apply_custom_command_fn apply_custom_command;
 
 	se_editor_audio_clip_refs clips;
 	se_editor_audio_stream_refs streams;
@@ -69,7 +71,21 @@ struct se_editor {
 	se_editor_items items;
 	se_editor_properties properties;
 	se_editor_command_queue queue;
+	se_editor_shortcuts shortcuts;
+	se_editor_shortcut_events shortcut_events;
+	se_editor_mode mode;
+	se_key shortcut_sequence[SE_EDITOR_SHORTCUT_MAX_KEYS];
+	u32 shortcut_sequence_count;
+	se_key shortcut_repeat_key;
+	u32 shortcut_repeat_modifiers;
+	se_editor_mode shortcut_repeat_mode;
+	f64 shortcut_repeat_next_time;
+	c8 shortcut_repeat_action[SE_MAX_NAME_LENGTH];
+	b8 shortcut_repeat_active : 1;
 };
+
+#define SE_EDITOR_SHORTCUT_REPEAT_DELAY 0.32
+#define SE_EDITOR_SHORTCUT_REPEAT_INTERVAL 0.16
 
 #define SE_EDITOR_ARRAY_POP_ALL(_arr) \
 	do { \
@@ -155,10 +171,12 @@ struct se_editor {
 #define SE_EDITOR_NAME_CONTEXT_POP "context_pop"
 #define SE_EDITOR_NAME_CONTEXT_PUSH "context_push"
 #define SE_EDITOR_NAME_CONTEXT_SET_ENABLED "context_set_enabled"
+#define SE_EDITOR_NAME_COMMAND "command"
 #define SE_EDITOR_NAME_CULLING "culling"
 #define SE_EDITOR_NAME_CURRENT_TICK "current_tick"
 #define SE_EDITOR_NAME_CURSOR "cursor"
 #define SE_EDITOR_NAME_CURSOR_MODE "cursor_mode"
+#define SE_EDITOR_NAME_CUSTOM "custom"
 #define SE_EDITOR_NAME_DEBUG "debug"
 #define SE_EDITOR_NAME_DEBUG_OVERLAY "debug_overlay"
 #define SE_EDITOR_NAME_DELTA_TIME "delta_time"
@@ -238,6 +256,7 @@ struct se_editor {
 #define SE_EDITOR_NAME_INDEX_COUNT "index_count"
 #define SE_EDITOR_NAME_INERTIA "inertia"
 #define SE_EDITOR_NAME_INPUT "input"
+#define SE_EDITOR_NAME_INSERT "insert"
 #define SE_EDITOR_NAME_INPUT_MS "input_ms"
 #define SE_EDITOR_NAME_INSTANCE_COUNT "instance_count"
 #define SE_EDITOR_NAME_INSTANCE_REMOVE "instance_remove"
@@ -545,7 +564,6 @@ struct se_editor {
 #define SE_EDITOR_NAME_WINDOW_U "window[%u]"
 #define SE_EDITOR_NAME_WINDOW_UPDATE_MS "window_update_ms"
 #define SE_EDITOR_NAME_Z_ORDER "z_order"
-#define SE_EDITOR_NAME_JSON_PATH "json_path"
 #define SE_EDITOR_NAME_ROOT "root"
 #define SE_EDITOR_NAME_VALID "valid"
 #define SE_EDITOR_NAME_MESSAGE "message"
@@ -557,8 +575,6 @@ struct se_editor {
 #define SE_EDITOR_NAME_DISABLED_PREFIX "disabled_"
 #define SE_EDITOR_NAME_FOCUSED_PREFIX "focused_"
 
-#define SE_EDITOR_DEFAULT_SCENE_2D_JSON_PATH "scene2d_snapshot.json"
-#define SE_EDITOR_DEFAULT_SCENE_3D_JSON_PATH "scene3d_snapshot.json"
 static void se_editor_copy_text(c8* dst, sz dst_size, const c8* src) {
 	if (!dst || dst_size == 0u) {
 		return;
@@ -684,48 +700,9 @@ static b8 se_editor_context_has_vfx_3d(const se_context* context, se_vfx_3d_hand
 	return false;
 }
 
-static b8 se_editor_context_has_scene_2d(const se_context* context, se_scene_2d_handle handle) {
-	if (!context || handle == S_HANDLE_NULL) {
-		return false;
-	}
-	for (sz i = 0; i < s_array_get_size(&context->scenes_2d); ++i) {
-		if (s_array_handle(&context->scenes_2d, (u32)i) == handle) {
-			return true;
-		}
-	}
-	return false;
-}
-
-static b8 se_editor_context_has_scene_3d(const se_context* context, se_scene_3d_handle handle) {
-	if (!context || handle == S_HANDLE_NULL) {
-		return false;
-	}
-	for (sz i = 0; i < s_array_get_size(&context->scenes_3d); ++i) {
-		if (s_array_handle(&context->scenes_3d, (u32)i) == handle) {
-			return true;
-		}
-	}
-	return false;
-}
-
-static void se_editor_set_default_json_paths(se_editor* editor) {
-	if (!editor) {
-		return;
-	}
-	if (editor->scene_2d_json_path[0] == '\0') {
-		se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), SE_EDITOR_DEFAULT_SCENE_2D_JSON_PATH);
-	}
-	if (editor->scene_3d_json_path[0] == '\0') {
-		se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), SE_EDITOR_DEFAULT_SCENE_3D_JSON_PATH);
-	}
-}
-
 static void se_editor_refresh_defaults_internal(se_editor* editor) {
 	se_context* context = se_editor_context(editor);
 	if (!editor || !context) {
-		if (editor) {
-			se_editor_set_default_json_paths(editor);
-		}
 		return;
 	}
 	if (editor->window != S_HANDLE_NULL && !se_editor_context_has_window(context, editor->window)) {
@@ -752,21 +729,6 @@ static void se_editor_refresh_defaults_internal(se_editor* editor) {
 	if (editor->focused_vfx_3d == S_HANDLE_NULL && s_array_get_size(&context->vfx_3ds) > 0) {
 		editor->focused_vfx_3d = s_array_handle(&context->vfx_3ds, 0u);
 	}
-	if (editor->focused_scene_2d != S_HANDLE_NULL &&
-		!se_editor_context_has_scene_2d(context, editor->focused_scene_2d)) {
-		editor->focused_scene_2d = S_HANDLE_NULL;
-	}
-	if (editor->focused_scene_2d == S_HANDLE_NULL && s_array_get_size(&context->scenes_2d) > 0) {
-		editor->focused_scene_2d = s_array_handle(&context->scenes_2d, 0u);
-	}
-	if (editor->focused_scene_3d != S_HANDLE_NULL &&
-		!se_editor_context_has_scene_3d(context, editor->focused_scene_3d)) {
-		editor->focused_scene_3d = S_HANDLE_NULL;
-	}
-	if (editor->focused_scene_3d == S_HANDLE_NULL && s_array_get_size(&context->scenes_3d) > 0) {
-		editor->focused_scene_3d = s_array_handle(&context->scenes_3d, 0u);
-	}
-	se_editor_set_default_json_paths(editor);
 }
 
 static b8 se_editor_trace_summary_collect(se_editor_trace_summary* out_summary) {
@@ -835,6 +797,304 @@ static void se_editor_queue_clear(se_editor* editor) {
 		return;
 	}
 	SE_EDITOR_ARRAY_POP_ALL(&editor->queue);
+}
+
+static void se_editor_shortcut_events_clear(se_editor* editor) {
+	if (!editor) {
+		return;
+	}
+	SE_EDITOR_ARRAY_POP_ALL(&editor->shortcut_events);
+}
+
+static b8 se_editor_shortcut_key_valid(se_key key) {
+	return key >= 0 && key < SE_KEY_COUNT;
+}
+
+static b8 se_editor_shortcut_key_modifier(se_key key) {
+	return key == SE_KEY_LEFT_SHIFT || key == SE_KEY_RIGHT_SHIFT ||
+		key == SE_KEY_LEFT_CONTROL || key == SE_KEY_RIGHT_CONTROL ||
+		key == SE_KEY_LEFT_ALT || key == SE_KEY_RIGHT_ALT ||
+		key == SE_KEY_LEFT_SUPER || key == SE_KEY_RIGHT_SUPER;
+}
+
+static b8 se_editor_shortcut_modifiers_down(se_window_handle window, u32 modifiers) {
+	u32 active = 0u;
+	if (se_window_is_key_down(window, SE_KEY_LEFT_SHIFT) || se_window_is_key_down(window, SE_KEY_RIGHT_SHIFT)) {
+		active |= SE_EDITOR_SHORTCUT_MOD_SHIFT;
+	}
+	if (se_window_is_key_down(window, SE_KEY_LEFT_CONTROL) || se_window_is_key_down(window, SE_KEY_RIGHT_CONTROL)) {
+		active |= SE_EDITOR_SHORTCUT_MOD_CONTROL;
+	}
+	if (se_window_is_key_down(window, SE_KEY_LEFT_ALT) || se_window_is_key_down(window, SE_KEY_RIGHT_ALT)) {
+		active |= SE_EDITOR_SHORTCUT_MOD_ALT;
+	}
+	if (se_window_is_key_down(window, SE_KEY_LEFT_SUPER) || se_window_is_key_down(window, SE_KEY_RIGHT_SUPER)) {
+		active |= SE_EDITOR_SHORTCUT_MOD_SUPER;
+	}
+	return active == modifiers;
+}
+
+static b8 se_editor_shortcut_repeat_matches(const se_editor* editor, const se_editor_shortcut* shortcut) {
+	return editor && shortcut && editor->shortcut_repeat_active &&
+		editor->shortcut_repeat_key == shortcut->keys[0] &&
+		editor->shortcut_repeat_modifiers == shortcut->modifiers &&
+		editor->shortcut_repeat_mode == shortcut->mode &&
+		strcmp(editor->shortcut_repeat_action, shortcut->action) == 0;
+}
+
+static void se_editor_shortcut_repeat_clear(se_editor* editor) {
+	if (!editor) return;
+	editor->shortcut_repeat_key = SE_KEY_UNKNOWN;
+	editor->shortcut_repeat_modifiers = SE_EDITOR_SHORTCUT_MOD_NONE;
+	editor->shortcut_repeat_mode = SE_EDITOR_MODE_NORMAL;
+	editor->shortcut_repeat_next_time = 0.0;
+	editor->shortcut_repeat_action[0] = '\0';
+	editor->shortcut_repeat_active = false;
+}
+
+static void se_editor_shortcut_repeat_set(se_editor* editor, const se_editor_shortcut* shortcut, f64 next_time) {
+	if (!editor || !shortcut || shortcut->key_count == 0u) return;
+	editor->shortcut_repeat_key = shortcut->keys[0];
+	editor->shortcut_repeat_modifiers = shortcut->modifiers;
+	editor->shortcut_repeat_mode = shortcut->mode;
+	editor->shortcut_repeat_next_time = next_time;
+	se_editor_copy_text(editor->shortcut_repeat_action, sizeof(editor->shortcut_repeat_action), shortcut->action);
+	editor->shortcut_repeat_active = true;
+}
+
+static b8 se_editor_shortcut_repeat_ready(se_editor* editor, const se_editor_shortcut* shortcut) {
+	f64 now = 0.0;
+	if (!editor || !shortcut || shortcut->key_count != 1u || !shortcut->repeat) return false;
+	now = se_window_get_time(editor->window);
+	if (!se_window_is_key_down(editor->window, shortcut->keys[0])) {
+		if (se_editor_shortcut_repeat_matches(editor, shortcut)) {
+			se_editor_shortcut_repeat_clear(editor);
+		}
+		return false;
+	}
+	if (se_window_is_key_pressed(editor->window, shortcut->keys[0]) ||
+		!se_editor_shortcut_repeat_matches(editor, shortcut)) {
+		se_editor_shortcut_repeat_set(editor, shortcut, now + SE_EDITOR_SHORTCUT_REPEAT_DELAY);
+		return se_window_is_key_pressed(editor->window, shortcut->keys[0]);
+	}
+	if (now >= editor->shortcut_repeat_next_time) {
+		se_editor_shortcut_repeat_set(editor, shortcut, now + SE_EDITOR_SHORTCUT_REPEAT_INTERVAL);
+		return true;
+	}
+	return false;
+}
+
+static se_key se_editor_shortcut_pressed_key(se_window_handle window) {
+	for (i32 key = 0; key < SE_KEY_COUNT; ++key) {
+		const se_key typed_key = (se_key)key;
+		if (se_editor_shortcut_key_modifier(typed_key)) {
+			continue;
+		}
+		if (se_window_is_key_pressed(window, typed_key)) {
+			return typed_key;
+		}
+	}
+	return SE_KEY_UNKNOWN;
+}
+
+static b8 se_editor_shortcut_parse_key_name(const c8* name, se_key* out_key) {
+	typedef struct {
+		const c8* name;
+		se_key key;
+	} se_editor_key_alias;
+	c8 normalized[SE_MAX_NAME_LENGTH] = {0};
+	static const se_editor_key_alias aliases[] = {
+		{ "space", SE_KEY_SPACE },
+		{ "tab", SE_KEY_TAB },
+		{ "enter", SE_KEY_ENTER },
+		{ "return", SE_KEY_ENTER },
+		{ "escape", SE_KEY_ESCAPE },
+		{ "esc", SE_KEY_ESCAPE },
+		{ "backspace", SE_KEY_BACKSPACE },
+		{ "insert", SE_KEY_INSERT },
+		{ "ins", SE_KEY_INSERT },
+		{ "delete", SE_KEY_DELETE },
+		{ "del", SE_KEY_DELETE },
+		{ "right", SE_KEY_RIGHT },
+		{ "left", SE_KEY_LEFT },
+		{ "down", SE_KEY_DOWN },
+		{ "up", SE_KEY_UP },
+		{ "pageup", SE_KEY_PAGE_UP },
+		{ "pagedown", SE_KEY_PAGE_DOWN },
+		{ "home", SE_KEY_HOME },
+		{ "end", SE_KEY_END },
+		{ "slash", SE_KEY_SLASH },
+		{ "backslash", SE_KEY_BACKSLASH },
+		{ "comma", SE_KEY_COMMA },
+		{ "period", SE_KEY_PERIOD },
+		{ "dot", SE_KEY_PERIOD },
+		{ "minus", SE_KEY_MINUS },
+		{ "equal", SE_KEY_EQUAL },
+		{ "semicolon", SE_KEY_SEMICOLON },
+		{ "apostrophe", SE_KEY_APOSTROPHE },
+		{ "quote", SE_KEY_APOSTROPHE },
+		{ "grave", SE_KEY_GRAVE_ACCENT },
+		{ "backtick", SE_KEY_GRAVE_ACCENT }
+	};
+	if (!name || !out_key) {
+		return false;
+	}
+	se_editor_normalize_name(name, normalized, sizeof(normalized));
+	if (normalized[0] == '\0') {
+		return false;
+	}
+	if (normalized[1] == '\0') {
+		if (normalized[0] >= 'a' && normalized[0] <= 'z') {
+			*out_key = (se_key)(SE_KEY_A + (normalized[0] - 'a'));
+			return true;
+		}
+		if (normalized[0] >= '0' && normalized[0] <= '9') {
+			*out_key = (se_key)(SE_KEY_0 + (normalized[0] - '0'));
+			return true;
+		}
+	}
+	if (normalized[0] == 'f' && normalized[1] >= '1' && normalized[1] <= '9') {
+		i32 number = 0;
+		for (u32 i = 1u; normalized[i] != '\0'; ++i) {
+			if (normalized[i] < '0' || normalized[i] > '9') {
+				number = 0;
+				break;
+			}
+			number = number * 10 + (normalized[i] - '0');
+		}
+		if (number >= 1 && number <= 25) {
+			*out_key = (se_key)(SE_KEY_F1 + number - 1);
+			return true;
+		}
+	}
+	for (u32 i = 0u; i < (u32)(sizeof(aliases) / sizeof(aliases[0])); ++i) {
+		if (strcmp(normalized, aliases[i].name) == 0) {
+			*out_key = aliases[i].key;
+			return true;
+		}
+	}
+	return false;
+}
+
+static b8 se_editor_shortcut_parse_token(const c8* token, se_key* out_key, u32* out_modifiers) {
+	c8 part[SE_MAX_NAME_LENGTH] = {0};
+	sz part_index = 0u;
+	se_key key = SE_KEY_UNKNOWN;
+	u32 modifiers = 0u;
+	if (!token || !out_key || !out_modifiers) {
+		return false;
+	}
+	for (sz i = 0u;; ++i) {
+		const c8 c = token[i];
+		if (c == '+' || c == '\0') {
+			c8 normalized[SE_MAX_NAME_LENGTH] = {0};
+			part[part_index] = '\0';
+			se_editor_normalize_name(part, normalized, sizeof(normalized));
+			if (strcmp(normalized, "shift") == 0) {
+				modifiers |= SE_EDITOR_SHORTCUT_MOD_SHIFT;
+			} else if (strcmp(normalized, "ctrl") == 0 || strcmp(normalized, "control") == 0) {
+				modifiers |= SE_EDITOR_SHORTCUT_MOD_CONTROL;
+			} else if (strcmp(normalized, "alt") == 0) {
+				modifiers |= SE_EDITOR_SHORTCUT_MOD_ALT;
+			} else if (strcmp(normalized, "super") == 0 || strcmp(normalized, "cmd") == 0 || strcmp(normalized, "meta") == 0) {
+				modifiers |= SE_EDITOR_SHORTCUT_MOD_SUPER;
+			} else if (normalized[0] != '\0') {
+				if (key != SE_KEY_UNKNOWN || !se_editor_shortcut_parse_key_name(part, &key)) {
+					return false;
+				}
+			}
+			part_index = 0u;
+			if (c == '\0') {
+				break;
+			}
+			continue;
+		}
+		if (part_index + 1u >= sizeof(part)) {
+			return false;
+		}
+		part[part_index++] = c;
+	}
+	if (key == SE_KEY_UNKNOWN) {
+		return false;
+	}
+	*out_key = key;
+	*out_modifiers = modifiers;
+	return true;
+}
+
+static b8 se_editor_shortcut_add_event(se_editor* editor, const c8* action) {
+	se_editor_shortcut_event event = {0};
+	if (!editor || !action || action[0] == '\0') {
+		return false;
+	}
+	event.mode = editor->mode;
+	se_editor_copy_text(event.action, sizeof(event.action), action);
+	s_array_add(&editor->shortcut_events, event);
+	if (strcmp(action, "normal_mode") == 0) {
+		editor->mode = SE_EDITOR_MODE_NORMAL;
+	} else if (strcmp(action, "insert_mode") == 0) {
+		editor->mode = SE_EDITOR_MODE_INSERT;
+	} else if (strcmp(action, "command_mode") == 0) {
+		editor->mode = SE_EDITOR_MODE_COMMAND;
+	}
+	return true;
+}
+
+static b8 se_editor_shortcut_sequence_matches(const se_editor_shortcut* shortcut, const se_key* keys, u32 key_count) {
+	if (!shortcut || !keys || key_count == 0u || shortcut->key_count < key_count) {
+		return false;
+	}
+	for (u32 i = 0u; i < key_count; ++i) {
+		if (shortcut->keys[i] != keys[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void se_editor_shortcut_sequence_push(se_editor* editor, se_key key) {
+	if (!editor || !se_editor_shortcut_key_valid(key)) {
+		return;
+	}
+	if (editor->shortcut_sequence_count >= SE_EDITOR_SHORTCUT_MAX_KEYS) {
+		for (u32 i = 1u; i < SE_EDITOR_SHORTCUT_MAX_KEYS; ++i) {
+			editor->shortcut_sequence[i - 1u] = editor->shortcut_sequence[i];
+		}
+		editor->shortcut_sequence_count = SE_EDITOR_SHORTCUT_MAX_KEYS - 1u;
+	}
+	editor->shortcut_sequence[editor->shortcut_sequence_count++] = key;
+}
+
+static b8 se_editor_shortcut_process_sequence(se_editor* editor) {
+	b8 matched = false;
+	b8 prefix = false;
+	if (!editor || editor->shortcut_sequence_count == 0u) {
+		return false;
+	}
+	for (sz i = 0u; i < s_array_get_size(&editor->shortcuts); ++i) {
+		const s_handle handle = s_array_handle(&editor->shortcuts, (u32)i);
+		const se_editor_shortcut* shortcut = s_array_get(&editor->shortcuts, handle);
+		if (!shortcut || shortcut->mode != editor->mode || shortcut->key_count <= 1u) {
+			continue;
+		}
+		if (!se_editor_shortcut_modifiers_down(editor->window, shortcut->modifiers)) {
+			continue;
+		}
+		if (!se_editor_shortcut_sequence_matches(shortcut, editor->shortcut_sequence, editor->shortcut_sequence_count)) {
+			continue;
+		}
+		if (shortcut->key_count == editor->shortcut_sequence_count) {
+			se_editor_shortcut_add_event(editor, shortcut->action);
+			matched = true;
+		} else {
+			prefix = true;
+		}
+	}
+	if (matched) {
+		editor->shortcut_sequence_count = 0u;
+		return true;
+	}
+	return prefix;
 }
 
 static void se_editor_push_item(
@@ -962,7 +1222,36 @@ static void se_editor_add_property_text(se_editor_properties* properties, const 
 	se_editor_add_property(properties, name, &editor_value, editable);
 }
 
-static b8 se_editor_value_as_bool(const se_editor_value* value, b8* out_value) {
+b8 se_editor_add_item(
+	se_editor* editor,
+	se_editor_category category,
+	s_handle handle,
+	s_handle owner_handle,
+	void* pointer,
+	void* owner_pointer,
+	u32 index,
+	const c8* label
+) {
+	if (!editor || (u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT || !label || label[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_editor_push_item(&editor->items, category, handle, owner_handle, pointer, owner_pointer, index, label);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_add_property_value(se_editor* editor, const c8* name, const se_editor_value* value, b8 editable) {
+	if (!editor || !name || name[0] == '\0' || !value) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_editor_add_property(&editor->properties, name, value, editable);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_value_as_bool(const se_editor_value* value, b8* out_value) {
 	if (!value || !out_value) {
 		return false;
 	}
@@ -990,7 +1279,7 @@ static b8 se_editor_value_as_bool(const se_editor_value* value, b8* out_value) {
 	}
 }
 
-static b8 se_editor_value_as_i32(const se_editor_value* value, i32* out_value) {
+b8 se_editor_value_as_i32(const se_editor_value* value, i32* out_value) {
 	if (!value || !out_value) {
 		return false;
 	}
@@ -1018,7 +1307,7 @@ static b8 se_editor_value_as_i32(const se_editor_value* value, i32* out_value) {
 	}
 }
 
-static b8 se_editor_value_as_u32(const se_editor_value* value, u32* out_value) {
+b8 se_editor_value_as_u32(const se_editor_value* value, u32* out_value) {
 	i32 i32_value = 0;
 	if (!value || !out_value) {
 		return false;
@@ -1034,7 +1323,7 @@ static b8 se_editor_value_as_u32(const se_editor_value* value, u32* out_value) {
 	return true;
 }
 
-static b8 se_editor_value_as_u64(const se_editor_value* value, u64* out_value) {
+b8 se_editor_value_as_u64(const se_editor_value* value, u64* out_value) {
 	if (!value || !out_value) {
 		return false;
 	}
@@ -1059,7 +1348,7 @@ static b8 se_editor_value_as_u64(const se_editor_value* value, u64* out_value) {
 	}
 }
 
-static b8 se_editor_value_as_f32(const se_editor_value* value, f32* out_value) {
+b8 se_editor_value_as_f32(const se_editor_value* value, f32* out_value) {
 	if (!value || !out_value) {
 		return false;
 	}
@@ -1084,7 +1373,7 @@ static b8 se_editor_value_as_f32(const se_editor_value* value, f32* out_value) {
 	}
 }
 
-static b8 se_editor_value_as_f64(const se_editor_value* value, f64* out_value) {
+b8 se_editor_value_as_f64(const se_editor_value* value, f64* out_value) {
 	if (!value || !out_value) {
 		return false;
 	}
@@ -1109,7 +1398,7 @@ static b8 se_editor_value_as_f64(const se_editor_value* value, f64* out_value) {
 	}
 }
 
-static b8 se_editor_value_as_handle(const se_editor_value* value, s_handle* out_value) {
+b8 se_editor_value_as_handle(const se_editor_value* value, s_handle* out_value) {
 	u64 u64_value = 0u;
 	if (!value || !out_value) {
 		return false;
@@ -1125,7 +1414,7 @@ static b8 se_editor_value_as_handle(const se_editor_value* value, s_handle* out_
 	return true;
 }
 
-static b8 se_editor_value_as_vec2(const se_editor_value* value, s_vec2* out_value) {
+b8 se_editor_value_as_vec2(const se_editor_value* value, s_vec2* out_value) {
 	if (!value || !out_value || value->type != SE_EDITOR_VALUE_VEC2) {
 		return false;
 	}
@@ -1133,7 +1422,7 @@ static b8 se_editor_value_as_vec2(const se_editor_value* value, s_vec2* out_valu
 	return true;
 }
 
-static b8 se_editor_value_as_vec3(const se_editor_value* value, s_vec3* out_value) {
+b8 se_editor_value_as_vec3(const se_editor_value* value, s_vec3* out_value) {
 	if (!value || !out_value || value->type != SE_EDITOR_VALUE_VEC3) {
 		return false;
 	}
@@ -1141,7 +1430,7 @@ static b8 se_editor_value_as_vec3(const se_editor_value* value, s_vec3* out_valu
 	return true;
 }
 
-static b8 se_editor_value_as_vec4(const se_editor_value* value, s_vec4* out_value) {
+b8 se_editor_value_as_vec4(const se_editor_value* value, s_vec4* out_value) {
 	if (!value || !out_value || value->type != SE_EDITOR_VALUE_VEC4) {
 		return false;
 	}
@@ -1149,7 +1438,7 @@ static b8 se_editor_value_as_vec4(const se_editor_value* value, s_vec4* out_valu
 	return true;
 }
 
-static b8 se_editor_value_as_mat3(const se_editor_value* value, s_mat3* out_value) {
+b8 se_editor_value_as_mat3(const se_editor_value* value, s_mat3* out_value) {
 	if (!value || !out_value || value->type != SE_EDITOR_VALUE_MAT3) {
 		return false;
 	}
@@ -1157,7 +1446,7 @@ static b8 se_editor_value_as_mat3(const se_editor_value* value, s_mat3* out_valu
 	return true;
 }
 
-static b8 se_editor_value_as_mat4(const se_editor_value* value, s_mat4* out_value) {
+b8 se_editor_value_as_mat4(const se_editor_value* value, s_mat4* out_value) {
 	if (!value || !out_value || value->type != SE_EDITOR_VALUE_MAT4) {
 		return false;
 	}
@@ -1165,14 +1454,14 @@ static b8 se_editor_value_as_mat4(const se_editor_value* value, s_mat4* out_valu
 	return true;
 }
 
-static const c8* se_editor_value_as_text(const se_editor_value* value) {
+const c8* se_editor_value_as_text(const se_editor_value* value) {
 	if (!value || value->type != SE_EDITOR_VALUE_TEXT) {
 		return NULL;
 	}
 	return value->text_value;
 }
 
-static b8 se_editor_json_write_file(const c8* path, s_json* root) {
+b8 se_editor_json_write_file(const c8* path, s_json* root) {
 	c8* text = NULL;
 	b8 ok = false;
 	if (!path || path[0] == '\0' || !root) {
@@ -1194,7 +1483,7 @@ static b8 se_editor_json_write_file(const c8* path, s_json* root) {
 	return true;
 }
 
-static b8 se_editor_json_read_file(const c8* path, s_json** out_root) {
+b8 se_editor_json_read_file(const c8* path, s_json** out_root) {
 	c8* text = NULL;
 	s_json* root = NULL;
 	if (!path || path[0] == '\0' || !out_root) {
@@ -1649,7 +1938,6 @@ static b8 se_editor_collect_scene_2d_properties(se_editor* editor, const se_edit
 			se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_OUTPUT_AUTO_RESIZE, framebuffer->auto_resize, true);
 		}
 	}
-	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->scene_2d_json_path, true);
 	return true;
 }
 
@@ -1690,7 +1978,6 @@ static b8 se_editor_collect_scene_3d_properties(se_editor* editor, const se_edit
 			se_editor_add_property_bool(&editor->properties, SE_EDITOR_NAME_OUTPUT_AUTO_RESIZE, framebuffer->auto_resize, true);
 		}
 	}
-	se_editor_add_property_text(&editor->properties, SE_EDITOR_NAME_JSON_PATH, editor->scene_3d_json_path, true);
 	return true;
 }
 
@@ -2632,17 +2919,8 @@ static b8 se_editor_apply_scene_2d_command(se_editor* editor, const se_editor_co
 	se_scene_2d* scene = se_editor_scene_2d_ptr(editor, scene_handle);
 	s_vec2 vec2_value = {0};
 	s_handle handle_value = S_HANDLE_NULL;
-	const c8* path = NULL;
 	if (!scene) {
 		return false;
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_JSON_PATH) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			return false;
-		}
-		se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), path);
-		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_OUTPUT_SIZE) == 0) {
 		if (!se_editor_value_as_vec2(&command->value, &vec2_value) || scene->output == S_HANDLE_NULL) {
@@ -2741,20 +3019,6 @@ static b8 se_editor_apply_scene_2d_command(se_editor* editor, const se_editor_co
 		se_scene_2d_remove_object(scene_handle, (se_object_2d_handle)handle_value);
 		return true;
 	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_SAVE_FILE) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			path = editor->scene_2d_json_path;
-		}
-		return se_editor_scene_2d_json_save(editor, scene_handle, path);
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_LOAD_FILE) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			path = editor->scene_2d_json_path;
-		}
-		return se_editor_scene_2d_json_load(editor, scene_handle, path);
-	}
 	return false;
 }
 
@@ -2850,18 +3114,9 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 	se_scene_3d* scene = se_editor_scene_3d_ptr(editor, scene_handle);
 	s_vec2 vec2_value = {0};
 	s_handle handle_value = S_HANDLE_NULL;
-	const c8* path = NULL;
 	b8 bool_value = false;
 	if (!scene) {
 		return false;
-	}
-	if (strcmp(command->name, SE_EDITOR_NAME_JSON_PATH) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			return false;
-		}
-		se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), path);
-		return true;
 	}
 	if (strcmp(command->name, SE_EDITOR_NAME_CAMERA) == 0) {
 		if (!se_editor_value_as_handle(&command->value, &handle_value)) {
@@ -2974,20 +3229,6 @@ static b8 se_editor_apply_scene_3d_command(se_editor* editor, const se_editor_co
 		}
 		se_scene_3d_remove_post_process_buffer(scene_handle, (se_render_buffer_handle)handle_value);
 		return true;
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_SAVE_FILE) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			path = editor->scene_3d_json_path;
-		}
-		return se_editor_scene_3d_json_save(editor, scene_handle, path);
-	}
-	if (command->type == SE_EDITOR_COMMAND_ACTION && strcmp(command->name, SE_EDITOR_NAME_JSON_LOAD_FILE) == 0) {
-		path = se_editor_value_as_text(&command->value);
-		if (!path || path[0] == '\0') {
-			path = editor->scene_3d_json_path;
-		}
-		return se_editor_scene_3d_json_load(editor, scene_handle, path);
 	}
 	return false;
 }
@@ -4710,6 +4951,7 @@ const c8* se_editor_category_name(se_editor_category category) {
 		case SE_EDITOR_CATEGORY_PHYSICS_2D_BODY: return SE_EDITOR_NAME_PHYSICS2D_BODY;
 		case SE_EDITOR_CATEGORY_PHYSICS_3D: return SE_EDITOR_NAME_PHYSICS3D;
 		case SE_EDITOR_CATEGORY_PHYSICS_3D_BODY: return SE_EDITOR_NAME_PHYSICS3D_BODY;
+		case SE_EDITOR_CATEGORY_CUSTOM: return SE_EDITOR_NAME_CUSTOM;
 		case SE_EDITOR_CATEGORY_COUNT:
 		default: return SE_EDITOR_NAME_UNKNOWN;
 	}
@@ -4782,6 +5024,16 @@ const c8* se_editor_value_type_name(se_editor_value_type type) {
 	}
 }
 
+const c8* se_editor_mode_name(se_editor_mode mode) {
+	switch (mode) {
+		case SE_EDITOR_MODE_NORMAL: return SE_EDITOR_NAME_NORMAL;
+		case SE_EDITOR_MODE_INSERT: return SE_EDITOR_NAME_INSERT;
+		case SE_EDITOR_MODE_COMMAND: return SE_EDITOR_NAME_COMMAND;
+		case SE_EDITOR_MODE_COUNT:
+		default: return SE_EDITOR_NAME_UNKNOWN;
+	}
+}
+
 se_editor* se_editor_create(const se_editor_config* config) {
 	se_editor* editor = calloc(1, sizeof(*editor));
 	se_editor_config cfg = SE_EDITOR_CONFIG_DEFAULTS;
@@ -4798,6 +5050,9 @@ se_editor* se_editor_create(const se_editor_config* config) {
 	s_array_init(&editor->items);
 	s_array_init(&editor->properties);
 	s_array_init(&editor->queue);
+	s_array_init(&editor->shortcuts);
+	s_array_init(&editor->shortcut_events);
+	se_editor_shortcut_repeat_clear(editor);
 
 	editor->context = cfg.context ? cfg.context : se_current_context();
 	editor->window = cfg.window;
@@ -4809,10 +5064,10 @@ se_editor* se_editor_create(const se_editor_config* config) {
 	editor->focused_simulation = cfg.focused_simulation;
 	editor->focused_vfx_2d = cfg.focused_vfx_2d;
 	editor->focused_vfx_3d = cfg.focused_vfx_3d;
-	editor->focused_scene_2d = cfg.focused_scene_2d;
-	editor->focused_scene_3d = cfg.focused_scene_3d;
-	se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), cfg.scene_2d_json_path);
-	se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), cfg.scene_3d_json_path);
+	editor->custom_user_data = cfg.custom_user_data;
+	editor->collect_custom_items = cfg.collect_custom_items;
+	editor->collect_custom_properties = cfg.collect_custom_properties;
+	editor->apply_custom_command = cfg.apply_custom_command;
 	se_editor_refresh_defaults_internal(editor);
 
 	se_set_last_error(SE_RESULT_OK);
@@ -4824,6 +5079,8 @@ void se_editor_destroy(se_editor* editor) {
 		return;
 	}
 	s_array_clear(&editor->queue);
+	s_array_clear(&editor->shortcut_events);
+	s_array_clear(&editor->shortcuts);
 	s_array_clear(&editor->properties);
 	s_array_clear(&editor->items);
 	s_array_clear(&editor->captures);
@@ -4841,11 +5098,14 @@ void se_editor_reset(se_editor* editor) {
 	SE_EDITOR_ARRAY_POP_ALL(&editor->clips);
 	SE_EDITOR_ARRAY_POP_ALL(&editor->streams);
 	SE_EDITOR_ARRAY_POP_ALL(&editor->captures);
+	SE_EDITOR_ARRAY_POP_ALL(&editor->shortcut_events);
+	SE_EDITOR_ARRAY_POP_ALL(&editor->shortcuts);
 	editor->focused_simulation = S_HANDLE_NULL;
 	editor->focused_vfx_2d = S_HANDLE_NULL;
 	editor->focused_vfx_3d = S_HANDLE_NULL;
-	editor->focused_scene_2d = S_HANDLE_NULL;
-	editor->focused_scene_3d = S_HANDLE_NULL;
+	editor->mode = SE_EDITOR_MODE_NORMAL;
+	editor->shortcut_sequence_count = 0u;
+	se_editor_shortcut_repeat_clear(editor);
 	se_editor_refresh_defaults_internal(editor);
 }
 
@@ -4873,6 +5133,7 @@ void se_editor_set_window(se_editor* editor, se_window_handle window) {
 		return;
 	}
 	editor->window = window;
+	se_editor_shortcut_repeat_clear(editor);
 	se_editor_refresh_defaults_internal(editor);
 }
 
@@ -4998,202 +5259,39 @@ se_vfx_3d_handle se_editor_get_focused_vfx_3d(const se_editor* editor) {
 	return editor->focused_vfx_3d;
 }
 
-void se_editor_set_focused_scene_2d(se_editor* editor, se_scene_2d_handle scene) {
+void se_editor_set_custom_user_data(se_editor* editor, void* user_data) {
 	if (!editor) {
 		return;
 	}
-	editor->focused_scene_2d = scene;
-	se_editor_refresh_defaults_internal(editor);
+	editor->custom_user_data = user_data;
 }
 
-se_scene_2d_handle se_editor_get_focused_scene_2d(const se_editor* editor) {
-	if (!editor) {
-		return S_HANDLE_NULL;
-	}
-	return editor->focused_scene_2d;
-}
-
-void se_editor_set_focused_scene_3d(se_editor* editor, se_scene_3d_handle scene) {
-	if (!editor) {
-		return;
-	}
-	editor->focused_scene_3d = scene;
-	se_editor_refresh_defaults_internal(editor);
-}
-
-se_scene_3d_handle se_editor_get_focused_scene_3d(const se_editor* editor) {
-	if (!editor) {
-		return S_HANDLE_NULL;
-	}
-	return editor->focused_scene_3d;
-}
-
-void se_editor_set_scene_2d_json_path(se_editor* editor, const c8* path) {
-	if (!editor) {
-		return;
-	}
-	se_editor_copy_text(editor->scene_2d_json_path, sizeof(editor->scene_2d_json_path), path);
-	se_editor_set_default_json_paths(editor);
-}
-
-const c8* se_editor_get_scene_2d_json_path(const se_editor* editor) {
+void* se_editor_get_custom_user_data(const se_editor* editor) {
 	if (!editor) {
 		return NULL;
 	}
-	return editor->scene_2d_json_path;
+	return editor->custom_user_data;
 }
 
-void se_editor_set_scene_3d_json_path(se_editor* editor, const c8* path) {
+void se_editor_set_collect_custom_items(se_editor* editor, se_editor_collect_custom_items_fn fn) {
 	if (!editor) {
 		return;
 	}
-	se_editor_copy_text(editor->scene_3d_json_path, sizeof(editor->scene_3d_json_path), path);
-	se_editor_set_default_json_paths(editor);
+	editor->collect_custom_items = fn;
 }
 
-const c8* se_editor_get_scene_3d_json_path(const se_editor* editor) {
+void se_editor_set_collect_custom_properties(se_editor* editor, se_editor_collect_custom_properties_fn fn) {
 	if (!editor) {
-		return NULL;
+		return;
 	}
-	return editor->scene_3d_json_path;
+	editor->collect_custom_properties = fn;
 }
 
-b8 se_editor_scene_2d_json_save(se_editor* editor, se_scene_2d_handle scene, const c8* path) {
-	s_json* root = NULL;
-	(void)editor;
-	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	root = se_scene_2d_to_json(scene);
-	if (!root) {
-		return false;
-	}
-	if (!se_editor_json_write_file(path, root)) {
-		s_json_free(root);
-		return false;
-	}
-	s_json_free(root);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-b8 se_editor_scene_2d_json_load(se_editor* editor, se_scene_2d_handle scene, const c8* path) {
-	s_json* root = NULL;
-	(void)editor;
-	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	if (!se_editor_json_read_file(path, &root)) {
-		return false;
-	}
-	if (!se_scene_2d_from_json(scene, root)) {
-		s_json_free(root);
-		return false;
-	}
-	s_json_free(root);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-b8 se_editor_scene_3d_json_save(se_editor* editor, se_scene_3d_handle scene, const c8* path) {
-	s_json* root = NULL;
-	(void)editor;
-	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	root = se_scene_3d_to_json(scene);
-	if (!root) {
-		return false;
-	}
-	if (!se_editor_json_write_file(path, root)) {
-		s_json_free(root);
-		return false;
-	}
-	s_json_free(root);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-b8 se_editor_scene_3d_json_load(se_editor* editor, se_scene_3d_handle scene, const c8* path) {
-	s_json* root = NULL;
-	(void)editor;
-	if (scene == S_HANDLE_NULL || !path || path[0] == '\0') {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	if (!se_editor_json_read_file(path, &root)) {
-		return false;
-	}
-	if (!se_scene_3d_from_json(scene, root)) {
-		s_json_free(root);
-		return false;
-	}
-	s_json_free(root);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-b8 se_editor_scene_kit_json_save(
-	se_editor* editor,
-	const c8* scene_2d_path,
-	const c8* scene_3d_path
-) {
-	const c8* use_scene_2d_path = scene_2d_path;
-	const c8* use_scene_3d_path = scene_3d_path;
+void se_editor_set_apply_custom_command(se_editor* editor, se_editor_apply_custom_command_fn fn) {
 	if (!editor) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
+		return;
 	}
-	se_editor_set_default_json_paths(editor);
-	if (!use_scene_2d_path || use_scene_2d_path[0] == '\0') {
-		use_scene_2d_path = editor->scene_2d_json_path;
-	}
-	if (!use_scene_3d_path || use_scene_3d_path[0] == '\0') {
-		use_scene_3d_path = editor->scene_3d_json_path;
-	}
-	if (editor->focused_scene_2d != S_HANDLE_NULL &&
-		!se_editor_scene_2d_json_save(editor, editor->focused_scene_2d, use_scene_2d_path)) {
-		return false;
-	}
-	if (editor->focused_scene_3d != S_HANDLE_NULL &&
-		!se_editor_scene_3d_json_save(editor, editor->focused_scene_3d, use_scene_3d_path)) {
-		return false;
-	}
-	se_set_last_error(SE_RESULT_OK);
-	return true;
-}
-
-b8 se_editor_scene_kit_json_load(
-	se_editor* editor,
-	const c8* scene_2d_path,
-	const c8* scene_3d_path
-) {
-	const c8* use_scene_2d_path = scene_2d_path;
-	const c8* use_scene_3d_path = scene_3d_path;
-	if (!editor) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		return false;
-	}
-	se_editor_set_default_json_paths(editor);
-	if (!use_scene_2d_path || use_scene_2d_path[0] == '\0') {
-		use_scene_2d_path = editor->scene_2d_json_path;
-	}
-	if (!use_scene_3d_path || use_scene_3d_path[0] == '\0') {
-		use_scene_3d_path = editor->scene_3d_json_path;
-	}
-	if (editor->focused_scene_2d != S_HANDLE_NULL &&
-		!se_editor_scene_2d_json_load(editor, editor->focused_scene_2d, use_scene_2d_path)) {
-		return false;
-	}
-	if (editor->focused_scene_3d != S_HANDLE_NULL &&
-		!se_editor_scene_3d_json_load(editor, editor->focused_scene_3d, use_scene_3d_path)) {
-		return false;
-	}
-	se_set_last_error(SE_RESULT_OK);
-	return true;
+	editor->apply_custom_command = fn;
 }
 
 b8 se_editor_track_audio_clip(se_editor* editor, se_audio_clip* clip, const c8* label) {
@@ -5360,6 +5458,18 @@ b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts) {
 		out_counts->framebuffers = (u32)s_array_get_size(&context->framebuffers);
 		out_counts->render_buffers = (u32)s_array_get_size(&context->render_buffers);
 		out_counts->fonts = (u32)s_array_get_size(&context->fonts);
+	}
+	if (editor->collect_custom_items) {
+		se_editor_clear_runtime_arrays(editor);
+		if (!editor->collect_custom_items(editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_CUSTOM), editor->custom_user_data)) {
+			se_editor_clear_runtime_arrays(editor);
+			if (se_get_last_error() == SE_RESULT_OK) {
+				se_set_last_error(SE_RESULT_NOT_FOUND);
+			}
+			return false;
+		}
+		out_counts->custom_items = (u32)s_array_get_size(&editor->items);
+		se_editor_clear_runtime_arrays(editor);
 	}
 	se_set_last_error(SE_RESULT_OK);
 	return true;
@@ -5576,6 +5686,15 @@ b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_m
 		}
 	}
 
+	if (se_editor_mask_has(category_mask, SE_EDITOR_CATEGORY_CUSTOM) && editor->collect_custom_items) {
+		if (!editor->collect_custom_items(editor, category_mask, editor->custom_user_data)) {
+			if (se_get_last_error() == SE_RESULT_OK) {
+				se_set_last_error(SE_RESULT_NOT_FOUND);
+			}
+			return false;
+		}
+	}
+
 	*out_items = s_array_get_data(&editor->items);
 	*out_count = s_array_get_size(&editor->items);
 	se_set_last_error(SE_RESULT_OK);
@@ -5677,6 +5796,11 @@ b8 se_editor_collect_properties(se_editor* editor, const se_editor_item* item, c
 			break;
 		case SE_EDITOR_CATEGORY_PHYSICS_3D_BODY:
 			ok = se_editor_collect_physics_3d_body_properties(editor, item);
+			break;
+		case SE_EDITOR_CATEGORY_CUSTOM:
+			ok = editor->collect_custom_properties
+				? editor->collect_custom_properties(editor, item, editor->custom_user_data)
+				: false;
 			break;
 		case SE_EDITOR_CATEGORY_COUNT:
 		default:
@@ -5928,6 +6052,263 @@ b8 se_editor_find_property(const se_editor_property* properties, sz property_cou
 	return false;
 }
 
+void se_editor_set_mode(se_editor* editor, se_editor_mode mode) {
+	if (!editor || (u32)mode >= (u32)SE_EDITOR_MODE_COUNT) {
+		return;
+	}
+	editor->mode = mode;
+	editor->shortcut_sequence_count = 0u;
+	se_editor_shortcut_repeat_clear(editor);
+}
+
+se_editor_mode se_editor_get_mode(const se_editor* editor) {
+	if (!editor) {
+		return SE_EDITOR_MODE_NORMAL;
+	}
+	return editor->mode;
+}
+
+b8 se_editor_bind_shortcut(se_editor* editor, se_editor_mode mode, const se_key* keys, u32 key_count, u32 modifiers, const c8* action) {
+	se_editor_shortcut shortcut = {0};
+	if (!editor || (u32)mode >= (u32)SE_EDITOR_MODE_COUNT || !keys ||
+		key_count == 0u || key_count > SE_EDITOR_SHORTCUT_MAX_KEYS ||
+		!action || action[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	for (u32 i = 0u; i < key_count; ++i) {
+		if (!se_editor_shortcut_key_valid(keys[i])) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return false;
+		}
+		shortcut.keys[i] = keys[i];
+	}
+	shortcut.mode = mode;
+	shortcut.key_count = key_count;
+	shortcut.modifiers = modifiers;
+	se_editor_copy_text(shortcut.action, sizeof(shortcut.action), action);
+
+	for (sz i = 0u; i < s_array_get_size(&editor->shortcuts); ++i) {
+		const s_handle handle = s_array_handle(&editor->shortcuts, (u32)i);
+		se_editor_shortcut* existing = s_array_get(&editor->shortcuts, handle);
+		b8 same_keys = existing && existing->key_count == shortcut.key_count && existing->modifiers == shortcut.modifiers;
+		for (u32 key_index = 0u; same_keys && key_index < shortcut.key_count; ++key_index) {
+			if (existing->keys[key_index] != shortcut.keys[key_index]) {
+				same_keys = false;
+			}
+		}
+		if (existing && existing->mode == mode && strcmp(existing->action, shortcut.action) == 0 && same_keys) {
+			*existing = shortcut;
+			se_set_last_error(SE_RESULT_OK);
+			return true;
+		}
+	}
+	s_array_add(&editor->shortcuts, shortcut);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_bind_key(se_editor* editor, se_editor_mode mode, se_key key, u32 modifiers, const c8* action) {
+	return se_editor_bind_shortcut(editor, mode, &key, 1u, modifiers, action);
+}
+
+b8 se_editor_bind_shortcut_text(se_editor* editor, se_editor_mode mode, const c8* keys, const c8* action) {
+	se_key parsed_keys[SE_EDITOR_SHORTCUT_MAX_KEYS] = {0};
+	u32 key_count = 0u;
+	u32 modifiers = 0u;
+	sz index = 0u;
+	if (!editor || !keys || keys[0] == '\0' || !action || action[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	while (keys[index] != '\0') {
+		c8 token[SE_MAX_NAME_LENGTH] = {0};
+		sz token_index = 0u;
+		se_key key = SE_KEY_UNKNOWN;
+		u32 token_modifiers = 0u;
+		while (keys[index] == ' ' || keys[index] == '\t' || keys[index] == ',') {
+			index++;
+		}
+		if (keys[index] == '\0') {
+			break;
+		}
+		while (keys[index] != '\0' && keys[index] != ' ' && keys[index] != '\t' && keys[index] != ',') {
+			if (token_index + 1u >= sizeof(token)) {
+				se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+				return false;
+			}
+			token[token_index++] = keys[index++];
+		}
+		token[token_index] = '\0';
+		if (key_count >= SE_EDITOR_SHORTCUT_MAX_KEYS ||
+			!se_editor_shortcut_parse_token(token, &key, &token_modifiers)) {
+			se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+			return false;
+		}
+		parsed_keys[key_count++] = key;
+		modifiers |= token_modifiers;
+	}
+	return se_editor_bind_shortcut(editor, mode, parsed_keys, key_count, modifiers, action);
+}
+
+b8 se_editor_bind_default_shortcuts(se_editor* editor) {
+	se_key gg[2] = { SE_KEY_G, SE_KEY_G };
+	b8 ok = true;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_H, SE_EDITOR_SHORTCUT_MOD_NONE, "move_left") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_J, SE_EDITOR_SHORTCUT_MOD_NONE, "move_down") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_K, SE_EDITOR_SHORTCUT_MOD_NONE, "move_up") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_L, SE_EDITOR_SHORTCUT_MOD_NONE, "move_right") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_LEFT, SE_EDITOR_SHORTCUT_MOD_NONE, "move_left") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_DOWN, SE_EDITOR_SHORTCUT_MOD_NONE, "move_down") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_UP, SE_EDITOR_SHORTCUT_MOD_NONE, "move_up") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_RIGHT, SE_EDITOR_SHORTCUT_MOD_NONE, "move_right") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_TAB, SE_EDITOR_SHORTCUT_MOD_NONE, "next") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_TAB, SE_EDITOR_SHORTCUT_MOD_SHIFT, "previous") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_I, SE_EDITOR_SHORTCUT_MOD_NONE, "insert_mode") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_INSERT, SE_KEY_ESCAPE, SE_EDITOR_SHORTCUT_MOD_NONE, "normal_mode") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_SLASH, SE_EDITOR_SHORTCUT_MOD_NONE, "command_mode") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_COMMAND, SE_KEY_ESCAPE, SE_EDITOR_SHORTCUT_MOD_NONE, "normal_mode") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_S, SE_EDITOR_SHORTCUT_MOD_CONTROL, "save") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_O, SE_EDITOR_SHORTCUT_MOD_CONTROL, "load") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_Q, SE_EDITOR_SHORTCUT_MOD_CONTROL, "quit") && ok;
+	ok = se_editor_bind_shortcut(editor, SE_EDITOR_MODE_NORMAL, gg, 2u, SE_EDITOR_SHORTCUT_MOD_NONE, "first") && ok;
+	ok = se_editor_bind_key(editor, SE_EDITOR_MODE_NORMAL, SE_KEY_G, SE_EDITOR_SHORTCUT_MOD_SHIFT, "last") && ok;
+	ok = se_editor_set_shortcut_repeat(editor, "move_left", true) && ok;
+	ok = se_editor_set_shortcut_repeat(editor, "move_down", true) && ok;
+	ok = se_editor_set_shortcut_repeat(editor, "move_up", true) && ok;
+	ok = se_editor_set_shortcut_repeat(editor, "move_right", true) && ok;
+	if (!ok && se_get_last_error() == SE_RESULT_OK) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+	}
+	return ok;
+}
+
+b8 se_editor_set_shortcut_repeat(se_editor* editor, const c8* action, b8 repeat) {
+	b8 changed = false;
+	if (!editor || !action || action[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	for (sz i = 0u; i < s_array_get_size(&editor->shortcuts); ++i) {
+		const s_handle handle = s_array_handle(&editor->shortcuts, (u32)i);
+		se_editor_shortcut* shortcut = s_array_get(&editor->shortcuts, handle);
+		if (shortcut && strcmp(shortcut->action, action) == 0) {
+			shortcut->repeat = repeat;
+			if (!repeat && se_editor_shortcut_repeat_matches(editor, shortcut)) {
+				se_editor_shortcut_repeat_clear(editor);
+			}
+			changed = true;
+		}
+	}
+	se_set_last_error(changed ? SE_RESULT_OK : SE_RESULT_NOT_FOUND);
+	return changed;
+}
+
+b8 se_editor_unbind_shortcut(se_editor* editor, const c8* action) {
+	b8 removed = false;
+	if (!editor || !action || action[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	for (sz i = s_array_get_size(&editor->shortcuts); i-- > 0u;) {
+		const s_handle handle = s_array_handle(&editor->shortcuts, (u32)i);
+		se_editor_shortcut* shortcut = s_array_get(&editor->shortcuts, handle);
+		if (shortcut && strcmp(shortcut->action, action) == 0) {
+			if (se_editor_shortcut_repeat_matches(editor, shortcut)) {
+				se_editor_shortcut_repeat_clear(editor);
+			}
+			s_array_remove(&editor->shortcuts, handle);
+			removed = true;
+		}
+	}
+	se_set_last_error(removed ? SE_RESULT_OK : SE_RESULT_NOT_FOUND);
+	return removed;
+}
+
+void se_editor_clear_shortcuts(se_editor* editor) {
+	if (!editor) {
+		return;
+	}
+	SE_EDITOR_ARRAY_POP_ALL(&editor->shortcuts);
+	editor->shortcut_sequence_count = 0u;
+	se_editor_shortcut_repeat_clear(editor);
+}
+
+b8 se_editor_get_shortcuts(const se_editor* editor, const se_editor_shortcut** out_shortcuts, sz* out_count) {
+	if (!editor || !out_shortcuts || !out_count) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_shortcuts = s_array_get_data((se_editor_shortcuts*)&editor->shortcuts);
+	*out_count = s_array_get_size(&editor->shortcuts);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_update_shortcuts(se_editor* editor) {
+	se_key pressed = SE_KEY_UNKNOWN;
+	if (!editor || editor->window == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_editor_shortcut_events_clear(editor);
+	for (sz i = 0u; i < s_array_get_size(&editor->shortcuts); ++i) {
+		const s_handle handle = s_array_handle(&editor->shortcuts, (u32)i);
+		const se_editor_shortcut* shortcut = s_array_get(&editor->shortcuts, handle);
+		if (!shortcut || shortcut->mode != editor->mode || shortcut->key_count != 1u) {
+			continue;
+		}
+		if (!se_editor_shortcut_modifiers_down(editor->window, shortcut->modifiers)) {
+			continue;
+		}
+		if (shortcut->repeat
+			? se_editor_shortcut_repeat_ready(editor, shortcut)
+			: se_window_is_key_pressed(editor->window, shortcut->keys[0])) {
+			se_editor_shortcut_add_event(editor, shortcut->action);
+		}
+	}
+	pressed = se_editor_shortcut_pressed_key(editor->window);
+	if (pressed != SE_KEY_UNKNOWN) {
+		se_editor_shortcut_sequence_push(editor, pressed);
+		if (!se_editor_shortcut_process_sequence(editor)) {
+			editor->shortcut_sequence[0] = pressed;
+			editor->shortcut_sequence_count = 1u;
+			if (!se_editor_shortcut_process_sequence(editor)) {
+				editor->shortcut_sequence_count = 0u;
+			}
+		}
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_editor_poll_shortcut(se_editor* editor, se_editor_shortcut_event* out_event) {
+	s_handle handle = S_HANDLE_NULL;
+	se_editor_shortcut_event* event = NULL;
+	if (!editor || !out_event) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (s_array_get_size(&editor->shortcut_events) == 0u) {
+		se_set_last_error(SE_RESULT_OK);
+		return false;
+	}
+	handle = s_array_handle(&editor->shortcut_events, 0u);
+	event = s_array_get(&editor->shortcut_events, handle);
+	if (!event) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	*out_event = *event;
+	s_array_remove_ordered(&editor->shortcut_events, handle);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+void se_editor_clear_shortcut_events(se_editor* editor) {
+	se_editor_shortcut_events_clear(editor);
+}
+
 b8 se_editor_apply_command(se_editor* editor, const se_editor_command* command) {
 	b8 ok = false;
 	if (!editor || !command || command->name[0] == '\0') {
@@ -6026,6 +6407,11 @@ b8 se_editor_apply_command(se_editor* editor, const se_editor_command* command) 
 			break;
 		case SE_EDITOR_CATEGORY_PHYSICS_3D_BODY:
 			ok = se_editor_apply_physics_3d_body_command(editor, command);
+			break;
+		case SE_EDITOR_CATEGORY_CUSTOM:
+			ok = editor->apply_custom_command
+				? editor->apply_custom_command(editor, command, editor->custom_user_data)
+				: false;
 			break;
 		case SE_EDITOR_CATEGORY_COUNT:
 		default:

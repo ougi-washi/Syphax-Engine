@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 typedef struct se_editor se_editor;
+typedef struct s_json s_json;
 
 typedef enum {
 	SE_EDITOR_CATEGORY_BACKEND = 0,
@@ -49,12 +50,14 @@ typedef enum {
 	SE_EDITOR_CATEGORY_PHYSICS_2D_BODY,
 	SE_EDITOR_CATEGORY_PHYSICS_3D,
 	SE_EDITOR_CATEGORY_PHYSICS_3D_BODY,
+	SE_EDITOR_CATEGORY_CUSTOM,
 	SE_EDITOR_CATEGORY_COUNT
 } se_editor_category;
 
 typedef u64 se_editor_category_mask;
 
 #define SE_EDITOR_CATEGORY_MASK_ALL ((se_editor_category_mask)~(se_editor_category_mask)0)
+#define SE_EDITOR_SHORTCUT_MAX_KEYS 4u
 
 static inline se_editor_category_mask se_editor_category_to_mask(const se_editor_category category) {
 	if ((u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT || (u32)category >= 64u) {
@@ -123,6 +126,21 @@ typedef enum {
 	SE_EDITOR_COMMAND_ACTION
 } se_editor_command_type;
 
+typedef enum {
+	SE_EDITOR_MODE_NORMAL = 0,
+	SE_EDITOR_MODE_INSERT,
+	SE_EDITOR_MODE_COMMAND,
+	SE_EDITOR_MODE_COUNT
+} se_editor_mode;
+
+typedef enum {
+	SE_EDITOR_SHORTCUT_MOD_NONE = 0,
+	SE_EDITOR_SHORTCUT_MOD_SHIFT = 1u << 0,
+	SE_EDITOR_SHORTCUT_MOD_CONTROL = 1u << 1,
+	SE_EDITOR_SHORTCUT_MOD_ALT = 1u << 2,
+	SE_EDITOR_SHORTCUT_MOD_SUPER = 1u << 3
+} se_editor_shortcut_mod;
+
 typedef struct {
 	se_editor_command_type type;
 	se_editor_item item;
@@ -130,6 +148,24 @@ typedef struct {
 	se_editor_value value;
 	se_editor_value aux_value;
 } se_editor_command;
+
+typedef struct {
+	se_editor_mode mode;
+	se_key keys[SE_EDITOR_SHORTCUT_MAX_KEYS];
+	u32 key_count;
+	u32 modifiers;
+	b8 repeat : 1;
+	c8 action[SE_MAX_NAME_LENGTH];
+} se_editor_shortcut;
+
+typedef struct {
+	se_editor_mode mode;
+	c8 action[SE_MAX_NAME_LENGTH];
+} se_editor_shortcut_event;
+
+typedef b8 (*se_editor_collect_custom_items_fn)(se_editor* editor, se_editor_category_mask category_mask, void* user_data);
+typedef b8 (*se_editor_collect_custom_properties_fn)(se_editor* editor, const se_editor_item* item, void* user_data);
+typedef b8 (*se_editor_apply_custom_command_fn)(se_editor* editor, const se_editor_command* command, void* user_data);
 
 typedef struct {
 	se_context* context;
@@ -142,10 +178,10 @@ typedef struct {
 	se_simulation_handle focused_simulation;
 	se_vfx_2d_handle focused_vfx_2d;
 	se_vfx_3d_handle focused_vfx_3d;
-	se_scene_2d_handle focused_scene_2d;
-	se_scene_3d_handle focused_scene_3d;
-	const c8* scene_2d_json_path;
-	const c8* scene_3d_json_path;
+	void* custom_user_data;
+	se_editor_collect_custom_items_fn collect_custom_items;
+	se_editor_collect_custom_properties_fn collect_custom_properties;
+	se_editor_apply_custom_command_fn apply_custom_command;
 } se_editor_config;
 
 #define SE_EDITOR_CONFIG_DEFAULTS ((se_editor_config){ \
@@ -159,10 +195,10 @@ typedef struct {
 	.focused_simulation = S_HANDLE_NULL, \
 	.focused_vfx_2d = S_HANDLE_NULL, \
 	.focused_vfx_3d = S_HANDLE_NULL, \
-	.focused_scene_2d = S_HANDLE_NULL, \
-	.focused_scene_3d = S_HANDLE_NULL, \
-	.scene_2d_json_path = NULL, \
-	.scene_3d_json_path = NULL \
+	.custom_user_data = NULL, \
+	.collect_custom_items = NULL, \
+	.collect_custom_properties = NULL, \
+	.apply_custom_command = NULL \
 })
 
 typedef struct {
@@ -189,6 +225,7 @@ typedef struct {
 	u32 audio_captures;
 	u32 physics_2d_bodies;
 	u32 physics_3d_bodies;
+	u32 custom_items;
 	u32 queued_commands;
 } se_editor_counts;
 
@@ -224,6 +261,7 @@ extern const c8* se_editor_category_name(se_editor_category category);
 /* Accepts case-insensitive names and ignores separators such as '_', '-', and spaces. */
 extern se_editor_category se_editor_category_from_name(const c8* name);
 extern const c8* se_editor_value_type_name(se_editor_value_type type);
+extern const c8* se_editor_mode_name(se_editor_mode mode);
 
 extern se_editor_value se_editor_value_none(void);
 extern se_editor_value se_editor_value_bool(b8 value);
@@ -240,6 +278,19 @@ extern se_editor_value se_editor_value_mat4(s_mat4 value);
 extern se_editor_value se_editor_value_handle(s_handle value);
 extern se_editor_value se_editor_value_pointer(void* value);
 extern se_editor_value se_editor_value_text(const c8* value);
+extern b8 se_editor_value_as_bool(const se_editor_value* value, b8* out_value);
+extern b8 se_editor_value_as_i32(const se_editor_value* value, i32* out_value);
+extern b8 se_editor_value_as_u32(const se_editor_value* value, u32* out_value);
+extern b8 se_editor_value_as_u64(const se_editor_value* value, u64* out_value);
+extern b8 se_editor_value_as_f32(const se_editor_value* value, f32* out_value);
+extern b8 se_editor_value_as_f64(const se_editor_value* value, f64* out_value);
+extern b8 se_editor_value_as_handle(const se_editor_value* value, s_handle* out_value);
+extern b8 se_editor_value_as_vec2(const se_editor_value* value, s_vec2* out_value);
+extern b8 se_editor_value_as_vec3(const se_editor_value* value, s_vec3* out_value);
+extern b8 se_editor_value_as_vec4(const se_editor_value* value, s_vec4* out_value);
+extern b8 se_editor_value_as_mat3(const se_editor_value* value, s_mat3* out_value);
+extern b8 se_editor_value_as_mat4(const se_editor_value* value, s_mat4* out_value);
+extern const c8* se_editor_value_as_text(const se_editor_value* value);
 
 extern se_editor_command se_editor_command_make(se_editor_command_type type, const se_editor_item* item, const c8* name, const se_editor_value* value, const se_editor_value* aux_value);
 extern se_editor_command se_editor_command_make_set(const se_editor_item* item, const c8* name, const se_editor_value* value);
@@ -281,30 +332,14 @@ extern se_vfx_2d_handle se_editor_get_focused_vfx_2d(const se_editor* editor);
 extern void se_editor_set_focused_vfx_3d(se_editor* editor, se_vfx_3d_handle vfx);
 extern se_vfx_3d_handle se_editor_get_focused_vfx_3d(const se_editor* editor);
 
-extern void se_editor_set_focused_scene_2d(se_editor* editor, se_scene_2d_handle scene);
-extern se_scene_2d_handle se_editor_get_focused_scene_2d(const se_editor* editor);
-extern void se_editor_set_focused_scene_3d(se_editor* editor, se_scene_3d_handle scene);
-extern se_scene_3d_handle se_editor_get_focused_scene_3d(const se_editor* editor);
+extern void se_editor_set_custom_user_data(se_editor* editor, void* user_data);
+extern void* se_editor_get_custom_user_data(const se_editor* editor);
+extern void se_editor_set_collect_custom_items(se_editor* editor, se_editor_collect_custom_items_fn fn);
+extern void se_editor_set_collect_custom_properties(se_editor* editor, se_editor_collect_custom_properties_fn fn);
+extern void se_editor_set_apply_custom_command(se_editor* editor, se_editor_apply_custom_command_fn fn);
 
-extern void se_editor_set_scene_2d_json_path(se_editor* editor, const c8* path);
-extern const c8* se_editor_get_scene_2d_json_path(const se_editor* editor);
-extern void se_editor_set_scene_3d_json_path(se_editor* editor, const c8* path);
-extern const c8* se_editor_get_scene_3d_json_path(const se_editor* editor);
-
-extern b8 se_editor_scene_2d_json_save(se_editor* editor, se_scene_2d_handle scene, const c8* path);
-extern b8 se_editor_scene_2d_json_load(se_editor* editor, se_scene_2d_handle scene, const c8* path);
-extern b8 se_editor_scene_3d_json_save(se_editor* editor, se_scene_3d_handle scene, const c8* path);
-extern b8 se_editor_scene_3d_json_load(se_editor* editor, se_scene_3d_handle scene, const c8* path);
-extern b8 se_editor_scene_kit_json_save(
-	se_editor* editor,
-	const c8* scene_2d_path,
-	const c8* scene_3d_path
-);
-extern b8 se_editor_scene_kit_json_load(
-	se_editor* editor,
-	const c8* scene_2d_path,
-	const c8* scene_3d_path
-);
+extern b8 se_editor_json_write_file(const c8* path, s_json* root);
+extern b8 se_editor_json_read_file(const c8* path, s_json** out_root);
 
 extern b8 se_editor_track_audio_clip(se_editor* editor, se_audio_clip* clip, const c8* label);
 extern b8 se_editor_untrack_audio_clip(se_editor* editor, se_audio_clip* clip);
@@ -317,10 +352,26 @@ extern b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_coun
 extern b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_mask, const se_editor_item** out_items, sz* out_count);
 extern b8 se_editor_collect_properties(se_editor* editor, const se_editor_item* item, const se_editor_property** out_properties, sz* out_count);
 extern b8 se_editor_collect_diagnostics(se_editor* editor, se_editor_diagnostics* out_diagnostics);
+extern b8 se_editor_add_item(se_editor* editor, se_editor_category category, s_handle handle, s_handle owner_handle, void* pointer, void* owner_pointer, u32 index, const c8* label);
+extern b8 se_editor_add_property_value(se_editor* editor, const c8* name, const se_editor_value* value, b8 editable);
 extern b8 se_editor_validate_item(se_editor* editor, const se_editor_item* item);
 extern b8 se_editor_find_item(se_editor* editor, se_editor_category category, s_handle handle, se_editor_item* out_item);
 extern b8 se_editor_find_item_by_label(se_editor* editor, se_editor_category category, const c8* label, se_editor_item* out_item);
 extern b8 se_editor_find_property(const se_editor_property* properties, sz property_count, const c8* name, const se_editor_property** out_property);
+
+extern void se_editor_set_mode(se_editor* editor, se_editor_mode mode);
+extern se_editor_mode se_editor_get_mode(const se_editor* editor);
+extern b8 se_editor_bind_shortcut(se_editor* editor, se_editor_mode mode, const se_key* keys, u32 key_count, u32 modifiers, const c8* action);
+extern b8 se_editor_bind_key(se_editor* editor, se_editor_mode mode, se_key key, u32 modifiers, const c8* action);
+extern b8 se_editor_bind_shortcut_text(se_editor* editor, se_editor_mode mode, const c8* keys, const c8* action);
+extern b8 se_editor_bind_default_shortcuts(se_editor* editor);
+extern b8 se_editor_set_shortcut_repeat(se_editor* editor, const c8* action, b8 repeat);
+extern b8 se_editor_unbind_shortcut(se_editor* editor, const c8* action);
+extern void se_editor_clear_shortcuts(se_editor* editor);
+extern b8 se_editor_get_shortcuts(const se_editor* editor, const se_editor_shortcut** out_shortcuts, sz* out_count);
+extern b8 se_editor_update_shortcuts(se_editor* editor);
+extern b8 se_editor_poll_shortcut(se_editor* editor, se_editor_shortcut_event* out_event);
+extern void se_editor_clear_shortcut_events(se_editor* editor);
 
 extern b8 se_editor_apply_command(se_editor* editor, const se_editor_command* command);
 extern b8 se_editor_apply_commands(se_editor* editor, const se_editor_command* commands, sz command_count, u32* out_applied);

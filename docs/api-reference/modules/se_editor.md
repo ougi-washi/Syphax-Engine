@@ -15,6 +15,30 @@ This page is generated from `include/se_editor.h` and is deterministic.
 
 ## Functions
 
+### `se_editor_add_item`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_add_item(se_editor* editor, se_editor_category category, s_handle handle, s_handle owner_handle, void* pointer, void* owner_pointer, u32 index, const c8* label);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_add_property_value`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_add_property_value(se_editor* editor, const c8* name, const se_editor_value* value, b8 editable);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_apply_action`
 
 <div class="api-signature">
@@ -87,6 +111,54 @@ extern b8 se_editor_apply_toggle(se_editor* editor, const se_editor_item* item, 
 
 No inline description found in header comments.
 
+### `se_editor_bind_default_shortcuts`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_bind_default_shortcuts(se_editor* editor);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_bind_key`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_bind_key(se_editor* editor, se_editor_mode mode, se_key key, u32 modifiers, const c8* action);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_bind_shortcut`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_bind_shortcut(se_editor* editor, se_editor_mode mode, const se_key* keys, u32 key_count, u32 modifiers, const c8* action);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_bind_shortcut_text`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_bind_shortcut_text(se_editor* editor, se_editor_mode mode, const c8* keys, const c8* action);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_category_from_name`
 
 <div class="api-signature">
@@ -117,6 +189,30 @@ No inline description found in header comments.
 
 ```c
 extern void se_editor_clear_queue(se_editor* editor);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_clear_shortcut_events`
+
+<div class="api-signature">
+
+```c
+extern void se_editor_clear_shortcut_events(se_editor* editor);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_clear_shortcuts`
+
+<div class="api-signature">
+
+```c
+extern void se_editor_clear_shortcuts(se_editor* editor);
 ```
 
 </div>
@@ -303,24 +399,12 @@ extern se_context* se_editor_get_context(const se_editor* editor);
 
 No inline description found in header comments.
 
-### `se_editor_get_focused_scene_2d`
+### `se_editor_get_custom_user_data`
 
 <div class="api-signature">
 
 ```c
-extern se_scene_2d_handle se_editor_get_focused_scene_2d(const se_editor* editor);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_get_focused_scene_3d`
-
-<div class="api-signature">
-
-```c
-extern se_scene_3d_handle se_editor_get_focused_scene_3d(const se_editor* editor);
+extern void* se_editor_get_custom_user_data(const se_editor* editor);
 ```
 
 </div>
@@ -375,6 +459,18 @@ extern se_input_handle* se_editor_get_input(const se_editor* editor);
 
 No inline description found in header comments.
 
+### `se_editor_get_mode`
+
+<div class="api-signature">
+
+```c
+extern se_editor_mode se_editor_get_mode(const se_editor* editor);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_get_navigation`
 
 <div class="api-signature">
@@ -423,24 +519,12 @@ extern b8 se_editor_get_queue(const se_editor* editor, const se_editor_command**
 
 No inline description found in header comments.
 
-### `se_editor_get_scene_2d_json_path`
+### `se_editor_get_shortcuts`
 
 <div class="api-signature">
 
 ```c
-extern const c8* se_editor_get_scene_2d_json_path(const se_editor* editor);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_get_scene_3d_json_path`
-
-<div class="api-signature">
-
-```c
-extern const c8* se_editor_get_scene_3d_json_path(const se_editor* editor);
+extern b8 se_editor_get_shortcuts(const se_editor* editor, const se_editor_shortcut** out_shortcuts, sz* out_count);
 ```
 
 </div>
@@ -453,6 +537,54 @@ No inline description found in header comments.
 
 ```c
 extern se_window_handle se_editor_get_window(const se_editor* editor);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_json_read_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_json_read_file(const c8* path, s_json** out_root);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_json_write_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_json_write_file(const c8* path, s_json* root);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_mode_name`
+
+<div class="api-signature">
+
+```c
+extern const c8* se_editor_mode_name(se_editor_mode mode);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_poll_shortcut`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_poll_shortcut(se_editor* editor, se_editor_shortcut_event* out_event);
 ```
 
 </div>
@@ -495,72 +627,12 @@ extern void se_editor_reset(se_editor* editor);
 
 No inline description found in header comments.
 
-### `se_editor_scene_2d_json_load`
+### `se_editor_set_apply_custom_command`
 
 <div class="api-signature">
 
 ```c
-extern b8 se_editor_scene_2d_json_load(se_editor* editor, se_scene_2d_handle scene, const c8* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_scene_2d_json_save`
-
-<div class="api-signature">
-
-```c
-extern b8 se_editor_scene_2d_json_save(se_editor* editor, se_scene_2d_handle scene, const c8* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_scene_3d_json_load`
-
-<div class="api-signature">
-
-```c
-extern b8 se_editor_scene_3d_json_load(se_editor* editor, se_scene_3d_handle scene, const c8* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_scene_3d_json_save`
-
-<div class="api-signature">
-
-```c
-extern b8 se_editor_scene_3d_json_save(se_editor* editor, se_scene_3d_handle scene, const c8* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_scene_kit_json_load`
-
-<div class="api-signature">
-
-```c
-extern b8 se_editor_scene_kit_json_load( se_editor* editor, const c8* scene_2d_path, const c8* scene_3d_path );
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_scene_kit_json_save`
-
-<div class="api-signature">
-
-```c
-extern b8 se_editor_scene_kit_json_save( se_editor* editor, const c8* scene_2d_path, const c8* scene_3d_path );
+extern void se_editor_set_apply_custom_command(se_editor* editor, se_editor_apply_custom_command_fn fn);
 ```
 
 </div>
@@ -579,6 +651,30 @@ extern void se_editor_set_audio_engine(se_editor* editor, se_audio_engine* audio
 
 No inline description found in header comments.
 
+### `se_editor_set_collect_custom_items`
+
+<div class="api-signature">
+
+```c
+extern void se_editor_set_collect_custom_items(se_editor* editor, se_editor_collect_custom_items_fn fn);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_set_collect_custom_properties`
+
+<div class="api-signature">
+
+```c
+extern void se_editor_set_collect_custom_properties(se_editor* editor, se_editor_collect_custom_properties_fn fn);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_set_context`
 
 <div class="api-signature">
@@ -591,24 +687,12 @@ extern void se_editor_set_context(se_editor* editor, se_context* context);
 
 No inline description found in header comments.
 
-### `se_editor_set_focused_scene_2d`
+### `se_editor_set_custom_user_data`
 
 <div class="api-signature">
 
 ```c
-extern void se_editor_set_focused_scene_2d(se_editor* editor, se_scene_2d_handle scene);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_set_focused_scene_3d`
-
-<div class="api-signature">
-
-```c
-extern void se_editor_set_focused_scene_3d(se_editor* editor, se_scene_3d_handle scene);
+extern void se_editor_set_custom_user_data(se_editor* editor, void* user_data);
 ```
 
 </div>
@@ -663,6 +747,18 @@ extern void se_editor_set_input(se_editor* editor, se_input_handle* input);
 
 No inline description found in header comments.
 
+### `se_editor_set_mode`
+
+<div class="api-signature">
+
+```c
+extern void se_editor_set_mode(se_editor* editor, se_editor_mode mode);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_set_navigation`
 
 <div class="api-signature">
@@ -699,24 +795,12 @@ extern void se_editor_set_physics_3d(se_editor* editor, se_physics_world_3d_hand
 
 No inline description found in header comments.
 
-### `se_editor_set_scene_2d_json_path`
+### `se_editor_set_shortcut_repeat`
 
 <div class="api-signature">
 
 ```c
-extern void se_editor_set_scene_2d_json_path(se_editor* editor, const c8* path);
-```
-
-</div>
-
-No inline description found in header comments.
-
-### `se_editor_set_scene_3d_json_path`
-
-<div class="api-signature">
-
-```c
-extern void se_editor_set_scene_3d_json_path(se_editor* editor, const c8* path);
+extern b8 se_editor_set_shortcut_repeat(se_editor* editor, const c8* action, b8 repeat);
 ```
 
 </div>
@@ -771,6 +855,18 @@ extern b8 se_editor_track_audio_stream(se_editor* editor, se_audio_stream* strea
 
 No inline description found in header comments.
 
+### `se_editor_unbind_shortcut`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_unbind_shortcut(se_editor* editor, const c8* action);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_untrack_audio_capture`
 
 <div class="api-signature">
@@ -807,12 +903,180 @@ extern b8 se_editor_untrack_audio_stream(se_editor* editor, se_audio_stream* str
 
 No inline description found in header comments.
 
+### `se_editor_update_shortcuts`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_update_shortcuts(se_editor* editor);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_validate_item`
 
 <div class="api-signature">
 
 ```c
 extern b8 se_editor_validate_item(se_editor* editor, const se_editor_item* item);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_bool`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_bool(const se_editor_value* value, b8* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_f32`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_f32(const se_editor_value* value, f32* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_f64`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_f64(const se_editor_value* value, f64* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_handle`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_handle(const se_editor_value* value, s_handle* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_i32`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_i32(const se_editor_value* value, i32* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_mat3`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_mat3(const se_editor_value* value, s_mat3* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_mat4`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_mat4(const se_editor_value* value, s_mat4* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_text`
+
+<div class="api-signature">
+
+```c
+extern const c8* se_editor_value_as_text(const se_editor_value* value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_u32`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_u32(const se_editor_value* value, u32* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_u64`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_u64(const se_editor_value* value, u64* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_vec2`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_vec2(const se_editor_value* value, s_vec2* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_vec3`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_vec3(const se_editor_value* value, s_vec3* out_value);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_as_vec4`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_as_vec4(const se_editor_value* value, s_vec4* out_value);
 ```
 
 </div>
@@ -1018,7 +1282,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef enum { SE_EDITOR_CATEGORY_BACKEND = 0, SE_EDITOR_CATEGORY_DEBUG, SE_EDITOR_CATEGORY_WINDOW, SE_EDITOR_CATEGORY_INPUT, SE_EDITOR_CATEGORY_CAMERA, SE_EDITOR_CATEGORY_SCENE_2D, SE_EDITOR_CATEGORY_OBJECT_2D, SE_EDITOR_CATEGORY_SCENE_3D, SE_EDITOR_CATEGORY_OBJECT_3D, SE_EDITOR_CATEGORY_UI, SE_EDITOR_CATEGORY_UI_WIDGET, SE_EDITOR_CATEGORY_VFX_2D, SE_EDITOR_CATEGORY_VFX_3D, SE_EDITOR_CATEGORY_SIMULATION, SE_EDITOR_CATEGORY_MODEL, SE_EDITOR_CATEGORY_SHADER, SE_EDITOR_CATEGORY_TEXTURE, SE_EDITOR_CATEGORY_FRAMEBUFFER, SE_EDITOR_CATEGORY_RENDER_BUFFER, SE_EDITOR_CATEGORY_FONT, SE_EDITOR_CATEGORY_AUDIO, SE_EDITOR_CATEGORY_AUDIO_CLIP, SE_EDITOR_CATEGORY_AUDIO_STREAM, SE_EDITOR_CATEGORY_AUDIO_CAPTURE, SE_EDITOR_CATEGORY_NAVIGATION, SE_EDITOR_CATEGORY_PHYSICS_2D, SE_EDITOR_CATEGORY_PHYSICS_2D_BODY, SE_EDITOR_CATEGORY_PHYSICS_3D, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, SE_EDITOR_CATEGORY_COUNT } se_editor_category;
+typedef enum { SE_EDITOR_CATEGORY_BACKEND = 0, SE_EDITOR_CATEGORY_DEBUG, SE_EDITOR_CATEGORY_WINDOW, SE_EDITOR_CATEGORY_INPUT, SE_EDITOR_CATEGORY_CAMERA, SE_EDITOR_CATEGORY_SCENE_2D, SE_EDITOR_CATEGORY_OBJECT_2D, SE_EDITOR_CATEGORY_SCENE_3D, SE_EDITOR_CATEGORY_OBJECT_3D, SE_EDITOR_CATEGORY_UI, SE_EDITOR_CATEGORY_UI_WIDGET, SE_EDITOR_CATEGORY_VFX_2D, SE_EDITOR_CATEGORY_VFX_3D, SE_EDITOR_CATEGORY_SIMULATION, SE_EDITOR_CATEGORY_MODEL, SE_EDITOR_CATEGORY_SHADER, SE_EDITOR_CATEGORY_TEXTURE, SE_EDITOR_CATEGORY_FRAMEBUFFER, SE_EDITOR_CATEGORY_RENDER_BUFFER, SE_EDITOR_CATEGORY_FONT, SE_EDITOR_CATEGORY_AUDIO, SE_EDITOR_CATEGORY_AUDIO_CLIP, SE_EDITOR_CATEGORY_AUDIO_STREAM, SE_EDITOR_CATEGORY_AUDIO_CAPTURE, SE_EDITOR_CATEGORY_NAVIGATION, SE_EDITOR_CATEGORY_PHYSICS_2D, SE_EDITOR_CATEGORY_PHYSICS_2D_BODY, SE_EDITOR_CATEGORY_PHYSICS_3D, SE_EDITOR_CATEGORY_PHYSICS_3D_BODY, SE_EDITOR_CATEGORY_CUSTOM, SE_EDITOR_CATEGORY_COUNT } se_editor_category;
 ```
 
 </div>
@@ -1037,7 +1301,43 @@ typedef enum { SE_EDITOR_COMMAND_SET = 0, SE_EDITOR_COMMAND_TOGGLE, SE_EDITOR_CO
 
 No inline description found in header comments.
 
+### `se_editor_mode`
+
+<div class="api-signature">
+
+```c
+typedef enum { SE_EDITOR_MODE_NORMAL = 0, SE_EDITOR_MODE_INSERT, SE_EDITOR_MODE_COMMAND, SE_EDITOR_MODE_COUNT } se_editor_mode;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_shortcut_mod`
+
+<div class="api-signature">
+
+```c
+typedef enum { SE_EDITOR_SHORTCUT_MOD_NONE = 0, SE_EDITOR_SHORTCUT_MOD_SHIFT = 1u << 0, SE_EDITOR_SHORTCUT_MOD_CONTROL = 1u << 1, SE_EDITOR_SHORTCUT_MOD_ALT = 1u << 2, SE_EDITOR_SHORTCUT_MOD_SUPER = 1u << 3 } se_editor_shortcut_mod;
+```
+
+</div>
+
+No inline description found in header comments.
+
 ## Typedefs
+
+### `s_json`
+
+<div class="api-signature">
+
+```c
+typedef struct s_json s_json;
+```
+
+</div>
+
+No inline description found in header comments.
 
 ### `se_editor`
 
@@ -1051,12 +1351,48 @@ typedef struct se_editor se_editor;
 
 No inline description found in header comments.
 
+### `se_editor_apply_custom_command_fn`
+
+<div class="api-signature">
+
+```c
+typedef b8 (*se_editor_apply_custom_command_fn)(se_editor* editor, const se_editor_command* command, void* user_data);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_category_mask`
 
 <div class="api-signature">
 
 ```c
 typedef u64 se_editor_category_mask;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_collect_custom_items_fn`
+
+<div class="api-signature">
+
+```c
+typedef b8 (*se_editor_collect_custom_items_fn)(se_editor* editor, se_editor_category_mask category_mask, void* user_data);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_collect_custom_properties_fn`
+
+<div class="api-signature">
+
+```c
+typedef b8 (*se_editor_collect_custom_properties_fn)(se_editor* editor, const se_editor_item* item, void* user_data);
 ```
 
 </div>
@@ -1080,7 +1416,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { se_context* context; se_window_handle window; se_input_handle* input; se_audio_engine* audio; se_navigation_grid* navigation; se_physics_world_2d_handle physics_2d; se_physics_world_3d_handle physics_3d; se_simulation_handle focused_simulation; se_vfx_2d_handle focused_vfx_2d; se_vfx_3d_handle focused_vfx_3d; se_scene_2d_handle focused_scene_2d; se_scene_3d_handle focused_scene_3d; const c8* scene_2d_json_path; const c8* scene_3d_json_path; } se_editor_config;
+typedef struct { se_context* context; se_window_handle window; se_input_handle* input; se_audio_engine* audio; se_navigation_grid* navigation; se_physics_world_2d_handle physics_2d; se_physics_world_3d_handle physics_3d; se_simulation_handle focused_simulation; se_vfx_2d_handle focused_vfx_2d; se_vfx_3d_handle focused_vfx_3d; void* custom_user_data; se_editor_collect_custom_items_fn collect_custom_items; se_editor_collect_custom_properties_fn collect_custom_properties; se_editor_apply_custom_command_fn apply_custom_command; } se_editor_config;
 ```
 
 </div>
@@ -1092,7 +1428,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { u32 windows; u32 inputs; u32 cameras; u32 scenes_2d; u32 objects_2d; u32 scenes_3d; u32 objects_3d; u32 uis; u32 ui_widgets; u32 vfx_2d; u32 vfx_3d; u32 simulations; u32 models; u32 shaders; u32 textures; u32 framebuffers; u32 render_buffers; u32 fonts; u32 audio_clips; u32 audio_streams; u32 audio_captures; u32 physics_2d_bodies; u32 physics_3d_bodies; u32 queued_commands; } se_editor_counts;
+typedef struct { u32 windows; u32 inputs; u32 cameras; u32 scenes_2d; u32 objects_2d; u32 scenes_3d; u32 objects_3d; u32 uis; u32 ui_widgets; u32 vfx_2d; u32 vfx_3d; u32 simulations; u32 models; u32 shaders; u32 textures; u32 framebuffers; u32 render_buffers; u32 fonts; u32 audio_clips; u32 audio_streams; u32 audio_captures; u32 physics_2d_bodies; u32 physics_3d_bodies; u32 custom_items; u32 queued_commands; } se_editor_counts;
 ```
 
 </div>
@@ -1129,6 +1465,30 @@ No inline description found in header comments.
 
 ```c
 typedef struct { c8 name[SE_MAX_NAME_LENGTH]; se_editor_value value; b8 editable : 1; } se_editor_property;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_shortcut`
+
+<div class="api-signature">
+
+```c
+typedef struct { se_editor_mode mode; se_key keys[SE_EDITOR_SHORTCUT_MAX_KEYS]; u32 key_count; u32 modifiers; b8 repeat : 1; c8 action[SE_MAX_NAME_LENGTH]; } se_editor_shortcut;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_shortcut_event`
+
+<div class="api-signature">
+
+```c
+typedef struct { se_editor_mode mode; c8 action[SE_MAX_NAME_LENGTH]; } se_editor_shortcut_event;
 ```
 
 </div>
