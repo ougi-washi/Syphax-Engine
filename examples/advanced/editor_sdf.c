@@ -254,7 +254,7 @@ static b8 editor_sdf_add_item_for_json(se_editor* editor, s_json* object, editor
 	const s_handle handle = (s_handle)(*id);
 	editor_sdf_make_item_label(object, kind, handle, label, sizeof(label));
 	(*id)++;
-	return se_editor_add_item(editor, SE_EDITOR_CATEGORY_CUSTOM, handle, owner, object, NULL, (u32)kind, label);
+	return se_editor_add_item(editor, SE_EDITOR_CATEGORY_ITEM, handle, owner, object, NULL, (u32)kind, label);
 }
 
 static b8 editor_sdf_collect_node(se_editor* editor, s_json* node, s_handle parent, u32* id) {
@@ -322,7 +322,7 @@ static b8 editor_sdf_apply_json(editor_sdf_app* app) {
 static b8 editor_sdf_collect_items(se_editor* editor, se_editor_category_mask mask, void* user_data) {
 	editor_sdf_app* app = user_data;
 	u32 id = 1u;
-	if (!(mask & se_editor_category_to_mask(SE_EDITOR_CATEGORY_CUSTOM))) return true;
+	if (!(mask & se_editor_category_to_mask(SE_EDITOR_CATEGORY_ITEM))) return true;
 	return app && app->root && editor_sdf_collect_node(editor, app->root, S_HANDLE_NULL, &id);
 }
 
@@ -584,7 +584,7 @@ static b8 editor_sdf_collect_selection(editor_sdf_app* app, const se_editor_item
 	const se_editor_property* properties = NULL;
 	sz item_count = 0u;
 	sz property_count = 0u;
-	if (!app || !se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_CUSTOM), &items, &item_count) || item_count == 0u) {
+	if (!app || !se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_ITEM), &items, &item_count) || item_count == 0u) {
 		return false;
 	}
 	if (app->selected_item >= item_count) app->selected_item = (u32)item_count - 1u;
@@ -1091,7 +1091,7 @@ static b8 editor_sdf_setup(editor_sdf_app* app) {
 	if (app->window == S_HANDLE_NULL) return false;
 	se_window_set_target_fps(app->window, 60);
 	se_render_set_background(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
-	app->font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 22.0f);
+	app->font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 42.0f);
 	if (app->font == S_HANDLE_NULL) return false;
 	app->camera = se_camera_create();
 	se_camera_set_window_aspect(app->camera, app->window);
@@ -1104,12 +1104,11 @@ static b8 editor_sdf_setup(editor_sdf_app* app) {
 	editor_sdf_apply_camera(app);
 	app->scene = se_sdf_create();
 	if (!editor_sdf_load_file(app, EDITOR_SDF_PATH)) return false;
-	config.context = app->context;
 	config.window = app->window;
-	config.custom_user_data = app;
-	config.collect_custom_items = editor_sdf_collect_items;
-	config.collect_custom_properties = editor_sdf_collect_properties;
-	config.apply_custom_command = editor_sdf_apply_command;
+	config.user_data = app;
+	config.collect_items = editor_sdf_collect_items;
+	config.collect_properties = editor_sdf_collect_properties;
+	config.apply_command = editor_sdf_apply_command;
 	app->editor = se_editor_create(&config);
 	se_window_set_text_callback(app->window, editor_sdf_text_input, app);
 	editor_sdf_set_status(app, "ready");
@@ -1129,7 +1128,7 @@ static b8 editor_sdf_autotest(editor_sdf_app* app) {
 	const se_editor_item* items = NULL;
 	sz item_count = 0u;
 	se_editor_shortcut_event event = {0};
-	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_CUSTOM), &items, &item_count) || item_count == 0u) return false;
+	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_ITEM), &items, &item_count) || item_count == 0u) return false;
 	se_window_clear_input_state(app->window);
 	se_window_inject_key_state(app->window, SE_KEY_LEFT_CONTROL, true);
 	se_window_inject_key_state(app->window, SE_KEY_S, true);

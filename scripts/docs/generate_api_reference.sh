@@ -62,7 +62,7 @@ MODULE_OVERVIEW = {
     "se_curve": "Curve keyframe data and interpolation helpers.",
     "se_debug": "Logging, trace spans, overlays, and frame timing diagnostics.",
     "se_defines": "Global constants, resource scope macros, and engine-wide result codes.",
-    "se_editor": "Editor inspection, diagnostics, and runtime command APIs.",
+    "se_editor": "Generic editor values, item/property collection, commands, shortcuts, and JSON helpers.",
     "se_ext": "Optional extension capability checks.",
     "se_framebuffer": "Framebuffer creation, binding, and resize lifecycle.",
     "se_graphics": "Render lifecycle helpers such as clear, blending, and context state.",
