@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define EDITOR_SDF_PATH "editor_sdf_scene.json"
+#define EDITOR_SDF_PATH SE_RESOURCE_EXAMPLE("editor_sdf/scene.json")
 
 typedef enum {
 	EDITOR_SDF_NODE = 1,
@@ -390,7 +390,8 @@ static b8 editor_sdf_collect_properties(se_editor* editor, const se_editor_item*
 
 static b8 editor_sdf_load_file(editor_sdf_app* app, const c8* path) {
 	s_json* root = NULL;
-	if (!app || !path || path[0] == '\0' || !se_editor_json_read_file(path, &root)) return false;
+	c8 file_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!app || !se_paths_resolve_resource_path(file_path, sizeof(file_path), path) || !se_editor_json_read_file(file_path, &root)) return false;
 	if (!se_sdf_from_json(app->scene, root)) {
 		s_json_free(root);
 		return false;
@@ -403,10 +404,11 @@ static b8 editor_sdf_load_file(editor_sdf_app* app, const c8* path) {
 
 static b8 editor_sdf_save_file(editor_sdf_app* app, const c8* path) {
 	s_json* fresh = NULL;
-	if (!app || !path || path[0] == '\0') return false;
+	c8 file_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!app || !se_paths_resolve_resource_path(file_path, sizeof(file_path), path)) return false;
 	fresh = se_sdf_to_json(app->scene);
 	if (!fresh) return false;
-	if (!se_editor_json_write_file(path, fresh)) {
+	if (!se_editor_json_write_file(file_path, fresh)) {
 		s_json_free(fresh);
 		return false;
 	}
@@ -678,7 +680,7 @@ static void editor_sdf_update_focus(editor_sdf_app* app, f32 dt) {
 		editor_sdf_focus_selection(app, true);
 	}
 	if (app->focus_active && app->focus_valid) {
-		const f32 t = s_min(1.0f, s_max(0.0f, dt * 5.5f));
+		const f32 t = s_min(1.0f, s_max(0.0f, dt * 25.f));
 		app->camera_target = s_vec3_lerp(&app->camera_target, &app->focus_target, t);
 		if (s_vec3_length(&s_vec3_sub(&app->focus_target, &app->camera_target)) < 0.03f) {
 			app->camera_target = app->focus_target;
@@ -1081,9 +1083,9 @@ static b8 editor_sdf_apply_command(se_editor* editor, const se_editor_command* c
 }
 
 static b8 editor_sdf_setup(editor_sdf_app* app) {
-	c8 resource_path[SE_MAX_PATH_LENGTH] = {0};
 	se_editor_config config = SE_EDITOR_CONFIG_DEFAULTS;
 	if (!app) return false;
+	se_paths_set_resource_root(RESOURCES_DIR);
 	app->context = se_context_create();
 	app->window = se_window_create("Syphax - Editor SDF", 1280, 720);
 	if (app->window == S_HANDLE_NULL) return false;
@@ -1101,9 +1103,7 @@ static b8 editor_sdf_setup(editor_sdf_app* app) {
 	app->focused_handle = S_HANDLE_NULL;
 	editor_sdf_apply_camera(app);
 	app->scene = se_sdf_create();
-	if (!se_paths_resolve_resource_path(resource_path, sizeof(resource_path), SE_RESOURCE_EXAMPLE("sdf/scene.json"))) return false;
-	if (!editor_sdf_load_file(app, resource_path)) return false;
-	snprintf(app->json_path, sizeof(app->json_path), "%s", EDITOR_SDF_PATH);
+	if (!editor_sdf_load_file(app, EDITOR_SDF_PATH)) return false;
 	config.context = app->context;
 	config.window = app->window;
 	config.custom_user_data = app;
