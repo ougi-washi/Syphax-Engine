@@ -19,6 +19,7 @@ option(SE_INSTALL "Enable install/export targets for Syphax" OFF)
 option(SE_USE_SYSTEM_GLFW "Use system GLFW instead of vendored GLFW" OFF)
 option(SE_USE_SYSTEM_MINIAUDIO "Use system miniaudio instead of vendored miniaudio" OFF)
 option(SE_INSTALL_VENDOR_DEPS "Install vendored dependency libraries when vendored mode is active" ${SE_IS_TOP_LEVEL})
+option(SE_ANDROID_BUILD_ALL_EXAMPLES "Build compile-only Android shared libraries for every example source" OFF)
 
 set(SE_BACKEND_RENDER "gl" CACHE STRING "Render backend: gl|gles|webgl|metal|vulkan|software")
 set_property(CACHE SE_BACKEND_RENDER PROPERTY STRINGS gl gles webgl metal vulkan software)
@@ -43,6 +44,14 @@ set(LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 set(BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 set(EXAMPLES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/examples")
+set(SE_ANDROID_ENTRY_SOURCE "${EXAMPLES_DIR}/hello_text.c" CACHE FILEPATH "Android NativeActivity entry source file")
+set(SE_ANDROID_APP_ID "com.syphax.engine" CACHE STRING "Android application id")
+set(SE_ANDROID_APP_NAME "Syphax Engine" CACHE STRING "Android application display name")
+set(SE_ANDROID_LIB_NAME "syphax_android_app" CACHE STRING "Android NativeActivity library name")
+set(SE_ANDROID_MIN_SDK "24" CACHE STRING "Android minSdkVersion for the NativeActivity package")
+set(SE_ANDROID_TARGET_SDK "34" CACHE STRING "Android targetSdkVersion for the NativeActivity package")
+set(SE_ANDROID_VERSION_CODE "1" CACHE STRING "Android versionCode for the NativeActivity package")
+set(SE_ANDROID_VERSION_NAME "0.1.0" CACHE STRING "Android versionName for the NativeActivity package")
 
 set(SE_RENDER_BACKEND_DEFINE "")
 set(SE_WINDOW_BACKEND_DEFINE "")
@@ -53,7 +62,7 @@ if(SE_BACKEND_RENDER STREQUAL "gl")
 	set(SE_RENDER_BACKEND_DEFINE SE_RENDER_BACKEND_OPENGL)
 	set(SE_CONFIG_NEEDS_OPENGL ON)
 elseif(SE_BACKEND_RENDER STREQUAL "gles")
-	find_library(SE_GLES_LIBRARY NAMES GLESv2)
+	find_library(SE_GLES_LIBRARY NAMES GLESv3 GLESv2)
 	find_library(SE_EGL_LIBRARY NAMES EGL)
 	if(NOT SE_GLES_LIBRARY OR NOT SE_EGL_LIBRARY)
 		message(FATAL_ERROR "SE_BACKEND_RENDER=gles requires GLESv2 and EGL libraries.")
@@ -63,20 +72,31 @@ else()
 	message(FATAL_ERROR "SE_BACKEND_RENDER='${SE_BACKEND_RENDER}' is not implemented yet. Supported today: gl, gles.")
 endif()
 
+if(SE_BACKEND_PLATFORM STREQUAL "android")
+	if(NOT ANDROID)
+		message(FATAL_ERROR "SE_BACKEND_PLATFORM=android requires the Android NDK CMake toolchain.")
+	endif()
+	if(NOT SE_BACKEND_RENDER STREQUAL "gles")
+		message(FATAL_ERROR "SE_BACKEND_PLATFORM=android currently requires SE_BACKEND_RENDER=gles.")
+	endif()
+endif()
+
 if(SE_BACKEND_PLATFORM STREQUAL "desktop_glfw")
 	set(SE_WINDOW_BACKEND_DEFINE SE_WINDOW_BACKEND_GLFW)
+elseif(SE_BACKEND_PLATFORM STREQUAL "android")
+	set(SE_WINDOW_BACKEND_DEFINE SE_WINDOW_BACKEND_ANDROID)
 elseif(SE_BACKEND_PLATFORM STREQUAL "terminal")
 	set(SE_WINDOW_BACKEND_DEFINE SE_WINDOW_BACKEND_TERMINAL)
 	message(STATUS "SE_BACKEND_PLATFORM=terminal is experimental.")
 else()
-	message(FATAL_ERROR "SE_BACKEND_PLATFORM='${SE_BACKEND_PLATFORM}' is not implemented yet. Supported today: desktop_glfw, terminal.")
+	message(FATAL_ERROR "SE_BACKEND_PLATFORM='${SE_BACKEND_PLATFORM}' is not implemented yet. Supported today: desktop_glfw, android, terminal.")
 endif()
 
 set(SE_GLFW_TARGET "")
 set(SE_GLFW_INCLUDE_DIR "")
 set(SE_GLFW_BUILD_LINK_ITEM "")
-set(SE_GLFW_INSTALL_LINK_ITEM "-lglfw")
-if(SE_USE_SYSTEM_GLFW)
+set(SE_GLFW_INSTALL_LINK_ITEM "")
+if(SE_BACKEND_PLATFORM STREQUAL "desktop_glfw" AND SE_USE_SYSTEM_GLFW)
 	message(STATUS "Resolving system GLFW")
 	find_path(SE_GLFW_SYSTEM_INCLUDE_DIR NAMES GLFW/glfw3.h)
 	find_library(SE_GLFW_SYSTEM_LIBRARY NAMES glfw3 glfw)
@@ -84,7 +104,7 @@ if(SE_USE_SYSTEM_GLFW)
 		set(SE_GLFW_INCLUDE_DIR "${SE_GLFW_SYSTEM_INCLUDE_DIR}")
 		set(SE_GLFW_BUILD_LINK_ITEM "${SE_GLFW_SYSTEM_LIBRARY}")
 	endif()
-else()
+elseif(SE_BACKEND_PLATFORM STREQUAL "desktop_glfw")
 	message(STATUS "Using vendored GLFW")
 	set(GLFW_INSTALL OFF CACHE BOOL "Generate installation targets" FORCE)
 	set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW docs" FORCE)
@@ -117,7 +137,7 @@ else()
 	endif()
 endif()
 
-if(SE_GLFW_BUILD_LINK_ITEM STREQUAL "")
+if(SE_BACKEND_PLATFORM STREQUAL "desktop_glfw" AND SE_GLFW_BUILD_LINK_ITEM STREQUAL "")
 	message(FATAL_ERROR "Unable to resolve GLFW. Use vendored mode or provide system GLFW include/library paths.")
 endif()
 
@@ -207,17 +227,28 @@ target_include_directories(
 		${SE_GLFW_INCLUDE_DIR}
 		${SE_MINIAUDIO_INCLUDE_DIR})
 
+if(NOT SE_GLFW_BUILD_LINK_ITEM STREQUAL "")
+	target_link_libraries(
+		se_engine
+		PRIVATE
+			$<BUILD_INTERFACE:${SE_GLFW_BUILD_LINK_ITEM}>)
+endif()
+
 target_link_libraries(
 	se_engine
 	PRIVATE
-		$<BUILD_INTERFACE:${SE_GLFW_BUILD_LINK_ITEM}>
-		$<BUILD_INTERFACE:${SE_MINIAUDIO_BUILD_LINK_ITEM}>
-)
+		$<BUILD_INTERFACE:${SE_MINIAUDIO_BUILD_LINK_ITEM}>)
+
+if(NOT SE_GLFW_INSTALL_LINK_ITEM STREQUAL "")
+	target_link_libraries(
+		se_engine
+		INTERFACE
+			$<INSTALL_INTERFACE:${SE_GLFW_INSTALL_LINK_ITEM}>)
+endif()
 
 target_link_libraries(
 	se_engine
 	INTERFACE
-		$<INSTALL_INTERFACE:${SE_GLFW_INSTALL_LINK_ITEM}>
 		$<INSTALL_INTERFACE:${SE_MINIAUDIO_INSTALL_LINK_ITEM}>)
 
 if(SE_BACKEND_RENDER STREQUAL "gl")
@@ -268,6 +299,11 @@ target_compile_definitions(
 
 target_compile_options(se_engine PRIVATE -Wall $<$<CONFIG:Debug>:-O0>)
 
+if(SE_BACKEND_PLATFORM STREQUAL "android" AND SE_BUILD_EXAMPLES)
+	message(STATUS "Disabling standalone example executables for Android builds.")
+	set(SE_BUILD_EXAMPLES OFF)
+endif()
+
 message(STATUS "Configured render backend: ${SE_BACKEND_RENDER}")
 message(STATUS "Configured platform backend: ${SE_BACKEND_PLATFORM}")
 message(STATUS "Syphax examples enabled: ${SE_BUILD_EXAMPLES}")
@@ -277,6 +313,149 @@ message(STATUS "Resolved GLFW target: ${SE_GLFW_TARGET}")
 message(STATUS "Resolved GLFW build link item: ${SE_GLFW_BUILD_LINK_ITEM}")
 message(STATUS "Resolved miniaudio target: ${SE_MINIAUDIO_TARGET}")
 message(STATUS "Resolved miniaudio build link item: ${SE_MINIAUDIO_BUILD_LINK_ITEM}")
+
+if(SE_BACKEND_PLATFORM STREQUAL "android")
+	set(SE_ANDROID_NDK_ROOT "")
+	if(DEFINED CMAKE_ANDROID_NDK AND NOT "${CMAKE_ANDROID_NDK}" STREQUAL "")
+		set(SE_ANDROID_NDK_ROOT "${CMAKE_ANDROID_NDK}")
+	elseif(DEFINED ANDROID_NDK AND NOT "${ANDROID_NDK}" STREQUAL "")
+		set(SE_ANDROID_NDK_ROOT "${ANDROID_NDK}")
+	endif()
+	if(SE_ANDROID_NDK_ROOT STREQUAL "")
+		message(FATAL_ERROR "Unable to resolve the Android NDK root for native_app_glue.")
+	endif()
+	if(NOT EXISTS "${SE_ANDROID_ENTRY_SOURCE}")
+		message(FATAL_ERROR "SE_ANDROID_ENTRY_SOURCE='${SE_ANDROID_ENTRY_SOURCE}' does not exist.")
+	endif()
+	get_filename_component(SE_ANDROID_ENTRY_SOURCE_REALPATH "${SE_ANDROID_ENTRY_SOURCE}" REALPATH)
+
+	set(SE_ANDROID_NATIVE_APP_GLUE_DIR "${SE_ANDROID_NDK_ROOT}/sources/android/native_app_glue")
+	set(SE_ANDROID_NATIVE_APP_GLUE_SOURCE "${SE_ANDROID_NATIVE_APP_GLUE_DIR}/android_native_app_glue.c")
+	if(NOT EXISTS "${SE_ANDROID_NATIVE_APP_GLUE_SOURCE}")
+		message(FATAL_ERROR "native_app_glue source not found at ${SE_ANDROID_NATIVE_APP_GLUE_SOURCE}")
+	endif()
+
+	set(SE_ANDROID_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/android")
+	set(SE_ANDROID_GENERATED_RES_DIR "${SE_ANDROID_GENERATED_DIR}/res/values")
+	file(MAKE_DIRECTORY "${SE_ANDROID_GENERATED_RES_DIR}")
+
+	configure_file(
+		${CMAKE_CURRENT_SOURCE_DIR}/android/AndroidManifest.xml.in
+		${SE_ANDROID_GENERATED_DIR}/AndroidManifest.xml
+		@ONLY)
+	configure_file(
+		${CMAKE_CURRENT_SOURCE_DIR}/android/res/values/strings.xml.in
+		${SE_ANDROID_GENERATED_RES_DIR}/strings.xml
+		@ONLY)
+
+	add_library(se_android_native_app_glue STATIC ${SE_ANDROID_NATIVE_APP_GLUE_SOURCE})
+	target_include_directories(se_android_native_app_glue PUBLIC ${SE_ANDROID_NATIVE_APP_GLUE_DIR})
+	target_include_directories(se_engine PRIVATE ${SE_ANDROID_NATIVE_APP_GLUE_DIR})
+
+	add_library(se_android_entry OBJECT ${SE_ANDROID_ENTRY_SOURCE})
+	target_compile_definitions(se_android_entry PRIVATE main=se_android_example_main)
+	target_link_libraries(se_android_entry PRIVATE se_engine)
+
+	add_library(
+		${SE_ANDROID_LIB_NAME}
+		SHARED
+			android/launcher/se_android_main.c
+			$<TARGET_OBJECTS:se_android_entry>)
+	target_compile_options(${SE_ANDROID_LIB_NAME} PRIVATE -Wall $<$<CONFIG:Debug>:-O0>)
+	target_include_directories(
+		${SE_ANDROID_LIB_NAME}
+		PRIVATE
+			${SRC_DIR}
+			${SE_ANDROID_NATIVE_APP_GLUE_DIR})
+	target_link_libraries(
+		${SE_ANDROID_LIB_NAME}
+		PRIVATE
+			se_engine
+			se_android_native_app_glue
+			android
+			log)
+	target_link_options(${SE_ANDROID_LIB_NAME} PRIVATE "LINKER:-u,ANativeActivity_onCreate")
+	set_target_properties(
+		${SE_ANDROID_LIB_NAME}
+		PROPERTIES
+			OUTPUT_NAME "${SE_ANDROID_LIB_NAME}"
+			LIBRARY_OUTPUT_DIRECTORY "${BIN_DIR}/android/${ANDROID_ABI}"
+			RUNTIME_OUTPUT_DIRECTORY "${BIN_DIR}/android/${ANDROID_ABI}")
+
+	if(SE_ANDROID_BUILD_ALL_EXAMPLES)
+		function(se_add_android_example_library example_file)
+			get_filename_component(example_name "${example_file}" NAME_WE)
+			set(entry_target "se_android_entry_${example_name}")
+			set(library_target "se_android_example_${example_name}")
+
+			if(TARGET "${entry_target}" OR TARGET "${library_target}")
+				message(FATAL_ERROR "Duplicate Android example target '${example_name}' from ${example_file}")
+			endif()
+
+			add_library("${entry_target}" OBJECT "${example_file}")
+			target_compile_definitions("${entry_target}" PRIVATE main=se_android_example_main)
+			target_link_libraries("${entry_target}" PRIVATE se_engine)
+
+			add_library(
+				"${library_target}"
+				SHARED
+					android/launcher/se_android_main.c
+					$<TARGET_OBJECTS:${entry_target}>)
+			target_compile_options("${library_target}" PRIVATE -Wall $<$<CONFIG:Debug>:-O0>)
+			target_include_directories(
+				"${library_target}"
+				PRIVATE
+					${SRC_DIR}
+					${SE_ANDROID_NATIVE_APP_GLUE_DIR})
+			target_link_libraries(
+				"${library_target}"
+				PRIVATE
+					se_engine
+					se_android_native_app_glue
+					android
+					log)
+			target_link_options("${library_target}" PRIVATE "LINKER:-u,ANativeActivity_onCreate")
+			set_target_properties(
+				"${library_target}"
+				PROPERTIES
+					OUTPUT_NAME "syphax_android_example_${example_name}"
+					LIBRARY_OUTPUT_DIRECTORY "${BIN_DIR}/android/${ANDROID_ABI}/examples"
+					RUNTIME_OUTPUT_DIRECTORY "${BIN_DIR}/android/${ANDROID_ABI}/examples")
+			list(APPEND SE_ANDROID_ALL_EXAMPLE_TARGETS "${library_target}")
+			set(SE_ANDROID_ALL_EXAMPLE_TARGETS "${SE_ANDROID_ALL_EXAMPLE_TARGETS}" PARENT_SCOPE)
+		endfunction()
+
+		set(EXAMPLES_ADVANCED_DIR "${EXAMPLES_DIR}/advanced")
+		file(GLOB SE_ANDROID_EXAMPLES_BEGINNER CONFIGURE_DEPENDS
+			"${EXAMPLES_DIR}/*.c"
+			"${EXAMPLES_DIR}/*.cpp")
+		file(GLOB SE_ANDROID_EXAMPLES_ADVANCED CONFIGURE_DEPENDS
+			"${EXAMPLES_ADVANCED_DIR}/*.c"
+			"${EXAMPLES_ADVANCED_DIR}/*.cpp")
+		list(SORT SE_ANDROID_EXAMPLES_BEGINNER)
+		list(SORT SE_ANDROID_EXAMPLES_ADVANCED)
+		set(SE_ANDROID_ALL_EXAMPLE_SOURCES ${SE_ANDROID_EXAMPLES_BEGINNER} ${SE_ANDROID_EXAMPLES_ADVANCED})
+		set(SE_ANDROID_ALL_EXAMPLE_TARGETS "")
+		foreach(example_file ${SE_ANDROID_ALL_EXAMPLE_SOURCES})
+			get_filename_component(example_realpath "${example_file}" REALPATH)
+			if(example_realpath STREQUAL SE_ANDROID_ENTRY_SOURCE_REALPATH)
+				continue()
+			endif()
+			se_add_android_example_library("${example_file}")
+		endforeach()
+
+		if(SE_ANDROID_ALL_EXAMPLE_TARGETS)
+			add_custom_target(se_android_all_examples DEPENDS ${SE_ANDROID_ALL_EXAMPLE_TARGETS})
+			message(STATUS "Configured Android all-example compile target: se_android_all_examples")
+		else()
+			message(STATUS "No additional Android examples found for compile-only coverage.")
+		endif()
+	endif()
+
+	message(STATUS "Configured Android entry source: ${SE_ANDROID_ENTRY_SOURCE}")
+	message(STATUS "Configured Android library target: ${SE_ANDROID_LIB_NAME}")
+	message(STATUS "Configured Android manifest: ${SE_ANDROID_GENERATED_DIR}/AndroidManifest.xml")
+endif()
 
 if(SE_BUILD_EXAMPLES)
 	function(se_add_example example_file)

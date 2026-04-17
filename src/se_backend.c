@@ -24,6 +24,8 @@ static se_backend_render se_backend_render_current(void) {
 static se_backend_platform se_backend_platform_current(void) {
 #if defined(SE_WINDOW_BACKEND_GLFW)
 	return SE_BACKEND_PLATFORM_DESKTOP_GLFW;
+#elif defined(SE_WINDOW_BACKEND_ANDROID)
+	return SE_BACKEND_PLATFORM_ANDROID;
 #elif defined(SE_WINDOW_BACKEND_TERMINAL)
 	return SE_BACKEND_PLATFORM_TERMINAL;
 #elif defined(SE_WINDOW_BACKEND_WEB)

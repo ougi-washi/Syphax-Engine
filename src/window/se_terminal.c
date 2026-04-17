@@ -1544,4 +1544,35 @@ void se_window_backend_render_thread_set_vsync(const se_window_handle window, co
 	(void)enabled;
 }
 
+void* se_window_backend_get_gl_proc_address(const c8* name) {
+	(void)name;
+	return NULL;
+}
+
+b8 se_window_backend_has_current_context(void) {
+	return false;
+}
+
+b8 se_window_backend_read_asset_text(const c8* path, c8** out_data, sz* out_size) {
+	(void)path;
+	(void)out_data;
+	(void)out_size;
+	return false;
+}
+
+b8 se_window_backend_read_asset_binary(const c8* path, u8** out_data, sz* out_size) {
+	(void)path;
+	(void)out_data;
+	(void)out_size;
+	return false;
+}
+
+b8 se_window_backend_get_asset_mtime(const c8* path, time_t* out_mtime) {
+	(void)path;
+	if (out_mtime) {
+		*out_mtime = 0;
+	}
+	return false;
+}
+
 #endif // SE_WINDOW_BACKEND_TERMINAL

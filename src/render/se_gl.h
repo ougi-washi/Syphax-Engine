@@ -7,10 +7,18 @@
 #include <GLES3/gl3.h>
 #else
 #include <GL/gl.h>
+#include <GL/glext.h>
 #endif
-#include <GLFW/glfw3.h>
 #include <stddef.h>
 #include "syphax/s_types.h"
+
+#if !defined(APIENTRY)
+#if defined(_WIN32)
+#define APIENTRY __stdcall
+#else
+#define APIENTRY
+#endif
+#endif
 
 typedef void(APIENTRY *PFNGLDELETEBUFFERS)(GLsizei n, const GLuint *buffers);
 typedef void(APIENTRY *PFNGLGENBUFFERS)(GLsizei n, GLuint *buffers);
@@ -47,6 +55,11 @@ typedef void(APIENTRY *PFNGLTEXIMAGE2D)(GLenum target, GLint level,
 										GLsizei height, GLint border,
 										GLenum format, GLenum type,
 										const void *pixels);
+typedef void(APIENTRY *PFNGLTEXIMAGE3D)(GLenum target, GLint level,
+										GLint internalFormat, GLsizei width,
+										GLsizei height, GLsizei depth,
+										GLint border, GLenum format,
+										GLenum type, const void *pixels);
 typedef void(APIENTRY *PFNGLTEXPARAMETERI)(GLenum target, GLenum pname,
 											 GLint param);
 typedef void(APIENTRY *PFNGLTEXPARAMETERF)(GLenum target, GLenum pname,
@@ -129,6 +142,7 @@ typedef void(APIENTRY *PFNGLBLITFRAMEBUFFER)(GLint srcX0, GLint srcY0,
 											 GLint dstX0, GLint dstY0,
 											 GLint dstX1, GLint dstY1,
 											 GLbitfield mask, GLenum filter);
+typedef void(APIENTRY *PFNGLREADBUFFER)(GLenum src);
 
 extern PFNGLDELETEBUFFERS se_glDeleteBuffers;
 extern PFNGLGENBUFFERS se_glGenBuffers;
@@ -151,6 +165,7 @@ extern PFNGLFRAMEBUFFERTEXTURE se_glFramebufferTexture;
 extern PFNGLBINDVERTEXARRAY se_glBindVertexArray;
 extern PFNGLGENVERTEXARRAYS se_glGenVertexArrays;
 extern PFNGLDELETEVERTEXARRAYS se_glDeleteVertexArrays;
+extern PFNGLTEXIMAGE3D se_glTexImage3D;
 extern PFNGLVERTEXATTRIBPOINTER se_glVertexAttribPointer;
 extern PFNGLENABLEVERTEXATTRIBARRAY se_glEnableVertexAttribArray;
 extern PFNGLDISABLEVERTEXATTRIBARRAY se_glDisableVertexAttribArray;
@@ -185,6 +200,7 @@ extern PFNGLRENDERBUFFERSTORAGE se_glRenderbufferStorage;
 extern PFNGLCHECKFRAMEBUFFERSTATUS se_glCheckFramebufferStatus;
 extern PFNGLGENERATEMIPMAP se_glGenerateMipmap;
 extern PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer;
+extern PFNGLREADBUFFER se_glReadBuffer;
 
 #if defined(SE_GL_NO_DISPATCH_WRAPPERS)
 

@@ -19,7 +19,7 @@ show_help() {
     echo "  -render=backend  Render backend: gl (default), gles"
     echo "                   Planned (not implemented yet): webgl, metal, vulkan, software"
     echo "  -platform=kind   Platform backend: desktop_glfw (default), terminal (experimental)"
-    echo "                   Planned (not implemented yet): android, ios, web"
+    echo "                   Android packaging/builds use scripts/android/build_native_activity.sh"
     echo "  target           Specific target to build (e.g., hello_text)"
     echo ""
     echo "Examples:"
@@ -105,7 +105,11 @@ case "$PLATFORM" in
     desktop|desktop_glfw|glfw)
         PLATFORM="desktop_glfw"
         ;;
-    terminal|android|ios|web)
+    terminal|ios|web)
+        ;;
+    android)
+        echo "Android builds are handled by scripts/android/build_native_activity.sh"
+        exit 1
         ;;
     *)
         echo "Error: Unknown platform backend: $PLATFORM"

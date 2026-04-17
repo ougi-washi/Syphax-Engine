@@ -4,8 +4,8 @@
 #include "se_debug.h"
 #include "se_graphics.h"
 #include "se_texture.h"
+#include "se_resource_io.h"
 #include "render/se_gl.h"
-#include "syphax/s_files.h"
 
 #define SE_UNIFORMS_MAX 128
 
@@ -318,8 +318,8 @@ b8 se_shader_load_internal(se_shader *shader) {
 	char *vertex_source = NULL;
 	char *fragment_source = NULL;
 
-	if (!s_file_read(shader->vertex_path, &vertex_source, NULL) ||
-		!s_file_read(shader->fragment_path, &fragment_source, NULL)) {
+	if (!se_resource_read_text_file(shader->vertex_path, &vertex_source, NULL) ||
+		!se_resource_read_text_file(shader->fragment_path, &fragment_source, NULL)) {
 		free(vertex_source);
 		free(fragment_source);
 		return false;
@@ -334,8 +334,8 @@ b8 se_shader_load_internal(se_shader *shader) {
 
 	shader->vertex_mtime = 0;
 	shader->fragment_mtime = 0;
-	s_file_mtime(shader->vertex_path, &shader->vertex_mtime);
-	s_file_mtime(shader->fragment_path, &shader->fragment_mtime);
+	se_resource_file_mtime(shader->vertex_path, &shader->vertex_mtime);
+	se_resource_file_mtime(shader->fragment_path, &shader->fragment_mtime);
 	s_array_init(&shader->uniforms);
 	se_log("se_shader_load_internal :: created program: %d, from %s, %s", shader->program, shader->vertex_path, shader->fragment_path);
 	return true;
@@ -447,8 +447,10 @@ b8 se_shader_reload_if_changed(const se_shader_handle shader) {
 
 	time_t vertex_mtime = 0;
 	time_t fragment_mtime = 0;
-	s_file_mtime(shader_ptr->vertex_path, &vertex_mtime);
-	s_file_mtime(shader_ptr->fragment_path, &fragment_mtime);
+	if (!se_resource_file_mtime(shader_ptr->vertex_path, &vertex_mtime) ||
+		!se_resource_file_mtime(shader_ptr->fragment_path, &fragment_mtime)) {
+		return false;
+	}
 
 	if (vertex_mtime != shader_ptr->vertex_mtime ||
 		fragment_mtime != shader_ptr->fragment_mtime) {

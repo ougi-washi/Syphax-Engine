@@ -1599,12 +1599,12 @@ void se_gl_dispatchTexImage2D(GLenum target, GLint level, GLint internalFormat, 
 static void se_gl_exec_tex_image_3d(const void* payload, void* out_result) {
 	(void)out_result;
 	const se_gl_tex_image_3d_payload* args = (const se_gl_tex_image_3d_payload*)payload;
-	glTexImage3D(args->target, args->level, args->internal_format, args->width, args->height, args->depth, args->border, args->format, args->type, args->pixels);
+	se_glTexImage3D(args->target, args->level, args->internal_format, args->width, args->height, args->depth, args->border, args->format, args->type, args->pixels);
 }
 
 void se_gl_dispatchTexImage3D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels) {
 	if (se_gl_dispatch_direct()) {
-		glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, pixels);
+		se_glTexImage3D(target, level, internalFormat, width, height, depth, border, format, type, pixels);
 		return;
 	}
 	const se_gl_tex_image_3d_payload payload = {target, level, internalFormat, width, height, depth, border, format, type, pixels};
@@ -1750,12 +1750,12 @@ void se_gl_dispatchPixelStorei(GLenum pname, GLint param) {
 static void se_gl_exec_read_buffer(const void* payload, void* out_result) {
 	(void)out_result;
 	const se_gl_enable_payload* args = (const se_gl_enable_payload*)payload;
-	glReadBuffer(args->cap);
+	se_glReadBuffer(args->cap);
 }
 
 void se_gl_dispatchReadBuffer(GLenum src) {
 	if (se_gl_dispatch_direct()) {
-		glReadBuffer(src);
+		se_glReadBuffer(src);
 		return;
 	}
 	const se_gl_enable_payload payload = {src};

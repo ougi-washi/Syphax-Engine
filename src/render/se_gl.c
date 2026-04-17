@@ -7,6 +7,7 @@
 #include "se_graphics.h"
 #include "se_quad.h"
 #include "render/se_render_queue.h"
+#include "window/se_window_backend_internal.h"
 #include "syphax/s_files.h"
 #if defined(SE_RENDER_BACKEND_GLES)
 #include <EGL/egl.h>
@@ -21,11 +22,7 @@
 
 #if !defined(SE_WINDOW_BACKEND_TERMINAL)
 static void *se_gl_get_proc_address(const char *name) {
-#if defined(SE_RENDER_BACKEND_GLES)
-	return (void *)eglGetProcAddress(name);
-#else
-	return (void *)glfwGetProcAddress(name);
-#endif
+	return se_window_backend_get_gl_proc_address(name);
 }
 #endif
 
@@ -82,6 +79,7 @@ PFNGLFRAMEBUFFERTEXTURE se_glFramebufferTexture = NULL;
 PFNGLBINDVERTEXARRAY se_glBindVertexArray = NULL;
 PFNGLGENVERTEXARRAYS se_glGenVertexArrays = NULL;
 PFNGLDELETEVERTEXARRAYS se_glDeleteVertexArrays = NULL;
+PFNGLTEXIMAGE3D se_glTexImage3D = NULL;
 PFNGLVERTEXATTRIBPOINTER se_glVertexAttribPointer = NULL;
 PFNGLENABLEVERTEXATTRIBARRAY se_glEnableVertexAttribArray = NULL;
 PFNGLDISABLEVERTEXATTRIBARRAY se_glDisableVertexAttribArray = NULL;
@@ -116,6 +114,7 @@ PFNGLRENDERBUFFERSTORAGE se_glRenderbufferStorage = NULL;
 PFNGLCHECKFRAMEBUFFERSTATUS se_glCheckFramebufferStatus = NULL;
 PFNGLGENERATEMIPMAP se_glGenerateMipmap = NULL;
 PFNGLBLITFRAMEBUFFER se_glBlitFramebuffer = NULL;
+PFNGLREADBUFFER se_glReadBuffer = NULL;
 
 #if defined(SE_WINDOW_BACKEND_TERMINAL)
 static GLuint se_gl_terminal_next_id = 1u;
@@ -282,6 +281,19 @@ static void APIENTRY se_gl_terminal_framebuffer_texture2d(const GLenum target, c
 	(void)textarget;
 	(void)texture;
 	(void)level;
+}
+
+static void APIENTRY se_gl_terminal_tex_image_3d(const GLenum target, const GLint level, const GLint internal_format, const GLsizei width, const GLsizei height, const GLsizei depth, const GLint border, const GLenum format, const GLenum type, const void* pixels) {
+	(void)target;
+	(void)level;
+	(void)internal_format;
+	(void)width;
+	(void)height;
+	(void)depth;
+	(void)border;
+	(void)format;
+	(void)type;
+	(void)pixels;
 }
 
 static void APIENTRY se_gl_terminal_get_shader_iv(const GLuint shader, const GLenum pname, GLint* params) {
@@ -469,6 +481,10 @@ static void APIENTRY se_gl_terminal_blit_framebuffer(const GLint src_x0, const G
 	(void)filter;
 }
 
+static void APIENTRY se_gl_terminal_read_buffer(const GLenum src) {
+	(void)src;
+}
+
 static b8 se_init_opengl_terminal(void) {
 	se_glDeleteBuffers = se_gl_terminal_delete_buffers;
 	se_glGenBuffers = se_gl_terminal_gen_buffers;
@@ -491,6 +507,7 @@ static b8 se_init_opengl_terminal(void) {
 	se_glBindVertexArray = se_gl_terminal_bind_vertex_array;
 	se_glGenVertexArrays = se_gl_terminal_gen_vertex_arrays;
 	se_glDeleteVertexArrays = se_gl_terminal_delete_vertex_arrays;
+	se_glTexImage3D = se_gl_terminal_tex_image_3d;
 	se_glVertexAttribPointer = se_gl_terminal_vertex_attrib_pointer;
 	se_glEnableVertexAttribArray = se_gl_terminal_enable_vertex_attrib_array;
 	se_glDisableVertexAttribArray = se_gl_terminal_disable_vertex_attrib_array;
@@ -525,6 +542,7 @@ static b8 se_init_opengl_terminal(void) {
 	se_glCheckFramebufferStatus = se_gl_terminal_check_framebuffer_status;
 	se_glGenerateMipmap = se_gl_terminal_generate_mipmap;
 	se_glBlitFramebuffer = se_gl_terminal_blit_framebuffer;
+	se_glReadBuffer = se_gl_terminal_read_buffer;
 	return true;
 }
 #endif // SE_WINDOW_BACKEND_TERMINAL
@@ -564,6 +582,7 @@ b8 se_init_opengl(void) {
 	SE_GL_ASSIGN(se_glBindVertexArray, PFNGLBINDVERTEXARRAY, "glBindVertexArray", glBindVertexArray);
 	SE_GL_ASSIGN(se_glGenVertexArrays, PFNGLGENVERTEXARRAYS, "glGenVertexArrays", glGenVertexArrays);
 	SE_GL_ASSIGN(se_glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYS, "glDeleteVertexArrays", glDeleteVertexArrays);
+	SE_GL_ASSIGN(se_glTexImage3D, PFNGLTEXIMAGE3D, "glTexImage3D", glTexImage3D);
 	SE_GL_ASSIGN(se_glVertexAttribPointer, PFNGLVERTEXATTRIBPOINTER, "glVertexAttribPointer", glVertexAttribPointer);
 	SE_GL_ASSIGN(se_glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAY, "glEnableVertexAttribArray", glEnableVertexAttribArray);
 	SE_GL_ASSIGN(se_glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAY, "glDisableVertexAttribArray", glDisableVertexAttribArray);
@@ -598,6 +617,7 @@ b8 se_init_opengl(void) {
 	SE_GL_ASSIGN(se_glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUS, "glCheckFramebufferStatus", glCheckFramebufferStatus);
 	SE_GL_ASSIGN(se_glGenerateMipmap, PFNGLGENERATEMIPMAP, "glGenerateMipmap", glGenerateMipmap);
 	SE_GL_ASSIGN(se_glBlitFramebuffer, PFNGLBLITFRAMEBUFFER, "glBlitFramebuffer", glBlitFramebuffer);
+	SE_GL_ASSIGN(se_glReadBuffer, PFNGLREADBUFFER, "glReadBuffer", glReadBuffer);
 #else
 	SE_GL_ASSIGN(se_glDeleteBuffers, PFNGLDELETEBUFFERS, "glDeleteBuffers", NULL);
 	SE_GL_ASSIGN(se_glGenBuffers, PFNGLGENBUFFERS, "glGenBuffers", NULL);
@@ -620,6 +640,7 @@ b8 se_init_opengl(void) {
 	SE_GL_ASSIGN(se_glBindVertexArray, PFNGLBINDVERTEXARRAY, "glBindVertexArray", NULL);
 	SE_GL_ASSIGN(se_glGenVertexArrays, PFNGLGENVERTEXARRAYS, "glGenVertexArrays", NULL);
 	SE_GL_ASSIGN(se_glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYS, "glDeleteVertexArrays", NULL);
+	SE_GL_ASSIGN(se_glTexImage3D, PFNGLTEXIMAGE3D, "glTexImage3D", NULL);
 	SE_GL_ASSIGN(se_glVertexAttribPointer, PFNGLVERTEXATTRIBPOINTER, "glVertexAttribPointer", NULL);
 	SE_GL_ASSIGN(se_glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAY, "glEnableVertexAttribArray", NULL);
 	SE_GL_ASSIGN(se_glDisableVertexAttribArray, PFNGLDISABLEVERTEXATTRIBARRAY, "glDisableVertexAttribArray", NULL);
@@ -654,13 +675,14 @@ b8 se_init_opengl(void) {
 	SE_GL_ASSIGN(se_glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUS, "glCheckFramebufferStatus", NULL);
 	SE_GL_ASSIGN(se_glGenerateMipmap, PFNGLGENERATEMIPMAP, "glGenerateMipmap", NULL);
 	SE_GL_ASSIGN(se_glBlitFramebuffer, PFNGLBLITFRAMEBUFFER, "glBlitFramebuffer", NULL);
+	SE_GL_ASSIGN(se_glReadBuffer, PFNGLREADBUFFER, "glReadBuffer", NULL);
 #endif
 	return true;
 }
 
 b8 se_render_init(void) {
-#if defined(SE_WINDOW_BACKEND_GLFW)
-	if (!glfwGetCurrentContext()) {
+#if !defined(SE_WINDOW_BACKEND_TERMINAL)
+	if (!se_window_backend_has_current_context()) {
 		se_log("se_render_init :: no active OpenGL context");
 		se_render_initialized = false;
 		return false;
@@ -685,13 +707,13 @@ void se_render_shutdown(void) {
 }
 
 b8 se_render_has_context(void) {
-#if defined(SE_WINDOW_BACKEND_GLFW)
-	if (glfwGetCurrentContext() != NULL) {
+#if defined(SE_WINDOW_BACKEND_TERMINAL)
+	return se_render_initialized;
+#else
+	if (se_window_backend_has_current_context()) {
 		return true;
 	}
 	return se_render_queue_is_running();
-#else
-	return se_render_initialized;
 #endif
 }
 

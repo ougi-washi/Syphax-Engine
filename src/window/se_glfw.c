@@ -10,6 +10,7 @@
 #include "render/se_gl.h"
 #include "render/se_render_queue.h"
 #include "window/se_window_backend_internal.h"
+#include <GLFW/glfw3.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,6 +19,7 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
@@ -2518,6 +2520,39 @@ void se_window_backend_render_thread_set_vsync(const se_window_handle window, co
 	se_set_tls_context(context);
 	glfwSwapInterval(enabled ? 1 : 0);
 	window_ptr->vsync_enabled = enabled;
+}
+
+void* se_window_backend_get_gl_proc_address(const c8* name) {
+	if (!name || name[0] == '\0') {
+		return NULL;
+	}
+	return (void*)glfwGetProcAddress(name);
+}
+
+b8 se_window_backend_has_current_context(void) {
+	return glfwGetCurrentContext() != NULL;
+}
+
+b8 se_window_backend_read_asset_text(const c8* path, c8** out_data, sz* out_size) {
+	(void)path;
+	(void)out_data;
+	(void)out_size;
+	return false;
+}
+
+b8 se_window_backend_read_asset_binary(const c8* path, u8** out_data, sz* out_size) {
+	(void)path;
+	(void)out_data;
+	(void)out_size;
+	return false;
+}
+
+b8 se_window_backend_get_asset_mtime(const c8* path, time_t* out_mtime) {
+	(void)path;
+	if (out_mtime) {
+		*out_mtime = 0;
+	}
+	return false;
 }
 
 #endif // SE_WINDOW_BACKEND_GLFW

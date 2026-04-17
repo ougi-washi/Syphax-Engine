@@ -8,6 +8,7 @@
 #include "se_defines.h"
 #include "se_debug.h"
 #include "se_math.h"
+#include "se_resource_io.h"
 #include "se_shader.h"
 #include "se_framebuffer.h"
 #include "se_texture.h"
@@ -1730,7 +1731,7 @@ static b8 se_sdf_read_resource_text(c8** out_text, const c8* resource_path) {
 		se_log("se_sdf :: failed to resolve shader template path: %s", resource_path);
 		return false;
 	}
-	if (!s_file_read(absolute_path, out_text, NULL)) {
+	if (!se_resource_read_text_file(absolute_path, out_text, NULL)) {
 		se_log("se_sdf :: failed to read shader template: %s", absolute_path);
 		return false;
 	}
@@ -1747,7 +1748,7 @@ static b8 se_sdf_read_resource_mtime(time_t* out_mtime, const c8* resource_path)
 		se_log("se_sdf :: failed to resolve shader template path: %s", resource_path);
 		return false;
 	}
-	if (!s_file_mtime(absolute_path, out_mtime)) {
+	if (!se_resource_file_mtime(absolute_path, out_mtime)) {
 		se_log("se_sdf :: failed to stat shader template: %s", absolute_path);
 		return false;
 	}

@@ -16,6 +16,7 @@
 
 #include "se_defines.h"
 #include "se_debug.h"
+#include "se_resource_io.h"
 #include "syphax/s_array.h"
 #include "syphax/s_files.h"
 #include <math.h>
@@ -50,22 +51,30 @@ struct se_audio_engine {
 struct se_audio_clip {
 	se_audio_engine* owner;
 	ma_sound sound;
+	ma_decoder decoder;
 	char path[SE_MAX_PATH_LENGTH];
 	f32 base_volume;
 	se_audio_bus bus;
-	b8 in_use : 1;
+	b8 in_use;
+	b8 decoder_initialized;
 	f32* analysis_pcm;
 	ma_uint64 analysis_frame_count;
 	u32 analysis_channels;
 	u32 analysis_sample_rate;
+	u8* encoded_data;
+	sz encoded_size;
 };
 
 struct se_audio_stream {
 	se_audio_engine* owner;
 	ma_sound sound;
+	ma_decoder decoder;
 	f32 base_volume;
 	se_audio_bus bus;
-	b8 in_use : 1;
+	b8 in_use;
+	b8 decoder_initialized;
+	u8* encoded_data;
+	sz encoded_size;
 };
 
 struct se_audio_capture {
@@ -106,7 +115,11 @@ static void se_audio_clip_refresh_volume(se_audio_clip* clip);
 static void se_audio_stream_refresh_volume(se_audio_stream* stream);
 static const se_audio_play_params* se_audio_resolve_play_params(const se_audio_play_params* params);
 static char* se_audio_resolve_resource_path(const char* relative_path, char* out_path, sz path_size);
+static ma_result se_audio_init_sound_from_resource(se_audio_engine* engine, const char* full_path, ma_uint32 flags, ma_sound* out_sound, ma_decoder* out_decoder, b8* out_decoder_initialized, u8** out_encoded_data, sz* out_encoded_size);
+static void se_audio_release_clip_source(se_audio_clip* clip);
+static void se_audio_release_stream_source(se_audio_stream* stream);
 static se_audio_bus se_audio_sanitize_bus(se_audio_bus bus);
+static f32 se_audio_get_effective_bus_volume(const se_audio_engine* engine, se_audio_bus bus);
 static float se_audio_clamp_volume(float value);
 static float se_audio_clamp_pan(float value);
 static float se_audio_clamp_pitch(float value);
@@ -194,6 +207,7 @@ void se_audio_shutdown(se_audio_engine* engine) {
 	s_foreach(&engine->clips, clip) {
 		if (clip->in_use) {
 			ma_sound_uninit(&clip->sound);
+			se_audio_release_clip_source(clip);
 			se_audio_free_analysis_data(clip);
 		}
 	}
@@ -203,6 +217,7 @@ void se_audio_shutdown(se_audio_engine* engine) {
 	s_foreach(&engine->streams, stream) {
 		if (stream->in_use) {
 			ma_sound_uninit(&stream->sound);
+			se_audio_release_stream_source(stream);
 		}
 	}
 	s_array_clear(&engine->streams);
@@ -256,18 +271,18 @@ void se_audio_bus_set_volume(se_audio_engine* engine, se_audio_bus bus, f32 volu
 	if (!engine || !engine->initialized) {
 		return;
 	}
-	se_audio_bus sanitized = se_audio_sanitize_bus(bus);
+	const se_audio_bus sanitized = se_audio_sanitize_bus(bus);
 	engine->bus_volumes[sanitized] = se_audio_clamp_volume(volume);
 
 	se_audio_clip* clip = NULL;
 	s_foreach(&engine->clips, clip) {
-		if (clip->in_use && clip->bus == sanitized) {
+		if (clip->in_use && (sanitized == SE_AUDIO_BUS_MASTER || clip->bus == sanitized)) {
 			se_audio_clip_refresh_volume(clip);
 		}
 	}
 	se_audio_stream* stream = NULL;
 	s_foreach(&engine->streams, stream) {
-		if (stream->in_use && stream->bus == sanitized) {
+		if (stream->in_use && (sanitized == SE_AUDIO_BUS_MASTER || stream->bus == sanitized)) {
 			se_audio_stream_refresh_volume(stream);
 		}
 	}
@@ -297,8 +312,17 @@ se_audio_clip* se_audio_clip_load(se_audio_engine* engine, const char* relative_
 		return NULL;
 	}
 
-	ma_result ma_res = ma_sound_init_from_file(&engine->engine, full_path, MA_SOUND_FLAG_DECODE, NULL, NULL, &clip->sound);
+	ma_result ma_res = se_audio_init_sound_from_resource(
+		engine,
+		full_path,
+		MA_SOUND_FLAG_DECODE,
+		&clip->sound,
+		&clip->decoder,
+		&clip->decoder_initialized,
+		&clip->encoded_data,
+		&clip->encoded_size);
 	if (ma_res != MA_SUCCESS) {
+		se_audio_release_clip_source(clip);
 		memset(clip, 0, sizeof(se_audio_clip));
 		clip->owner = engine;
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
@@ -310,7 +334,9 @@ se_audio_clip* se_audio_clip_load(se_audio_engine* engine, const char* relative_
 	clip->bus = SE_AUDIO_BUS_MASTER;
 	clip->base_volume = 1.0f;
 	strncpy(clip->path, relative_path, sizeof(clip->path) - 1);
-	se_audio_load_analysis_data(full_path, clip);
+	if (s_file_exists(full_path)) {
+		se_audio_load_analysis_data(full_path, clip);
+	}
 	se_set_last_error(SE_RESULT_OK);
 	return clip;
 }
@@ -321,6 +347,7 @@ void se_audio_clip_unload(se_audio_engine* engine, se_audio_clip* clip) {
 	}
 	ma_sound_stop(&clip->sound);
 	ma_sound_uninit(&clip->sound);
+	se_audio_release_clip_source(clip);
 	se_audio_free_analysis_data(clip);
 	memset(clip, 0, sizeof(se_audio_clip));
 	clip->owner = engine;
@@ -389,8 +416,17 @@ se_audio_stream* se_audio_stream_open(se_audio_engine* engine, const char* relat
 		return NULL;
 	}
 
-	ma_result ma_res = ma_sound_init_from_file(&engine->engine, full_path, MA_SOUND_FLAG_STREAM, NULL, NULL, &stream->sound);
+	ma_result ma_res = se_audio_init_sound_from_resource(
+		engine,
+		full_path,
+		MA_SOUND_FLAG_STREAM,
+		&stream->sound,
+		&stream->decoder,
+		&stream->decoder_initialized,
+		&stream->encoded_data,
+		&stream->encoded_size);
 	if (ma_res != MA_SUCCESS) {
+		se_audio_release_stream_source(stream);
 		memset(stream, 0, sizeof(se_audio_stream));
 		stream->owner = engine;
 		se_set_last_error(SE_RESULT_BACKEND_FAILURE);
@@ -418,6 +454,7 @@ void se_audio_stream_close(se_audio_stream* stream) {
 	se_audio_engine* owner = stream->owner;
 	ma_sound_stop(&stream->sound);
 	ma_sound_uninit(&stream->sound);
+	se_audio_release_stream_source(stream);
 	memset(stream, 0, sizeof(se_audio_stream));
 	stream->owner = owner;
 }
@@ -514,7 +551,7 @@ se_audio_capture* se_audio_capture_start(se_audio_engine* engine, const se_audio
 		return NULL;
 	}
 	ma_device_id* selected_id = NULL;
-	if (resolved.device_index < capture_count) {
+	if (config && resolved.device_index < capture_count) {
 		capture->device_id = capture_infos[resolved.device_index].id;
 		selected_id = &capture->device_id;
 	}
@@ -742,16 +779,14 @@ static void se_audio_clip_refresh_volume(se_audio_clip* clip) {
 	if (!clip || !clip->owner) {
 		return;
 	}
-	const f32 bus_volume = clip->owner->bus_volumes[clip->bus];
-	ma_sound_set_volume(&clip->sound, clip->base_volume * bus_volume);
+	ma_sound_set_volume(&clip->sound, clip->base_volume * se_audio_get_effective_bus_volume(clip->owner, clip->bus));
 }
 
 static void se_audio_stream_refresh_volume(se_audio_stream* stream) {
 	if (!stream || !stream->owner) {
 		return;
 	}
-	const f32 bus_volume = stream->owner->bus_volumes[stream->bus];
-	ma_sound_set_volume(&stream->sound, stream->base_volume * bus_volume);
+	ma_sound_set_volume(&stream->sound, stream->base_volume * se_audio_get_effective_bus_volume(stream->owner, stream->bus));
 }
 
 static const se_audio_play_params* se_audio_resolve_play_params(const se_audio_play_params* params) {
@@ -769,11 +804,96 @@ static char* se_audio_resolve_resource_path(const char* relative_path, char* out
 	return out_path;
 }
 
+static ma_result se_audio_init_sound_from_resource(
+	se_audio_engine* engine,
+	const char* full_path,
+	ma_uint32 flags,
+	ma_sound* out_sound,
+	ma_decoder* out_decoder,
+	b8* out_decoder_initialized,
+	u8** out_encoded_data,
+	sz* out_encoded_size) {
+	if (!engine || !full_path || !out_sound || !out_decoder || !out_decoder_initialized || !out_encoded_data || !out_encoded_size) {
+		return MA_INVALID_ARGS;
+	}
+	*out_decoder_initialized = false;
+	*out_encoded_data = NULL;
+	*out_encoded_size = 0;
+	if (s_file_exists(full_path)) {
+		return ma_sound_init_from_file(&engine->engine, full_path, flags, NULL, NULL, out_sound);
+	}
+
+	u8* encoded_data = NULL;
+	sz encoded_size = 0;
+	if (!se_resource_read_binary_file(full_path, &encoded_data, &encoded_size)) {
+		return MA_DOES_NOT_EXIST;
+	}
+
+	ma_result result = ma_decoder_init_memory(encoded_data, encoded_size, NULL, out_decoder);
+	if (result != MA_SUCCESS) {
+		free(encoded_data);
+		return result;
+	}
+	result = ma_sound_init_from_data_source(&engine->engine, out_decoder, flags, NULL, out_sound);
+	if (result != MA_SUCCESS) {
+		ma_decoder_uninit(out_decoder);
+		free(encoded_data);
+		return result;
+	}
+
+	*out_decoder_initialized = true;
+	*out_encoded_data = encoded_data;
+	*out_encoded_size = encoded_size;
+	return MA_SUCCESS;
+}
+
+static void se_audio_release_clip_source(se_audio_clip* clip) {
+	if (!clip) {
+		return;
+	}
+	if (clip->decoder_initialized) {
+		ma_decoder_uninit(&clip->decoder);
+		clip->decoder_initialized = false;
+	}
+	if (clip->encoded_data) {
+		free(clip->encoded_data);
+		clip->encoded_data = NULL;
+	}
+	clip->encoded_size = 0;
+}
+
+static void se_audio_release_stream_source(se_audio_stream* stream) {
+	if (!stream) {
+		return;
+	}
+	if (stream->decoder_initialized) {
+		ma_decoder_uninit(&stream->decoder);
+		stream->decoder_initialized = false;
+	}
+	if (stream->encoded_data) {
+		free(stream->encoded_data);
+		stream->encoded_data = NULL;
+	}
+	stream->encoded_size = 0;
+}
+
 static se_audio_bus se_audio_sanitize_bus(se_audio_bus bus) {
 	if (bus < 0 || bus >= SE_AUDIO_BUS_COUNT) {
 		return SE_AUDIO_BUS_MASTER;
 	}
 	return bus;
+}
+
+static f32 se_audio_get_effective_bus_volume(const se_audio_engine* engine, se_audio_bus bus) {
+	if (!engine) {
+		return 0.0f;
+	}
+	const se_audio_bus sanitized = se_audio_sanitize_bus(bus);
+	const f32 bus_volume = engine->bus_volumes[sanitized];
+	if (sanitized == SE_AUDIO_BUS_MASTER) {
+		return bus_volume;
+	}
+	return bus_volume * engine->bus_volumes[SE_AUDIO_BUS_MASTER];
 }
 
 static float se_audio_clamp_volume(float value) {

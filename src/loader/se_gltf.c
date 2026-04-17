@@ -2,6 +2,7 @@
 
 #include "loader/se_gltf.h"
 #include "se_debug.h"
+#include "se_resource_io.h"
 
 #include "syphax/s_files.h"
 #include "syphax/s_json.h"
@@ -386,7 +387,7 @@ static b8 se_gltf_read_glb(const char *path, se_gltf_glb_data *out) {
 	memset(out, 0, sizeof(*out));
 	u8 *file_data = NULL;
 	sz file_size = 0;
-	if (!s_file_read_binary(path, &file_data, &file_size)) return false;
+	if (!se_resource_read_binary_file(path, &file_data, &file_size)) return false;
 	if (file_size < 12) {
 		free(file_data);
 		return false;
@@ -548,7 +549,7 @@ static b8 se_gltf_parse_buffers(const s_json *root, se_gltf_asset *asset, const 
 				} else {
 					if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, "", buf->uri)) return false;
 				}
-				if (!s_file_read_binary(full_path, &data, &size)) return false;
+				if (!se_resource_read_binary_file(full_path, &data, &size)) return false;
 				buf->data = data;
 				buf->data_size = size;
 				buf->owns_data = true;
@@ -672,7 +673,7 @@ static b8 se_gltf_parse_images(const s_json *root, se_gltf_asset *asset, const s
 				} else {
 					if (!s_path_join(full_path, SE_MAX_PATH_LENGTH, "", img->uri)) return false;
 				}
-				if (!s_file_read_binary(full_path, &data, &size)) return false;
+				if (!se_resource_read_binary_file(full_path, &data, &size)) return false;
 				img->data = data;
 				img->data_size = size;
 				img->owns_data = true;
@@ -1257,7 +1258,7 @@ se_gltf_asset *se_gltf_load(const char *path, const se_gltf_load_params *params)
 		bin_data = glb.bin_data;
 		bin_size = glb.bin_size;
 	} else {
-		if (!s_file_read(path, &json_text, NULL)) {
+		if (!se_resource_read_text_file(path, &json_text, NULL)) {
 			se_gltf_free(asset);
 			se_set_last_error(SE_RESULT_IO);
 			return NULL;

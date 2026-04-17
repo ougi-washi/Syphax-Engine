@@ -2,8 +2,8 @@
 
 #include "se_model.h"
 #include "se_debug.h"
+#include "se_resource_io.h"
 #include "render/se_gl.h"
-#include "syphax/s_files.h"
 
 static void se_model_cleanup(se_model *model);
 
@@ -340,7 +340,7 @@ se_model_handle se_model_load_obj_with_flags(const char *path, const se_shaders_
 	}
 
 	char *file_data = NULL;
-	if (!s_file_read(full_path, &file_data, NULL)) {
+	if (!se_resource_read_text_file(full_path, &file_data, NULL)) {
 		se_model_cleanup(model);
 		s_array_remove(&ctx->models, model_handle);
 		se_set_last_error(SE_RESULT_IO);

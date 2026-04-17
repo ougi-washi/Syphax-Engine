@@ -3,8 +3,8 @@
 #include "se_text.h"
 #include "se_debug.h"
 #include "se_graphics.h"
+#include "se_resource_io.h"
 #include "render/se_gl.h"
-#include "syphax/s_files.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
@@ -144,15 +144,8 @@ se_font_handle se_font_load(const char* path, const f32 size) {
 		return S_HANDLE_NULL;
 	}
 
-	c8 new_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!se_paths_resolve_resource_path(new_path, SE_MAX_PATH_LENGTH, path)) {
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
-		se_font_cleanup(new_font);
-		s_array_remove(&ctx->fonts, font_handle);
-		return S_HANDLE_NULL;
-	}
 	u8* font_file_data = NULL;
-	if (!s_file_read_binary(new_path, &font_file_data, NULL)) {
+	if (!se_resource_read_binary_path(path, &font_file_data, NULL)) {
 		se_set_last_error(SE_RESULT_IO);
 		se_font_cleanup(new_font);
 		s_array_remove(&ctx->fonts, font_handle);

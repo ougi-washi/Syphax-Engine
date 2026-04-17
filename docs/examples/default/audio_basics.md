@@ -12,7 +12,7 @@ prerequisites:
 
 ## Goal
 
-Play clips and stream looped audio with bus-level volume control.
+Play clips, stream looped audio with bus-level volume control, and show a live default-input meter.
 
 
 ## Learning path
@@ -25,6 +25,8 @@ Play clips and stream looped audio with bus-level volume control.
 - M: mute or unmute loop
 - Up/Down: master volume
 - Esc: quit
+
+The example also starts default audio input capture when available and shows a simple reactive meter.
 
 ## Build command
 
@@ -41,8 +43,9 @@ Play clips and stream looped audio with bus-level volume control.
 ## Internal flow
 
 - `se_audio_init` creates the mixer, then clip/stream handles are loaded once at startup.
+- `se_audio_capture_start(audio, NULL)` asks the backend for the system default input device and feeds the meter when available.
 - Per-frame `se_audio_update` advances stream state while input edges trigger clip play/mute toggles.
-- Bus and stream volume updates (`se_audio_bus_set_volume`, `se_audio_stream_set_volume`) apply in the mixer path.
+- Bus and stream volume updates (`se_audio_bus_set_volume`, `se_audio_stream_set_volume`) apply in the mixer path, including master bus gain.
 
 ## Related API links
 

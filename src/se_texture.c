@@ -1,6 +1,7 @@
 // Syphax Engine - Ougi Washi
 
 #include "se_texture.h"
+#include "se_resource_io.h"
 #include "render/se_gl.h"
 
 #include <math.h>
@@ -110,15 +111,17 @@ se_texture_handle se_texture_load(const char *file_path, const se_texture_wrap w
 	texture->target = GL_TEXTURE_2D;
 	texture->wrap = wrap;
 
-	char full_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!se_paths_resolve_resource_path(full_path, SE_MAX_PATH_LENGTH, file_path)) {
+	u8 *encoded_data = NULL;
+	sz encoded_size = 0;
+	if (!se_resource_read_binary_path(file_path, &encoded_data, &encoded_size)) {
 		s_array_remove(&ctx->textures, texture_handle);
-		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		se_set_last_error(SE_RESULT_IO);
 		return S_HANDLE_NULL;
 	}
 
-	u8 *pixels = stbi_load(full_path, &texture->width, &texture->height, &texture->channels, 0);
+	u8 *pixels = stbi_load_from_memory(encoded_data, (int)encoded_size, &texture->width, &texture->height, &texture->channels, 0);
 	if (!pixels) {
+		free(encoded_data);
 		s_array_remove(&ctx->textures, texture_handle);
 		se_set_last_error(SE_RESULT_IO);
 		return S_HANDLE_NULL;
@@ -141,6 +144,7 @@ se_texture_handle se_texture_load(const char *file_path, const se_texture_wrap w
 
 	if (!se_texture_store_cpu_pixels_rgba(texture, pixels)) {
 		stbi_image_free(pixels);
+		free(encoded_data);
 		se_texture_cleanup(texture);
 		s_array_remove(&ctx->textures, texture_handle);
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
@@ -148,6 +152,7 @@ se_texture_handle se_texture_load(const char *file_path, const se_texture_wrap w
 	}
 
 	stbi_image_free(pixels);
+	free(encoded_data);
 	se_set_last_error(SE_RESULT_OK);
 	return texture_handle;
 }

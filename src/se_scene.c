@@ -3,6 +3,7 @@
 #include "se_scene.h"
 #include "se_debug.h"
 #include "se_graphics.h"
+#include "se_resource_io.h"
 #include "syphax/s_files.h"
 #include "syphax/s_json.h"
 #include "render/se_gl.h"
@@ -87,11 +88,11 @@ static b8 se_scene_json_read_file(const c8* path, s_json** out_root) {
 		return false;
 	}
 	*out_root = NULL;
-	if (!s_file_read(read_path, &text, NULL)) {
+	if (!se_resource_read_text_file(read_path, &text, NULL)) {
 		if (se_paths_resolve_resource_path(resolved_path, sizeof(resolved_path), path)) {
 			read_path = resolved_path;
 		}
-		if (!s_file_read(read_path, &text, NULL)) {
+		if (!se_resource_read_text_file(read_path, &text, NULL)) {
 			se_set_last_error(SE_RESULT_IO);
 			return false;
 		}
