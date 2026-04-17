@@ -26,6 +26,12 @@ prerequisites:
 ./scripts/docs/build.sh
 ```
 
+## Coverage model
+
+- `Path` is curated. Not every public header needs a deep-dive path page.
+- `Module Guides` are broader. Every public header that appears in generated API reference should also have an authored module guide page and nav entry.
+- `Examples` should stay one page per runnable target.
+
 ## Path authoring workflow
 
 1. Create or update one page under `docs/path/`.
@@ -46,6 +52,20 @@ prerequisites:
 1. Add at least one link to an API module page and one link to an example page.
 1. Add or update the page in `mkdocs.yml` navigation.
 
+## Module guide workflow
+
+1. Create or update one page under `docs/module-guides/`.
+1. Keep the required concept-page headings:
+   - `## When to use this`
+   - `## Minimal working snippet`
+   - `## Step-by-step explanation`
+   - `## Next`
+   - `## Common mistakes`
+   - `## Related pages`
+1. Link the guide to the generated API page for the same public header.
+1. Link the guide to the best matching Path page when one exists; otherwise link to the most relevant topic landing page or example page.
+1. Add the guide to both `docs/module-guides/index.md` and the `Module Guides` section of `mkdocs.yml`.
+
 ## Add a new module Path
 
 1. Copy `docs/templates/path-template.md` into `docs/path/<slug>.md`.
@@ -64,6 +84,15 @@ prerequisites:
 1. Add a placeholder image under `docs/assets/img/examples/<track>/<target>.svg`.
 1. Update `scripts/docs/capture_examples.sh` if the target should participate in local screenshot capture.
 1. Run `./scripts/docs/check_example_coverage.sh` before opening the PR.
+
+## Add or rename a public module
+
+1. Update the public header under `include/` or `include/loader/`.
+1. Regenerate API reference pages with `./scripts/docs/generate_api_reference.sh`.
+1. Add or update the matching authored module guide page.
+1. Add the guide to `docs/module-guides/index.md` and `mkdocs.yml`.
+1. Add or update related links from landing pages when the module changes the visible public surface.
+1. Run the full command set above before opening the PR.
 
 ## Release cadence
 
@@ -94,7 +123,7 @@ Use front matter on each page:
 
 - Concept pages must include a `Related pages` section.
 - Example pages must include related API links and a learning-path mapping to Path steps.
-- Module guides must link to deep-dive Path plus generated API pages.
+- Module guides must link to generated API pages and to the clearest matching Path page, topic landing page, or example page.
 - Path must link back to module guides, API pages, and at least one example page.
 
 ## Labels for docs issues

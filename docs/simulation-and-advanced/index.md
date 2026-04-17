@@ -8,6 +8,11 @@ prerequisites:
 
 Advanced simulation and integration references.
 
+## Use this section when
+
+- You are working on fixed-tick simulation, background task execution, or larger integration examples.
+- You want to connect `se_simulation` with `se_worker`, navigation, loaders, and the main integration targets.
+
 ## In this section
 
 - [Path: Simulation](../path/simulation.md)
@@ -16,4 +21,5 @@ Advanced simulation and integration references.
 - [Example: simulation_advanced](../examples/advanced/simulation_advanced.md)
 - [Example: rts_integration](../examples/advanced/rts_integration.md)
 - [Module guide: se_simulation](../module-guides/se-simulation.md)
-- [API: se_simulation.h](../api-reference/modules/se_simulation.md)
+- [Module guide: se_worker](../module-guides/se-worker.md)
+- [Module guide: se_navigation](../module-guides/se-navigation.md)

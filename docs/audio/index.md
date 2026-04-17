@@ -8,6 +8,11 @@ prerequisites:
 
 Audio setup and playback controls.
 
+## Use this section when
+
+- You need one-shot clips, looping streams, or capture analysis.
+- You want the smallest path from audio engine setup to a runnable example.
+
 ## In this section
 
 - [Path: Audio](../path/audio.md)

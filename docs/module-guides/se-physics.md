@@ -1,47 +1,49 @@
 ---
 title: se_physics
-summary: Rigid body worlds, shapes, and stepping APIs.
+summary: 2D and 3D physics worlds, bodies, shapes, and stepping APIs.
 prerequisites:
   - Public header include path available.
 ---
 
 # se_physics
 
-
 ## When to use this
 
-Use `se_physics` for features that map directly to its module boundary.
+Use `se_physics` when rigid bodies, collisions, queries, or stepped physical motion belong in the runtime.
 
 ## Minimal working snippet
 
 ```c
 #include "se_physics.h"
+
 se_physics_world_3d_step(world, dt);
 ```
 
 ## Step-by-step explanation
 
-1. Include the module header and create required handles.
-1. Call per-frame functions in your frame loop where needed.
-1. Destroy resources before context teardown.
+1. Create the 2D or 3D world that matches the simulation space you need, then populate it with bodies and shapes.
+1. Step the world with a deliberate time step and pull transformed state back into scene or gameplay systems from the results.
+1. Use the world APIs for queries and controlled body updates instead of keeping a second untracked motion model in app code.
 
 <div class="next-block" markdown="1">
 
 ## Next
 
 1. Open [API declarations](../api-reference/modules/se_physics.md).
-1. Run one linked example and change one parameter.
+1. Continue with the [Physics path page](../path/physics.md).
 
 </div>
 
 ## Common mistakes
 
-- Skipping creation failure checks.
-- Using this module to encode domain-specific framework logic in engine core.
+- Driving physics with inconsistent timing while the rest of the app assumes a fixed step.
+- Keeping duplicate transform state in gameplay objects and physics bodies without a clear sync direction.
+- Treating the physics world as a gameplay framework instead of as a reusable simulation primitive.
 
 ## Related pages
 
-- [Deep dive path page](../path/physics.md)
-- [API module page](../api-reference/modules/se_physics.md)
+- [Path: Physics](../path/physics.md)
+- [Physics overview](../physics/index.md)
+- [Module guide: se_math](se-math.md)
 - [Example: physics2d_playground](../examples/default/physics2d_playground.md)
 - [Example: physics3d_playground](../examples/default/physics3d_playground.md)

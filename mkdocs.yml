@@ -79,6 +79,11 @@ nav:
       - Error Handling: start-here/error-handling.md
       - Resource Paths: start-here/resource-paths.md
       - First Run Checklist: start-here/first-run-checklist.md
+  - Task Guides:
+      - Runtime And Platform: runtime-and-platform/index.md
+      - Loading And Assets: loading-and-assets/index.md
+      - Utilities: utilities/index.md
+      - SDF: sdf/index.md
   - Path:
       - path/index.md
       - Window: path/window.md
@@ -150,7 +155,7 @@ nav:
           - navigation_grid: examples/advanced/navigation_grid.md
           - noise_texture: examples/advanced/noise_texture.md
           - rts_integration: examples/advanced/rts_integration.md
-          - sdf_path_steps: examples/advanced/sdf_path_steps.md
+          - sdf_path_steps (docs helper): examples/advanced/sdf_path_steps.md
           - simulation_intro: examples/advanced/simulation_intro.md
           - simulation_advanced: examples/advanced/simulation_advanced.md
           - ui_showcase: examples/advanced/ui_showcase.md
@@ -159,24 +164,34 @@ nav:
       - module-guides/index.md
       - se_window: module-guides/se-window.md
       - se_input: module-guides/se-input.md
+      - se_backend: module-guides/se-backend.md
+      - se_render_frame: module-guides/se-render-frame.md
+      - se_render_thread: module-guides/se-render-thread.md
+      - se_worker: module-guides/se-worker.md
+      - se_debug: module-guides/se-debug.md
       - se_camera: module-guides/se-camera.md
       - se_scene: module-guides/se-scene.md
-      - se_ui: module-guides/se-ui.md
-      - se_audio: module-guides/se-audio.md
-      - se_vfx: module-guides/se-vfx.md
-      - se_physics: module-guides/se-physics.md
-      - se_navigation: module-guides/se-navigation.md
-      - se_simulation: module-guides/se-simulation.md
-      - se_debug: module-guides/se-debug.md
       - se_graphics: module-guides/se-graphics.md
       - se_model: module-guides/se-model.md
       - se_shader: module-guides/se-shader.md
       - se_texture: module-guides/se-texture.md
       - se_text: module-guides/se-text.md
+      - se_quad: module-guides/se-quad.md
+      - se_noise: module-guides/se-noise.md
+      - se_sdf: module-guides/se-sdf.md
       - se_render_buffer: module-guides/se-render-buffer.md
       - se_framebuffer: module-guides/se-framebuffer.md
-      - se_backend: module-guides/se-backend.md
+      - se_ui: module-guides/se-ui.md
+      - se_audio: module-guides/se-audio.md
+      - se_vfx: module-guides/se-vfx.md
       - se_curve: module-guides/se-curve.md
+      - se_physics: module-guides/se-physics.md
+      - se_navigation: module-guides/se-navigation.md
+      - se_simulation: module-guides/se-simulation.md
+      - se_editor: module-guides/se-editor.md
+      - se_math: module-guides/se-math.md
+      - se_defines: module-guides/se-defines.md
+      - se_ext: module-guides/se-ext.md
       - loader/se_loader: module-guides/loader-se-loader.md
       - loader/se_gltf: module-guides/loader-se-gltf.md
   - API Reference:

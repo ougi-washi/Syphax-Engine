@@ -1,46 +1,48 @@
 ---
 title: se_navigation
-summary: Grid navigation and pathfinding APIs.
+summary: Grid and field pathfinding, reachability, and world/cell conversion APIs.
 prerequisites:
   - Public header include path available.
 ---
 
 # se_navigation
 
-
 ## When to use this
 
-Use `se_navigation` for features that map directly to its module boundary.
+Use `se_navigation` when an app needs grid-based paths, sampled navigation fields, reachable-area queries, or world/cell conversion helpers.
 
 ## Minimal working snippet
 
 ```c
 #include "se_navigation.h"
+
 se_navigation_find_path_simple(&grid, start, goal, true, &path);
 ```
 
 ## Step-by-step explanation
 
-1. Include the module header and create required handles.
-1. Call per-frame functions in your frame loop where needed.
-1. Destroy resources before context teardown.
+1. Create a grid or field that matches the world representation you want to navigate.
+1. Mark blocked cells or sampled costs explicitly so path queries see the same walkability rules as the rest of the app.
+1. Reuse `se_navigation_path` and related containers across queries to keep the navigation layer predictable and cheap to reason about.
 
 <div class="next-block" markdown="1">
 
 ## Next
 
 1. Open [API declarations](../api-reference/modules/se_navigation.md).
-1. Run one linked example and change one parameter.
+1. Continue with the [Navigation path page](../path/navigation.md).
 
 </div>
 
 ## Common mistakes
 
-- Skipping creation failure checks.
-- Using this module to encode domain-specific framework logic in engine core.
+- Forgetting to initialize or reset path/area containers before reuse.
+- Mixing grid cells and world coordinates without a single conversion boundary.
+- Treating debug-only navigation traces as the authoritative path output.
 
 ## Related pages
 
-- [Deep dive path page](../path/navigation.md)
-- [API module page](../api-reference/modules/se_navigation.md)
+- [Path: Navigation](../path/navigation.md)
+- [Physics overview](../physics/index.md)
+- [Module guide: se_math](se-math.md)
 - [Example: navigation_grid](../examples/advanced/navigation_grid.md)

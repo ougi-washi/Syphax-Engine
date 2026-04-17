@@ -17,6 +17,7 @@ Inspect and edit an SDF scene from the keyboard, including transforms, lights, n
 
 ## Learning path
 
+- Start with the [SDF overview](../../sdf/index.md) if the goal is simply to learn how to use SDFs.
 - This example extends the [SDF path page](../../path/sdf.md) with runtime editing and scene round-tripping.
 - This example uses the generic editor data model from the [Utilities path page](../../path/utilities.md).
 
@@ -62,6 +63,7 @@ Inspect and edit an SDF scene from the keyboard, including transforms, lights, n
 ## Related API links
 
 - [Source code: `examples/advanced/editor_sdf.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/editor_sdf.c)
+- [SDF overview](../../sdf/index.md)
 - [Path: SDF](../../path/sdf.md)
 - [Path: Utilities](../../path/utilities.md)
 - [API: se_editor.h](../../api-reference/modules/se_editor.md)

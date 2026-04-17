@@ -19,7 +19,7 @@ Reference operations for `s_array` and handle-based remove behavior.
 
 ## Learning path
 
-- This example corresponds to [Utility Path](../../path/utilities.md) Step 2.
+- This example corresponds to the [Utilities path page](../../path/utilities.md) Step 2.
 
 ## Controls
 
@@ -46,7 +46,8 @@ Reference operations for `s_array` and handle-based remove behavior.
 ## Related API links
 
 - [Source code: `examples/advanced/array_handles.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/array_handles.c)
-- [Path: Utility Path](../../path/utilities.md)
+- [Path: Utilities](../../path/utilities.md)
 - [Glossary: handle](../../glossary/terms.md#handle)
 - [API: se_defines.h](../../api-reference/modules/se_defines.md)
-- [Module guide: se_navigation](../../module-guides/se-navigation.md)
+- [Module guide: se_math](../../module-guides/se-math.md)
+- [Module guide: se_defines](../../module-guides/se-defines.md)

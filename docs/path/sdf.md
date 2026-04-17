@@ -8,6 +8,8 @@ prerequisites:
 
 # SDF
 
+If you are not sure this is the right SDF page, start with the [SDF overview](../sdf/index.md). This page is the guided step-by-step walkthrough, not the shortest overview.
+
 ## When to use this
 
 Use this when signed-distance content should be assembled from reusable `se_sdf` objects, shared lights or noise should be attached by handle, and the same scene should scale from a single visible primitive to a full rendered example.
@@ -114,6 +116,7 @@ Key API calls:
 
 ## Related pages
 
+- [SDF overview](../sdf/index.md)
 - [Module guide: se-camera](../module-guides/se-camera.md)
 - [API: se_sdf.h](../api-reference/modules/se_sdf.md)
 - [Example: sdf](../examples/default/sdf.md)

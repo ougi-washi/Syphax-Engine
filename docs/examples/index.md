@@ -37,7 +37,7 @@ Use this section to find build/run commands, controls, and small edits for docum
 - [navigation_grid](advanced/navigation_grid.md)
 - [noise_texture](advanced/noise_texture.md)
 - [rts_integration](advanced/rts_integration.md)
-- [sdf_path_steps](advanced/sdf_path_steps.md)
+- [sdf_path_steps](advanced/sdf_path_steps.md) docs helper, usually skip unless updating SDF walkthrough captures
 - [simulation_intro](advanced/simulation_intro.md)
 - [simulation_advanced](advanced/simulation_advanced.md)
 - [ui_showcase](advanced/ui_showcase.md)

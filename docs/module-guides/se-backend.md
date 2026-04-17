@@ -1,48 +1,50 @@
 ---
 title: se_backend
-summary: Backend descriptor and runtime backend APIs.
+summary: Active backend, shader profile, portability, and capability queries.
 prerequisites:
   - Public header include path available.
 ---
 
 # se_backend
 
-
 ## When to use this
 
-Use `se_backend` for features that map directly to its module boundary.
+Use `se_backend` when feature availability depends on the active render backend, platform backend, shader profile, or capability limits.
 
 ## Minimal working snippet
 
 ```c
 #include "se_backend.h"
+
 se_backend_info info = se_get_backend_info();
+se_capabilities caps = se_capabilities_get();
 ```
 
 ## Step-by-step explanation
 
-1. Include the module header and create required handles.
-1. Call per-frame functions in your frame loop where needed.
-1. Destroy resources before context teardown.
+1. Query backend and capability state early in startup so optional features and shader paths can be selected deliberately.
+1. Combine backend info with `se_ext` checks when an optimization depends on both platform intent and runtime support.
+1. Use backend data when debugging portability issues, queue behavior, or render limits instead of hard-coding assumptions by platform name.
 
 <div class="next-block" markdown="1">
 
 ## Next
 
 1. Open [API declarations](../api-reference/modules/se_backend.md).
-1. Run one linked example and change one parameter.
+1. Continue with the [Backend path page](../path/backend.md).
 
 </div>
 
 ## Common mistakes
 
-- Skipping creation failure checks.
-- Using this module to encode domain-specific framework logic in engine core.
+- Treating planned backends as if they were implemented runtime targets.
+- Selecting advanced rendering paths without checking actual capability data.
+- Using backend enums alone when the real gate is an extension or capability query.
 
 ## Related pages
 
-- [Deep dive path page](../path/backend.md)
-- [API module page](../api-reference/modules/se_backend.md)
-- [API: se_render_frame.h](../api-reference/modules/se_render_frame.md)
-- [API: se_render_thread.h](../api-reference/modules/se_render_thread.md)
+- [Path: Backend](../path/backend.md)
+- [Module guide: se_ext](se-ext.md)
+- [Module guide: se_render_frame](se-render-frame.md)
+- [Module guide: se_render_thread](se-render-thread.md)
 - [Example: context_lifecycle](../examples/advanced/context_lifecycle.md)

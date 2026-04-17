@@ -8,6 +8,8 @@ prerequisites:
 
 Single, complete path with no duplicate tracks.
 
+If you want the shortest route for a specific task instead of the full learning path, start with one of the task guides on the home page, especially [SDF](../sdf/index.md), [Loading and assets](../loading-and-assets/index.md), or [Runtime and platform](../runtime-and-platform/index.md).
+
 ## Recommended order
 
 - [Window](window.md)

@@ -20,6 +20,10 @@ with open(mkdocs_file, "r", encoding="utf-8") as f:
     mkdocs_text = f.read()
 
 nav_paths = set(re.findall(r"([A-Za-z0-9_./-]+\.md)", mkdocs_text))
+module_guide_index = os.path.join(docs_dir, "module-guides", "index.md")
+with open(module_guide_index, "r", encoding="utf-8") as f:
+    module_guide_index_text = f.read()
+module_guide_links = set(re.findall(r"\(([A-Za-z0-9_./-]+\.md)\)", module_guide_index_text))
 
 all_docs = []
 for root, _, files in os.walk(docs_dir):
@@ -63,6 +67,14 @@ def header_to_module_id(path: str) -> str:
         return "loader_" + stem.split("/", 1)[1]
     return stem
 
+
+def header_to_module_guide(path: str) -> str:
+    rel = os.path.relpath(path, root_dir).replace("\\", "/")
+    stem = rel.replace("include/", "").replace(".h", "")
+    guide_name = stem.replace("/", "-").replace("_", "-") + ".md"
+    return f"module-guides/{guide_name}"
+
+expected_module_guides = set()
 for header in headers:
     module_id = header_to_module_id(header)
     page_rel = f"api-reference/modules/{module_id}.md"
@@ -71,6 +83,25 @@ for header in headers:
         raise SystemExit(f"Missing generated API page for header {header}: {page_rel}")
     if page_rel not in nav_paths:
         raise SystemExit(f"Generated API page missing in nav: {page_rel}")
+
+    guide_rel = header_to_module_guide(header)
+    guide_abs = os.path.join(docs_dir, guide_rel)
+    guide_name = os.path.basename(guide_rel)
+    expected_module_guides.add(guide_rel)
+    if not os.path.isfile(guide_abs):
+        raise SystemExit(f"Missing authored module guide for header {header}: {guide_rel}")
+    if guide_rel not in nav_paths:
+        raise SystemExit(f"Module guide missing in nav: {guide_rel}")
+    if guide_name not in module_guide_links:
+        raise SystemExit(f"docs/module-guides/index.md missing link: {guide_name}")
+
+guide_pages = sorted(glob.glob(os.path.join(docs_dir, "module-guides", "*.md")))
+for guide in guide_pages:
+    if os.path.basename(guide) == "index.md":
+        continue
+    rel = os.path.relpath(guide, docs_dir).replace("\\", "/")
+    if rel not in expected_module_guides:
+        raise SystemExit(f"Module guide has no matching public header: {rel}")
 
 # Required concept sections for Start Here and module guides.
 required_concept_sections = {

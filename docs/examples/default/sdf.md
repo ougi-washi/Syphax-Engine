@@ -17,6 +17,7 @@ Compose a small signed-distance scene with shared lights, per-object shading, an
 
 ## Learning path
 
+- Start with the [SDF overview](../../sdf/index.md) if you are new to the SDF docs.
 - This example corresponds to [SDF path page](../../path/sdf.md) Step 4.
 
 ## Controls
@@ -44,6 +45,7 @@ Compose a small signed-distance scene with shared lights, per-object shading, an
 ## Related API links
 
 - [Source code: `examples/sdf.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/sdf.c)
+- [SDF overview](../../sdf/index.md)
 - [Path: SDF](../../path/sdf.md)
 - [Path: Camera](../../path/camera.md)
 - [API: se_sdf.h](../../api-reference/modules/se_sdf.md)

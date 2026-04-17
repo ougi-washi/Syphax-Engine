@@ -27,7 +27,9 @@ docs/
 
 1. Treat `include/` as public contract.
 1. Treat `src/` as module implementation.
-1. Keep generated output in `build/` and `bin/`.
+1. Treat `examples/` and `examples/advanced/` as runnable validation and teaching targets.
+1. Treat `docs/` as authored docs source and `scripts/docs/` as docs maintenance tooling.
+1. Keep generated output in `build/`, `bin/`, and `site/`.
 
 <div class="next-block" markdown="1">
 
@@ -48,4 +50,5 @@ docs/
 - [Resource paths](resource-paths.md)
 - [Contributing docs](../contributing-docs.md)
 - [API module index](../api-reference/modules/index.md)
+- [Module guides](../module-guides/index.md)
 - [Next path page](../path/window.md)

@@ -9,6 +9,8 @@ prerequisites:
 
 > Scope: advanced docs helper
 
+Most users can skip this page. It exists to generate the staged screenshots used by the SDF walkthrough.
+
 <img src="../../../assets/img/examples/advanced/sdf_path_steps.svg" alt="sdf_path_steps preview image">
 
 ## Goal
@@ -18,6 +20,7 @@ Render the staged SDF scenes used by the SDF path walkthrough captures.
 ## Learning path
 
 - This target is the capture driver behind the [SDF path page](../../path/sdf.md).
+- For normal learning, start with the [SDF overview](../../sdf/index.md) or the runnable [sdf example](../default/sdf.md).
 
 ## Controls
 
@@ -45,5 +48,6 @@ SE_DOCS_SDF_STEP=3 ./bin/sdf_path_steps
 ## Related API links
 
 - [Source code: `examples/advanced/sdf_path_steps.c`](https://github.com/ougi-washi/Syphax-Engine/blob/main/examples/advanced/sdf_path_steps.c)
+- [SDF overview](../../sdf/index.md)
 - [Path: SDF](../../path/sdf.md)
 - [API: se_sdf.h](../../api-reference/modules/se_sdf.md)

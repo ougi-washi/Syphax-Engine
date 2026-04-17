@@ -24,21 +24,32 @@ Syphax Engine is a C framework for interactive visuals, games, and tools.
 
 - [Install and build](start-here/install-and-build.md)
 - [First window](start-here/first-window.md)
+- [Runtime and platform](runtime-and-platform/index.md)
+- [Loading and assets](loading-and-assets/index.md)
+- [Utilities](utilities/index.md)
+- [SDF](sdf/index.md)
 - [Path overview](path/index.md)
-- [Window path page](path/window.md)
 - [Examples index](examples/index.md)
 - [Module guides](module-guides/index.md)
+- [API module index](api-reference/modules/index.md)
 - [API reference](api-reference/index.md)
 - [Glossary](glossary/terms.md)
 
 ## Documentation map
 
 - `Start Here`: setup and first-run pages.
-- `Path`: ordered pages that each explain one concept.
+- `Path`: a curated learning route with one concept per page and four-step snippets.
 - `Examples`: one page per runnable target.
-- `Module Guides`: usage-oriented pages mapped to API modules.
-- `Path walkthroughs`: progressive four-step module pages with compileable snippets.
+- `Module Guides`: short usage guides that map the full public module surface to real tasks.
 - `API Reference`: generated declaration pages from public headers.
+
+## Use this site effectively
+
+- Start in `Start Here` if this is a fresh checkout or a first build.
+- Use `Task Guides` when you want the shortest answer to "which page do I read for this kind of task?"
+- Use `Path` when learning one subsystem from minimal setup to a fuller demo.
+- Use `Module Guides` when you already know the module name and want the shortest route to related docs.
+- Use `Examples` when you want a runnable target to inspect or extend.
 
 ## Build this docs site locally
 

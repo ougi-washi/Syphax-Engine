@@ -1,47 +1,49 @@
 ---
 title: se_simulation
-summary: Deterministic simulation entity/component/event APIs.
+summary: Fixed-tick entity, component, event, system, and snapshot APIs.
 prerequisites:
   - Public header include path available.
 ---
 
 # se_simulation
 
-
 ## When to use this
 
-Use `se_simulation` for features that map directly to its module boundary.
+Use `se_simulation` when state should advance in fixed ticks with explicit entities, registered component types, ordered systems, and queued events.
 
 ## Minimal working snippet
 
 ```c
 #include "se_simulation.h"
+
 se_simulation_step(sim, 1u);
 ```
 
 ## Step-by-step explanation
 
-1. Include the module header and create required handles.
-1. Call per-frame functions in your frame loop where needed.
-1. Destroy resources before context teardown.
+1. Create the simulation with capacities and a fixed time step that match the expected workload.
+1. Register component and event types up front, then add systems that operate on deterministic tick state instead of frame delta guesses.
+1. Use the JSON and snapshot helpers when you need persistence, rollback, replay, or tool-facing inspection of simulation state.
 
 <div class="next-block" markdown="1">
 
 ## Next
 
 1. Open [API declarations](../api-reference/modules/se_simulation.md).
-1. Run one linked example and change one parameter.
+1. Continue with the [Simulation path page](../path/simulation.md).
 
 </div>
 
 ## Common mistakes
 
-- Skipping creation failure checks.
-- Using this module to encode domain-specific framework logic in engine core.
+- Registering simulation types lazily in unpredictable runtime paths.
+- Mixing frame-time logic and fixed-tick logic without deciding which layer owns the state.
+- Treating the simulation module as an opinionated gameplay framework instead of a generic engine system.
 
 ## Related pages
 
-- [Deep dive path page](../path/simulation.md)
-- [API module page](../api-reference/modules/se_simulation.md)
+- [Path: Simulation](../path/simulation.md)
+- [Simulation and advanced overview](../simulation-and-advanced/index.md)
+- [Module guide: se_worker](se-worker.md)
 - [Example: simulation_intro](../examples/advanced/simulation_intro.md)
 - [Example: simulation_advanced](../examples/advanced/simulation_advanced.md)
