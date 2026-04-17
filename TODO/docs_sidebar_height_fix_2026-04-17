@@ -1,0 +1,4 @@
+[x] Inspect docs CSS and sidebar layout rules affecting the left navigation height.
+[x] Update the docs styles so the left navigation scroll area spans the full page height.
+[x] Rebuild the docs site and verify the sidebar no longer clips early.
+[x] Commit only the intended docs fix, push `dev`, and update `main` directly.

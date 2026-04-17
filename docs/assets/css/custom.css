@@ -168,23 +168,23 @@ button:focus-visible {
     align-self: start;
     position: sticky;
     top: calc(var(--md-header-height, 2.4rem) + 0.55rem);
-    max-height: calc(100vh - var(--md-header-height, 2.4rem) - 1rem);
   }
 
-  .md-sidebar--primary .md-sidebar__inner {
+  .md-sidebar--primary .md-sidebar__scrollwrap {
     box-sizing: border-box;
-    max-height: 100%;
+    height: calc(100vh - var(--md-header-height, 2.4rem) - 1rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: #0f1319;
     border: 1px solid var(--sx-border);
     border-radius: var(--sx-radius);
     padding: 0.45rem 0.35rem;
+    padding-bottom: 1.2rem;
+    padding-right: 0.2rem;
   }
 
-  .md-sidebar--primary .md-sidebar__scrollwrap {
-    max-height: calc(100vh - var(--md-header-height, 2.4rem) - 2.3rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-right: 0.2rem;
-    padding-bottom: 1.2rem;
+  .md-sidebar--primary .md-sidebar__inner {
+    box-sizing: border-box;
+    min-height: 100%;
   }
 }
