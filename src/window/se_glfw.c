@@ -1320,7 +1320,7 @@ static void framebuffer_size_callback(GLFWwindow* glfw_handle, i32 width, i32 he
 		width,
 		height);
 	glViewport(0, 0, width, height);
-	se_log("framebuffer_size_callback :: fallback resize handler");
+	se_log("framebuffer_size_callback :: fallback resize handler: %d x %d", width, height);
 	for (sz i = 0; i < s_array_get_size(&window->resize_handles); ++i) {
 		se_resize_handle* current_event_ptr = s_array_get(&window->resize_handles, s_array_handle(&window->resize_handles, (u32)i));
 		if (current_event_ptr && current_event_ptr->callback) {
