@@ -45,7 +45,6 @@ struct se_editor {
 #define SE_EDITOR_NAME_ACTION "action"
 #define SE_EDITOR_NAME_BOOL "bool"
 #define SE_EDITOR_NAME_COMMAND "command"
-#define SE_EDITOR_NAME_CUSTOM "custom"
 #define SE_EDITOR_NAME_DOUBLE "double"
 #define SE_EDITOR_NAME_FLOAT "float"
 #define SE_EDITOR_NAME_HANDLE "handle"
@@ -967,7 +966,7 @@ se_editor_category se_editor_category_from_name(const c8* name) {
 		return SE_EDITOR_CATEGORY_COUNT;
 	}
 	se_editor_normalize_name(name, normalized_name, sizeof(normalized_name));
-	if (strcmp(normalized_name, SE_EDITOR_NAME_ITEM) == 0 || strcmp(normalized_name, SE_EDITOR_NAME_CUSTOM) == 0) {
+	if (strcmp(normalized_name, SE_EDITOR_NAME_ITEM) == 0) {
 		return SE_EDITOR_CATEGORY_ITEM;
 	}
 	return SE_EDITOR_CATEGORY_COUNT;
@@ -1114,7 +1113,7 @@ b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts) {
 		return false;
 	}
 	memset(out_counts, 0, sizeof(*out_counts));
-	if (!se_editor_collect_items(editor, SE_EDITOR_CATEGORY_MASK_ALL, &items, &item_count)) {
+	if (!se_editor_collect_items(editor, &items, &item_count)) {
 		return false;
 	}
 	(void)items;
@@ -1124,16 +1123,13 @@ b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts) {
 	return true;
 }
 
-b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_mask, const se_editor_item** out_items, sz* out_count) {
+b8 se_editor_collect_items(se_editor* editor, const se_editor_item** out_items, sz* out_count) {
 	if (!editor || !out_items || !out_count) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	se_editor_clear_runtime_arrays(editor);
-	if (category_mask == 0u) {
-		category_mask = SE_EDITOR_CATEGORY_MASK_ALL;
-	}
-	if (editor->collect_items && !editor->collect_items(editor, category_mask, editor->user_data)) {
+	if (editor->collect_items && !editor->collect_items(editor, editor->user_data)) {
 		if (se_get_last_error() == SE_RESULT_OK) {
 			se_set_last_error(SE_RESULT_NOT_FOUND);
 		}
@@ -1167,12 +1163,11 @@ b8 se_editor_validate_item(se_editor* editor, const se_editor_item* item) {
 	const se_editor_item* items = NULL;
 	sz item_count = 0u;
 	b8 should_retry_without_owner = false;
-	const se_editor_category_mask mask = se_editor_category_to_mask(item ? item->category : SE_EDITOR_CATEGORY_COUNT);
-	if (!editor || !item || (u32)item->category >= (u32)SE_EDITOR_CATEGORY_COUNT || mask == 0u) {
+	if (!editor || !item || (u32)item->category >= (u32)SE_EDITOR_CATEGORY_COUNT) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
-	if (!se_editor_collect_items(editor, mask, &items, &item_count)) {
+	if (!se_editor_collect_items(editor, &items, &item_count)) {
 		return false;
 	}
 	if (!items || item_count == 0u) {
@@ -1207,17 +1202,19 @@ b8 se_editor_validate_item(se_editor* editor, const se_editor_item* item) {
 b8 se_editor_find_item(se_editor* editor, se_editor_category category, s_handle handle, se_editor_item* out_item) {
 	const se_editor_item* items = NULL;
 	sz item_count = 0u;
-	const se_editor_category_mask mask = se_editor_category_to_mask(category);
-	if (!editor || !out_item || (u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT || mask == 0u) {
+	if (!editor || !out_item || (u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
-	if (!se_editor_collect_items(editor, mask, &items, &item_count)) {
+	if (!se_editor_collect_items(editor, &items, &item_count)) {
 		return false;
 	}
 	for (sz i = 0; i < item_count; ++i) {
 		if (!items) {
 			break;
+		}
+		if (items[i].category != category) {
+			continue;
 		}
 		if (handle == S_HANDLE_NULL || items[i].handle == handle) {
 			*out_item = items[i];
@@ -1232,17 +1229,19 @@ b8 se_editor_find_item(se_editor* editor, se_editor_category category, s_handle 
 b8 se_editor_find_item_by_label(se_editor* editor, se_editor_category category, const c8* label, se_editor_item* out_item) {
 	const se_editor_item* items = NULL;
 	sz item_count = 0u;
-	const se_editor_category_mask mask = se_editor_category_to_mask(category);
-	if (!editor || !label || label[0] == '\0' || !out_item || (u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT || mask == 0u) {
+	if (!editor || !label || label[0] == '\0' || !out_item || (u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
-	if (!se_editor_collect_items(editor, mask, &items, &item_count)) {
+	if (!se_editor_collect_items(editor, &items, &item_count)) {
 		return false;
 	}
 	for (sz i = 0; i < item_count; ++i) {
 		if (!items) {
 			break;
+		}
+		if (items[i].category != category) {
+			continue;
 		}
 		if (strcmp(items[i].label, label) == 0) {
 			*out_item = items[i];

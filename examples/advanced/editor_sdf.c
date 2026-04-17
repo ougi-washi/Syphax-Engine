@@ -319,10 +319,9 @@ static b8 editor_sdf_apply_json(editor_sdf_app* app) {
 	return app && app->scene != SE_SDF_NULL && app->root && se_sdf_from_json(app->scene, app->root);
 }
 
-static b8 editor_sdf_collect_items(se_editor* editor, se_editor_category_mask mask, void* user_data) {
+static b8 editor_sdf_collect_items(se_editor* editor, void* user_data) {
 	editor_sdf_app* app = user_data;
 	u32 id = 1u;
-	if (!(mask & se_editor_category_to_mask(SE_EDITOR_CATEGORY_ITEM))) return true;
 	return app && app->root && editor_sdf_collect_node(editor, app->root, S_HANDLE_NULL, &id);
 }
 
@@ -584,7 +583,7 @@ static b8 editor_sdf_collect_selection(editor_sdf_app* app, const se_editor_item
 	const se_editor_property* properties = NULL;
 	sz item_count = 0u;
 	sz property_count = 0u;
-	if (!app || !se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_ITEM), &items, &item_count) || item_count == 0u) {
+	if (!app || !se_editor_collect_items(app->editor, &items, &item_count) || item_count == 0u) {
 		return false;
 	}
 	if (app->selected_item >= item_count) app->selected_item = (u32)item_count - 1u;
@@ -1128,7 +1127,7 @@ static b8 editor_sdf_autotest(editor_sdf_app* app) {
 	const se_editor_item* items = NULL;
 	sz item_count = 0u;
 	se_editor_shortcut_event event = {0};
-	if (!se_editor_collect_items(app->editor, se_editor_category_to_mask(SE_EDITOR_CATEGORY_ITEM), &items, &item_count) || item_count == 0u) return false;
+	if (!se_editor_collect_items(app->editor, &items, &item_count) || item_count == 0u) return false;
 	se_window_clear_input_state(app->window);
 	se_window_inject_key_state(app->window, SE_KEY_LEFT_CONTROL, true);
 	se_window_inject_key_state(app->window, SE_KEY_S, true);
@@ -1139,7 +1138,7 @@ static b8 editor_sdf_autotest(editor_sdf_app* app) {
 	if (!se_editor_apply_set(app->editor, &root_item, "operation_amount", &value)) return false;
 	if (!editor_sdf_save_file(app, "/tmp/editor_sdf_autotest.json")) return false;
 	if (!editor_sdf_load_file(app, "/tmp/editor_sdf_autotest.json")) return false;
-	printf("editor_sdf :: autotest custom_items=%zu ok\n", item_count);
+	printf("editor_sdf :: autotest items=%zu ok\n", item_count);
 	return true;
 }
 

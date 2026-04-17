@@ -236,7 +236,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-extern b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_mask, const se_editor_item** out_items, sz* out_count);
+extern b8 se_editor_collect_items(se_editor* editor, const se_editor_item** out_items, sz* out_count);
 ```
 
 </div>
@@ -970,7 +970,7 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef enum { SE_EDITOR_CATEGORY_ITEM = 0, SE_EDITOR_CATEGORY_CUSTOM = SE_EDITOR_CATEGORY_ITEM, SE_EDITOR_CATEGORY_COUNT } se_editor_category;
+typedef enum { SE_EDITOR_CATEGORY_ITEM = 0, SE_EDITOR_CATEGORY_COUNT } se_editor_category;
 ```
 
 </div>
@@ -1007,6 +1007,18 @@ No inline description found in header comments.
 
 ```c
 typedef enum { SE_EDITOR_SHORTCUT_MOD_NONE = 0, SE_EDITOR_SHORTCUT_MOD_SHIFT = 1u << 0, SE_EDITOR_SHORTCUT_MOD_CONTROL = 1u << 1, SE_EDITOR_SHORTCUT_MOD_ALT = 1u << 2, SE_EDITOR_SHORTCUT_MOD_SUPER = 1u << 3 } se_editor_shortcut_mod;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_type`
+
+<div class="api-signature">
+
+```c
+typedef enum { SE_EDITOR_VALUE_NONE = 0, SE_EDITOR_VALUE_BOOL, SE_EDITOR_VALUE_INT, SE_EDITOR_VALUE_UINT, SE_EDITOR_VALUE_U64, SE_EDITOR_VALUE_FLOAT, SE_EDITOR_VALUE_DOUBLE, SE_EDITOR_VALUE_VEC2, SE_EDITOR_VALUE_VEC3, SE_EDITOR_VALUE_VEC4, SE_EDITOR_VALUE_MAT3, SE_EDITOR_VALUE_MAT4, SE_EDITOR_VALUE_HANDLE, SE_EDITOR_VALUE_POINTER, SE_EDITOR_VALUE_TEXT } se_editor_value_type;
 ```
 
 </div>
@@ -1051,24 +1063,12 @@ typedef b8 (*se_editor_apply_command_fn)(se_editor* editor, const se_editor_comm
 
 No inline description found in header comments.
 
-### `se_editor_category_mask`
-
-<div class="api-signature">
-
-```c
-typedef u64 se_editor_category_mask;
-```
-
-</div>
-
-No inline description found in header comments.
-
 ### `se_editor_collect_items_fn`
 
 <div class="api-signature">
 
 ```c
-typedef b8 (*se_editor_collect_items_fn)(se_editor* editor, se_editor_category_mask category_mask, void* user_data);
+typedef b8 (*se_editor_collect_items_fn)(se_editor* editor, void* user_data);
 ```
 
 </div>

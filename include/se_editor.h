@@ -14,21 +14,10 @@ typedef struct s_json s_json;
 
 typedef enum {
 	SE_EDITOR_CATEGORY_ITEM = 0,
-	SE_EDITOR_CATEGORY_CUSTOM = SE_EDITOR_CATEGORY_ITEM,
 	SE_EDITOR_CATEGORY_COUNT
 } se_editor_category;
 
-typedef u64 se_editor_category_mask;
-
-#define SE_EDITOR_CATEGORY_MASK_ALL ((se_editor_category_mask)~(se_editor_category_mask)0)
 #define SE_EDITOR_SHORTCUT_MAX_KEYS 4u
-
-static inline se_editor_category_mask se_editor_category_to_mask(const se_editor_category category) {
-	if ((u32)category >= (u32)SE_EDITOR_CATEGORY_COUNT || (u32)category >= 64u) {
-		return 0u;
-	}
-	return ((se_editor_category_mask)1u) << (u32)category;
-}
 
 typedef enum {
 	SE_EDITOR_VALUE_NONE = 0,
@@ -127,7 +116,7 @@ typedef struct {
 	c8 action[SE_MAX_NAME_LENGTH];
 } se_editor_shortcut_event;
 
-typedef b8 (*se_editor_collect_items_fn)(se_editor* editor, se_editor_category_mask category_mask, void* user_data);
+typedef b8 (*se_editor_collect_items_fn)(se_editor* editor, void* user_data);
 typedef b8 (*se_editor_collect_properties_fn)(se_editor* editor, const se_editor_item* item, void* user_data);
 typedef b8 (*se_editor_apply_command_fn)(se_editor* editor, const se_editor_command* command, void* user_data);
 
@@ -208,7 +197,7 @@ extern b8 se_editor_json_write_file(const c8* path, s_json* root);
 extern b8 se_editor_json_read_file(const c8* path, s_json** out_root);
 
 extern b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_counts);
-extern b8 se_editor_collect_items(se_editor* editor, se_editor_category_mask category_mask, const se_editor_item** out_items, sz* out_count);
+extern b8 se_editor_collect_items(se_editor* editor, const se_editor_item** out_items, sz* out_count);
 extern b8 se_editor_collect_properties(se_editor* editor, const se_editor_item* item, const se_editor_property** out_properties, sz* out_count);
 extern b8 se_editor_add_item(se_editor* editor, se_editor_category category, s_handle handle, s_handle owner_handle, void* pointer, void* owner_pointer, u32 index, const c8* label);
 extern b8 se_editor_add_property_value(se_editor* editor, const c8* name, const se_editor_value* value, b8 editable);
