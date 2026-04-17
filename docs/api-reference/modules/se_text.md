@@ -27,6 +27,30 @@ extern void se_font_destroy(const se_font_handle font);
 
 No inline description found in header comments.
 
+### `se_font_get_line_advance`
+
+<div class="api-signature">
+
+```c
+extern f32 se_font_get_line_advance(const se_font_handle font);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_font_get_line_height`
+
+<div class="api-signature">
+
+```c
+extern f32 se_font_get_line_height(const se_font_handle font);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_font_load`
 
 <div class="api-signature">
@@ -98,7 +122,7 @@ No enums found in this header.
 <div class="api-signature">
 
 ```c
-typedef struct se_font { s_array(c8, path); u32 atlas_texture; f32 size; u16 atlas_width, atlas_height; u16 first_character, characters_count; s_array(stbtt_packedchar, packed_characters); s_array(stbtt_aligned_quad, aligned_quads); } se_font;
+typedef struct se_font { s_array(c8, path); u32 atlas_texture; f32 size; f32 line_advance; f32 line_height; u16 atlas_width, atlas_height; u16 first_character, characters_count; s_array(stbtt_packedchar, packed_characters); s_array(stbtt_aligned_quad, aligned_quads); } se_font;
 ```
 
 </div>

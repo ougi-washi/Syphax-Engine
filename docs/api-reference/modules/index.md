@@ -31,7 +31,7 @@ Generated API pages by public header.
 | [include/se_sdf.h](se_sdf.md) | 62 | 2 | 6 |
 | [include/se_shader.h](se_shader.md) | 32 | 1 | 6 |
 | [include/se_simulation.h](se_simulation.md) | 31 | 0 | 12 |
-| [include/se_text.h](se_text.md) | 6 | 0 | 3 |
+| [include/se_text.h](se_text.md) | 8 | 0 | 3 |
 | [include/se_texture.h](se_texture.md) | 7 | 1 | 4 |
 | [include/se_ui.h](se_ui.md) | 98 | 5 | 30 |
 | [include/se_vfx.h](se_vfx.md) | 63 | 2 | 11 |

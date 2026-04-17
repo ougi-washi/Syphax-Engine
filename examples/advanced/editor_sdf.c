@@ -16,6 +16,11 @@
 #include <string.h>
 
 #define EDITOR_SDF_PATH SE_RESOURCE_EXAMPLE("editor_sdf/scene.json")
+#define EDITOR_SDF_FONT_SIZE 42.0f
+#define EDITOR_SDF_TEXT_SCALE 0.70f
+#define EDITOR_SDF_TEXT_NEWLINE_OFFSET 0.024f
+#define EDITOR_SDF_TEXT_TOP_Y 0.90f
+#define EDITOR_SDF_TEXT_BOTTOM_Y -0.90f
 
 typedef enum {
 	EDITOR_SDF_NODE = 1,
@@ -68,6 +73,27 @@ typedef struct {
 } sdf_editor;
 
 static void editor_sdf_handle_shortcut(sdf_editor* editor, const se_editor_shortcut_event* event);
+
+static f32 editor_sdf_text_line_step(const sdf_editor* editor) {
+	u32 framebuffer_width = 0u;
+	u32 framebuffer_height = 0u;
+	f32 line_advance = 0.0f;
+	f32 line_height = 0.0f;
+	f32 line_step = 0.045f;
+	if (!editor || editor->window == S_HANDLE_NULL) {
+		return line_step;
+	}
+	se_window_get_framebuffer_size(editor->window, &framebuffer_width, &framebuffer_height);
+	(void)framebuffer_width;
+	if (framebuffer_height == 0u) {
+		return line_step;
+	}
+	line_advance = se_font_get_line_advance(editor->font);
+	line_height = se_font_get_line_height(editor->font);
+	line_height = s_max(line_height, s_max(line_advance, EDITOR_SDF_FONT_SIZE));
+	line_step = (line_height * EDITOR_SDF_TEXT_SCALE * (2.0f / (f32)framebuffer_height)) + EDITOR_SDF_TEXT_NEWLINE_OFFSET;
+	return s_max(line_step, 0.045f);
+}
 
 static void editor_sdf_set_status(sdf_editor* editor, const c8* format, ...) {
 	va_list args;
@@ -1233,7 +1259,7 @@ static void editor_sdf_draw_text(sdf_editor* editor, f32 x, f32 y, const c8* for
 	va_start(args, format);
 	vsnprintf(line, sizeof(line), format, args);
 	va_end(args);
-	se_text_draw(editor->font, line, &s_vec2(x, y), &s_vec2(0.70f, 0.70f), 0.024f);
+	se_text_draw(editor->font, line, &s_vec2(x, y), &s_vec2(EDITOR_SDF_TEXT_SCALE, EDITOR_SDF_TEXT_SCALE), EDITOR_SDF_TEXT_NEWLINE_OFFSET);
 }
 
 static void editor_sdf_draw_ui(sdf_editor* editor) {
@@ -1241,36 +1267,49 @@ static void editor_sdf_draw_ui(sdf_editor* editor) {
 	const se_editor_property* properties = NULL;
 	sz item_count = 0u;
 	sz property_count = 0u;
-	const u32 visible_items = 17u;
-	const u32 visible_properties = 17u;
 	u32 item_start = 0u;
 	u32 property_start = 0u;
+	u32 visible_rows = 0u;
+	const f32 line_step = editor_sdf_text_line_step(editor);
+	const f32 title_y = EDITOR_SDF_TEXT_TOP_Y;
+	const f32 selected_y = title_y - line_step;
+	const f32 pane_y = selected_y - line_step;
+	const f32 list_y = pane_y - line_step;
+	const f32 footer_y = EDITOR_SDF_TEXT_BOTTOM_Y;
+	const f32 help_y = footer_y + line_step;
+	const f32 status_y = help_y + line_step;
+	const f32 list_bottom_y = status_y + line_step;
 	const c8* mode = editor->moving ? "move" : se_editor_mode_name(se_editor_get_mode(editor->handle));
+	if (line_step > 0.0f && list_y > list_bottom_y) {
+		visible_rows = (u32)s_max(1.0f, floorf(((list_y - list_bottom_y) / line_step) + 1.0f));
+	}
 	if (!editor_sdf_collect_selection(editor, &items, &item_count, NULL, &properties, &property_count)) {
-		editor_sdf_draw_text(editor, -0.96f, 0.86f, "SDF editor: no items");
+		editor_sdf_draw_text(editor, -0.96f, selected_y, "SDF editor: no items");
 		return;
 	}
-	if (editor->selected_item > visible_items / 2u) item_start = editor->selected_item - visible_items / 2u;
-	if (item_start + visible_items > item_count) item_start = item_count > visible_items ? (u32)item_count - visible_items : 0u;
-	if (editor->selected_property > visible_properties / 2u) property_start = editor->selected_property - visible_properties / 2u;
-	if (property_start + visible_properties > property_count) property_start = property_count > visible_properties ? (u32)property_count - visible_properties : 0u;
+	if (visible_rows > 0u) {
+		if (editor->selected_item > visible_rows / 2u) item_start = editor->selected_item - visible_rows / 2u;
+		if (item_start + visible_rows > item_count) item_start = item_count > visible_rows ? (u32)item_count - visible_rows : 0u;
+		if (editor->selected_property > visible_rows / 2u) property_start = editor->selected_property - visible_rows / 2u;
+		if (property_start + visible_rows > property_count) property_start = property_count > visible_rows ? (u32)property_count - visible_rows : 0u;
+	}
 
-	editor_sdf_draw_text(editor, -0.96f, 0.90f, "SDF level editor | %s | %s", mode, editor->json_path);
-	editor_sdf_draw_text(editor, -0.96f, 0.86f, "selected: %s @ %.2f %.2f %.2f%s",
+	editor_sdf_draw_text(editor, -0.96f, title_y, "SDF level editor | %s | %s", mode, editor->json_path);
+	editor_sdf_draw_text(editor, -0.96f, selected_y, "selected: %s @ %.2f %.2f %.2f%s",
 		items[editor->selected_item].label,
 		editor->focus_target.x, editor->focus_target.y, editor->focus_target.z,
 		editor->focus_active ? " -> camera" : "");
-	editor_sdf_draw_text(editor, -0.96f, 0.82f, "%s items (%zu)", editor->active_pane == EDITOR_SDF_PANE_ITEMS ? ">" : " ", item_count);
-	editor_sdf_draw_text(editor, -0.10f, 0.82f, "%s properties (%zu)", editor->active_pane == EDITOR_SDF_PANE_PROPERTIES ? ">" : " ", property_count);
-	for (u32 row = 0u; row < visible_items && item_start + row < item_count; ++row) {
+	editor_sdf_draw_text(editor, -0.96f, pane_y, "%s items (%zu)", editor->active_pane == EDITOR_SDF_PANE_ITEMS ? ">" : " ", item_count);
+	editor_sdf_draw_text(editor, -0.10f, pane_y, "%s properties (%zu)", editor->active_pane == EDITOR_SDF_PANE_PROPERTIES ? ">" : " ", property_count);
+	for (u32 row = 0u; row < visible_rows && item_start + row < item_count; ++row) {
 		const u32 index = item_start + row;
 		const u32 depth = editor_sdf_item_depth(items, item_count, &items[index]);
-		editor_sdf_draw_text(editor, -0.96f, 0.76f - (f32)row * 0.045f, "%s%*s%s",
+		editor_sdf_draw_text(editor, -0.96f, list_y - (f32)row * line_step, "%s%*s%s",
 			index == editor->selected_item ? ">" : " ",
 			(i32)(depth * 2u), "",
 			items[index].label);
 	}
-	for (u32 row = 0u; row < visible_properties && property_start + row < property_count; ++row) {
+	for (u32 row = 0u; row < visible_rows && property_start + row < property_count; ++row) {
 		c8 value_text[160] = {0};
 		c8 component[16] = {0};
 		const c8* component_name = NULL;
@@ -1280,7 +1319,7 @@ static void editor_sdf_draw_ui(sdf_editor* editor) {
 		if (index == editor->selected_property && se_editor_property_component_count(&properties[index]) > 1u && component_name) {
 			snprintf(component, sizeof(component), "[%s] ", component_name);
 		}
-		editor_sdf_draw_text(editor, -0.10f, 0.76f - (f32)row * 0.045f, "%s%s%s = %s%s",
+		editor_sdf_draw_text(editor, -0.10f, list_y - (f32)row * line_step, "%s%s%s = %s%s",
 			index == editor->selected_property ? ">" : " ",
 			properties[index].editable ? "" : "(ro) ",
 			editor_sdf_property_label(&properties[index]),
@@ -1288,12 +1327,12 @@ static void editor_sdf_draw_ui(sdf_editor* editor) {
 			value_text);
 	}
 	if (editor->editing && property_count > 0u) {
-		editor_sdf_draw_text(editor, -0.96f, -0.74f, "edit %s: %s_", editor_sdf_property_label(&properties[editor->selected_property]), editor->edit_buffer);
+		editor_sdf_draw_text(editor, -0.96f, status_y, "edit %s: %s_", editor_sdf_property_label(&properties[editor->selected_property]), editor->edit_buffer);
 	} else {
-		editor_sdf_draw_text(editor, -0.96f, -0.74f, "%s", editor->status[0] ? editor->status : "ready");
+		editor_sdf_draw_text(editor, -0.96f, status_y, "%s", editor->status[0] ? editor->status : "ready");
 	}
-	editor_sdf_draw_text(editor, -0.96f, -0.82f, "j/k select  h/l pane  Enter/i edit  +/- nudge  [/] component  M move  Ctrl+S save  Ctrl+O load  Ctrl+Q quit");
-	editor_sdf_draw_text(editor, -0.96f, -0.90f, "move: X/Y/Z axis  Shift coarse  Alt fine  Enter keep  Esc cancel  |  camera: WASD/QE U/O Y/P Z/X R F");
+	editor_sdf_draw_text(editor, -0.96f, help_y, "j/k select  h/l pane  Enter/i edit  +/- nudge  [/] component  M move  Ctrl+S save  Ctrl+O load  Ctrl+Q quit");
+	editor_sdf_draw_text(editor, -0.96f, footer_y, "move: X/Y/Z axis  Shift coarse  Alt fine  Enter keep  Esc cancel  |  camera: WASD/QE U/O Y/P Z/X R F");
 }
 
 static b8 editor_sdf_bind_shortcuts(sdf_editor* editor) {
@@ -1494,7 +1533,7 @@ static b8 editor_sdf_setup(sdf_editor* editor) {
 	if (editor->window == S_HANDLE_NULL) return false;
 	se_window_set_target_fps(editor->window, 60);
 	se_render_set_background(s_vec4(0.04f, 0.05f, 0.07f, 1.0f));
-	editor->font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), 42.0f);
+	editor->font = se_font_load(SE_RESOURCE_PUBLIC("fonts/ithaca.ttf"), EDITOR_SDF_FONT_SIZE);
 	if (editor->font == S_HANDLE_NULL) return false;
 	editor->camera = se_camera_create();
 	se_camera_set_window_aspect(editor->camera, editor->window);

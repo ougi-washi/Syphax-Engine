@@ -56,6 +56,15 @@ static se_text_handle* se_text_default_handle_get(se_context* ctx) {
 	return ctx->default_text_handle;
 }
 
+static s_vec2 se_text_get_clip_pixel_scale(void) {
+	GLint viewport[4] = {0, 0, 0, 0};
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	if (viewport[2] <= 0 || viewport[3] <= 0) {
+		return s_vec2(1.0f / 1024.0f, 1.0f / 1024.0f);
+	}
+	return s_vec2(2.0f / (f32)viewport[2], 2.0f / (f32)viewport[3]);
+}
+
 se_text_handle* se_text_handle_create(const u32 fonts_count) {
 	se_context *ctx = se_current_context();
 	if (!ctx) {
@@ -160,6 +169,23 @@ se_font_handle se_font_load(const char* path, const f32 size) {
 		s_array_remove(&ctx->fonts, font_handle);
 		return S_HANDLE_NULL;
 	}
+
+	stbtt_fontinfo font_info;
+	const i32 font_offset = stbtt_GetFontOffsetForIndex(font_file_data, 0);
+	if (!stbtt_InitFont(&font_info, font_file_data, font_offset)) {
+		free(font_file_data);
+		se_set_last_error(SE_RESULT_UNSUPPORTED);
+		se_font_cleanup(new_font);
+		s_array_remove(&ctx->fonts, font_handle);
+		return S_HANDLE_NULL;
+	}
+	new_font->size = size;
+	i32 ascent = 0;
+	i32 descent = 0;
+	i32 line_gap = 0;
+	stbtt_GetFontVMetrics(&font_info, &ascent, &descent, &line_gap);
+	const f32 font_scale = stbtt_ScaleForPixelHeight(&font_info, new_font->size);
+	new_font->line_advance = (ascent - descent + line_gap) * font_scale;
 	
 	new_font->atlas_width = 1024;
 	new_font->atlas_height = 1024;
@@ -176,7 +202,9 @@ se_font_handle se_font_load(const char* path, const f32 size) {
 	// ASCII 32(Space) to ASCII 126(~) are the commonly used characters in text 
 	new_font->first_character = 32;
 	new_font->characters_count = 95;
-	new_font->size = size;
+	if (new_font->line_advance <= 0.0f) {
+		new_font->line_advance = new_font->size;
+	}
 
 	s_array_init(&new_font->packed_characters);
 	s_array_init(&new_font->aligned_quads);
@@ -186,17 +214,32 @@ se_font_handle se_font_load(const char* path, const f32 size) {
 	}
 
 	stbtt_pack_context pack_ctx;
+	f32 font_top = 0.0f;
+	f32 font_bottom = 0.0f;
+	b8 has_vertical_bounds = false;
 	stbtt_PackBegin(&pack_ctx, atlas_bitmap, new_font->atlas_width, new_font->atlas_height, 0, 1, NULL);
 	stbtt_PackFontRange(&pack_ctx, font_file_data, 0, new_font->size, new_font->first_character, new_font->characters_count, s_array_get_data(&new_font->packed_characters));
 	
 	for (i32 i = 0; i < new_font->characters_count; i++) {
 		f32 unused_x, unused_y;
+		stbtt_packedchar* packed_char = s_array_get(&new_font->packed_characters, s_array_handle(&new_font->packed_characters, (u32)i));
+		if (!has_vertical_bounds || packed_char->yoff < font_top) {
+			font_top = packed_char->yoff;
+		}
+		if (!has_vertical_bounds || packed_char->yoff2 > font_bottom) {
+			font_bottom = packed_char->yoff2;
+		}
+		has_vertical_bounds = true;
 		stbtt_GetPackedQuad(s_array_get_data(&new_font->packed_characters), 
 				new_font->atlas_width, new_font->atlas_height, 
 				i,
 				&unused_x, &unused_y,
 				s_array_get(&new_font->aligned_quads, s_array_handle(&new_font->aligned_quads, (u32)i)),
 				0);
+	}
+	new_font->line_height = font_bottom - font_top;
+	if (new_font->line_height <= 0.0f) {
+		new_font->line_height = s_max(new_font->line_advance, new_font->size);
 	}
 
 	glGenTextures(1, &new_font->atlas_texture);
@@ -215,6 +258,36 @@ se_font_handle se_font_load(const char* path, const f32 size) {
 
 	se_set_last_error(SE_RESULT_OK);
 	return font_handle;
+}
+
+f32 se_font_get_line_advance(const se_font_handle font) {
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0.0f;
+	}
+	se_font* font_ptr = s_array_get(&ctx->fonts, font);
+	if (!font_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0.0f;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return font_ptr->line_advance;
+}
+
+f32 se_font_get_line_height(const se_font_handle font) {
+	se_context* ctx = se_current_context();
+	if (!ctx) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0.0f;
+	}
+	se_font* font_ptr = s_array_get(&ctx->fonts, font);
+	if (!font_ptr) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return 0.0f;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return font_ptr->line_height;
 }
 
 void se_font_destroy(const se_font_handle font) {
@@ -275,10 +348,11 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 	se_shader_set_texture(text_handle->text_shader, "u_atlas_texture", font_ptr->atlas_texture);
 	
 	s_vec2 local_position = *position;
-	const f32 pixel_scale = 1.f / 1024.f; // TODO: dynamic pixel scale by screen size
-    s_vec2 text_scale = *size;
-    text_scale.x *= pixel_scale;
-    text_scale.y *= pixel_scale;
+	const s_vec2 clip_scale = se_text_get_clip_pixel_scale();
+	s_vec2 text_scale = *size;
+	text_scale.x *= clip_scale.x;
+	text_scale.y *= clip_scale.y;
+	const f32 baseline_advance = font_ptr->line_advance * size->y * clip_scale.y;
 	i32 glyph_count = 0;
 	for (sz i = 0; i < text_size; ++i) {
 		const c8 raw_c = text[i];
@@ -289,7 +363,7 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 		const i32 c = (u8)raw_c;
 		
 		if (raw_c == '\n') {
-			local_position.y -= new_line_offset * size->y * font_ptr->size / 10.;
+			local_position.y -= baseline_advance + new_line_offset;
 			local_position.x = position->x;
 			continue;
 		}
@@ -303,7 +377,7 @@ void se_text_render(se_text_handle* text_handle, const se_font_handle font, cons
 			stbtt_aligned_quad* aligned_quad = s_array_get(&font_ptr->aligned_quads, s_array_handle(&font_ptr->aligned_quads, char_index));
 			
 			f32 glyph_width = (packed_char->x1 - packed_char->x0) * text_scale.x; 
-			f32 glyph_height = (packed_char->y1 - packed_char->y0) * text_scale.x;
+			f32 glyph_height = (packed_char->y1 - packed_char->y0) * text_scale.y;
 			
 			// xoff/yoff are offsets to top-left corner, but shader centers quad
 			// So we add half size to get offset to the center
