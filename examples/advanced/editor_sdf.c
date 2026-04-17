@@ -7,6 +7,7 @@
 #include "se_sdf.h"
 #include "se_text.h"
 #include "se_window.h"
+#include "syphax/s_files.h"
 #include "syphax/s_json.h"
 
 #include <stdarg.h>
@@ -73,6 +74,7 @@ typedef struct {
 } sdf_editor;
 
 static void editor_sdf_handle_shortcut(sdf_editor* editor, const se_editor_shortcut_event* event);
+static f32 editor_sdf_json_round_f32(f32 value);
 
 static f32 editor_sdf_text_line_step(const sdf_editor* editor) {
 	u32 framebuffer_width = 0u;
@@ -138,7 +140,7 @@ static void editor_sdf_apply_camera(sdf_editor* editor) {
 
 static b8 editor_sdf_json_number(const s_json* node, f32* out) {
 	if (!node || node->type != S_JSON_NUMBER || !out) return false;
-	*out = (f32)node->as.number;
+	*out = editor_sdf_json_round_f32((f32)node->as.number);
 	return true;
 }
 
@@ -316,6 +318,15 @@ static b8 editor_sdf_json_replace(s_json* object, const c8* key, s_json* value) 
 	return s_json_add(object, value);
 }
 
+static f32 editor_sdf_json_round_f32(const f32 value) {
+	const f32 scale = 1000.0f;
+	if (!isfinite(value)) {
+		return value;
+	}
+	const f32 rounded = roundf(value * scale) / scale;
+	return fabsf(rounded) < (0.5f / scale) ? 0.0f : rounded;
+}
+
 static void editor_sdf_json_remove(s_json* object, const c8* key) {
 	if (!object || object->type != S_JSON_OBJECT || !key) return;
 	for (sz i = 0u; i < object->as.children.count; ++i) {
@@ -331,7 +342,7 @@ static void editor_sdf_json_remove(s_json* object, const c8* key) {
 }
 
 static b8 editor_sdf_set_number(s_json* object, const c8* key, f32 value) {
-	return editor_sdf_json_replace(object, key, s_json_num(NULL, value));
+	return editor_sdf_json_replace(object, key, s_json_num(NULL, editor_sdf_json_round_f32(value)));
 }
 
 static b8 editor_sdf_set_string(s_json* object, const c8* key, const c8* value) {
@@ -341,8 +352,8 @@ static b8 editor_sdf_set_string(s_json* object, const c8* key, const c8* value) 
 static b8 editor_sdf_set_vec2(s_json* object, const c8* key, s_vec2 value) {
 	s_json* array = s_json_array_empty(NULL);
 	if (!array) return false;
-	if (!s_json_add(array, s_json_num(NULL, value.x)) ||
-		!s_json_add(array, s_json_num(NULL, value.y)) ||
+	if (!s_json_add(array, s_json_num(NULL, editor_sdf_json_round_f32(value.x))) ||
+		!s_json_add(array, s_json_num(NULL, editor_sdf_json_round_f32(value.y))) ||
 		!editor_sdf_json_replace(object, key, array)) {
 		s_json_free(array);
 		return false;
@@ -353,9 +364,9 @@ static b8 editor_sdf_set_vec2(s_json* object, const c8* key, s_vec2 value) {
 static b8 editor_sdf_set_vec3(s_json* object, const c8* key, s_vec3 value) {
 	s_json* array = s_json_array_empty(NULL);
 	if (!array) return false;
-	if (!s_json_add(array, s_json_num(NULL, value.x)) ||
-		!s_json_add(array, s_json_num(NULL, value.y)) ||
-		!s_json_add(array, s_json_num(NULL, value.z)) ||
+	if (!s_json_add(array, s_json_num(NULL, editor_sdf_json_round_f32(value.x))) ||
+		!s_json_add(array, s_json_num(NULL, editor_sdf_json_round_f32(value.y))) ||
+		!s_json_add(array, s_json_num(NULL, editor_sdf_json_round_f32(value.z))) ||
 		!editor_sdf_json_replace(object, key, array)) {
 		s_json_free(array);
 		return false;
@@ -369,7 +380,7 @@ static b8 editor_sdf_set_mat4(s_json* object, const c8* key, const s_mat4* value
 	if (!array) return false;
 	for (u32 row = 0u; row < 4u; ++row) {
 		for (u32 col = 0u; col < 4u; ++col) {
-			if (!s_json_add(array, s_json_num(NULL, value->m[row][col]))) {
+			if (!s_json_add(array, s_json_num(NULL, editor_sdf_json_round_f32(value->m[row][col])))) {
 				s_json_free(array);
 				return false;
 			}
@@ -677,14 +688,18 @@ static b8 editor_sdf_load_file(sdf_editor* editor, const c8* path) {
 
 static b8 editor_sdf_save_file(sdf_editor* editor, const c8* path) {
 	s_json* fresh = NULL;
+	c8* text = NULL;
 	c8 file_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!editor || !se_paths_resolve_resource_path(file_path, sizeof(file_path), path)) return false;
 	fresh = se_sdf_to_json(editor->scene);
 	if (!fresh) return false;
-	if (!se_editor_json_write_file(file_path, fresh)) {
+	text = s_json_stringify_precision(fresh, 3);
+	if (!text || !s_file_write(file_path, text, strlen(text))) {
+		free(text);
 		s_json_free(fresh);
 		return false;
 	}
+	free(text);
 	s_json_free(editor->root);
 	editor->root = fresh;
 	snprintf(editor->json_path, sizeof(editor->json_path), "%s", path);
@@ -709,28 +724,37 @@ static void editor_sdf_value_text(const se_editor_value* value, c8* out, sz out_
 			snprintf(out, out_size, "%llu", (unsigned long long)value->u64_value);
 			break;
 		case SE_EDITOR_VALUE_FLOAT:
-			snprintf(out, out_size, "%.4f", value->float_value);
+			snprintf(out, out_size, "%.3f", editor_sdf_json_round_f32(value->float_value));
 			break;
 		case SE_EDITOR_VALUE_DOUBLE:
-			snprintf(out, out_size, "%.4f", value->double_value);
+			snprintf(out, out_size, "%.3f", (f64)editor_sdf_json_round_f32((f32)value->double_value));
 			break;
 		case SE_EDITOR_VALUE_VEC2:
-			snprintf(out, out_size, "%.4f %.4f", value->vec2_value.x, value->vec2_value.y);
+			snprintf(out, out_size, "%.3f %.3f",
+				editor_sdf_json_round_f32(value->vec2_value.x),
+				editor_sdf_json_round_f32(value->vec2_value.y));
 			break;
 		case SE_EDITOR_VALUE_VEC3:
-			snprintf(out, out_size, "%.4f %.4f %.4f", value->vec3_value.x, value->vec3_value.y, value->vec3_value.z);
+			snprintf(out, out_size, "%.3f %.3f %.3f",
+				editor_sdf_json_round_f32(value->vec3_value.x),
+				editor_sdf_json_round_f32(value->vec3_value.y),
+				editor_sdf_json_round_f32(value->vec3_value.z));
 			break;
 		case SE_EDITOR_VALUE_VEC4:
-			snprintf(out, out_size, "%.4f %.4f %.4f %.4f", value->vec4_value.x, value->vec4_value.y, value->vec4_value.z, value->vec4_value.w);
+			snprintf(out, out_size, "%.3f %.3f %.3f %.3f",
+				editor_sdf_json_round_f32(value->vec4_value.x),
+				editor_sdf_json_round_f32(value->vec4_value.y),
+				editor_sdf_json_round_f32(value->vec4_value.z),
+				editor_sdf_json_round_f32(value->vec4_value.w));
 			break;
 		case SE_EDITOR_VALUE_MAT4:
 			if (edit_text) {
 				snprintf(out, out_size,
-					"%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f",
-					value->mat4_value.m[0][0], value->mat4_value.m[0][1], value->mat4_value.m[0][2], value->mat4_value.m[0][3],
-					value->mat4_value.m[1][0], value->mat4_value.m[1][1], value->mat4_value.m[1][2], value->mat4_value.m[1][3],
-					value->mat4_value.m[2][0], value->mat4_value.m[2][1], value->mat4_value.m[2][2], value->mat4_value.m[2][3],
-					value->mat4_value.m[3][0], value->mat4_value.m[3][1], value->mat4_value.m[3][2], value->mat4_value.m[3][3]);
+					"%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f",
+					editor_sdf_json_round_f32(value->mat4_value.m[0][0]), editor_sdf_json_round_f32(value->mat4_value.m[0][1]), editor_sdf_json_round_f32(value->mat4_value.m[0][2]), editor_sdf_json_round_f32(value->mat4_value.m[0][3]),
+					editor_sdf_json_round_f32(value->mat4_value.m[1][0]), editor_sdf_json_round_f32(value->mat4_value.m[1][1]), editor_sdf_json_round_f32(value->mat4_value.m[1][2]), editor_sdf_json_round_f32(value->mat4_value.m[1][3]),
+					editor_sdf_json_round_f32(value->mat4_value.m[2][0]), editor_sdf_json_round_f32(value->mat4_value.m[2][1]), editor_sdf_json_round_f32(value->mat4_value.m[2][2]), editor_sdf_json_round_f32(value->mat4_value.m[2][3]),
+					editor_sdf_json_round_f32(value->mat4_value.m[3][0]), editor_sdf_json_round_f32(value->mat4_value.m[3][1]), editor_sdf_json_round_f32(value->mat4_value.m[3][2]), editor_sdf_json_round_f32(value->mat4_value.m[3][3]));
 			} else {
 				const s_vec3 position = s_mat4_get_translation(&value->mat4_value);
 				snprintf(out, out_size, "pos %.3f %.3f %.3f", position.x, position.y, position.z);
@@ -797,22 +821,29 @@ static b8 editor_sdf_parse_value(se_editor_value_type type, const c8* text, se_e
 			*out = se_editor_value_u64((u64)strtoull(text, &end, 10));
 			return end != text;
 		case SE_EDITOR_VALUE_FLOAT:
-			*out = se_editor_value_float(strtof(text, &end));
+			*out = se_editor_value_float(editor_sdf_json_round_f32(strtof(text, &end)));
 			return end != text;
 		case SE_EDITOR_VALUE_DOUBLE:
-			*out = se_editor_value_double(strtod(text, &end));
+			*out = se_editor_value_double((f64)editor_sdf_json_round_f32((f32)strtod(text, &end)));
 			return end != text;
 		case SE_EDITOR_VALUE_VEC2:
 			if (!editor_sdf_parse_floats(text, values, 2u)) return false;
-			*out = se_editor_value_vec2(s_vec2(values[0], values[1]));
+			*out = se_editor_value_vec2(s_vec2(editor_sdf_json_round_f32(values[0]), editor_sdf_json_round_f32(values[1])));
 			return true;
 		case SE_EDITOR_VALUE_VEC3:
 			if (!editor_sdf_parse_floats(text, values, 3u)) return false;
-			*out = se_editor_value_vec3(s_vec3(values[0], values[1], values[2]));
+			*out = se_editor_value_vec3(s_vec3(
+				editor_sdf_json_round_f32(values[0]),
+				editor_sdf_json_round_f32(values[1]),
+				editor_sdf_json_round_f32(values[2])));
 			return true;
 		case SE_EDITOR_VALUE_VEC4:
 			if (!editor_sdf_parse_floats(text, values, 4u)) return false;
-			*out = se_editor_value_vec4(s_vec4(values[0], values[1], values[2], values[3]));
+			*out = se_editor_value_vec4(s_vec4(
+				editor_sdf_json_round_f32(values[0]),
+				editor_sdf_json_round_f32(values[1]),
+				editor_sdf_json_round_f32(values[2]),
+				editor_sdf_json_round_f32(values[3])));
 			return true;
 		case SE_EDITOR_VALUE_MAT4:
 			if (!editor_sdf_parse_floats(text, values, 16u)) return false;
@@ -821,7 +852,7 @@ static b8 editor_sdf_parse_value(se_editor_value_type type, const c8* text, se_e
 				u32 index = 0u;
 				for (u32 row = 0u; row < 4u; ++row) {
 					for (u32 col = 0u; col < 4u; ++col) {
-						matrix.m[row][col] = values[index++];
+						matrix.m[row][col] = editor_sdf_json_round_f32(values[index++]);
 					}
 				}
 				*out = se_editor_value_mat4(matrix);
@@ -1580,6 +1611,7 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 	se_editor_item sphere_item = {0};
 	se_editor_item noise_item = {0};
 	se_editor_item point_light_item = {0};
+	se_editor_item directional_light_item = {0};
 	se_editor_value value = se_editor_value_none();
 	s_vec3 position = s_vec3(0.0f, 0.0f, 0.0f);
 	s_vec3 original_position = s_vec3(0.0f, 0.0f, 0.0f);
@@ -1597,6 +1629,7 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 	b8 found_sphere = false;
 	b8 found_noise = false;
 	b8 found_point_light = false;
+	b8 found_directional_light = false;
 	if (!se_editor_collect_items(editor->handle, &items, &item_count) || item_count == 0u) return false;
 	for (u32 i = 0u; i < (u32)item_count; ++i) {
 		editor_sdf_item_kind item_kind = 0;
@@ -1613,6 +1646,10 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 		if (!found_point_light && item_kind == EDITOR_SDF_POINT_LIGHT) {
 			point_light_item = items[i];
 			found_point_light = true;
+		}
+		if (!found_directional_light && item_kind == EDITOR_SDF_DIRECTIONAL_LIGHT) {
+			directional_light_item = items[i];
+			found_directional_light = true;
 		}
 		if (item_kind != EDITOR_SDF_NODE) continue;
 		type_name = editor_sdf_json_string(item_object, "type", "custom");
@@ -1646,7 +1683,7 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 			found_color = true;
 		}
 	}
-	if (!found_float || !found_transform) return false;
+	if (!found_float || !found_transform || !found_directional_light) return false;
 	if (found_box) {
 		if (!se_editor_collect_properties(editor->handle, &box_item, &properties, &property_count)) return false;
 		if (!se_editor_find_property(properties, property_count, "size", &property)) return false;
@@ -1717,6 +1754,9 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 		if (!se_editor_apply_set(editor->handle, &point_light_item, "radius", &value)) return false;
 		if (editor_sdf_scene_shader(editor) != shader_before) return false;
 	}
+	value = se_editor_value_vec3(s_vec3(0.93f, 0.95f, 1.0f));
+	if (!se_editor_apply_set(editor->handle, &directional_light_item, "color", &value)) return false;
+	if (editor_sdf_scene_shader(editor) != shader_before) return false;
 	editor->selected_item = transform_item_index;
 	if (!editor_sdf_collect_selection(editor, NULL, NULL, &item, &properties, &property_count) ||
 		!se_editor_find_property(properties, property_count, "transform.position", &property) ||

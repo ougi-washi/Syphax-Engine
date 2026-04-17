@@ -53,6 +53,7 @@
 #define SE_SDF_FRAGMENT_SHADER_TEMPLATE_PATH SE_RESOURCE_INTERNAL("shaders/sdf/sdf_fragment_template.glsl")
 #define SE_SDF_JSON_FORMAT "se_sdf_json"
 #define SE_SDF_JSON_MAX_SAFE_INTEGER_U64 9007199254740991ULL
+#define SE_SDF_JSON_PRECISION_SCALE 1000.0f
 #define SE_SDF_HANDLE_FMT "%llu"
 #define SE_SDF_HANDLE_ARG(_handle) ((unsigned long long)(_handle))
 
@@ -804,6 +805,14 @@ static s_json* se_sdf_json_add_array(s_json* parent, const c8* name) {
 	return array;
 }
 
+static f32 se_sdf_json_round_f32(const f32 value) {
+	if (!isfinite((f64)value)) {
+		return value;
+	}
+	const f32 rounded = roundf(value * SE_SDF_JSON_PRECISION_SCALE) / SE_SDF_JSON_PRECISION_SCALE;
+	return fabsf(rounded) < (0.5f / SE_SDF_JSON_PRECISION_SCALE) ? 0.0f : rounded;
+}
+
 static b8 se_sdf_json_add_u32(s_json* parent, const c8* name, const u32 value) {
 	return se_sdf_json_add_child(parent, s_json_num(name, (f64)value));
 }
@@ -812,7 +821,7 @@ static b8 se_sdf_json_add_f32(s_json* parent, const c8* name, const f32 value) {
 	if (!isfinite((f64)value)) {
 		return false;
 	}
-	return se_sdf_json_add_child(parent, s_json_num(name, (f64)value));
+	return se_sdf_json_add_child(parent, s_json_num(name, (f64)se_sdf_json_round_f32(value)));
 }
 
 static b8 se_sdf_json_add_string(s_json* parent, const c8* name, const c8* value) {
@@ -913,7 +922,7 @@ static b8 se_sdf_json_number_to_f32(const s_json* node, f32* out_value) {
 	if (!isfinite(value) || value < -(f64)FLT_MAX || value > (f64)FLT_MAX) {
 		return false;
 	}
-	*out_value = (f32)value;
+	*out_value = se_sdf_json_round_f32((f32)value);
 	return true;
 }
 
