@@ -57,6 +57,14 @@ typedef struct {
 	};
 } se_editor_value;
 
+typedef enum {
+	SE_EDITOR_PROPERTY_ROLE_NONE = 0,
+	SE_EDITOR_PROPERTY_ROLE_POSITION,
+	SE_EDITOR_PROPERTY_ROLE_ROTATION,
+	SE_EDITOR_PROPERTY_ROLE_SCALE,
+	SE_EDITOR_PROPERTY_ROLE_COLOR
+} se_editor_property_role;
+
 typedef struct {
 	se_editor_category category;
 	s_handle handle;
@@ -68,8 +76,32 @@ typedef struct {
 } se_editor_item;
 
 typedef struct {
-	c8 name[SE_MAX_NAME_LENGTH];
+	const c8* name;
+	const c8* label;
 	se_editor_value value;
+	se_editor_property_role role;
+	f32 step;
+	f32 large_step;
+	b8 editable : 1;
+} se_editor_property_desc;
+
+#define SE_EDITOR_PROPERTY_DESC_DEFAULTS ((se_editor_property_desc){ \
+	.name = NULL, \
+	.label = NULL, \
+	.value = {0}, \
+	.role = SE_EDITOR_PROPERTY_ROLE_NONE, \
+	.step = 0.0f, \
+	.large_step = 0.0f, \
+	.editable = false \
+})
+
+typedef struct {
+	c8 name[SE_MAX_NAME_LENGTH];
+	c8 label[SE_MAX_NAME_LENGTH];
+	se_editor_value value;
+	se_editor_property_role role;
+	f32 step;
+	f32 large_step;
 	b8 editable : 1;
 } se_editor_property;
 
@@ -175,6 +207,7 @@ extern b8 se_editor_value_as_vec4(const se_editor_value* value, s_vec4* out_valu
 extern b8 se_editor_value_as_mat3(const se_editor_value* value, s_mat3* out_value);
 extern b8 se_editor_value_as_mat4(const se_editor_value* value, s_mat4* out_value);
 extern const c8* se_editor_value_as_text(const se_editor_value* value);
+extern b8 se_editor_value_adjust_component(se_editor_value* value, u32 component, f32 delta);
 
 extern se_editor_command se_editor_command_make(se_editor_command_type type, const se_editor_item* item, const c8* name, const se_editor_value* value, const se_editor_value* aux_value);
 extern se_editor_command se_editor_command_make_set(const se_editor_item* item, const c8* name, const se_editor_value* value);
@@ -200,7 +233,10 @@ extern b8 se_editor_collect_counts(se_editor* editor, se_editor_counts* out_coun
 extern b8 se_editor_collect_items(se_editor* editor, const se_editor_item** out_items, sz* out_count);
 extern b8 se_editor_collect_properties(se_editor* editor, const se_editor_item* item, const se_editor_property** out_properties, sz* out_count);
 extern b8 se_editor_add_item(se_editor* editor, se_editor_category category, s_handle handle, s_handle owner_handle, void* pointer, void* owner_pointer, u32 index, const c8* label);
+extern b8 se_editor_add_property(se_editor* editor, const se_editor_property_desc* desc);
 extern b8 se_editor_add_property_value(se_editor* editor, const c8* name, const se_editor_value* value, b8 editable);
+extern u32 se_editor_property_component_count(const se_editor_property* property);
+extern const c8* se_editor_property_component_name(const se_editor_property* property, u32 component);
 extern b8 se_editor_validate_item(se_editor* editor, const se_editor_item* item);
 extern b8 se_editor_find_item(se_editor* editor, se_editor_category category, s_handle handle, se_editor_item* out_item);
 extern b8 se_editor_find_item_by_label(se_editor* editor, se_editor_category category, const c8* label, se_editor_item* out_item);

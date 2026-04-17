@@ -6,6 +6,7 @@
 #include "syphax/s_files.h"
 #include "syphax/s_json.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -457,14 +458,19 @@ static void se_editor_push_item(
 	s_array_add(items, item);
 }
 
-static void se_editor_add_property(se_editor_properties* properties, const c8* name, const se_editor_value* value, b8 editable) {
+static void se_editor_add_property_internal(se_editor_properties* properties, const se_editor_property_desc* desc) {
 	se_editor_property property = {0};
-	if (!properties || !name || !value) {
+	if (!properties || !desc || !desc->name || desc->name[0] == '\0') {
 		return;
 	}
-	se_editor_copy_text(property.name, sizeof(property.name), name);
-	property.value = *value;
-	property.editable = editable;
+	se_editor_copy_text(property.name, sizeof(property.name), desc->name);
+	se_editor_copy_text(property.label, sizeof(property.label),
+		(desc->label && desc->label[0] != '\0') ? desc->label : desc->name);
+	property.value = desc->value;
+	property.role = desc->role;
+	property.step = desc->step > 0.0f ? desc->step : 0.0f;
+	property.large_step = desc->large_step > 0.0f ? desc->large_step : 0.0f;
+	property.editable = desc->editable;
 	s_array_add(properties, property);
 }
 
@@ -567,14 +573,70 @@ b8 se_editor_add_item(
 	return true;
 }
 
+b8 se_editor_add_property(se_editor* editor, const se_editor_property_desc* desc) {
+	if (!editor || !desc || !desc->name || desc->name[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	se_editor_add_property_internal(&editor->properties, desc);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 b8 se_editor_add_property_value(se_editor* editor, const c8* name, const se_editor_value* value, b8 editable) {
+	se_editor_property_desc desc = SE_EDITOR_PROPERTY_DESC_DEFAULTS;
 	if (!editor || !name || name[0] == '\0' || !value) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
-	se_editor_add_property(&editor->properties, name, value, editable);
-	se_set_last_error(SE_RESULT_OK);
-	return true;
+	desc.name = name;
+	desc.label = name;
+	desc.value = *value;
+	desc.editable = editable;
+	return se_editor_add_property(editor, &desc);
+}
+
+u32 se_editor_property_component_count(const se_editor_property* property) {
+	if (!property) {
+		return 0u;
+	}
+	switch (property->value.type) {
+		case SE_EDITOR_VALUE_BOOL:
+		case SE_EDITOR_VALUE_INT:
+		case SE_EDITOR_VALUE_UINT:
+		case SE_EDITOR_VALUE_U64:
+		case SE_EDITOR_VALUE_FLOAT:
+		case SE_EDITOR_VALUE_DOUBLE:
+		case SE_EDITOR_VALUE_HANDLE:
+		case SE_EDITOR_VALUE_POINTER:
+		case SE_EDITOR_VALUE_TEXT:
+			return 1u;
+		case SE_EDITOR_VALUE_VEC2:
+			return 2u;
+		case SE_EDITOR_VALUE_VEC3:
+			return 3u;
+		case SE_EDITOR_VALUE_VEC4:
+			return 4u;
+		default:
+			return 0u;
+	}
+}
+
+const c8* se_editor_property_component_name(const se_editor_property* property, u32 component) {
+	static const c8* scalar_name = "value";
+	static const c8* vector_names[] = { "x", "y", "z", "w" };
+	static const c8* color_names[] = { "r", "g", "b", "a" };
+	const u32 count = se_editor_property_component_count(property);
+	if (!property || count == 0u || component >= count) {
+		return NULL;
+	}
+	if (count == 1u) {
+		return scalar_name;
+	}
+	if (property->role == SE_EDITOR_PROPERTY_ROLE_COLOR) {
+		return color_names[component];
+	}
+	return vector_names[component];
 }
 
 se_editor_value se_editor_value_none(void) {
@@ -889,6 +951,97 @@ const c8* se_editor_value_as_text(const se_editor_value* value) {
 		return NULL;
 	}
 	return value->text_value;
+}
+
+static u32 se_editor_delta_units(const f32 delta) {
+	const f32 abs_delta = fabsf(delta);
+	u32 amount = (u32)(abs_delta + 0.5f);
+	if (amount == 0u && abs_delta > 0.0f) {
+		amount = 1u;
+	}
+	return amount;
+}
+
+b8 se_editor_value_adjust_component(se_editor_value* value, u32 component, f32 delta) {
+	if (!value) {
+		return false;
+	}
+	switch (value->type) {
+		case SE_EDITOR_VALUE_INT: {
+			const i32 amount = (i32)se_editor_delta_units(delta);
+			if (component != 0u) {
+				return false;
+			}
+			if (delta < 0.0f) {
+				value->int_value -= amount;
+			} else if (delta > 0.0f) {
+				value->int_value += amount;
+			}
+			return true;
+		}
+		case SE_EDITOR_VALUE_UINT: {
+			const u32 amount = se_editor_delta_units(delta);
+			if (component != 0u) {
+				return false;
+			}
+			if (delta < 0.0f) {
+				value->uint_value = amount >= value->uint_value ? 0u : value->uint_value - amount;
+			} else if (delta > 0.0f) {
+				value->uint_value += amount;
+			}
+			return true;
+		}
+		case SE_EDITOR_VALUE_U64: {
+			const u64 amount = (u64)se_editor_delta_units(delta);
+			if (component != 0u) {
+				return false;
+			}
+			if (delta < 0.0f) {
+				value->u64_value = amount >= value->u64_value ? 0u : value->u64_value - amount;
+			} else if (delta > 0.0f) {
+				value->u64_value += amount;
+			}
+			return true;
+		}
+		case SE_EDITOR_VALUE_FLOAT:
+			if (component != 0u) {
+				return false;
+			}
+			value->float_value += delta;
+			return true;
+		case SE_EDITOR_VALUE_DOUBLE:
+			if (component != 0u) {
+				return false;
+			}
+			value->double_value += delta;
+			return true;
+		case SE_EDITOR_VALUE_VEC2:
+			if (component >= 2u) {
+				return false;
+			}
+			if (component == 0u) value->vec2_value.x += delta;
+			else value->vec2_value.y += delta;
+			return true;
+		case SE_EDITOR_VALUE_VEC3:
+			if (component >= 3u) {
+				return false;
+			}
+			if (component == 0u) value->vec3_value.x += delta;
+			else if (component == 1u) value->vec3_value.y += delta;
+			else value->vec3_value.z += delta;
+			return true;
+		case SE_EDITOR_VALUE_VEC4:
+			if (component >= 4u) {
+				return false;
+			}
+			if (component == 0u) value->vec4_value.x += delta;
+			else if (component == 1u) value->vec4_value.y += delta;
+			else if (component == 2u) value->vec4_value.z += delta;
+			else value->vec4_value.w += delta;
+			return true;
+		default:
+			return false;
+	}
 }
 
 b8 se_editor_json_write_file(const c8* path, s_json* root) {

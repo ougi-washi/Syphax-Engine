@@ -1,0 +1,25 @@
+Task: show only the active shape data in `editor_sdf`
+
+Scope
+- Make node property collection show `size` only for box nodes.
+- Make node property collection show `radius` only for sphere nodes.
+- Keep other node properties unchanged.
+- Add autotest coverage so box and sphere nodes do not expose each other's shape fields.
+
+Implementation checklist
+- Inspect `editor_sdf_collect_properties(...)` shape-property logic.
+- Gate `size` and `radius` by the current node `type` instead of raw JSON field presence.
+- Extend `editor_sdf_autotest(...)` to verify:
+  - a box node exposes `size` and not `radius`
+  - a sphere node exposes `radius` and not `size`
+- Build and run the headless autotest.
+
+Validation checklist
+- `./build.sh editor_sdf`
+- `timeout 25s env SE_TERMINAL_RENDER=1 SE_TERMINAL_HIDE_WINDOW=1 ./bin/editor_sdf --autotest`
+
+Completion
+- [x] Property visibility updated
+- [x] Autotest updated
+- [x] Build passed
+- [x] Runtime validation passed

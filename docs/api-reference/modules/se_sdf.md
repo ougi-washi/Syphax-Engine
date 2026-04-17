@@ -135,6 +135,18 @@ extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
 
 No inline description found in header comments.
 
+### `se_sdf_get_children`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_get_children(se_sdf_handle sdf, const se_sdf_handle** out_children, sz* out_count);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_get_directional_light_color`
 
 <div class="api-signature">
@@ -153,6 +165,18 @@ No inline description found in header comments.
 
 ```c
 extern s_vec3 se_sdf_get_directional_light_direction(se_sdf_directional_light_handle directional_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_directional_lights`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_get_directional_lights(se_sdf_handle sdf, const se_sdf_directional_light_handle** out_directional_lights, sz* out_count);
 ```
 
 </div>
@@ -183,12 +207,48 @@ extern s_vec3 se_sdf_get_noise_offset(se_sdf_noise_handle noise);
 
 No inline description found in header comments.
 
+### `se_sdf_get_noise_scale`
+
+<div class="api-signature">
+
+```c
+extern s_vec3 se_sdf_get_noise_scale(se_sdf_noise_handle noise);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_noise_seed`
+
+<div class="api-signature">
+
+```c
+extern u32 se_sdf_get_noise_seed(se_sdf_noise_handle noise);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_get_noise_texture`
 
 <div class="api-signature">
 
 ```c
 extern se_texture_handle se_sdf_get_noise_texture(se_sdf_noise_handle noise);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_noises`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_get_noises(se_sdf_handle sdf, const se_sdf_noise_handle** out_noises, sz* out_count);
 ```
 
 </div>
@@ -225,6 +285,18 @@ No inline description found in header comments.
 
 ```c
 extern f32 se_sdf_get_point_light_radius(se_sdf_point_light_handle point_light);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_get_point_lights`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_get_point_lights(se_sdf_handle sdf, const se_sdf_point_light_handle** out_point_lights, sz* out_count);
 ```
 
 </div>
@@ -387,6 +459,30 @@ extern void se_sdf_noise_set_offset(se_sdf_noise_handle noise, const s_vec3* off
 
 No inline description found in header comments.
 
+### `se_sdf_noise_set_scale`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_noise_set_scale(se_sdf_noise_handle noise, const s_vec3* scale);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_noise_set_seed`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_noise_set_seed(se_sdf_noise_handle noise, u32 seed);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_sdf_noise_set_texture`
 
 <div class="api-signature">
@@ -477,6 +573,18 @@ No inline description found in header comments.
 
 ```c
 extern void se_sdf_render_to_window(se_sdf_handle sdf, se_camera_handle camera, se_window_handle window, const f32 ratio);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_operation_amount`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_operation_amount(se_sdf_handle sdf, f32 amount);
 ```
 
 </div>
@@ -621,6 +729,18 @@ No inline description found in header comments.
 
 ```c
 extern void se_sdf_set_shadow_softness(se_sdf_handle sdf, f32 softness);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_sdf_set_transform`
+
+<div class="api-signature">
+
+```c
+extern void se_sdf_set_transform(se_sdf_handle sdf, const s_mat4* transform);
 ```
 
 </div>

@@ -1,0 +1,15 @@
+- [x] Re-read the current `editor_sdf` shortcut bindings and help text.
+- [x] Re-read the default `se_editor` shortcut bindings for `Esc`, `Ctrl+Q`, and mode transitions.
+- [x] Confirm whether `Esc` is bound in `editor_sdf` normal mode in addition to `se_editor` defaults.
+- [x] Confirm how `quit` is handled while editing, moving, and in normal mode.
+- [x] Decide the intended non-destructive `Esc` behavior for normal mode in `editor_sdf`.
+- [x] Remove or change the normal-mode `Esc` binding in `editor_sdf` if it is causing the unwanted app close.
+- [x] Keep edit-mode `Esc` cancel behavior intact through the default editor shortcut path.
+- [x] Keep move-mode `Esc` cancel behavior intact.
+- [x] Keep `Ctrl+Q` as the explicit app quit shortcut unless the codebase shows a different intended exit path.
+- [x] Update the on-screen help text and startup controls text to match the new behavior.
+- [x] Extend or adjust `editor_sdf` autotest coverage if needed for the changed shortcut behavior.
+- [x] Build `editor_sdf` with `./build.sh editor_sdf`.
+- [x] Run `timeout 25s env SE_TERMINAL_RENDER=1 SE_TERMINAL_HIDE_WINDOW=1 ./bin/editor_sdf --autotest`.
+- [x] Review diffs for `examples/advanced/`, `TODO/`, and any touched docs.
+- [x] Mark this task checklist complete once the shortcut behavior and validation are done.

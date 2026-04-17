@@ -27,6 +27,18 @@ extern b8 se_editor_add_item(se_editor* editor, se_editor_category category, s_h
 
 No inline description found in header comments.
 
+### `se_editor_add_property`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_add_property(se_editor* editor, const se_editor_property_desc* desc);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_add_property_value`
 
 <div class="api-signature">
@@ -471,6 +483,30 @@ extern b8 se_editor_poll_shortcut(se_editor* editor, se_editor_shortcut_event* o
 
 No inline description found in header comments.
 
+### `se_editor_property_component_count`
+
+<div class="api-signature">
+
+```c
+extern u32 se_editor_property_component_count(const se_editor_property* property);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_property_component_name`
+
+<div class="api-signature">
+
+```c
+extern const c8* se_editor_property_component_name(const se_editor_property* property, u32 component);
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_queue_command`
 
 <div class="api-signature">
@@ -609,6 +645,18 @@ No inline description found in header comments.
 
 ```c
 extern b8 se_editor_validate_item(se_editor* editor, const se_editor_item* item);
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_value_adjust_component`
+
+<div class="api-signature">
+
+```c
+extern b8 se_editor_value_adjust_component(se_editor_value* value, u32 component, f32 delta);
 ```
 
 </div>
@@ -1001,6 +1049,18 @@ typedef enum { SE_EDITOR_MODE_NORMAL = 0, SE_EDITOR_MODE_INSERT, SE_EDITOR_MODE_
 
 No inline description found in header comments.
 
+### `se_editor_property_role`
+
+<div class="api-signature">
+
+```c
+typedef enum { SE_EDITOR_PROPERTY_ROLE_NONE = 0, SE_EDITOR_PROPERTY_ROLE_POSITION, SE_EDITOR_PROPERTY_ROLE_ROTATION, SE_EDITOR_PROPERTY_ROLE_SCALE, SE_EDITOR_PROPERTY_ROLE_COLOR } se_editor_property_role;
+```
+
+</div>
+
+No inline description found in header comments.
+
 ### `se_editor_shortcut_mod`
 
 <div class="api-signature">
@@ -1140,7 +1200,19 @@ No inline description found in header comments.
 <div class="api-signature">
 
 ```c
-typedef struct { c8 name[SE_MAX_NAME_LENGTH]; se_editor_value value; b8 editable : 1; } se_editor_property;
+typedef struct { c8 name[SE_MAX_NAME_LENGTH]; c8 label[SE_MAX_NAME_LENGTH]; se_editor_value value; se_editor_property_role role; f32 step; f32 large_step; b8 editable : 1; } se_editor_property;
+```
+
+</div>
+
+No inline description found in header comments.
+
+### `se_editor_property_desc`
+
+<div class="api-signature">
+
+```c
+typedef struct { const c8* name; const c8* label; se_editor_value value; se_editor_property_role role; f32 step; f32 large_step; b8 editable : 1; } se_editor_property_desc;
 ```
 
 </div>

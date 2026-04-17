@@ -2449,6 +2449,98 @@ void se_sdf_add_child(se_sdf_handle parent, se_sdf_handle child) {
 	se_sdf_invalidate_shader_chain(parent);
 }
 
+b8 se_sdf_get_children(se_sdf_handle sdf, const se_sdf_handle** out_children, sz* out_count) {
+	se_context* ctx = se_current_context();
+	const se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!out_children || !out_count) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_children = NULL;
+	*out_count = 0u;
+	if (!ctx || sdf == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!sdf_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	*out_children = (const se_sdf_handle*)sdf_ptr->children.b.data;
+	*out_count = s_array_get_size(&sdf_ptr->children);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_sdf_get_noises(se_sdf_handle sdf, const se_sdf_noise_handle** out_noises, sz* out_count) {
+	se_context* ctx = se_current_context();
+	const se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!out_noises || !out_count) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_noises = NULL;
+	*out_count = 0u;
+	if (!ctx || sdf == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!sdf_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	*out_noises = (const se_sdf_noise_handle*)sdf_ptr->noises.b.data;
+	*out_count = s_array_get_size(&sdf_ptr->noises);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_sdf_get_point_lights(se_sdf_handle sdf, const se_sdf_point_light_handle** out_point_lights, sz* out_count) {
+	se_context* ctx = se_current_context();
+	const se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!out_point_lights || !out_count) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_point_lights = NULL;
+	*out_count = 0u;
+	if (!ctx || sdf == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!sdf_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	*out_point_lights = (const se_sdf_point_light_handle*)sdf_ptr->point_lights.b.data;
+	*out_count = s_array_get_size(&sdf_ptr->point_lights);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
+b8 se_sdf_get_directional_lights(se_sdf_handle sdf, const se_sdf_directional_light_handle** out_directional_lights, sz* out_count) {
+	se_context* ctx = se_current_context();
+	const se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!out_directional_lights || !out_count) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_directional_lights = NULL;
+	*out_count = 0u;
+	if (!ctx || sdf == S_HANDLE_NULL) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!sdf_ptr) {
+		se_set_last_error(SE_RESULT_NOT_FOUND);
+		return false;
+	}
+	*out_directional_lights = (const se_sdf_directional_light_handle*)sdf_ptr->directional_lights.b.data;
+	*out_count = s_array_get_size(&sdf_ptr->directional_lights);
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 se_sdf_noise_handle se_sdf_add_noise_internal(se_sdf_handle sdf, const se_noise_2d* noise) {
 	se_context* ctx = se_current_context();
 	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
@@ -2515,6 +2607,44 @@ void se_sdf_noise_set_offset(se_sdf_noise_handle noise, const s_vec3* offset) {
 		return;
 	}
 	noise_ptr->descriptor.offset = s_vec2(offset->x, offset->y);
+	se_noise_update(ctx, noise_ptr->texture, &noise_ptr->descriptor);
+}
+
+s_vec3 se_sdf_get_noise_scale(se_sdf_noise_handle noise) {
+	se_context* ctx = se_current_context();
+	se_sdf_noise* noise_ptr = se_sdf_noise_from_handle(ctx, noise);
+	if (!noise_ptr) {
+		return s_vec3(0.0f, 0.0f, 0.0f);
+	}
+	return s_vec3(noise_ptr->descriptor.scale.x, noise_ptr->descriptor.scale.y, 0.0f);
+}
+
+void se_sdf_noise_set_scale(se_sdf_noise_handle noise, const s_vec3* scale) {
+	se_context* ctx = se_current_context();
+	se_sdf_noise* noise_ptr = se_sdf_noise_from_handle(ctx, noise);
+	if (!noise_ptr || !scale) {
+		return;
+	}
+	noise_ptr->descriptor.scale = s_vec2(scale->x, scale->y);
+	se_noise_update(ctx, noise_ptr->texture, &noise_ptr->descriptor);
+}
+
+u32 se_sdf_get_noise_seed(se_sdf_noise_handle noise) {
+	se_context* ctx = se_current_context();
+	se_sdf_noise* noise_ptr = se_sdf_noise_from_handle(ctx, noise);
+	if (!noise_ptr) {
+		return 0u;
+	}
+	return noise_ptr->descriptor.seed;
+}
+
+void se_sdf_noise_set_seed(se_sdf_noise_handle noise, u32 seed) {
+	se_context* ctx = se_current_context();
+	se_sdf_noise* noise_ptr = se_sdf_noise_from_handle(ctx, noise);
+	if (!noise_ptr) {
+		return;
+	}
+	noise_ptr->descriptor.seed = seed;
 	se_noise_update(ctx, noise_ptr->texture, &noise_ptr->descriptor);
 }
 
@@ -3103,6 +3233,24 @@ void se_sdf_render_to_window(se_sdf_handle sdf, se_camera_handle camera, se_wind
 
 void se_sdf_bake(se_sdf_handle sdf) {
 	(void)sdf;
+}
+
+void se_sdf_set_transform(se_sdf_handle sdf, const s_mat4* transform) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr || !transform) {
+		return;
+	}
+	sdf_ptr->transform = *transform;
+}
+
+void se_sdf_set_operation_amount(se_sdf_handle sdf, f32 amount) {
+	se_context* ctx = se_current_context();
+	se_sdf* sdf_ptr = se_sdf_from_handle(ctx, sdf);
+	if (!sdf_ptr) {
+		return;
+	}
+	sdf_ptr->operation_amount = amount;
 }
 
 void se_sdf_set_position(se_sdf_handle sdf, const s_vec3* position) {
