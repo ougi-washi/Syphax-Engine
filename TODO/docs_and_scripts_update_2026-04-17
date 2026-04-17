@@ -1,5 +1,0 @@
-[x] Review current docs and docs scripts relevant to recent engine/editor changes.
-[x] Run docs validation and sync scripts to identify concrete failures or stale generated output.
-[x] Update docs content and docs scripts as needed to match current public APIs and behavior.
-[x] Re-run docs validation/build checks until clean.
-[x] Commit only the intended docs/script changes and push `dev`.
