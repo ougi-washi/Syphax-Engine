@@ -1575,4 +1575,11 @@ b8 se_window_backend_get_asset_mtime(const c8* path, time_t* out_mtime) {
 	return false;
 }
 
+b8 se_window_backend_resolve_writable_path(const c8* path, c8* out_path, sz out_path_size) {
+	(void)path;
+	(void)out_path;
+	(void)out_path_size;
+	return false;
+}
+
 #endif // SE_WINDOW_BACKEND_TERMINAL

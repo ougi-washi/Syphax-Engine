@@ -4,48 +4,8 @@
 #include "se_graphics.h"
 #include "se_scene.h"
 #include "se_window.h"
-#include "syphax/s_files.h"
-#include "syphax/s_json.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-static b8 scene_json_save(const se_scene_3d_handle scene, const c8* path) {
-	s_json* root = se_scene_3d_to_json(scene);
-	if (!root) {
-		return false;
-	}
-	c8* text = s_json_stringify(root);
-	s_json_free(root);
-	if (!text) {
-		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
-		return false;
-	}
-	const b8 ok = s_file_write(path, text, strlen(text));
-	free(text);
-	if (!ok) {
-		se_set_last_error(SE_RESULT_IO);
-	}
-	return ok;
-}
-
-static b8 scene_json_load(const se_scene_3d_handle scene, const c8* path) {
-	c8* text = NULL;
-	if (!s_file_read(path, &text, NULL)) {
-		se_set_last_error(SE_RESULT_IO);
-		return false;
-	}
-	s_json* root = s_json_parse(text);
-	free(text);
-	if (!root) {
-		se_set_last_error(SE_RESULT_IO);
-		return false;
-	}
-	const b8 ok = se_scene_3d_from_json(scene, root);
-	s_json_free(root);
-	return ok;
-}
 
 int main(void) {
 	const c8* json_path = "scene3d_snapshot.json";
@@ -101,7 +61,7 @@ int main(void) {
 		return 1;
 	}
 
-	if (!scene_json_save(source_scene, json_path)) {
+	if (!se_scene_3d_to_json_file(source_scene, json_path)) {
 		printf("scene3d_json :: save failed (%s)\n", se_result_str(se_get_last_error()));
 		se_scene_3d_destroy_full(source_scene, true, true);
 		se_context_destroy(context);
@@ -109,7 +69,7 @@ int main(void) {
 	}
 
 	se_scene_3d_handle loaded_scene = se_scene_3d_create_for_window(window, 16);
-	if (!scene_json_load(loaded_scene, json_path)) {
+	if (!se_scene_3d_from_json_file(loaded_scene, json_path)) {
 		printf("scene3d_json :: load failed (%s)\n", se_result_str(se_get_last_error()));
 		se_scene_3d_destroy_full(loaded_scene, true, true);
 		se_scene_3d_destroy_full(source_scene, true, true);

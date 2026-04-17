@@ -15,5 +15,6 @@ extern b8 se_window_backend_has_current_context(void);
 extern b8 se_window_backend_read_asset_text(const c8* path, c8** out_data, sz* out_size);
 extern b8 se_window_backend_read_asset_binary(const c8* path, u8** out_data, sz* out_size);
 extern b8 se_window_backend_get_asset_mtime(const c8* path, time_t* out_mtime);
+extern b8 se_window_backend_resolve_writable_path(const c8* path, c8* out_path, sz out_path_size);
 
 #endif // SE_WINDOW_BACKEND_INTERNAL_H

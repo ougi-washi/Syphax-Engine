@@ -49,7 +49,19 @@ extern b8 se_paths_resolve_resource_path(char* out_path, sz out_path_size, const
 
 </div>
 
-No inline description found in header comments.
+Resolves a bundled resource path against the current resource root.
+
+### `se_paths_resolve_writable_path`
+
+<div class="api-signature">
+
+```c
+extern b8 se_paths_resolve_writable_path(char* out_path, sz out_path_size, const char* path);
+```
+
+</div>
+
+Resolves a writable file path for the active platform and creates parent directories when needed. Host builds resolve resource-style paths under the current resource root and otherwise preserve normal file-system paths. Android maps writes into app data storage.
 
 ### `se_paths_set_resource_root`
 

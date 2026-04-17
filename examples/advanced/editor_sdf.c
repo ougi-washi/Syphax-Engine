@@ -674,8 +674,7 @@ static b8 editor_sdf_collect_properties(se_editor* handle, const se_editor_item*
 
 static b8 editor_sdf_load_file(sdf_editor* editor, const c8* path) {
 	s_json* root = NULL;
-	c8 file_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!editor || !se_paths_resolve_resource_path(file_path, sizeof(file_path), path) || !se_editor_json_read_file(file_path, &root)) return false;
+	if (!editor || !se_editor_json_read_file(path, &root)) return false;
 	if (!se_sdf_from_json(editor->scene, root)) {
 		s_json_free(root);
 		return false;
@@ -686,20 +685,40 @@ static b8 editor_sdf_load_file(sdf_editor* editor, const c8* path) {
 	return true;
 }
 
+static b8 editor_sdf_write_json_file(const c8* path, s_json* root) {
+	c8* text = NULL;
+	c8 write_path[SE_MAX_PATH_LENGTH] = {0};
+	if (!path || path[0] == '\0' || !root) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_paths_resolve_writable_path(write_path, sizeof(write_path), path)) {
+		return false;
+	}
+	text = s_json_stringify_precision(root, 3);
+	if (!text) {
+		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
+		return false;
+	}
+	const b8 ok = s_file_write(write_path, text, strlen(text));
+	free(text);
+	if (!ok) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 static b8 editor_sdf_save_file(sdf_editor* editor, const c8* path) {
 	s_json* fresh = NULL;
-	c8* text = NULL;
-	c8 file_path[SE_MAX_PATH_LENGTH] = {0};
-	if (!editor || !se_paths_resolve_resource_path(file_path, sizeof(file_path), path)) return false;
+	if (!editor) return false;
 	fresh = se_sdf_to_json(editor->scene);
 	if (!fresh) return false;
-	text = s_json_stringify_precision(fresh, 3);
-	if (!text || !s_file_write(file_path, text, strlen(text))) {
-		free(text);
+	if (!editor_sdf_write_json_file(path, fresh)) {
 		s_json_free(fresh);
 		return false;
 	}
-	free(text);
 	s_json_free(editor->root);
 	editor->root = fresh;
 	snprintf(editor->json_path, sizeof(editor->json_path), "%s", path);
@@ -1700,7 +1719,7 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 	se_window_end_frame(editor->window);
 	shader_before = editor_sdf_scene_shader(editor);
 	if (shader_before == S_HANDLE_NULL) return false;
-	snprintf(editor->json_path, sizeof(editor->json_path), "%s", "/tmp/editor_sdf_autotest_shortcut.json");
+	snprintf(editor->json_path, sizeof(editor->json_path), "%s", "editor_sdf_autotest_shortcut.json");
 	se_window_clear_input_state(editor->window);
 	se_window_inject_key_state(editor->window, SE_KEY_LEFT_CONTROL, true);
 	se_window_inject_key_state(editor->window, SE_KEY_S, true);
@@ -1790,8 +1809,8 @@ static b8 editor_sdf_autotest(sdf_editor* editor) {
 		!se_editor_find_property(properties, property_count, "transform.position", &property) ||
 		!se_editor_value_as_vec3(&property->value, &position)) return false;
 	if (fabsf(position.x - original_position.x) > 0.001f || fabsf(position.y - original_position.y) > 0.001f || fabsf(position.z - original_position.z) > 0.001f) return false;
-	if (!editor_sdf_save_file(editor, "/tmp/editor_sdf_autotest.json")) return false;
-	if (!editor_sdf_load_file(editor, "/tmp/editor_sdf_autotest.json")) return false;
+	if (!editor_sdf_save_file(editor, "editor_sdf_autotest.json")) return false;
+	if (!editor_sdf_load_file(editor, "editor_sdf_autotest.json")) return false;
 	printf("editor_sdf :: autotest items=%zu ok\n", item_count);
 	return true;
 }

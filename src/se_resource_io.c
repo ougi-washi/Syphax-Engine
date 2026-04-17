@@ -5,6 +5,8 @@
 #include "window/se_window_backend_internal.h"
 #include "syphax/s_files.h"
 
+#include <string.h>
+
 static b8 se_resource_resolve_path(const c8* path, c8* out_path, const sz out_path_size) {
 	if (!path || !out_path || out_path_size == 0) {
 		return false;
@@ -12,21 +14,40 @@ static b8 se_resource_resolve_path(const c8* path, c8* out_path, const sz out_pa
 	return se_paths_resolve_resource_path(out_path, out_path_size, path);
 }
 
+static b8 se_resource_resolve_backend_writable_path(const c8* path, c8* out_path, const sz out_path_size) {
+	if (!path || !out_path || out_path_size == 0) {
+		return false;
+	}
+	return se_window_backend_resolve_writable_path(path, out_path, out_path_size);
+}
+
 b8 se_resource_read_text_file(const c8* path, c8** out_data, sz* out_size) {
+	c8 writable_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!path || !out_data) {
 		return false;
 	}
 	if (s_file_read(path, out_data, out_size)) {
 		return true;
 	}
+	if (se_resource_resolve_backend_writable_path(path, writable_path, sizeof(writable_path)) &&
+		strcmp(writable_path, path) != 0 &&
+		s_file_read(writable_path, out_data, out_size)) {
+		return true;
+	}
 	return se_window_backend_read_asset_text(path, out_data, out_size);
 }
 
 b8 se_resource_read_binary_file(const c8* path, u8** out_data, sz* out_size) {
+	c8 writable_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!path || !out_data) {
 		return false;
 	}
 	if (s_file_read_binary(path, out_data, out_size)) {
+		return true;
+	}
+	if (se_resource_resolve_backend_writable_path(path, writable_path, sizeof(writable_path)) &&
+		strcmp(writable_path, path) != 0 &&
+		s_file_read_binary(writable_path, out_data, out_size)) {
 		return true;
 	}
 	return se_window_backend_read_asset_binary(path, out_data, out_size);
@@ -49,10 +70,16 @@ b8 se_resource_read_binary_path(const c8* path, u8** out_data, sz* out_size) {
 }
 
 b8 se_resource_file_mtime(const c8* path, time_t* out_mtime) {
+	c8 writable_path[SE_MAX_PATH_LENGTH] = {0};
 	if (!path || !out_mtime) {
 		return false;
 	}
 	if (s_file_mtime(path, out_mtime)) {
+		return true;
+	}
+	if (se_resource_resolve_backend_writable_path(path, writable_path, sizeof(writable_path)) &&
+		strcmp(writable_path, path) != 0 &&
+		s_file_mtime(writable_path, out_mtime)) {
 		return true;
 	}
 	return se_window_backend_get_asset_mtime(path, out_mtime);

@@ -2047,14 +2047,16 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 	if (asset == NULL || path == NULL || path[0] == '\0') return false;
 	se_gltf_write_params cfg;
 	se_gltf_set_default_write_params(&cfg, params);
+	char write_path[SE_MAX_PATH_LENGTH] = {0};
 	char base_name[SE_MAX_PATH_LENGTH] = {0};
-	const char *filename = s_path_filename(path);
+	if (!se_paths_resolve_writable_path(write_path, sizeof(write_path), path)) return false;
+	const char *filename = s_path_filename(write_path);
 	if (filename == NULL) return false;
 	strncpy(base_name, filename, sizeof(base_name) - 1);
 	char *dot = strrchr(base_name, '.');
 	if (dot) *dot = '\0';
 	char output_dir[SE_MAX_PATH_LENGTH] = {0};
-	if (s_path_parent(path, output_dir, SE_MAX_PATH_LENGTH) == false) output_dir[0] = '\0';
+	if (s_path_parent(write_path, output_dir, SE_MAX_PATH_LENGTH) == false) output_dir[0] = '\0';
 	s_json *root = s_json_object_empty(NULL);
 	if (root == NULL) return false;
 	if (!se_gltf_write_assets_json(asset, root)) { s_json_free(root); return false; }
@@ -2131,7 +2133,7 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 			free(image_uris);
 			return false;
 		}
-		ok = se_gltf_write_glb(asset, path, glb_root, offsets, bin_data, bin_size);
+		ok = se_gltf_write_glb(asset, write_path, glb_root, offsets, bin_data, bin_size);
 		s_json_free(glb_root);
 		free(bin_data);
 		free(offsets);
@@ -2143,7 +2145,7 @@ b8 se_gltf_write(const se_gltf_asset *asset, const char *path, const se_gltf_wri
 			free(image_uris);
 			return false;
 		}
-		ok = s_file_write(path, json_text, strlen(json_text));
+		ok = s_file_write(write_path, json_text, strlen(json_text));
 		free(json_text);
 		if (ok) {
 			if (!cfg.embed_buffers && buffer_uris) {

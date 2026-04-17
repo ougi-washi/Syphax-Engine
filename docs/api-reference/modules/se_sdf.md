@@ -135,6 +135,18 @@ extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
 
 No inline description found in header comments.
 
+### `se_sdf_from_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_sdf_from_json_file(se_sdf_handle sdf, const c8* path);
+```
+
+</div>
+
+Loads an SDF scene from either a normal file path or a packaged asset path.
+
 ### `se_sdf_get_children`
 
 <div class="api-signature">

@@ -58,9 +58,13 @@ static void se_scene_json_serialize_path(const c8* input_path, c8* out_path, con
 
 static b8 se_scene_json_write_file(const c8* path, s_json* root) {
 	c8* text = NULL;
+	c8 write_path[SE_MAX_PATH_LENGTH] = {0};
 	b8 ok = false;
 	if (!path || path[0] == '\0' || !root) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_paths_resolve_writable_path(write_path, sizeof(write_path), path)) {
 		return false;
 	}
 	text = s_json_stringify(root);
@@ -68,7 +72,7 @@ static b8 se_scene_json_write_file(const c8* path, s_json* root) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return false;
 	}
-	ok = s_file_write(path, text, strlen(text));
+	ok = s_file_write(write_path, text, strlen(text));
 	free(text);
 	if (!ok) {
 		se_set_last_error(SE_RESULT_IO);
@@ -1635,7 +1639,7 @@ b8 se_object_2d_set_metadata_by_id(const se_object_2d_handle object, const se_in
 		return false;
 	}
 	*entry = *metadata;
-	se_object_3d_set_instances_dirty(object, true);
+	se_object_2d_set_instances_dirty(object, true);
 	se_set_last_error(SE_RESULT_OK);
 	return true;
 }
@@ -2289,6 +2293,22 @@ s_json* se_scene_2d_to_json(const se_scene_2d_handle scene) {
 	return root;
 }
 
+b8 se_scene_2d_to_json_file(const se_scene_2d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	b8 ok = false;
+	if (!path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	root = se_scene_2d_to_json(scene);
+	if (!root) {
+		return false;
+	}
+	ok = se_scene_json_write_file(path, root);
+	s_json_free(root);
+	return ok;
+}
+
 b8 se_scene_2d_from_json(const se_scene_2d_handle scene, const s_json* root) {
 	se_context* ctx = se_current_context();
 	if (!ctx || scene == S_HANDLE_NULL || !root) {
@@ -2416,6 +2436,21 @@ fail:
 	se_scene_2d_cleanup_loaded_objects(ctx, &loaded_objects, &existing_shaders, &loaded_shaders);
 	s_array_clear(&existing_shaders);
 	return false;
+}
+
+b8 se_scene_2d_from_json_file(const se_scene_2d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	b8 ok = false;
+	if (!path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_scene_json_read_file(path, &root)) {
+		return false;
+	}
+	ok = se_scene_2d_from_json(scene, root);
+	s_json_free(root);
+	return ok;
 }
 
 s_json* se_scene_3d_to_json(const se_scene_3d_handle scene) {
@@ -2614,6 +2649,22 @@ s_json* se_scene_3d_to_json(const se_scene_3d_handle scene) {
 	s_array_clear(&model_handles);
 	se_set_last_error(SE_RESULT_OK);
 	return root;
+}
+
+b8 se_scene_3d_to_json_file(const se_scene_3d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	b8 ok = false;
+	if (!path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	root = se_scene_3d_to_json(scene);
+	if (!root) {
+		return false;
+	}
+	ok = se_scene_json_write_file(path, root);
+	s_json_free(root);
+	return ok;
 }
 
 b8 se_scene_3d_from_json(const se_scene_3d_handle scene, const s_json* root) {
@@ -2829,6 +2880,21 @@ fail:
 	se_scene_3d_cleanup_loaded_data(ctx, &loaded_objects, &loaded_models, &existing_shaders, &loaded_shaders);
 	s_array_clear(&existing_shaders);
 	return false;
+}
+
+b8 se_scene_3d_from_json_file(const se_scene_3d_handle scene, const c8* path) {
+	s_json* root = NULL;
+	b8 ok = false;
+	if (!path || path[0] == '\0') {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_scene_json_read_file(path, &root)) {
+		return false;
+	}
+	ok = se_scene_3d_from_json(scene, root);
+	s_json_free(root);
+	return ok;
 }
 
 se_scene_3d_handle se_scene_3d_create(const s_vec2 *size, const u16 object_count) {

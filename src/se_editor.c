@@ -1,6 +1,7 @@
 // Syphax-Engine - Ougi Washi
 
 #include "se_editor.h"
+#include "se_resource_io.h"
 
 #include "syphax/s_array.h"
 #include "syphax/s_files.h"
@@ -1046,9 +1047,13 @@ b8 se_editor_value_adjust_component(se_editor_value* value, u32 component, f32 d
 
 b8 se_editor_json_write_file(const c8* path, s_json* root) {
 	c8* text = NULL;
+	c8 write_path[SE_MAX_PATH_LENGTH] = {0};
 	b8 ok = false;
 	if (!path || path[0] == '\0' || !root) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	if (!se_paths_resolve_writable_path(write_path, sizeof(write_path), path)) {
 		return false;
 	}
 	text = s_json_stringify(root);
@@ -1056,7 +1061,7 @@ b8 se_editor_json_write_file(const c8* path, s_json* root) {
 		se_set_last_error(SE_RESULT_OUT_OF_MEMORY);
 		return false;
 	}
-	ok = s_file_write(path, text, strlen(text));
+	ok = s_file_write(write_path, text, strlen(text));
 	free(text);
 	if (!ok) {
 		se_set_last_error(SE_RESULT_IO);
@@ -1069,14 +1074,21 @@ b8 se_editor_json_write_file(const c8* path, s_json* root) {
 b8 se_editor_json_read_file(const c8* path, s_json** out_root) {
 	c8* text = NULL;
 	s_json* root = NULL;
+	c8 resolved_path[SE_MAX_PATH_LENGTH] = {0};
+	const c8* read_path = path;
 	if (!path || path[0] == '\0' || !out_root) {
 		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
 		return false;
 	}
 	*out_root = NULL;
-	if (!s_file_read(path, &text, NULL)) {
-		se_set_last_error(SE_RESULT_IO);
-		return false;
+	if (!se_resource_read_text_file(read_path, &text, NULL)) {
+		if (se_paths_resolve_resource_path(resolved_path, sizeof(resolved_path), path)) {
+			read_path = resolved_path;
+		}
+		if (!se_resource_read_text_file(read_path, &text, NULL)) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
 	}
 	root = s_json_parse(text);
 	free(text);

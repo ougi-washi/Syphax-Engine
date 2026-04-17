@@ -32,6 +32,12 @@ extern void se_set_last_error(se_result result);
 
 extern void se_paths_set_resource_root(const char* path);
 extern const char* se_paths_get_resource_root(void);
+// Resolves a bundled resource path against the current resource root.
 extern b8 se_paths_resolve_resource_path(char* out_path, sz out_path_size, const char* path);
+// Resolves a writable file path for the active platform and creates parent
+// directories when needed. Host builds resolve resource-style paths under the
+// current resource root and otherwise preserve normal file-system paths.
+// Android maps writes into app data storage.
+extern b8 se_paths_resolve_writable_path(char* out_path, sz out_path_size, const char* path);
 
 #endif // SE_DEFINES_H

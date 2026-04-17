@@ -139,6 +139,8 @@ extern void se_sdf_set_shadow_samples(se_sdf_handle sdf, u16 samples);
 
 extern s_json* se_sdf_to_json(se_sdf_handle sdf);
 extern b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root);
+// Loads an SDF scene from either a normal file path or a packaged asset path.
+extern b8 se_sdf_from_json_file(se_sdf_handle sdf, const c8* path);
 
 extern void se_sdf_render_to_framebuffer(se_sdf_handle sdf, se_camera_handle camera, const s_vec2* resolution);
 extern void se_sdf_render_framebuffer_to_window(se_sdf_handle sdf, se_window_handle window);

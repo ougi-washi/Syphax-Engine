@@ -12,7 +12,7 @@ Generated API pages by public header.
 | [include/se_camera.h](se_camera.md) | 27 | 0 | 4 |
 | [include/se_curve.h](se_curve.md) | 24 | 1 | 8 |
 | [include/se_debug.h](se_debug.md) | 26 | 3 | 5 |
-| [include/se_defines.h](se_defines.md) | 6 | 1 | 0 |
+| [include/se_defines.h](se_defines.md) | 7 | 1 | 0 |
 | [include/se_editor.h](se_editor.md) | 83 | 6 | 14 |
 | [include/se_ext.h](se_ext.md) | 3 | 1 | 0 |
 | [include/se_framebuffer.h](se_framebuffer.md) | 9 | 0 | 4 |
@@ -27,8 +27,8 @@ Generated API pages by public header.
 | [include/se_render_buffer.h](se_render_buffer.md) | 9 | 0 | 4 |
 | [include/se_render_frame.h](se_render_frame.md) | 4 | 0 | 1 |
 | [include/se_render_thread.h](se_render_thread.md) | 5 | 0 | 3 |
-| [include/se_scene.h](se_scene.md) | 101 | 0 | 34 |
-| [include/se_sdf.h](se_sdf.md) | 62 | 2 | 6 |
+| [include/se_scene.h](se_scene.md) | 105 | 0 | 34 |
+| [include/se_sdf.h](se_sdf.md) | 63 | 2 | 6 |
 | [include/se_shader.h](se_shader.md) | 32 | 1 | 6 |
 | [include/se_simulation.h](se_simulation.md) | 31 | 0 | 12 |
 | [include/se_text.h](se_text.md) | 8 | 0 | 3 |

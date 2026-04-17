@@ -855,6 +855,18 @@ extern b8 se_scene_2d_from_json(const se_scene_2d_handle scene, const s_json* ro
 
 No inline description found in header comments.
 
+### `se_scene_2d_from_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_2d_from_json_file(const se_scene_2d_handle scene, const c8* path);
+```
+
+</div>
+
+Loads a scene JSON snapshot from either normal files or packaged assets.
+
 ### `se_scene_2d_pick_object`
 
 <div class="api-signature">
@@ -938,6 +950,18 @@ extern s_json* se_scene_2d_to_json(const se_scene_2d_handle scene);
 </div>
 
 No inline description found in header comments.
+
+### `se_scene_2d_to_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_2d_to_json_file(const se_scene_2d_handle scene, const c8* path);
+```
+
+</div>
+
+Saves a scene JSON snapshot using the engine's platform-aware writable path rules.
 
 ### `se_scene_2d_unbind`
 
@@ -1058,6 +1082,18 @@ extern b8 se_scene_3d_from_json(const se_scene_3d_handle scene, const s_json* ro
 </div>
 
 No inline description found in header comments.
+
+### `se_scene_3d_from_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_3d_from_json_file(const se_scene_3d_handle scene, const c8* path);
+```
+
+</div>
+
+Loads a scene JSON snapshot from either normal files or packaged assets.
 
 ### `se_scene_3d_get_camera`
 
@@ -1214,6 +1250,18 @@ extern s_json* se_scene_3d_to_json(const se_scene_3d_handle scene);
 </div>
 
 No inline description found in header comments.
+
+### `se_scene_3d_to_json_file`
+
+<div class="api-signature">
+
+```c
+extern b8 se_scene_3d_to_json_file(const se_scene_3d_handle scene, const c8* path);
+```
+
+</div>
+
+Saves a scene JSON snapshot using the engine's platform-aware writable path rules.
 
 ### `se_scene_3d_unregister_custom_render`
 

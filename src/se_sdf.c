@@ -1755,6 +1755,40 @@ static b8 se_sdf_read_resource_mtime(time_t* out_mtime, const c8* resource_path)
 	return true;
 }
 
+static b8 se_sdf_json_read_file(const c8* path, s_json** out_root) {
+	c8* text = NULL;
+	s_json* root = NULL;
+	c8 resolved_path[SE_MAX_PATH_LENGTH] = {0};
+	const c8* read_path = path;
+	if (!path || path[0] == '\0' || !out_root) {
+		se_set_last_error(SE_RESULT_INVALID_ARGUMENT);
+		return false;
+	}
+	*out_root = NULL;
+	if (!se_resource_read_text_file(read_path, &text, NULL)) {
+		if (se_paths_resolve_resource_path(resolved_path, sizeof(resolved_path), path)) {
+			read_path = resolved_path;
+		}
+		if (!se_resource_read_text_file(read_path, &text, NULL)) {
+			se_set_last_error(SE_RESULT_IO);
+			return false;
+		}
+	}
+	if (!text) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	root = s_json_parse(text);
+	free(text);
+	if (!root) {
+		se_set_last_error(SE_RESULT_IO);
+		return false;
+	}
+	*out_root = root;
+	se_set_last_error(SE_RESULT_OK);
+	return true;
+}
+
 static void se_sdf_refresh_shader_templates(se_context* ctx) {
 	time_t vertex_mtime = 0;
 	time_t common_mtime = 0;
@@ -3099,6 +3133,16 @@ b8 se_sdf_from_json(se_sdf_handle sdf, const s_json* root) {
 
 	se_set_last_error(SE_RESULT_OK);
 	return true;
+}
+
+b8 se_sdf_from_json_file(se_sdf_handle sdf, const c8* path) {
+	s_json* root = NULL;
+	if (!se_sdf_json_read_file(path, &root)) {
+		return false;
+	}
+	const b8 ok = se_sdf_from_json(sdf, root);
+	s_json_free(root);
+	return ok;
 }
 
 static void se_sdf_upload_common_uniforms(

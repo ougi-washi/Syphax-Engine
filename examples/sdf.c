@@ -7,21 +7,6 @@
 #include "se_noise.h"
 #include "se_sdf.h"
 #include "se_window.h"
-#include "syphax/s_files.h"
-#include "syphax/s_json.h"
-
-static s_json* sdf_scene_json_load(void) {
-	c8 path[SE_MAX_PATH_LENGTH] = {0};
-	c8* text = NULL;
-	s_json* root = NULL;
-	if (!se_paths_resolve_resource_path(path, sizeof(path), SE_RESOURCE_EXAMPLE("sdf/scene.json")) ||
-		!s_file_read(path, &text, NULL)) {
-		return NULL;
-	}
-	root = s_json_parse(text);
-	free(text);
-	return root;
-}
 
 i32 main(void) {
 	se_context* context = se_context_create();
@@ -39,13 +24,10 @@ i32 main(void) {
 	se_camera_set_target(camera, &s_vec3(0.0f, 0.0f, 0.0f));
 
 	se_sdf_handle scene = se_sdf_create();
-	s_json* scene_json = sdf_scene_json_load();
-	if (scene == SE_SDF_NULL || !scene_json || !se_sdf_from_json(scene, scene_json)) {
-		s_json_free(scene_json);
+	if (scene == SE_SDF_NULL || !se_sdf_from_json_file(scene, SE_RESOURCE_EXAMPLE("sdf/scene.json"))) {
 		se_context_destroy(context);
 		return 1;
 	}
-	s_json_free(scene_json);
 
 	se_sdf_add_point_light(scene,
 		.position = {2.5f, 3.0f, -2.0f},

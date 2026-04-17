@@ -24,8 +24,7 @@ int main(void) {
 		s_array_get_size(&asset->nodes),
 		s_array_get_size(&asset->scenes));
 
-	char glb_path[SE_MAX_PATH_LENGTH] = {0};
-	snprintf(glb_path, sizeof(glb_path), "/tmp/syphax_triangle_roundtrip.glb");
+	const char* glb_path = "syphax_triangle_roundtrip.glb";
 	se_gltf_write_params write_params = {0};
 	write_params.write_glb = true;
 	if (!se_gltf_write(asset, glb_path, &write_params)) {

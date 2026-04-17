@@ -24,6 +24,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "syphax/s_files.h"
+
 #define SE_MAX_INPUT_EVENTS 1024
 #define SE_MAX_RESIZE_HANDLE 1024
 
@@ -1737,6 +1739,45 @@ static AAsset* se_android_open_asset(const c8* path, const i32 mode) {
 	return AAssetManager_open(g_android.app->activity->assetManager, path, mode);
 }
 
+static b8 se_android_path_has_prefix(const c8* path, const c8* prefix) {
+	const sz prefix_len = prefix ? strlen(prefix) : 0u;
+	return path && prefix && prefix_len > 0u && strncmp(path, prefix, prefix_len) == 0;
+}
+
+static const c8* se_android_skip_separators(const c8* path) {
+	while (path && s_path_is_sep(path[0])) {
+		path++;
+	}
+	return path;
+}
+
+static b8 se_android_path_is_absolute(const c8* path) {
+	if (!path || path[0] == '\0') {
+		return false;
+	}
+	if (s_path_is_sep(path[0])) {
+		return true;
+	}
+	return path[0] != '\0' && path[1] == ':' && s_path_is_sep(path[2]);
+}
+
+static const c8* se_android_resource_relative_path(const c8* path) {
+	const c8* relative = path;
+	if (!path || path[0] == '\0') {
+		return NULL;
+	}
+	if (se_android_path_has_prefix(relative, RESOURCES_DIR)) {
+		relative += strlen(RESOURCES_DIR);
+	}
+	relative = se_android_skip_separators(relative);
+	if (se_android_path_has_prefix(relative, SE_RESOURCE_INTERNAL("")) ||
+		se_android_path_has_prefix(relative, SE_RESOURCE_PUBLIC("")) ||
+		se_android_path_has_prefix(relative, SE_RESOURCE_EXAMPLE(""))) {
+		return relative;
+	}
+	return NULL;
+}
+
 b8 se_window_backend_read_asset_text(const c8* path, c8** out_data, sz* out_size) {
 	if (!out_data) {
 		return false;
@@ -1812,6 +1853,44 @@ b8 se_window_backend_get_asset_mtime(const c8* path, time_t* out_mtime) {
 		*out_mtime = 0;
 	}
 	return false;
+}
+
+b8 se_window_backend_resolve_writable_path(const c8* path, c8* out_path, sz out_path_size) {
+	const c8* base_path = NULL;
+	const c8* relative_resource = NULL;
+	const c8* write_path = path;
+	c8 resolved_relative[SE_MAX_PATH_LENGTH] = {0};
+	if (!path || path[0] == '\0' || !out_path || out_path_size == 0u || !g_android.app || !g_android.app->activity) {
+		return false;
+	}
+
+	base_path = g_android.app->activity->internalDataPath;
+	if (!base_path || base_path[0] == '\0') {
+		base_path = g_android.app->activity->externalDataPath;
+	}
+	if (!base_path || base_path[0] == '\0') {
+		return false;
+	}
+
+	relative_resource = se_android_resource_relative_path(path);
+	if (relative_resource != NULL) {
+		if (!s_path_join(resolved_relative, sizeof(resolved_relative), RESOURCES_DIR, relative_resource)) {
+			return false;
+		}
+		write_path = resolved_relative;
+	} else if (se_android_path_is_absolute(path)) {
+		write_path = s_path_filename(path);
+		if (!write_path || write_path[0] == '\0') {
+			return false;
+		}
+	} else {
+		write_path = se_android_skip_separators(path);
+		if (!write_path || write_path[0] == '\0') {
+			return false;
+		}
+	}
+
+	return s_path_join(out_path, out_path_size, base_path, write_path);
 }
 
 #endif // SE_WINDOW_BACKEND_ANDROID
