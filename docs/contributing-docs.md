@@ -18,6 +18,7 @@ prerequisites:
 ```bash
 ./scripts/docs/generate_api_reference.sh
 ./scripts/docs/check_nav_consistency.sh
+./scripts/docs/check_example_coverage.sh
 ./scripts/docs/check_links.sh
 ./scripts/docs/check_content_quality.sh
 ./scripts/docs/check_path_coverage.sh
@@ -55,6 +56,14 @@ prerequisites:
    - Example page learning path -> Path step
    - Generated API page -> Path (via API generator mapping)
 1. Run the required command set above before opening the PR.
+
+## Add or rename an example target
+
+1. Create or update the reference page under `docs/examples/default/` or `docs/examples/advanced/`.
+1. Add the page to both `docs/examples/index.md` and the `Examples` nav section in `mkdocs.yml`.
+1. Add a placeholder image under `docs/assets/img/examples/<track>/<target>.svg`.
+1. Update `scripts/docs/capture_examples.sh` if the target should participate in local screenshot capture.
+1. Run `./scripts/docs/check_example_coverage.sh` before opening the PR.
 
 ## Release cadence
 

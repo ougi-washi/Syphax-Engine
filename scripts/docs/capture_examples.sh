@@ -13,7 +13,9 @@ declare -a DEFAULT_TARGETS=(
 	input_actions
 	scene2d_click
 	scene2d_instancing
+	scene2d_json
 	scene3d_orbit
+	scene3d_json
 	physics2d_playground
 	physics3d_playground
 	ui_basics
@@ -24,17 +26,32 @@ declare -a DEFAULT_TARGETS=(
 
 declare -a ADVANCED_TARGETS=(
 	array_handles
+	civilization
 	context_lifecycle
 	debug_tools
+	editor_sdf
 	gltf_roundtrip
 	multi_window
 	navigation_grid
+	noise_texture
 	rts_integration
+	sdf_path_steps
 	simulation_intro
 	simulation_advanced
 	ui_showcase
 	vfx_emitters
 )
+
+cleanup_target_artifacts() {
+	case "${1:-}" in
+		scene2d_json)
+			rm -f "$ROOT_DIR/scene2d_snapshot.json" "$ROOT_DIR/scene2d_object_snapshot.json"
+			;;
+		scene3d_json)
+			rm -f "$ROOT_DIR/scene3d_snapshot.json" "$ROOT_DIR/scene3d_object_snapshot.json"
+			;;
+	esac
+}
 
 declare -A SKIP_REASON_BY_TARGET=(
 	[array_handles]="non-visual stdout reference example"
@@ -140,6 +157,8 @@ for target in "${CAPTURE_TARGETS[@]}"; do
 	fi
 done
 
+cd "$ROOT_DIR"
+
 if [[ "$SHOULD_BUILD" -eq 1 ]]; then
 	for target in "${CAPTURE_TARGETS[@]}"; do
 		echo "Building $target"
@@ -165,6 +184,7 @@ for target in "${CAPTURE_TARGETS[@]}"; do
 	binary="$ROOT_DIR/bin/$target"
 	output="$ROOT_DIR/docs/assets/img/examples/$track/$target.png"
 	capture_frame="$FRAME"
+	cleanup_target_artifacts "$target"
 
 	if [[ ! -x "$binary" ]]; then
 		echo "Missing binary: $binary (build first or use --build)" >&2
@@ -219,6 +239,7 @@ for target in "${CAPTURE_TARGETS[@]}"; do
 		tail -n 40 /tmp/se_docs_capture_"$target".log >&2 || true
 		FAILURES+=("$target")
 	fi
+	cleanup_target_artifacts "$target"
 done
 
 echo "Capture summary: ${#SUCCESSES[@]} succeeded, ${#SKIPPED[@]} skipped, ${#FAILURES[@]} failed."

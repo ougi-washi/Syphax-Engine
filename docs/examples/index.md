@@ -15,7 +15,9 @@ Use this section to find build/run commands, controls, and small edits for docum
 - [input_actions](default/input_actions.md)
 - [scene2d_click](default/scene2d_click.md)
 - [scene2d_instancing](default/scene2d_instancing.md)
+- [scene2d_json](default/scene2d_json.md)
 - [scene3d_orbit](default/scene3d_orbit.md)
+- [scene3d_json](default/scene3d_json.md)
 - [physics2d_playground](default/physics2d_playground.md)
 - [physics3d_playground](default/physics3d_playground.md)
 - [ui_basics](default/ui_basics.md)
@@ -26,12 +28,16 @@ Use this section to find build/run commands, controls, and small edits for docum
 ## Advanced examples
 
 - [array_handles](advanced/array_handles.md)
+- [civilization](advanced/civilization.md)
 - [context_lifecycle](advanced/context_lifecycle.md)
 - [debug_tools](advanced/debug_tools.md)
+- [editor_sdf](advanced/editor_sdf.md)
 - [gltf_roundtrip](advanced/gltf_roundtrip.md)
 - [multi_window](advanced/multi_window.md)
 - [navigation_grid](advanced/navigation_grid.md)
+- [noise_texture](advanced/noise_texture.md)
 - [rts_integration](advanced/rts_integration.md)
+- [sdf_path_steps](advanced/sdf_path_steps.md)
 - [simulation_intro](advanced/simulation_intro.md)
 - [simulation_advanced](advanced/simulation_advanced.md)
 - [ui_showcase](advanced/ui_showcase.md)
@@ -48,7 +54,8 @@ Rules:
 - `<track>` is `default` or `advanced`.
 - `<target>` matches the executable name exactly.
 - Use lowercase and underscores.
-- Keep the existing `.svg` placeholder file as a fallback for each example page.
+- Add a `.png` when a live capture exists.
+- Keep the `.svg` placeholder file for every example page.
 
 ## Generate captures locally
 

@@ -16,6 +16,7 @@ cd "$ROOT_DIR"
 rm -rf site
 ./scripts/docs/generate_api_reference.sh
 ./scripts/docs/check_nav_consistency.sh
+./scripts/docs/check_example_coverage.sh
 ./scripts/docs/check_links.sh
 ./scripts/docs/check_content_quality.sh
 ./scripts/docs/check_path_coverage.sh

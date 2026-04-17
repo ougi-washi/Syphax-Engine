@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-label="sdf_path_steps preview image">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#25131a" />
+      <stop offset="100%" stop-color="#8a3650" />
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#g)" />
+  <rect x="120" y="140" width="1040" height="440" rx="28" fill="rgba(0,0,0,0.15)" stroke="rgba(255,214,224,0.40)" stroke-width="2" />
+  <text x="170" y="250" font-size="44" fill="#fff2f6" font-family="sans-serif">sdf_path_steps</text>
+  <text x="170" y="320" font-size="30" fill="#ffd6e0" font-family="sans-serif">Advanced docs helper preview</text>
+  <text x="170" y="380" font-size="24" fill="#ffd6e0" font-family="sans-serif">Render the staged SDF scenes used by the path walkthrough captures.</text>
+</svg>

@@ -130,7 +130,9 @@ nav:
           - input_actions: examples/default/input_actions.md
           - scene2d_click: examples/default/scene2d_click.md
           - scene2d_instancing: examples/default/scene2d_instancing.md
+          - scene2d_json: examples/default/scene2d_json.md
           - scene3d_orbit: examples/default/scene3d_orbit.md
+          - scene3d_json: examples/default/scene3d_json.md
           - physics2d_playground: examples/default/physics2d_playground.md
           - physics3d_playground: examples/default/physics3d_playground.md
           - ui_basics: examples/default/ui_basics.md
@@ -139,12 +141,16 @@ nav:
           - sdf: examples/default/sdf.md
       - Advanced:
           - array_handles: examples/advanced/array_handles.md
+          - civilization: examples/advanced/civilization.md
           - context_lifecycle: examples/advanced/context_lifecycle.md
           - debug_tools: examples/advanced/debug_tools.md
+          - editor_sdf: examples/advanced/editor_sdf.md
           - gltf_roundtrip: examples/advanced/gltf_roundtrip.md
           - multi_window: examples/advanced/multi_window.md
           - navigation_grid: examples/advanced/navigation_grid.md
+          - noise_texture: examples/advanced/noise_texture.md
           - rts_integration: examples/advanced/rts_integration.md
+          - sdf_path_steps: examples/advanced/sdf_path_steps.md
           - simulation_intro: examples/advanced/simulation_intro.md
           - simulation_advanced: examples/advanced/simulation_advanced.md
           - ui_showcase: examples/advanced/ui_showcase.md
